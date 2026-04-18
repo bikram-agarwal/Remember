@@ -1,0 +1,18 @@
+.gradle/
+.kotlin/
+build/
+localdocs/
+devRelease.lnk
+release.lnk 
+
+# Machine-local Android SDK path (never commit)
+local.properties
+
+# CI-generated signing files if reproduced locally (do not commit)
+keystore.properties
+filepipe-release.keystore
+
+# Fastlane generated output (store metadata lives in fastlane/metadata and is committed)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output

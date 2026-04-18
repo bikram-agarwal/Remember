@@ -1,0 +1,32 @@
+package dev.bikram.remember.ui.theme
+
+import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
+import dev.bikram.remember.data.ThemeState
+
+data class ProgressiveBlurStyle(
+    val topHeightPx: Float,
+    val bottomHeightPx: Float,
+    val blurRadius: Float,
+    val overlayAlpha: Float,
+    val overlayAlphaBottom: Float,
+)
+
+val LocalProgressiveBlurStyle = staticCompositionLocalOf<ProgressiveBlurStyle?> { null }
+
+val LocalUseGradient = compositionLocalOf { false }
+
+val LocalHeroOnCards = compositionLocalOf { false }
+
+val LocalBlurBars = compositionLocalOf { true }
+
+val LocalFixedCardColors = compositionLocalOf { false }
+
+val LocalTagColors = compositionLocalOf<Map<String, String>> { emptyMap() }
+
+/**
+ * The full, already-collected [ThemeState]. Provided once from RememberTheme so downstream
+ * screens (Settings, etc.) can read it synchronously on first composition — no flash from
+ * default values → DataStore-backed values.
+ */
+val LocalThemeState = compositionLocalOf { ThemeState() }

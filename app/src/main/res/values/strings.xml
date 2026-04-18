@@ -1,0 +1,324 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- App -->
+    <string name="app_name">Remember</string>
+    <string name="app_tagline">Notes, lists, reminders - done right</string>
+
+    <!-- Common labels -->
+    <string name="common_cancel">Cancel</string>
+    <string name="common_save">Save</string>
+    <string name="common_done">Done</string>
+    <string name="common_ok">OK</string>
+    <string name="common_add">Add</string>
+    <string name="common_remove">Remove</string>
+    <string name="common_clear">Clear</string>
+    <string name="common_back">Back</string>
+    <string name="common_none">None</string>
+    <string name="common_title">Title</string>
+    <string name="edit_note_title_existing">Untitled</string>
+    <string name="edit_note_body_placeholder">Type your note…</string>
+    <string name="common_empty">Empty</string>
+
+    <!-- Toasts and transient feedback -->
+    <string name="toast_export_failed">Export failed</string>
+    <string name="toast_exported_notes">Exported %1$d notes</string>
+    <string name="toast_imported_notes">Imported %1$d notes</string>
+    <string name="toast_action_failed">Could not run action: %1$s</string>
+    <string name="toast_copied">Copied</string>
+    <string name="toast_about_link_copied">Link copied</string>
+    <string name="clipboard_default_label">Copied</string>
+
+    <!-- Launcher shortcuts and widget -->
+    <string name="shortcut_new_note_short">Note</string>
+    <string name="shortcut_new_note_long">New note</string>
+    <string name="shortcut_new_list_short">List</string>
+    <string name="shortcut_new_list_long">New list</string>
+    <string name="widget_description">Pinned notes and next reminder</string>
+    <string name="widget_header_title">Remember</string>
+    <string name="widget_new_note_cd">New note</string>
+    <string name="widget_empty">No notes yet</string>
+
+    <!-- Lock and PIN -->
+    <string name="lock_title_unlock">Unlock Remember</string>
+    <string name="lock_use_pin">Use PIN</string>
+    <string name="lock_enter_pin">Enter your PIN</string>
+    <string name="lock_wrong_pin">Wrong PIN</string>
+    <string name="pin_setup_title">Set up PIN</string>
+    <string name="pin_setup_subtitle">Choose a 4–6 digit PIN to unlock Remember.</string>
+    <string name="pin_label">PIN</string>
+    <string name="pin_confirm_label">Confirm</string>
+
+    <!-- Main navigation and home -->
+    <string name="main_tab_notes">Notes</string>
+    <string name="main_tab_history">History</string>
+    <string name="main_tab_settings">Settings</string>
+    <string name="main_fab_cd_close">Close</string>
+    <string name="main_fab_cd_create">Create</string>
+    <string name="main_menu_clear_trash">Clear all</string>
+    <string name="main_menu_share_app">Share app</string>
+    <string name="main_share_chooser_title">Share Remember</string>
+    <string name="main_share_text">Remember - notes, lists, reminders - done right. https://play.google.com/store/apps/details?id=dev.bikram.remember</string>
+    <string name="main_empty_trash_title">Empty trash?</string>
+    <string name="main_empty_trash_subtitle">Permanently delete all trashed notes. This cannot be undone.</string>
+    <string name="main_speed_dial_checklist">Checklist</string>
+    <string name="main_speed_dial_note">Note</string>
+    <string name="home_title">Notes</string>
+    <string name="home_view_options_cd">View options</string>
+    <string name="home_filter_cd">Filter</string>
+    <string name="home_no_notes_title">No notes yet</string>
+    <string name="home_no_notes_subtitle">Create a note or a checklist to get started.</string>
+    <string name="home_create_note">Create note</string>
+    <string name="home_create_list">Create list</string>
+
+    <!-- Filter and view options -->
+    <string name="filter_title">Filter</string>
+    <string name="view_options_title">View options</string>
+    <string name="view_options_subtitle">Change how your notes are sorted and grouped</string>
+    <string name="view_options_reset">Reset</string>
+
+    <!-- Note cards -->
+    <string name="notecard_pinned_cd">Pinned</string>
+    <string name="notecard_reminder_cd">Has reminder</string>
+    <string name="notecard_picture_cd">Has picture</string>
+    <string name="notecard_attachment_cd">Has attachment</string>
+
+    <!-- Note editor toolbar -->
+    <string name="edit_pin_cd">Pin</string>
+    <string name="edit_trash_cd">Trash</string>
+    <string name="edit_remove_picture_cd">Remove picture</string>
+
+    <!-- History (trash) -->
+    <string name="history_restore_cd">Restore</string>
+    <string name="history_delete_forever_cd">Delete forever</string>
+
+    <!-- Chips and tags on cards -->
+    <string name="chip_remove_cd">Remove</string>
+    <string name="remove_tag_cd">Remove %1$s</string>
+
+    <!-- Editor options row -->
+    <string name="options_icon">Icon</string>
+    <string name="options_tags">Tags</string>
+    <string name="options_reminder">Reminder</string>
+    <string name="options_actions">Actions</string>
+    <string name="options_importance">Importance</string>
+    <string name="options_picture">Picture</string>
+    <string name="options_picture_none">No picture</string>
+    <string name="options_picture_attached">Attached</string>
+    <string name="options_attachments">Attachments</string>
+    <string name="options_expand_more">More options</string>
+    <string name="options_expand_less">Fewer options</string>
+
+    <!-- Importance -->
+    <string name="importance_low">Low</string>
+    <string name="importance_default">Default</string>
+    <string name="importance_high">High</string>
+
+    <!-- Reminders -->
+    <string name="reminder_none">None</string>
+    <string name="reminder_set_title">Set reminder</string>
+    <string name="reminder_every_label">Every</string>
+    <string name="reminder_on_day">On day %1$d</string>
+    <string name="reminder_never">Never</string>
+    <string name="reminder_occurrences">occurrences</string>
+    <string name="reminder_clear_cd">Clear</string>
+    <string name="reminder_notification_fallback">Tap to open</string>
+
+    <!-- Tags editor -->
+    <string name="tags_title">Tags</string>
+    <string name="tags_new_label">New tag</string>
+    <string name="tags_hex_label">Hex</string>
+    <string name="tags_hex_placeholder">Enter hex</string>
+    <string name="tag_editor_suggested_heading">Suggested tags</string>
+    <string name="tag_editor_field_label">Tag</string>
+    <string name="tag_editor_field_placeholder">Name this tag</string>
+    <string name="tag_editor_preview_placeholder">Preview</string>
+    <string name="tag_editor_hex_label">HEX</string>
+    <string name="tag_editor_cancel">Cancel</string>
+    <string name="tag_editor_save">Save</string>
+    <string name="tag_editor_duplicate">Already added</string>
+
+    <!-- Note actions (sheet and editor) -->
+    <string name="actions_sheet_title">Actions</string>
+    <string name="actions_sheet_subtitle">Up to 3 quick actions attached to the notification</string>
+    <string name="actions_empty_hint">No actions yet. Add up to 3.</string>
+    <string name="actions_add_sheet_title">Add action</string>
+    <string name="actions_pick_contacts">Pick from contacts</string>
+    <string name="actions_pick_app">Pick app</string>
+    <string name="actions_pick_app_shortcut">Pick app for shortcut</string>
+    <string name="actions_change_app">Change app</string>
+    <string name="actions_pick_shortcut">Pick shortcut</string>
+    <string name="actions_change_shortcut">Change shortcut</string>
+    <string name="actions_open_app_title">Open %1$s</string>
+    <string name="actions_contact_title_format">%1$s %2$s</string>
+    <string name="action_contact_verb_call">Call</string>
+    <string name="action_contact_verb_message">Message</string>
+    <string name="action_contact_verb_email">Email</string>
+    <string name="action_type_call_number">Call number</string>
+    <string name="action_type_send_message">Send message</string>
+    <string name="action_type_send_email">Send email</string>
+    <string name="action_type_get_directions">Get directions</string>
+    <string name="action_type_open_link">Open link</string>
+    <string name="action_type_open_app">Open app</string>
+    <string name="action_type_open_shortcut">Open shortcut</string>
+    <string name="action_type_copy_to_clipboard">Copy to clipboard</string>
+    <string name="action_type_share_content">Share content</string>
+    <string name="action_type_mark_as_done">Mark as done</string>
+    <string name="action_field_phone_number">Phone number</string>
+    <string name="action_field_email_address">Email address</string>
+    <string name="action_field_address">Address or place</string>
+    <string name="action_field_url">URL</string>
+    <string name="action_field_package">Package</string>
+    <string name="action_field_shortcut">Shortcut</string>
+    <string name="action_field_text_copy">Text to copy</string>
+    <string name="action_field_text_share">Text to share</string>
+    <string name="action_field_mark_done_blank" translatable="false" />
+
+    <!-- Attachments and pickers -->
+    <string name="attachments_title">Attachments</string>
+    <string name="attachments_subtitle">Attach any file — PDFs, docs, audio, video</string>
+    <string name="attachments_add">Add attachment</string>
+    <string name="icon_picker_title">Pick an icon</string>
+    <string name="icon_picker_search_hint">Search icons</string>
+    <string name="icon_picker_results_heading">Matches</string>
+    <string name="icon_picker_no_results">No icons match that search.</string>
+    <string name="icon_picker_search_cd">Search icons</string>
+    <string name="icon_picker_choose_emoji">Emoji</string>
+    <string name="icon_picker_choose_emoji_cd">Pick emoji from keyboard</string>
+    <string name="icon_picker_emoji_dialog_title">Emoji icon</string>
+    <string name="icon_picker_emoji_dialog_hint">Enter an emoji</string>
+    <string name="icon_picker_emoji_dialog_confirm">Use emoji</string>
+    <string name="reminder_time_picker_title">Pick time</string>
+    <string name="reminder_time_input_mode_cd">Type time with keyboard</string>
+    <string name="reminder_time_dial_mode_cd">Pick time with clock dial</string>
+    <string name="reminder_pick_time">Set time</string>
+    <string name="app_picker_nothing_available">Nothing available</string>
+    <string name="share_chooser_generic">Share</string>
+    <string name="action_receiver_run_error">Couldn\'t run action: %1$s</string>
+
+    <!-- Appearance (theme screen) -->
+    <string name="appearance_theme">Theme</string>
+    <string name="appearance_theme_system">System</string>
+    <string name="appearance_theme_light">Light</string>
+    <string name="appearance_theme_dark">Dark</string>
+    <string name="appearance_theme_black">Black</string>
+    <string name="appearance_accent_color">Accent color</string>
+    <string name="appearance_palette_style">Palette style</string>
+    <string name="appearance_gradient_title">Gradient background</string>
+    <string name="appearance_gradient_subtitle">Show a subtle accent gradient behind the app</string>
+    <string name="appearance_blur_title">Progressive blur</string>
+    <string name="appearance_blur_subtitle">Blur content behind the top and bottom bars</string>
+    <string name="appearance_hero_title">Hero image on cards</string>
+    <string name="appearance_hero_subtitle">Use the note picture as a faded background of the card</string>
+    <string name="appearance_shading_title">Enhanced shading</string>
+    <string name="appearance_shading_subtitle">Makes cards darker in dark mode and lighter in light mode</string>
+    <string name="appearance_remove_custom_color_title">Remove custom color?</string>
+    <string name="appearance_add_custom_color_cd">Add custom color</string>
+    <string name="appearance_custom_accent_title">Custom accent color</string>
+    <string name="appearance_custom_accent_body">Pick any hex color - Material You will generate a harmonized palette from it.</string>
+    <string name="appearance_preview">Preview</string>
+    <string name="appearance_invalid_hex">Invalid hex</string>
+    <string name="appearance_hex_label">Hex</string>
+    <string name="appearance_hex_placeholder">#FF5733 or FF5733</string>
+    <string name="appearance_material_you_requires_s">Material You colors need Android 12 or newer.</string>
+
+    <!-- Palette style names (shared) -->
+    <string name="palette_style_tonal_spot">Tonal spot</string>
+    <string name="palette_style_neutral">Neutral</string>
+    <string name="palette_style_vibrant">Vibrant</string>
+    <string name="palette_style_expressive">Expressive</string>
+    <string name="palette_style_rainbow">Rainbow</string>
+    <string name="palette_style_fruit_salad">Fruit salad</string>
+    <string name="palette_style_monochrome">Monochrome</string>
+    <string name="palette_style_fidelity">Fidelity</string>
+    <string name="palette_style_content">Content</string>
+
+    <!-- Settings: shell and section titles -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_security">Security</string>
+    <string name="settings_section_data">Data</string>
+    <string name="settings_section_reminders">Reminders</string>
+    <string name="settings_section_about">About</string>
+
+    <!-- Settings: appearance summary row -->
+    <string name="settings_theme_colors_hint">Accent and dynamic color source</string>
+    <string name="settings_palette_style">Palette style</string>
+
+    <!-- Settings: data and defaults -->
+    <string name="settings_export_title">Export to JSON</string>
+    <string name="settings_export_subtitle">Save a backup to a file</string>
+    <string name="settings_import_title">Import from JSON</string>
+    <string name="settings_import_subtitle">Merge backup into current notes</string>
+    <string name="settings_default_importance_title">Default importance</string>
+    <string name="settings_default_importance_subtitle">Default</string>
+
+    <!-- Settings: touch, notifications, swipe -->
+    <string name="settings_touch_sound_section">Touch &amp; sound</string>
+    <string name="settings_haptic_feedback">Haptic feedback</string>
+    <string name="settings_haptic_feedback_desc">Light vibration when passing a swipe threshold</string>
+    <string name="settings_notifications">Notifications</string>
+    <string name="settings_notifications_desc">Reminder alerts and system notifications for Remember</string>
+    <string name="settings_swipe_section">Swipe actions</string>
+    <string name="settings_swipe_right">Swipe right →</string>
+    <string name="settings_swipe_left">← Swipe left</string>
+    <string name="settings_swipe_preview_note">Note</string>
+    <string name="swipe_action_open">Open</string>
+    <string name="swipe_action_trash">Trash</string>
+    <string name="swipe_action_duplicate">Duplicate</string>
+    <string name="swipe_action_toggle_pin">Pin</string>
+
+    <!-- Settings: backup and restore -->
+    <string name="settings_backup_section">Backup &amp; restore</string>
+    <string name="filesystem_folder_picker_internal_storage">Internal storage</string>
+    <string name="settings_choose_export_folder">Choose export folder</string>
+    <string name="settings_export_folder_hint">Folder for exporting backups (notes, lists, settings)</string>
+    <string name="settings_export_select_folder_first">Select an export folder first</string>
+    <string name="settings_export_success">%1$s saved</string>
+    <string name="settings_include_media_in_backup">Include images &amp; attachments?</string>
+    <string name="settings_include_media_in_backup_hint">This significantly increases the backup file size.</string>
+    <string name="settings_auto_export_on_change">Auto-export on app exit</string>
+    <string name="settings_auto_export_on_change_hint">Saves a full backup when you exit the app after making changes.</string>
+    <string name="settings_scheduled_export">Daily scheduled backup</string>
+    <string name="settings_scheduled_export_hint">Automatically backs up once a day when an export folder is set.</string>
+    <string name="settings_import_rules">Import backup</string>
+    <string name="settings_export_now">Export backup</string>
+    <string name="settings_restore_backup">Restore backup</string>
+    <string name="settings_backup_hint">Export creates a zip file with your notes, media, and settings. Import merges backup data with your current notes. Restore replaces all current data with the backup.</string>
+    <string name="settings_backup_help_icon_cd">Explain import and restore</string>
+    <string name="settings_backup_help_title">Import vs Restore</string>
+    <string name="settings_backup_help_body">Import adds notes from a backup to your existing collection, which may cause duplicates. Restore completely wipes all current data before importing the backup to ensure a clean slate.</string>
+    <string name="settings_restore_confirm_title">Replace all notes?</string>
+    <string name="settings_restore_confirm_body">This will permanently delete all notes and lists in the app and replace them with the backup. This cannot be undone.</string>
+    <string name="settings_restore_go_ahead">Replace and import</string>
+
+    <!-- Settings: security -->
+    <string name="settings_app_lock_title">App lock</string>
+    <string name="settings_app_lock_enabled">Enabled</string>
+    <string name="settings_app_lock_disabled">Disabled</string>
+    <string name="settings_biometric_title">Biometric unlock</string>
+    <string name="settings_biometric_no_hardware">No biometric enrolled on device</string>
+    <string name="settings_biometric_need_lock">Enable app lock first</string>
+    <string name="settings_biometric_enabled">Enabled</string>
+    <string name="settings_biometric_disabled">Disabled</string>
+
+    <!-- Settings: about -->
+    <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
+    <string name="settings_rate_on_play_store">Rate on Play Store</string>
+    <string name="settings_star_on_github">Star on GitHub</string>
+    <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
+
+    <!-- Note card colors (picker) -->
+    <string-array name="note_color_names">
+        <item>None</item>
+        <item>Rose</item>
+        <item>Peach</item>
+        <item>Sun</item>
+        <item>Lime</item>
+        <item>Mint</item>
+        <item>Sky</item>
+        <item>Orchid</item>
+        <item>Indigo</item>
+        <item>Stone</item>
+    </string-array>
+</resources>
