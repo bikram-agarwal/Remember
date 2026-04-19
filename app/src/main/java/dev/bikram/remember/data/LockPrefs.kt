@@ -8,9 +8,11 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.security.SecureRandom
 import javax.crypto.SecretKeyFactory
@@ -40,8 +42,11 @@ class LockPrefs(private val context: Context) {
     val state: Flow<State> = context.lockDataStore.data.map { p -> p.toState() }
 
     suspend fun enable(pin: String) {
-        val salt = randomSalt()
-        val hash = hashPin(pin, salt)
+        val saltAndHash = withContext(Dispatchers.Default) {
+            val salt = randomSalt()
+            salt to hashPin(pin, salt)
+        }
+        val (salt, hash) = saltAndHash
         val digitCount = pin.length.coerceIn(MIN_PIN_LENGTH, MAX_PIN_LENGTH)
         context.lockDataStore.edit {
             it[Keys.ENABLED] = true
@@ -69,9 +74,11 @@ class LockPrefs(private val context: Context) {
         val p = context.lockDataStore.data.first()
         val storedHash = p[Keys.PIN_HASH] ?: return false
         val storedSalt = p[Keys.PIN_SALT] ?: return false
-        val salt = Base64.decode(storedSalt, Base64.NO_WRAP)
-        val candidate = hashPin(pin, salt)
-        return constantTimeEquals(Base64.decode(storedHash, Base64.NO_WRAP), candidate)
+        return withContext(Dispatchers.Default) {
+            val salt = Base64.decode(storedSalt, Base64.NO_WRAP)
+            val candidate = hashPin(pin, salt)
+            constantTimeEquals(Base64.decode(storedHash, Base64.NO_WRAP), candidate)
+        }
     }
 
     private fun Preferences.toState(): State {
@@ -125,6 +132,12 @@ class LockPrefs(private val context: Context) {
 
     suspend fun importFromBackup(json: JSONObject?) {
         if (json == null || json.length() == 0) return
+        // Restore from a backup is conservative for security-sensitive keys: we only ever
+        // overwrite PIN_HASH / PIN_SALT / PIN_LENGTH when the backup actually carries a
+        // usable replacement. Backups taken before the user set a PIN will either lack
+        // these keys entirely or carry empty placeholder strings (see exportForBackup),
+        // and either case must NOT wipe an existing PIN - that would silently disable
+        // app lock without user consent.
         context.lockDataStore.edit { mutable ->
             if (json.has(Keys.ENABLED.name) && !json.isNull(Keys.ENABLED.name)) {
                 mutable[Keys.ENABLED] = json.getBoolean(Keys.ENABLED.name)
@@ -132,20 +145,19 @@ class LockPrefs(private val context: Context) {
             if (json.has(Keys.BIOMETRIC.name) && !json.isNull(Keys.BIOMETRIC.name)) {
                 mutable[Keys.BIOMETRIC] = json.getBoolean(Keys.BIOMETRIC.name)
             }
-            if (json.has(Keys.PIN_HASH.name) && !json.isNull(Keys.PIN_HASH.name)) {
-                mutable[Keys.PIN_HASH] = json.getString(Keys.PIN_HASH.name)
-            } else {
-                mutable.remove(Keys.PIN_HASH)
+            val backupPinHash = json.optString(Keys.PIN_HASH.name, "").takeIf { it.isNotBlank() }
+            if (backupPinHash != null) {
+                mutable[Keys.PIN_HASH] = backupPinHash
             }
-            if (json.has(Keys.PIN_SALT.name) && !json.isNull(Keys.PIN_SALT.name)) {
-                mutable[Keys.PIN_SALT] = json.getString(Keys.PIN_SALT.name)
-            } else {
-                mutable.remove(Keys.PIN_SALT)
+            val backupPinSalt = json.optString(Keys.PIN_SALT.name, "").takeIf { it.isNotBlank() }
+            if (backupPinSalt != null) {
+                mutable[Keys.PIN_SALT] = backupPinSalt
             }
             if (json.has(Keys.PIN_LENGTH.name) && !json.isNull(Keys.PIN_LENGTH.name)) {
-                mutable[Keys.PIN_LENGTH] = json.getInt(Keys.PIN_LENGTH.name)
-            } else {
-                mutable.remove(Keys.PIN_LENGTH)
+                val backupPinLength = json.optInt(Keys.PIN_LENGTH.name, -1)
+                if (backupPinLength in MIN_PIN_LENGTH..MAX_PIN_LENGTH) {
+                    mutable[Keys.PIN_LENGTH] = backupPinLength
+                }
             }
         }
     }

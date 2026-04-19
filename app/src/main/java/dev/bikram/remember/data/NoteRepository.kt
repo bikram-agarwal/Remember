@@ -1,5 +1,6 @@
 package dev.bikram.remember.data
 
+import androidx.room.withTransaction
 import dev.bikram.remember.reminders.ReminderScheduler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -9,6 +10,7 @@ data class NoteOptions(
     val importance: Importance = Importance.DEFAULT,
     val visibility: Visibility = Visibility.PRIVATE,
     val pictureUri: String? = null,
+    val pictureHeroFraming: String? = null,
     val locked: Boolean = false,
     val iconKey: String? = null,
     val actions: List<NoteAction> = emptyList(),
@@ -22,6 +24,7 @@ class NoteRepository(
     private val attachmentDao: AttachmentDao,
     private val scheduler: ReminderScheduler? = null,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val database: RememberDatabase? = null,
 ) {
 
     fun observeActive(): Flow<List<NoteWithItems>> = noteDao.observeActive()
@@ -29,7 +32,11 @@ class NoteRepository(
     /** Distinct tag names from non-trashed notes; for suggestion UIs (sheet-scoped collection preferred). */
     fun observeActiveTagSuggestions(): Flow<List<String>> =
         observeActive().map { notes ->
-            notes.flatMap { it.note.tags }.distinct().sorted()
+            notes
+                .flatMap { it.note.tags }
+                .filterNot { it == RememberReservedTags.FAVORITE }
+                .distinct()
+                .sorted()
         }
 
     fun observeTrashed(): Flow<List<NoteWithItems>> = noteDao.observeTrashed()
@@ -57,11 +64,12 @@ class NoteRepository(
                 importance = options.importance,
                 visibility = options.visibility,
                 pictureUri = options.pictureUri,
+                pictureHeroFraming = options.pictureHeroFraming,
                 locked = options.locked,
                 iconKey = options.iconKey,
                 actions = options.actions,
                 tags = options.tags,
-                recurrence = options.recurrence,
+                recurrence = options.recurrence?.sanitized(),
             )
         ).also { id -> options.reminderAt?.let { scheduler?.schedule(id, it) } }
     }
@@ -87,11 +95,12 @@ class NoteRepository(
                 importance = options.importance,
                 visibility = options.visibility,
                 pictureUri = options.pictureUri,
+                pictureHeroFraming = options.pictureHeroFraming,
                 locked = options.locked,
                 iconKey = options.iconKey,
                 actions = options.actions,
                 tags = options.tags,
-                recurrence = options.recurrence,
+                recurrence = options.recurrence?.sanitized(),
             )
         )
         if (items.isNotEmpty()) {
@@ -125,11 +134,12 @@ class NoteRepository(
                 importance = options.importance,
                 visibility = options.visibility,
                 pictureUri = options.pictureUri,
+                pictureHeroFraming = options.pictureHeroFraming,
                 locked = options.locked,
                 iconKey = options.iconKey,
                 actions = options.actions,
                 tags = options.tags,
-                recurrence = options.recurrence,
+                recurrence = options.recurrence?.sanitized(),
             )
         )
         rescheduleReminder(id, options.reminderAt)
@@ -142,36 +152,54 @@ class NoteRepository(
         items: List<ChecklistItemEntity>,
         options: NoteOptions,
     ) {
-        val existing = noteDao.get(id)?.note ?: return
-        noteDao.update(
-            existing.copy(
-                title = title,
-                colorIndex = colorIndex,
-                updatedAt = clock(),
-                reminderAt = options.reminderAt,
-                importance = options.importance,
-                visibility = options.visibility,
-                pictureUri = options.pictureUri,
-                locked = options.locked,
-                iconKey = options.iconKey,
-                actions = options.actions,
-                tags = options.tags,
-                recurrence = options.recurrence,
-            )
-        )
-        itemDao.deleteForNote(id)
-        if (items.isNotEmpty()) {
-            itemDao.insertAll(
-                items.mapIndexed { index, item ->
-                    item.copy(id = 0, noteId = id, position = index)
+        val applyUpdates: suspend () -> Boolean = {
+            val existing = noteDao.get(id)?.note
+            if (existing == null) {
+                false
+            } else {
+                noteDao.update(
+                    existing.copy(
+                        title = title,
+                        colorIndex = colorIndex,
+                        updatedAt = clock(),
+                        reminderAt = options.reminderAt,
+                        importance = options.importance,
+                        visibility = options.visibility,
+                        pictureUri = options.pictureUri,
+                        pictureHeroFraming = options.pictureHeroFraming,
+                        locked = options.locked,
+                        iconKey = options.iconKey,
+                        actions = options.actions,
+                        tags = options.tags,
+                        recurrence = options.recurrence?.sanitized(),
+                    )
+                )
+                itemDao.deleteForNote(id)
+                if (items.isNotEmpty()) {
+                    itemDao.insertAll(
+                        items.mapIndexed { index, item ->
+                            item.copy(id = 0, noteId = id, position = index)
+                        }
+                    )
                 }
-            )
+                true
+            }
         }
-        rescheduleReminder(id, options.reminderAt)
+        val didUpdate = if (database != null) {
+            database.withTransaction { applyUpdates() }
+        } else {
+            applyUpdates()
+        }
+        if (didUpdate) rescheduleReminder(id, options.reminderAt)
     }
 
     suspend fun setPinned(id: Long, pinned: Boolean) {
-        noteDao.setPinned(id, pinned, clock())
+        val row = noteDao.get(id) ?: return
+        val baseTags = row.note.tags.filterNot { it == RememberReservedTags.FAVORITE }
+        val newTags = if (pinned) (baseTags + RememberReservedTags.FAVORITE).distinct() else baseTags
+        val now = clock()
+        if (row.note.pinned == pinned && row.note.tags == newTags) return
+        noteDao.update(row.note.copy(pinned = pinned, tags = newTags, updatedAt = now))
     }
 
     suspend fun moveToTrash(id: Long) {
@@ -190,7 +218,10 @@ class NoteRepository(
         noteDao.deleteById(id)
     }
 
-    suspend fun emptyTrash() = noteDao.emptyTrash()
+    suspend fun emptyTrash() {
+        noteDao.trashedNoteIds().forEach { trashedId -> scheduler?.cancel(trashedId) }
+        noteDao.emptyTrash()
+    }
 
     /**
      * Removes every note (active and trashed), checklist rows, and attachments (Room cascades).
@@ -199,6 +230,39 @@ class NoteRepository(
     suspend fun deleteAllNotes() {
         noteDao.allNoteIds().forEach { noteId -> scheduler?.cancel(noteId) }
         noteDao.deleteAllNotes()
+    }
+
+    /**
+     * Runs [importBlock] only after the notes table has been cleared, inside a single Room
+     * transaction when [database] is non-null so a failed import rolls back the delete and
+     * leaves existing notes intact. Reminder [PendingIntent]s are reconciled after a successful
+     * commit only (never cancel the old schedule before we know the replace succeeded).
+     */
+    suspend fun restoreNotesFullReplace(importBlock: suspend () -> Int): Int {
+        val oldIds = noteDao.allNoteIds().toSet()
+        val count = if (database != null) {
+            database.withTransaction {
+                noteDao.deleteAllNotes()
+                importBlock()
+            }
+        } else {
+            deleteAllNotes()
+            importBlock()
+        }
+        resyncRemindersAfterMassReplace(oldIds)
+        return count
+    }
+
+    private suspend fun resyncRemindersAfterMassReplace(oldIds: Set<Long>) {
+        val schedulerNonNull = scheduler ?: return
+        val newIds = noteDao.allNoteIds().toSet()
+        (oldIds + newIds).forEach { noteId -> schedulerNonNull.cancel(noteId) }
+        newIds.forEach { noteId ->
+            val note = noteDao.get(noteId)?.note ?: return@forEach
+            if (!note.trashed && note.reminderAt != null) {
+                schedulerNonNull.schedule(noteId, note.reminderAt)
+            }
+        }
     }
 
     /**
@@ -212,6 +276,7 @@ class NoteRepository(
             importance = note.importance,
             visibility = note.visibility,
             pictureUri = note.pictureUri,
+            pictureHeroFraming = note.pictureHeroFraming,
             locked = note.locked,
             iconKey = note.iconKey,
             actions = note.actions,
@@ -264,6 +329,7 @@ class NoteRepository(
         note: NoteEntity,
         items: List<ChecklistItemEntity>,
         attachments: List<NoteAttachmentEntity>,
+        suppressReminderSchedule: Boolean = false,
     ): Long {
         val noteId = noteDao.insert(note)
         if (items.isNotEmpty()) {
@@ -280,7 +346,9 @@ class NoteRepository(
                 attachment.copy(id = 0, noteId = noteId),
             )
         }
-        note.reminderAt?.let { scheduler?.schedule(noteId, it) }
+        if (!suppressReminderSchedule && !note.trashed) {
+            note.reminderAt?.let { scheduler?.schedule(noteId, it) }
+        }
         return noteId
     }
 
@@ -289,6 +357,7 @@ class NoteRepository(
         noteDao.update(
             existing.copy(
                 pictureUri = pictureUri,
+                pictureHeroFraming = if (pictureUri == null) null else existing.pictureHeroFraming,
                 updatedAt = clock(),
             ),
         )
@@ -310,11 +379,12 @@ class NoteRepository(
      */
     suspend fun advanceReminderOnFire(id: Long) {
         val note = noteDao.get(id)?.note ?: return
-        val rule = note.recurrence ?: return
+        val rule = note.recurrence?.sanitized() ?: return
         val current = note.reminderAt ?: return
         val consumedRule = rule.afterFire()
         val stoppedByCount = consumedRule.endKind == RecurrenceEndKind.AFTER_COUNT &&
-            (consumedRule.endCount ?: 0) <= 0
+            consumedRule.endCount != null &&
+            consumedRule.endCount <= 0
         val nextTime = if (stoppedByCount) null else consumedRule.nextAfter(current)
         val nextRule = if (stoppedByCount || nextTime == null) null else consumedRule
         noteDao.update(

@@ -1,6 +1,10 @@
+@file:Suppress("DEPRECATION")
 package dev.bikram.remember.ui.theme
 
 import android.os.Build
+import android.os.SystemClock
+import kotlinx.coroutines.launch
+import android.view.SoundEffectConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -10,12 +14,14 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.MotionScheme
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -28,9 +34,12 @@ import androidx.core.view.WindowCompat
 import com.materialkolor.PaletteStyle
 import com.materialkolor.rememberDynamicColorScheme
 import dev.bikram.remember.data.ColorSource
+import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.PaletteStyleOpt
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemeState
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.LocalTapSound
 
 val LocalIsDark = staticCompositionLocalOf { false }
 
@@ -89,6 +98,7 @@ private fun ColorScheme.toOled(): ColorScheme = copy(
 @Composable
 fun RememberTheme(
     themeState: ThemeState = ThemeState(),
+    interactionState: InteractionState = InteractionState(),
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -148,6 +158,19 @@ fun RememberTheme(
     }
 
     val view = LocalView.current
+    SideEffect {
+        view.isSoundEffectsEnabled = true
+        var walkContext: android.content.Context? = view.context
+        var hostingActivity: android.app.Activity? = null
+        while (walkContext != null) {
+            if (walkContext is android.app.Activity) {
+                hostingActivity = walkContext
+                break
+            }
+            walkContext = (walkContext as? android.content.ContextWrapper)?.baseContext
+        }
+        hostingActivity?.window?.decorView?.isSoundEffectsEnabled = true
+    }
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
@@ -158,6 +181,20 @@ fun RememberTheme(
         }
     }
 
+    val realTapSound = remember(view) {
+        val lastTapTimeMs = longArrayOf(0L)
+        val minTapSoundSpacingMs = 85L
+        {
+            val now = SystemClock.uptimeMillis()
+            if (now - lastTapTimeMs[0] >= minTapSoundSpacingMs) {
+                lastTapTimeMs[0] = now
+                // view.isShown is sometimes false in dialogs/sheets
+                view.playSoundEffect(SoundEffectConstants.CLICK)
+            }
+        }
+    }
+    val playTapSound = realTapSound
+
     CompositionLocalProvider(
         LocalIsDark provides darkTheme,
         LocalUseGradient provides themeState.useGradient,
@@ -166,9 +203,12 @@ fun RememberTheme(
         LocalFixedCardColors provides themeState.fixedCardColors,
         LocalTagColors provides themeState.tagColors,
         LocalThemeState provides themeState,
+        LocalTapSound provides playTapSound,
+        LocalHapticEnabled provides interactionState.hapticFeedbackEnabled,
     ) {
         MaterialExpressiveTheme(
             colorScheme = themed,
+            motionScheme = MotionScheme.expressive(),
             typography = AppTypography,
         ) {
             Box(Modifier.fillMaxSize()) {
@@ -194,18 +234,19 @@ private fun GradientBackground(
     gradientTop: Color,
 ) {
     if (useGradient) {
+        val gradientBrush = remember(gradientBase, gradientTop) {
+            Brush.verticalGradient(
+                colorStops = arrayOf(
+                    0f to gradientTop.copy(alpha = 0.45f),
+                    0.55f to gradientBase.copy(alpha = 0f),
+                ),
+            )
+        }
         Box(
             Modifier
                 .fillMaxSize()
                 .background(gradientBase)
-                .background(
-                    Brush.verticalGradient(
-                        colorStops = arrayOf(
-                            0f to gradientTop.copy(alpha = 0.45f),
-                            0.55f to gradientBase.copy(alpha = 0f),
-                        ),
-                    ),
-                ),
+                .background(gradientBrush),
         )
     } else {
         Box(Modifier.fillMaxSize().background(pageBackground))

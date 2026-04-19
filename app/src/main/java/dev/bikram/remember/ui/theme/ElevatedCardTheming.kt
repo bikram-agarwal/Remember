@@ -5,22 +5,25 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
-import androidx.core.graphics.ColorUtils
+
+private val DarkContent = Color(0xFFE6E6EA)
+private val LightContent = Color(0xFF1C1B1F)
 
 /**
  * Elevated card colors used by every list card so all cards read the same as
  * Settings and Edit panels. Uses the theme's surfaceContainer directly; the
- * `fixedCardColors` toggle is handled upstream in Theme.kt by gating
- * `tintSurfacesTowardPrimary` so the scheme itself changes shade.
+ * `fixedCardColors` toggle is handled upstream in [RememberTheme] by gating the same
+ * primary surface boost path as FilePipe (`useEnhancedShading` equivalent).
+ *
+ * Reads [LocalIsDark] (provided by [RememberTheme]) instead of recomputing luminance
+ * per call - this is hit on every list card and shows up under repeated profiling.
  */
 @Composable
 fun elevatedCardColors(): CardColors {
-    val scheme = MaterialTheme.colorScheme
-    val dark = ColorUtils.calculateLuminance(scheme.background.toArgb()) < 0.35
-    val content = if (dark) Color(0xFFE6E6EA) else Color(0xFF1C1B1F)
+    val container = MaterialTheme.colorScheme.surfaceContainer
+    val content = if (LocalIsDark.current) DarkContent else LightContent
     return CardDefaults.elevatedCardColors(
-        containerColor = scheme.surfaceContainer,
+        containerColor = container,
         contentColor = content,
     )
 }

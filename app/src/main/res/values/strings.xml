@@ -34,7 +34,7 @@
     <string name="shortcut_new_note_long">New note</string>
     <string name="shortcut_new_list_short">List</string>
     <string name="shortcut_new_list_long">New list</string>
-    <string name="widget_description">Pinned notes and next reminder</string>
+    <string name="widget_description">Favorite notes and next reminder</string>
     <string name="widget_header_title">Remember</string>
     <string name="widget_new_note_cd">New note</string>
     <string name="widget_empty">No notes yet</string>
@@ -78,13 +78,19 @@
     <string name="view_options_reset">Reset</string>
 
     <!-- Note cards -->
-    <string name="notecard_pinned_cd">Pinned</string>
+    <string name="notecard_pinned_cd">Favorite</string>
     <string name="notecard_reminder_cd">Has reminder</string>
     <string name="notecard_picture_cd">Has picture</string>
     <string name="notecard_attachment_cd">Has attachment</string>
+    <string name="hero_edit_crop_chooser_title">Crop or edit photo</string>
+    <string name="hero_framing_title">Position cover</string>
+    <string name="viewer_cover_image_cd">Cover image</string>
+    <string name="toast_saved_to_downloads">Saved to Downloads</string>
+    <string name="toast_save_download_failed">Could not save file</string>
+    <string name="toast_open_attachment_failed">No app can open this file</string>
 
     <!-- Note editor toolbar -->
-    <string name="edit_pin_cd">Pin</string>
+    <string name="edit_favorite_cd">Favorite</string>
     <string name="edit_trash_cd">Trash</string>
     <string name="edit_remove_picture_cd">Remove picture</string>
 
@@ -266,7 +272,7 @@
     <string name="swipe_action_open">Open</string>
     <string name="swipe_action_trash">Trash</string>
     <string name="swipe_action_duplicate">Duplicate</string>
-    <string name="swipe_action_toggle_pin">Pin</string>
+    <string name="swipe_action_toggle_pin">Favorite</string>
 
     <!-- Settings: backup and restore -->
     <string name="settings_backup_section">Backup &amp; restore</string>

@@ -10,9 +10,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,16 +29,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.automirrored.filled.Notes
-import androidx.compose.material.icons.automirrored.filled.StickyNote2
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledIconButton
@@ -48,9 +36,9 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,23 +50,33 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.history.HistoryRoute
 import dev.bikram.remember.ui.home.HomeRoute
 import dev.bikram.remember.ui.settings.SettingsRoute
 import kotlinx.coroutines.launch
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberFilledIconButton
+import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberFloatingActionButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
-enum class MainTab(val label: String, val icon: ImageVector) {
-    Notes("Notes", Icons.AutoMirrored.Filled.Notes),
-    History("History", Icons.Filled.History),
-    Settings("Settings", Icons.Filled.Settings),
+/**
+ * Bottom tabs. Each [symbolName] must be listed by `font_subset/harvest_ligatures.py`
+ * (then run `subset_font.py`) so the subset icon font actually contains that glyph.
+ */
+enum class MainTab(val label: String, val symbolName: String) {
+    Notes("Notes", "notes"),
+    History("History", "history"),
+    Settings("Settings", "settings"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -111,11 +109,11 @@ fun MainTabScaffold(
             transitionSpec = {
                 val forward = targetState.ordinal > initialState.ordinal
                 if (forward) {
-                    (slideInHorizontally(initialOffsetX = { it }) + fadeIn()) togetherWith
-                        (slideOutHorizontally(targetOffsetX = { -it / 3 }) + fadeOut())
+                    (slideInHorizontally { it } + fadeIn()) togetherWith
+                        (slideOutHorizontally { -it / 3 } + fadeOut())
                 } else {
-                    (slideInHorizontally(initialOffsetX = { -it }) + fadeIn()) togetherWith
-                        (slideOutHorizontally(targetOffsetX = { it / 3 }) + fadeOut())
+                    (slideInHorizontally { -it } + fadeIn()) togetherWith
+                        (slideOutHorizontally { it } + fadeOut())
                 }
             },
             label = "tab",
@@ -149,47 +147,26 @@ fun MainTabScaffold(
             )
         }
 
-        val pillModifier = Modifier
-            .align(Alignment.BottomCenter)
-            .windowInsetsPadding(WindowInsets.navigationBars)
-            .padding(bottom = 14.dp, start = 20.dp, end = 20.dp)
-        val pillColors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(
-            toolbarContainerColor = MaterialTheme.colorScheme.primary,
-            toolbarContentColor = MaterialTheme.colorScheme.onPrimary,
-        )
-        val tabs: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {
-            MainTab.entries.forEach { t ->
-                TabButton(
-                    target = t,
-                    current = tab,
-                    onSelect = {
-                        tab = it
-                        fabExpanded = false
-                    },
-                )
-            }
-        }
-
-        val (fabIcon, fabDesc, fabAction) = when (tab) {
+        val (fabSymbolName, fabDesc, fabAction) = when (tab) {
             MainTab.Notes -> Triple(
-                if (fabExpanded) Icons.Filled.Close else Icons.Filled.Add,
+                if (fabExpanded) "close" else "add",
                 if (fabExpanded) "Close" else "Create",
                 { fabExpanded = !fabExpanded },
             )
             MainTab.History -> Triple(
-                Icons.Filled.DeleteSweep,
+                "delete_sweep",
                 "Clear all",
                 { clearTrashOpen = true },
             )
             MainTab.Settings -> Triple(
-                Icons.Filled.Share,
+                "share",
                 "Share app",
                 {
                     val send = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
                         putExtra(
                             Intent.EXTRA_TEXT,
-                            "Remember — a fresh take on Collateral. " +
+                            "Remember - Notes, Lists, Reminders - Done right. " +
                                 "https://play.google.com/store/apps/details?id=dev.bikram.remember",
                         )
                     }
@@ -198,21 +175,28 @@ fun MainTabScaffold(
             )
         }
 
-        HorizontalFloatingToolbar(
-            expanded = true,
-            modifier = pillModifier,
-            colors = pillColors,
-            floatingActionButton = {
-                FloatingActionButton(
+        RememberFloatingNavBar(
+            currentTab = tab,
+            onTabClick = { selected ->
+                tab = selected
+                fabExpanded = false
+            },
+            fabContent = {
+                RememberFloatingActionButton(
                     onClick = fabAction,
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
                 ) {
-                    Icon(fabIcon, contentDescription = fabDesc)
+                    RememberMaterialRoundedSymbol(
+                        name = fabSymbolName,
+                        size = 26.dp,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        weight = FontWeight.Medium,
+                    )
                 }
             },
-            content = tabs,
+            modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 
@@ -222,8 +206,8 @@ fun MainTabScaffold(
             subtitle = "Permanently delete all trashed notes. This cannot be undone.",
             onDismiss = { clearTrashOpen = false },
             actions = {
-                TextButton(onClick = { clearTrashOpen = false }) { Text("Cancel") }
-                TextButton(onClick = {
+                RememberTextButton(onClick = { clearTrashOpen = false }) { Text("Cancel") }
+                RememberTextButton(onClick = {
                     clearTrashOpen = false
                     scope.launch { repository.emptyTrash() }
                 }) { Text("Empty") }
@@ -234,67 +218,97 @@ fun MainTabScaffold(
     }
 }
 
+/** Same structure and motion as FilePipe `AppNavigation.kt` `FloatingNavBar`. */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun TabButton(
-    target: MainTab,
-    current: MainTab,
-    onSelect: (MainTab) -> Unit,
+private fun RememberFloatingNavBar(
+    currentTab: MainTab,
+    onTabClick: (MainTab) -> Unit,
+    fabContent: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    val selected = current == target
-    val labelWidth by animateDpAsState(
-        targetValue = if (selected) 72.dp else 0.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessLow,
+    HorizontalFloatingToolbar(
+        expanded = true,
+        floatingActionButton = fabContent,
+        modifier = modifier
+            .windowInsetsPadding(WindowInsets.navigationBars)
+            .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
+        colors = FloatingToolbarDefaults.vibrantFloatingToolbarColors(
+            toolbarContainerColor = MaterialTheme.colorScheme.primary,
+            toolbarContentColor = MaterialTheme.colorScheme.onPrimary,
         ),
-        label = "tab_$target",
-    )
-    IconButton(
-        onClick = { onSelect(target) },
-        modifier = Modifier
-            .height(48.dp)
-            .width(48.dp + labelWidth),
-        colors = if (selected) {
-            IconButtonDefaults.filledIconButtonColors(
-                containerColor = MaterialTheme.colorScheme.background,
-                contentColor = MaterialTheme.colorScheme.primary,
-            )
-        } else {
-            IconButtonDefaults.iconButtonColors(
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-            )
-        },
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(horizontal = if (selected) 10.dp else 4.dp),
-        ) {
-            Icon(target.icon, contentDescription = target.label, modifier = Modifier.size(22.dp))
-            if (labelWidth > 4.dp) {
-                Spacer(Modifier.width(6.dp))
-                Text(target.label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        MainTab.entries.forEachIndexed { index, item ->
+            val selected = currentTab == item
+            val labelWidth by animateDpAsState(
+                targetValue = if (selected) 72.dp else 0.dp,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow,
+                ),
+                label = "nav_label_$index",
+            )
+            RememberIconButton(
+                onClick = { onTabClick(item) },
+                modifier = Modifier
+                    .height(48.dp)
+                    .width(48.dp + labelWidth),
+                colors = if (selected) {
+                    IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.background,
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    )
+                } else {
+                    IconButtonDefaults.iconButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    )
+                },
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = if (selected) 6.dp else 0.dp),
+                ) {
+                    Box(modifier = Modifier.size(24.dp)) {
+                        RememberMaterialRoundedSymbol(
+                            name = item.symbolName,
+                            size = 24.dp,
+                            tint = LocalContentColor.current,
+                            weight = FontWeight.Medium,
+                        )
+                    }
+                    if (labelWidth > 4.dp) {
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = item.label,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                        )
+                    }
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun SpeedDialOverlay(
     onPickNote: () -> Unit,
     onPickList: () -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val motion = MaterialTheme.motionScheme
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .clickable(onClick = onDismiss),
+            .tapSoundClickable(onClick = onDismiss),
         contentAlignment = Alignment.BottomEnd,
     ) {
         AnimatedVisibility(
             visible = true,
-            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 3 }),
-            exit = fadeOut() + slideOutVertically(targetOffsetY = { it / 3 }),
+            enter = fadeIn(animationSpec = motion.defaultEffectsSpec()),
+            exit = fadeOut(animationSpec = motion.defaultEffectsSpec()),
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.navigationBars)
                 .padding(bottom = 116.dp, end = 28.dp),
@@ -303,8 +317,8 @@ private fun SpeedDialOverlay(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                SpeedDialItem("Checklist", Icons.AutoMirrored.Filled.List, onPickList)
-                SpeedDialItem("Note", Icons.AutoMirrored.Filled.StickyNote2, onPickNote)
+                SpeedDialItem("Checklist", "list", onPickList)
+                SpeedDialItem("Note", "sticky_note_2", onPickNote)
             }
         }
     }
@@ -313,7 +327,7 @@ private fun SpeedDialOverlay(
 @Composable
 private fun SpeedDialItem(
     label: String,
-    icon: ImageVector,
+    symbolName: String,
     onClick: () -> Unit,
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -329,7 +343,7 @@ private fun SpeedDialItem(
                 .padding(horizontal = 14.dp, vertical = 10.dp),
         )
         Spacer(Modifier.width(12.dp))
-        FilledIconButton(
+        RememberFilledIconButton(
             onClick = onClick,
             modifier = Modifier.size(48.dp),
             colors = IconButtonDefaults.filledIconButtonColors(
@@ -337,7 +351,12 @@ private fun SpeedDialItem(
                 contentColor = MaterialTheme.colorScheme.onPrimary,
             ),
         ) {
-            Icon(icon, contentDescription = label)
+            RememberMaterialRoundedSymbol(
+                name = symbolName,
+                size = 24.dp,
+                tint = MaterialTheme.colorScheme.onPrimary,
+                weight = FontWeight.Medium,
+            )
         }
     }
 }

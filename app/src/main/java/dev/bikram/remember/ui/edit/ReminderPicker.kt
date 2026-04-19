@@ -1,4 +1,6 @@
 package dev.bikram.remember.ui.edit
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
 
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
@@ -22,13 +24,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
@@ -37,14 +32,11 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -68,9 +60,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -81,6 +75,7 @@ import dev.bikram.remember.data.RecurrenceEndKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -95,10 +90,16 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
+import dev.bikram.remember.ui.components.RememberFilledTonalButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
-fun ReminderPickerDialog(
+fun ReminderPickerSheet(
     initialMillis: Long?,
     initialRule: RecurrenceRule?,
     onConfirm: (Long?, RecurrenceRule?) -> Unit,
@@ -180,7 +181,7 @@ fun ReminderPickerDialog(
     var endDate by rememberSaveable { mutableStateOf(initialRule?.endDate) }
     var endDateDialogOpen by rememberSaveable { mutableStateOf(false) }
     var endCountText by rememberSaveable {
-        mutableStateOf((initialRule?.endCount ?: 10).toString())
+        mutableStateOf((initialRule?.endCount ?: DEFAULT_END_COUNT).toString())
     }
 
     AppBottomSheet(
@@ -191,7 +192,7 @@ fun ReminderPickerDialog(
     ) {
         // Date pill
         PillRow(
-            icon = Icons.Filled.CalendarMonth,
+            materialSymbolName = "calendar_month",
             label = formatDate(selectedDate),
             hasValue = true,
             onClick = { dateDialogOpen = true },
@@ -200,7 +201,7 @@ fun ReminderPickerDialog(
         Spacer(Modifier.height(8.dp))
 
         PillRow(
-            icon = Icons.Filled.Schedule,
+            materialSymbolName = "schedule",
             label = if (reminderTimeExplicit) {
                 formatReminderTimePill(reminderHour, reminderMinute)
             } else {
@@ -219,7 +220,7 @@ fun ReminderPickerDialog(
 
         // Repeat pill
         PillRow(
-            icon = Icons.Filled.Repeat,
+            materialSymbolName = "repeat",
             label = if (repeatOn) repeatSummary(
                 unit = unit,
                 interval = intervalText.toIntOrNull() ?: 1,
@@ -286,7 +287,7 @@ fun ReminderPickerDialog(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(MaterialTheme.colorScheme.errorContainer)
-                    .clickable {
+                    .tapSoundClickable {
                         val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
                             data = Uri.parse("package:${context.packageName}")
                         }
@@ -311,10 +312,10 @@ fun ReminderPickerDialog(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
             if (initialMillis != null) {
-                FilledTonalButton(onClick = { onConfirm(null, null) }) { Text("Clear") }
+                RememberFilledTonalButton(onClick = { onConfirm(null, null) }) { Text("Clear") }
             }
-            FilledTonalButton(onClick = onDismiss) { Text("Cancel") }
-            Button(onClick = {
+            RememberFilledTonalButton(onClick = onDismiss) { Text("Cancel") }
+            RememberButton(onClick = {
                 val hour24 = if (reminderTimeExplicit) reminderHour else 18
                 val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
                 val fireAt = Calendar.getInstance().apply {
@@ -331,7 +332,10 @@ fun ReminderPickerDialog(
                         else MonthlyMode.ByNthWeekday(nthOrdinal, nthWeekday)
                     } else null
                     val daysSet = if (unit == RecurrenceUnit.WEEK) daysOfWeek else emptySet()
-                    val count = endCountText.toIntOrNull()?.coerceIn(1, 9999)
+                    // Fall back to the same default the picker pre-populates (10) when the field is
+                    // empty or otherwise unparseable. [RecurrenceRule.sanitized] also maps invalid
+                    // AFTER_COUNT + null endCount to NEVER so reminders never stop after one fire.
+                    val count = endCountText.toIntOrNull()?.coerceIn(1, 9999) ?: DEFAULT_END_COUNT
                     RecurrenceRule(
                         unit = unit,
                         interval = interval,
@@ -379,6 +383,10 @@ fun ReminderPickerDialog(
 }
 
 private enum class MonthlyKind { BY_DAY, BY_WEEKDAY }
+
+// Pre-fill / fallback occurrence count for AFTER_COUNT mode. Used both when first opening
+// the picker and as a sanity floor when the user submits an empty / unparseable field.
+private const val DEFAULT_END_COUNT = 10
 
 @Composable
 private fun formatReminderTimePill(hour24: Int, minute: Int): String {
@@ -452,10 +460,10 @@ private fun CalendarPickerDialog(
                         .padding(horizontal = 12.dp, vertical = 0.dp),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(onClick = onDismiss) {
+                    RememberTextButton(onClick = onDismiss) {
                         Text(stringResource(R.string.common_cancel))
                     }
-                    TextButton(
+                    RememberTextButton(
                         onClick = { state.selectedDateMillis?.let(onConfirm) },
                         enabled = state.selectedDateMillis != null,
                     ) {
@@ -525,6 +533,8 @@ private fun ReminderTimePickerDialog(
                             .padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        val timeInputModeCd = stringResource(R.string.reminder_time_input_mode_cd)
+                        val timeDialModeCd = stringResource(R.string.reminder_time_dial_mode_cd)
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
                                 TooltipAnchorPosition.Above,
@@ -542,24 +552,23 @@ private fun ReminderTimePickerDialog(
                             },
                             state = rememberTooltipState(),
                         ) {
-                            IconButton(
+                            RememberIconButton(
                                 onClick = { showDial = !showDial },
                             ) {
-                                Icon(
-                                    imageVector = if (showDial) Icons.Filled.Keyboard else Icons.Filled.Schedule,
-                                    contentDescription = if (showDial) {
-                                        stringResource(R.string.reminder_time_input_mode_cd)
-                                    } else {
-                                        stringResource(R.string.reminder_time_dial_mode_cd)
+                                RememberMaterialRoundedSymbol(
+                                    name = if (showDial) "keyboard" else "schedule",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics {
+                                        contentDescription = if (showDial) timeInputModeCd else timeDialModeCd
                                     },
                                 )
                             }
                         }
                         Spacer(Modifier.weight(1f))
-                        TextButton(onClick = onDismiss) {
+                        RememberTextButton(onClick = onDismiss) {
                             Text(stringResource(R.string.common_cancel))
                         }
-                        TextButton(
+                        RememberTextButton(
                             onClick = {
                                 onConfirm(timePickerState.hour, timePickerState.minute)
                             },
@@ -575,7 +584,7 @@ private fun ReminderTimePickerDialog(
 
 @Composable
 private fun PillRow(
-    icon: ImageVector,
+    materialSymbolName: String,
     label: String,
     hasValue: Boolean,
     onClick: () -> Unit,
@@ -593,16 +602,16 @@ private fun PillRow(
                 if (hasValue) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceContainerHigh,
             )
-            .clickable(onClick = onClick)
+            .tapSoundClickable(onClick = onClick)
             .padding(start = 20.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
+        RememberMaterialRoundedSymbol(
+            name = materialSymbolName,
+            size = 20.dp,
             tint = if (hasValue) MaterialTheme.colorScheme.onPrimaryContainer
             else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
+            weight = FontWeight.Medium,
         )
         Spacer(Modifier.width(16.dp))
         Text(
@@ -615,12 +624,13 @@ private fun PillRow(
         // Reserve the trailing slot so rows with and without Clear match height/width.
         Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
             if (onClear != null) {
-                IconButton(onClick = onClear, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = Icons.Filled.Close,
-                        contentDescription = "Clear",
+                RememberIconButton(onClick = onClear, modifier = Modifier.size(36.dp)) {
+                    RememberMaterialRoundedSymbol(
+                        name = "close",
+                        size = 18.dp,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(18.dp),
+                        weight = FontWeight.Medium,
+                        modifier = Modifier.semantics { contentDescription = "Clear" },
                     )
                 }
             }
@@ -702,7 +712,7 @@ private fun RepeatConfig(
                     onExpandedChange = onUnitMenuOpen,
                 ) {
                     RecurrenceUnit.entries.forEach { u ->
-                        DropdownMenuItem(
+                        RememberDropdownMenuItem(
                             text = { Text(unitLabel(u)) },
                             onClick = { onUnit(u); onUnitMenuOpen(false) },
                         )
@@ -734,7 +744,7 @@ private fun RepeatConfig(
                             },
                         ) {
                                 (1..31).forEach { d ->
-                                    DropdownMenuItem(
+                                    RememberDropdownMenuItem(
                                         text = { Text("On day $d") },
                                         onClick = { onDayOfMonth(d); onDayOfMonthMenuOpen(false) },
                                     )
@@ -758,7 +768,7 @@ private fun RepeatConfig(
                                 },
                             ) {
                                     listOf(1 to "First", 2 to "Second", 3 to "Third", 4 to "Fourth", 5 to "Last").forEach { (n, lbl) ->
-                                        DropdownMenuItem(
+                                        RememberDropdownMenuItem(
                                             text = { Text(lbl) },
                                             onClick = { onNthOrdinal(n); onNthOrdinalMenuOpen(false) },
                                         )
@@ -779,7 +789,7 @@ private fun RepeatConfig(
                                         Calendar.WEDNESDAY, Calendar.THURSDAY, Calendar.FRIDAY,
                                         Calendar.SATURDAY,
                                     ).forEach { wd ->
-                                        DropdownMenuItem(
+                                        RememberDropdownMenuItem(
                                             text = { Text(weekdayFullName(wd)) },
                                             onClick = { onNthWeekday(wd); onNthWeekdayMenuOpen(false) },
                                         )
@@ -807,7 +817,7 @@ private fun RepeatConfig(
                 onSelect = { onEndKind(RecurrenceEndKind.ON_DATE) },
             ) {
                 PillRow(
-                    icon = Icons.Filled.CalendarMonth,
+                    materialSymbolName = "calendar_month",
                     label = endDate?.let { formatDate(it) } ?: "Pick end date",
                     hasValue = endDate != null && endKind == RecurrenceEndKind.ON_DATE,
                     onClick = {
@@ -923,7 +933,7 @@ private fun SheetDropdown(
                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                     shape = RoundedCornerShape(12.dp),
                 )
-                .clickable { onExpandedChange(true) }
+                .tapSoundClickable { onExpandedChange(true) }
                 .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -933,10 +943,10 @@ private fun SheetDropdown(
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
             )
-            Icon(
-                Icons.Filled.ArrowDropDown,
-                contentDescription = null,
+            RememberMaterialRoundedSymbol(
+                name = "arrow_drop_down",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
             )
         }
         DropdownMenu(
@@ -957,7 +967,7 @@ private fun RadioOption(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onSelect)
+            .tapSoundClickable(onClick = onSelect)
             .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -995,7 +1005,7 @@ private fun WeekdayRow(selected: Set<Int>, onToggle: (Int) -> Unit) {
                         else MaterialTheme.colorScheme.outlineVariant,
                         shape = CircleShape,
                     )
-                    .clickable { onToggle(day) },
+                    .tapSoundClickable { onToggle(day) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -1049,10 +1059,26 @@ private fun weekdayShort(weekday: Int): String = when (weekday) {
     else -> ""
 }
 
-private fun formatDate(millis: Long): String {
-    val sdf = SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault())
-    return sdf.format(millis)
+// SimpleDateFormat is locale-sensitive, so we re-create it whenever the locale used to build it
+// changes. Allocating a new formatter for every pill label call (every recomposition) showed up
+// in profiles, so we cache the most recent (locale -> formatter) pair instead.
+private object DateFormatterCache {
+    private var cachedLocale: Locale? = null
+    private var cachedFormatter: SimpleDateFormat? = null
+
+    @Synchronized
+    fun get(locale: Locale): SimpleDateFormat {
+        val current = cachedFormatter
+        if (current != null && cachedLocale == locale) return current
+        val fresh = SimpleDateFormat("EEE, MMM d, yyyy", locale)
+        cachedLocale = locale
+        cachedFormatter = fresh
+        return fresh
+    }
 }
+
+private fun formatDate(millis: Long): String =
+    DateFormatterCache.get(Locale.getDefault()).format(millis)
 
 private fun repeatSummary(
     unit: RecurrenceUnit,

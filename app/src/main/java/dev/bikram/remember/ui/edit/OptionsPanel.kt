@@ -1,13 +1,5 @@
 package dev.bikram.remember.ui.edit
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,16 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddAPhoto
-import androidx.compose.material.icons.filled.Alarm
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Bolt
-import androidx.compose.material.icons.filled.EmojiSymbols
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.material.icons.filled.PriorityHigh
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -41,15 +23,17 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.TagChipFilled
 import java.text.DateFormat
 import java.util.Date
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 @Composable
 fun OptionsPanel(
@@ -69,7 +53,6 @@ fun OptionsPanel(
     onOpenAttachments: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
     var importanceOpen by rememberSaveable { mutableStateOf(false) }
 
     Surface(
@@ -83,13 +66,13 @@ fun OptionsPanel(
             modifier = Modifier.padding(vertical = 8.dp),
         ) {
             OptionRow(
-                icon = Icons.Filled.EmojiSymbols,
+                symbolName = "emoji_symbols",
                 title = "Icon",
                 summary = iconLabelFor(iconKey) ?: "None",
                 onClick = onOpenIcon,
             )
             OptionRow(
-                icon = Icons.AutoMirrored.Filled.Label,
+                symbolName = "label",
                 title = "Tags",
                 summary = if (tags.isEmpty()) "None" else "",
                 onClick = onOpenTags,
@@ -98,71 +81,35 @@ fun OptionsPanel(
                 },
             )
             OptionRow(
-                icon = Icons.Filled.Alarm,
+                symbolName = "alarm",
                 title = "Reminder",
                 summary = reminderSummary(reminderAt),
                 onClick = onOpenReminder,
             )
             OptionRow(
-                icon = Icons.Filled.Bolt,
+                symbolName = "bolt",
                 title = "Actions",
                 summary = actionsSummary(actions),
                 onClick = onOpenActions,
             )
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
-            ) {
-                Column {
-                    OptionRow(
-                        icon = Icons.Filled.PriorityHigh,
-                        title = "Importance",
-                        summary = importance.label(),
-                        onClick = { importanceOpen = true },
-                    )
-                    OptionRow(
-                        icon = Icons.Filled.AddAPhoto,
-                        title = "Picture",
-                        summary = if (pictureUri == null) "No picture" else "Attached",
-                        onClick = onOpenPicture,
-                    )
-                    OptionRow(
-                        icon = Icons.Filled.AttachFile,
-                        title = "Attachments",
-                        summary = attachmentsSummary(attachmentCount),
-                        onClick = onOpenAttachments,
-                    )
-                }
-            }
-
-            val rotation by animateFloatAsState(
-                targetValue = if (expanded) 180f else 0f,
-                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-                label = "expand_rotation",
+            OptionRow(
+                symbolName = "priority_high",
+                title = "Importance",
+                summary = importance.label(),
+                onClick = { importanceOpen = true },
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = !expanded }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    if (expanded) "Fewer options" else "More options",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                Spacer(Modifier.size(4.dp))
-                Icon(
-                    Icons.Filled.ExpandMore,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.rotate(rotation),
-                )
-            }
+            OptionRow(
+                symbolName = "add_a_photo",
+                title = "Picture",
+                summary = if (pictureUri == null) "No picture" else "Attached",
+                onClick = onOpenPicture,
+            )
+            OptionRow(
+                symbolName = "attach_file",
+                title = "Attachments",
+                summary = attachmentsSummary(attachmentCount),
+                onClick = onOpenAttachments,
+            )
         }
     }
 
@@ -179,7 +126,7 @@ fun OptionsPanel(
 
 @Composable
 private fun OptionRow(
-    icon: ImageVector,
+    symbolName: String,
     title: String,
     summary: String,
     onClick: (() -> Unit)? = null,
@@ -188,15 +135,15 @@ private fun OptionRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .let { if (onClick != null) it.tapSoundClickable(onClick = onClick) else it }
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
+        RememberMaterialRoundedSymbol(
+            name = symbolName,
+            size = 22.dp,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(22.dp),
+            weight = FontWeight.Medium,
         )
         Spacer(Modifier.size(14.dp))
         Column(Modifier.weight(1f)) {
@@ -245,14 +192,14 @@ private fun <T> ChoiceSheet(
         title = title,
         onDismiss = onDismiss,
         actions = {
-            TextButton(onClick = onDismiss) { Text("Done") }
+            RememberTextButton(onClick = onDismiss) { Text("Done") }
         },
     ) {
         options.forEach { (value, label) ->
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onPick(value) }
+                    .tapSoundClickable { onPick(value) }
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

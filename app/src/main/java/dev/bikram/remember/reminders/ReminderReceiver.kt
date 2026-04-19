@@ -45,7 +45,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     if (idx >= 3) return@forEachIndexed
                     builder.addAction(actionButton(context, noteId, idx, action))
                 }
-                nm.notify(noteId.toInt(), builder.build())
+                nm.notify(ReminderScheduler.pendingRequestCodeForNote(noteId), builder.build())
 
                 // Reschedule the next occurrence for recurring reminders. This mutates
                 // note.reminderAt and (when the rule is exhausted) clears it.
@@ -76,7 +76,7 @@ class ReminderReceiver : BroadcastReceiver() {
         }
         return PendingIntent.getActivity(
             context,
-            noteId.toInt(),
+            ReminderScheduler.pendingRequestCodeForNote(noteId),
             open,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -95,7 +95,7 @@ class ReminderReceiver : BroadcastReceiver() {
         }
         val pi = PendingIntent.getBroadcast(
             context,
-            noteId.toInt() * 10 + index,
+            ReminderScheduler.pendingRequestCodeForNoteAction(noteId, index),
             i,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )

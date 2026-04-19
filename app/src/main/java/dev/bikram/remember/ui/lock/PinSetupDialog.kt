@@ -1,4 +1,5 @@
 package dev.bikram.remember.ui.lock
+import androidx.compose.material3.TextButton
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,7 +8,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +18,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.components.RememberTextButton
 
 @Composable
 fun PinSetupDialog(
@@ -34,8 +35,8 @@ fun PinSetupDialog(
         subtitle = "Choose a 4–6 digit PIN to unlock Remember.",
         onDismiss = onDismiss,
         actions = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-            TextButton(enabled = ready, onClick = { onConfirm(pin) }) { Text("Save") }
+            RememberTextButton(onClick = onDismiss) { Text("Cancel") }
+            RememberTextButton(enabled = ready, onClick = { onConfirm(pin) }) { Text("Save") }
         },
     ) {
         Column(

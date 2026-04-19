@@ -1,4 +1,5 @@
 package dev.bikram.remember.ui.common
+import androidx.compose.material3.TextButton
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -8,16 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FormatBold
-import androidx.compose.material.icons.filled.FormatItalic
-import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.automirrored.filled.Undo
-import androidx.compose.material.icons.filled.FormatListNumbered
-import androidx.compose.material.icons.filled.FormatStrikethrough
-import androidx.compose.material.icons.filled.FormatUnderlined
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -25,18 +16,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.TextUnitType
-import androidx.compose.material.icons.filled.AddLink
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -47,6 +40,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import com.mohamedrejeb.richeditor.annotation.ExperimentalRichTextApi
 import com.mohamedrejeb.richeditor.model.RichTextState
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberIconButton
 
 // Ordered and unordered lists use different TextIndent math internally: unordered restLine is
 // (indent*level + bulletStartTextWidth), ordered restLine is (indent*level). Setting a single
@@ -59,9 +54,12 @@ private const val UnorderedListIndentSp = 30
 @OptIn(ExperimentalRichTextApi::class)
 @Composable
 fun ApplyRichEditorListIndent(state: RichTextState) {
-    LaunchedEffect(state) {
+    val scheme = MaterialTheme.colorScheme
+    LaunchedEffect(state, scheme.primary, scheme.background) {
         state.config.orderedListIndent = OrderedListIndentSp
         state.config.unorderedListIndent = UnorderedListIndentSp
+        state.config.linkColor = scheme.primary
+        state.config.linkTextDecoration = TextDecoration.Underline
     }
 }
 
@@ -126,66 +124,10 @@ fun RichTextToolbar(
     val cursorInLink = state.isLink
 
     if (showLinkDialog) {
-        val initialText = state.selectedLinkText
-            ?: state.annotatedString.substring(state.selection.min, state.selection.max)
-        val initialUrl = state.selectedLinkUrl.orEmpty()
-        var linkText by remember { mutableStateOf(initialText) }
-        var linkUrl by remember { mutableStateOf(initialUrl) }
-        val editing = cursorInLink
-        AlertDialog(
-            onDismissRequest = { showLinkDialog = false },
-            title = { Text(if (editing) "Edit Link" else "Add Link") },
-            text = {
-                Column {
-                    OutlinedTextField(
-                        value = linkText,
-                        onValueChange = { linkText = it },
-                        label = { Text("Text to display") },
-                        singleLine = true,
-                        enabled = !editing,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = linkUrl,
-                        onValueChange = { linkUrl = it },
-                        label = { Text("URL (e.g. https://...)") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (linkUrl.isNotBlank()) {
-                            val finalUrl = if (!linkUrl.startsWith("http")) "https://$linkUrl" else linkUrl
-                            if (editing) {
-                                state.updateLink(finalUrl)
-                            } else {
-                                val finalText = linkText.ifBlank { finalUrl }
-                                state.addLink(text = finalText, url = finalUrl)
-                            }
-                        }
-                        showLinkDialog = false
-                    }
-                ) {
-                    Text(if (editing) "Save" else "Add")
-                }
-            },
-            dismissButton = {
-                Row {
-                    if (editing) {
-                        TextButton(onClick = {
-                            state.removeLink()
-                            showLinkDialog = false
-                        }) { Text("Remove") }
-                    }
-                    TextButton(onClick = { showLinkDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            }
+        LinkDialog(
+            state = state,
+            editing = cursorInLink,
+            onDismiss = { showLinkDialog = false },
         )
     }
 
@@ -214,84 +156,212 @@ fun RichTextToolbar(
         val h3Style = remember { SpanStyle(fontSize = 1.17.em, fontWeight = FontWeight.Bold) }
 
         if (onUndo != null) {
-            IconButton(onClick = { onUndo() }, enabled = canUndo, colors = colors) {
-                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+            RememberIconButton(onClick = { onUndo() }, enabled = canUndo, colors = colors) {
+                RememberMaterialRoundedSymbol(
+                    name = "undo",
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.semantics { contentDescription = "Undo" },
+                )
             }
         }
         if (onRedo != null) {
-            IconButton(onClick = { onRedo() }, enabled = canRedo, colors = colors) {
-                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+            RememberIconButton(onClick = { onRedo() }, enabled = canRedo, colors = colors) {
+                RememberMaterialRoundedSymbol(
+                    name = "redo",
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.semantics { contentDescription = "Redo" },
+                )
             }
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold)) },
-            colors = if (state.currentSpanStyle.fontWeight == FontWeight.Bold && state.currentSpanStyle.fontSize == androidx.compose.ui.unit.TextUnit.Unspecified) activeColors else colors
+            colors = if (state.currentSpanStyle.fontWeight == FontWeight.Bold) activeColors else colors,
         ) {
-            Icon(Icons.Filled.FormatBold, contentDescription = "Bold")
+            RememberMaterialRoundedSymbol(
+                name = "format_bold",
+                weight = FontWeight.Medium,
+                modifier = Modifier.semantics { contentDescription = "Bold" },
+            )
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { state.toggleSpanStyle(SpanStyle(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)) },
             colors = if (state.currentSpanStyle.fontStyle == androidx.compose.ui.text.font.FontStyle.Italic) activeColors else colors
         ) {
-            Icon(Icons.Filled.FormatItalic, contentDescription = "Italic")
+            RememberMaterialRoundedSymbol(
+                name = "format_italic",
+                weight = FontWeight.Medium,
+                modifier = Modifier.semantics { contentDescription = "Italic" },
+            )
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)) },
             colors = if (state.currentSpanStyle.textDecoration?.contains(androidx.compose.ui.text.style.TextDecoration.Underline) == true) activeColors else colors
         ) {
-            Icon(Icons.Filled.FormatUnderlined, contentDescription = "Underline")
+            RememberMaterialRoundedSymbol(
+                name = "format_underlined",
+                weight = FontWeight.Medium,
+                modifier = Modifier.semantics { contentDescription = "Underline" },
+            )
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { state.toggleSpanStyle(SpanStyle(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough)) },
             colors = if (state.currentSpanStyle.textDecoration?.contains(androidx.compose.ui.text.style.TextDecoration.LineThrough) == true) activeColors else colors
         ) {
-            Icon(Icons.Filled.FormatStrikethrough, contentDescription = "Strikethrough")
+            RememberMaterialRoundedSymbol(
+                name = "format_strikethrough",
+                weight = FontWeight.Medium,
+                modifier = Modifier.semantics { contentDescription = "Strikethrough" },
+            )
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { applyHeadingToCurrentLine(state, h1Style) },
             colors = if (isHeadingActive(state, 2f)) activeColors else colors
         ) {
             Text("H1", fontWeight = FontWeight.Bold)
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { applyHeadingToCurrentLine(state, h2Style) },
             colors = if (isHeadingActive(state, 1.5f)) activeColors else colors
         ) {
             Text("H2", fontWeight = FontWeight.Bold)
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { applyHeadingToCurrentLine(state, h3Style) },
             colors = if (isHeadingActive(state, 1.17f)) activeColors else colors
         ) {
             Text("H3", fontWeight = FontWeight.Bold)
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { state.toggleUnorderedList() },
             colors = if (state.isUnorderedList) activeColors else colors
         ) {
-            Icon(Icons.AutoMirrored.Filled.FormatListBulleted, contentDescription = "Bullet List")
+            RememberMaterialRoundedSymbol(
+                name = "format_list_bulleted",
+                weight = FontWeight.Medium,
+                modifier = Modifier.semantics { contentDescription = "Bullet List" },
+            )
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { state.toggleOrderedList() },
             colors = if (state.isOrderedList) activeColors else colors
         ) {
-            Icon(Icons.Filled.FormatListNumbered, contentDescription = "Numbered List")
+            RememberMaterialRoundedSymbol(
+                name = "format_list_numbered",
+                weight = FontWeight.Medium,
+                modifier = Modifier.semantics { contentDescription = "Numbered List" },
+            )
         }
 
-        IconButton(
+        RememberIconButton(
             onClick = { showLinkDialog = true },
             colors = if (cursorInLink) activeColors else colors
         ) {
-            Icon(Icons.Filled.AddLink, contentDescription = if (cursorInLink) "Edit Link" else "Add Link")
+            RememberMaterialRoundedSymbol(
+                name = "add_link",
+                weight = FontWeight.Medium,
+                modifier = Modifier.semantics {
+                    contentDescription = if (cursorInLink) "Edit Link" else "Add Link"
+                },
+            )
         }
     }
+}
+
+@OptIn(ExperimentalRichTextApi::class)
+@Composable
+private fun LinkDialog(
+    state: RichTextState,
+    editing: Boolean,
+    onDismiss: () -> Unit,
+) {
+    val initialText = remember(state, editing) {
+        val fromLink = state.selectedLinkText
+        if (fromLink != null) {
+            fromLink
+        } else {
+            val text = state.annotatedString
+            val textLength = text.length
+            if (textLength == 0) {
+                ""
+            } else {
+                val start = state.selection.min.coerceIn(0, textLength)
+                val end = state.selection.max.coerceIn(0, textLength)
+                val rangeStart = minOf(start, end)
+                val rangeEnd = maxOf(start, end).coerceIn(rangeStart, textLength)
+                if (rangeStart >= rangeEnd) {
+                    ""
+                } else {
+                    text.substring(rangeStart, rangeEnd)
+                }
+            }
+        }
+    }
+    val initialUrl = remember(state, editing) { state.selectedLinkUrl.orEmpty() }
+    var linkText by remember(state, editing) { mutableStateOf(initialText) }
+    var linkUrl by remember(state, editing) { mutableStateOf(initialUrl) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (editing) "Edit Link" else "Add Link") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = linkText,
+                    onValueChange = { linkText = it },
+                    label = { Text("Text to display") },
+                    singleLine = true,
+                    enabled = !editing,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = linkUrl,
+                    onValueChange = { linkUrl = it },
+                    label = { Text("URL (e.g. https://...)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            RememberTextButton(
+                onClick = {
+                    if (linkUrl.isNotBlank()) {
+                        val finalUrl = if (!linkUrl.startsWith("http")) "https://$linkUrl" else linkUrl
+                        if (editing) {
+                            state.updateLink(finalUrl)
+                        } else {
+                            val finalText = linkText.ifBlank { finalUrl }
+                            state.addLink(text = finalText, url = finalUrl)
+                        }
+                    }
+                    onDismiss()
+                }
+            ) {
+                Text(if (editing) "Save" else "Add")
+            }
+        },
+        dismissButton = {
+            Row {
+                if (editing) {
+                    RememberTextButton(onClick = {
+                        state.removeLink()
+                        onDismiss()
+                    }) { Text("Remove") }
+                }
+                RememberTextButton(onClick = onDismiss) {
+                    Text("Cancel")
+                }
+            }
+        }
+    )
 }

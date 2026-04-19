@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.ui.lock.LockScreen
@@ -33,7 +34,13 @@ class MainActivity : FragmentActivity() {
             val themeState by container.themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
             )
-            RememberTheme(themeState = themeState) {
+            val interactionState by container.interactionPrefs.state.collectAsStateWithLifecycle(
+                initialValue = InteractionState(),
+            )
+            RememberTheme(
+                themeState = themeState,
+                interactionState = interactionState,
+            ) {
                 AppRoot(container = container)
             }
         }

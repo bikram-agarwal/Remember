@@ -47,17 +47,18 @@ class BackupIo(
         SettingsBackup.importJson(settingsJson, themePrefs, lockPrefs, interactionPrefs, backupPrefs)
     }
 
-    private suspend fun buildNotesRootObject(): JSONObject {
-        val active = repository.observeActive().first()
-        val trashed = repository.observeTrashed().first()
-        val all = active + trashed
-        return JSONObject().apply {
+    private data class NotesSnapshot(val root: JSONObject, val noteCount: Int)
+
+    private suspend fun snapshotNotes(): NotesSnapshot {
+        val all = repository.observeActive().first() + repository.observeTrashed().first()
+        val root = JSONObject().apply {
             put("version", SCHEMA_VERSION)
             put("exportedAt", System.currentTimeMillis())
             put("notes", JSONArray().apply {
                 all.forEach { put(encode(it)) }
             })
         }
+        return NotesSnapshot(root, all.size)
     }
 
     private fun encode(n: NoteWithItems): JSONObject {
@@ -76,6 +77,7 @@ class BackupIo(
             put("importance", note.importance.name)
             put("visibility", note.visibility.name)
             note.pictureUri?.let { put("pictureUri", it) }
+            note.pictureHeroFraming?.let { put("pictureHeroFraming", it) }
             put("locked", note.locked)
             note.iconKey?.let { put("iconKey", it) }
             put("actions", JSONArray().apply {
@@ -183,12 +185,11 @@ class BackupIo(
     /** @return note count on success, or -1 if the output stream could not be opened. */
     suspend fun exportTo(uri: Uri): Int = withContext(Dispatchers.IO) {
         val includeMedia = backupPrefs.snapshot().includeMediaInBackup
-        val notesRoot = buildNotesRootObject()
-        val all = repository.observeActive().first() + repository.observeTrashed().first()
-        val bytes = writeZipArchive(notesRoot, includeMedia)
+        val snapshot = snapshotNotes()
+        val bytes = writeZipArchive(snapshot.root, includeMedia)
         val outputStream = context.contentResolver.openOutputStream(uri) ?: return@withContext -1
         outputStream.use { stream -> stream.write(bytes) }
-        all.size
+        snapshot.noteCount
     }
 
     suspend fun exportToTreeFolder(treeUriString: String): Result<String> = withContext(Dispatchers.IO) {
@@ -196,8 +197,8 @@ class BackupIo(
             if (!treeUriString.startsWith("content://")) error("Invalid export folder")
             val includeMedia = backupPrefs.snapshot().includeMediaInBackup
             val treeUri = Uri.parse(treeUriString)
-            val notesRoot = buildNotesRootObject()
-            val bytes = writeZipArchive(notesRoot, includeMedia)
+            val snapshot = snapshotNotes()
+            val bytes = writeZipArchive(snapshot.root, includeMedia)
             val stamp = backupStamp()
             val fileName = "remember_backup_$stamp.zip"
             val docTreeUri = DocumentsContract.buildDocumentUriUsingTree(
@@ -218,8 +219,21 @@ class BackupIo(
     }
 
     suspend fun restoreFullReplace(uri: Uri): Int = withContext(Dispatchers.IO) {
-        repository.deleteAllNotes()
-        importFrom(uri, preserveIdsForNotes = true)
+        val payload = readRestorePayload(uri) ?: return@withContext 0
+        try {
+            val count = repository.restoreNotesFullReplace {
+                importFromJsonText(
+                    text = payload.notesText,
+                    extractDir = payload.extractRoot,
+                    preserveNoteIds = true,
+                    suppressReminderSchedule = true,
+                )
+            }
+            importSettingsFromJson(payload.settingsJson)
+            count
+        } finally {
+            payload.extractRoot?.deleteRecursively()
+        }
     }
 
     suspend fun importFrom(uri: Uri, preserveIdsForNotes: Boolean = false): Int = withContext(Dispatchers.IO) {
@@ -232,32 +246,85 @@ class BackupIo(
         }
     }
 
+    private data class RestorePayload(
+        val notesText: String,
+        val settingsJson: JSONObject?,
+        val extractRoot: File?,
+    )
+
+    /**
+     * Reads and validates backup contents without mutating notes. Used so a corrupt or
+     * unreadable archive never triggers a destructive delete first.
+     */
+    private fun readRestorePayload(uri: Uri): RestorePayload? {
+        if (isZipUri(uri)) {
+            val extractRoot = File(context.cacheDir, "remember_zip_restore_${UUID.randomUUID()}")
+            if (extractRoot.exists()) extractRoot.deleteRecursively()
+            extractRoot.mkdirs()
+            if (!materializeZipEntries(uri, extractRoot)) {
+                extractRoot.deleteRecursively()
+                return null
+            }
+            val notesFile = File(extractRoot, ENTRY_NOTES)
+            if (!notesFile.isFile) {
+                extractRoot.deleteRecursively()
+                return null
+            }
+            val notesText = runCatching { notesFile.readText() }.getOrNull() ?: run {
+                extractRoot.deleteRecursively()
+                return null
+            }
+            val root = runCatching { JSONObject(notesText) }.getOrNull() ?: run {
+                extractRoot.deleteRecursively()
+                return null
+            }
+            if (!root.has("notes")) {
+                extractRoot.deleteRecursively()
+                return null
+            }
+            val settingsFile = File(extractRoot, ENTRY_SETTINGS)
+            val settingsJson = if (settingsFile.isFile) {
+                runCatching { JSONObject(settingsFile.readText(Charsets.UTF_8)) }.getOrNull()
+            } else {
+                null
+            }
+            return RestorePayload(notesText, settingsJson, extractRoot)
+        }
+        val text = context.contentResolver.openInputStream(uri)?.use { input -> input.reader().readText() }
+            ?: return null
+        val root = runCatching { JSONObject(text) }.getOrNull() ?: return null
+        if (!root.has("notes")) return null
+        return RestorePayload(text, null, null)
+    }
+
+    private fun materializeZipEntries(uri: Uri, extractRoot: File): Boolean =
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                ZipInputStream(BufferedInputStream(input)).use { zipIn ->
+                    var entry = zipIn.nextEntry
+                    while (entry != null) {
+                        if (!entry.isDirectory) {
+                            val name = entry.name
+                            val outFile = File(extractRoot, name).canonicalFile
+                            val extractBase = extractRoot.canonicalFile
+                            if (outFile.path.startsWith(extractBase.path)) {
+                                outFile.parentFile?.mkdirs()
+                                FileOutputStream(outFile).use { fos -> zipIn.copyTo(fos) }
+                            }
+                        }
+                        entry = zipIn.nextEntry
+                    }
+                }
+                true
+            } ?: false
+        }.getOrDefault(false)
+
     private suspend fun importFromZip(uri: Uri, preserveNoteIds: Boolean): Int {
         val extractRoot = File(context.cacheDir, "remember_zip_import_${UUID.randomUUID()}")
         if (extractRoot.exists()) extractRoot.deleteRecursively()
         extractRoot.mkdirs()
         return try {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                ZipInputStream(BufferedInputStream(input)).use { zipIn ->
-                    var entry = zipIn.nextEntry
-                    while (entry != null) {
-                        val name = entry.name
-                        if (entry.isDirectory) {
-                            entry = zipIn.nextEntry
-                            continue
-                        }
-                        val outFile = File(extractRoot, name).canonicalFile
-                        val extractBase = extractRoot.canonicalFile
-                        if (!outFile.path.startsWith(extractBase.path)) {
-                            entry = zipIn.nextEntry
-                            continue
-                        }
-                        outFile.parentFile?.mkdirs()
-                        FileOutputStream(outFile).use { fos -> zipIn.copyTo(fos) }
-                        entry = zipIn.nextEntry
-                    }
-                }
-            }
+            if (!materializeZipEntries(uri, extractRoot)) return 0
             val notesFile = File(extractRoot, ENTRY_NOTES)
             val settingsFile = File(extractRoot, ENTRY_SETTINGS)
             val notesText = if (notesFile.isFile) notesFile.readText() else return 0
@@ -274,6 +341,7 @@ class BackupIo(
         text: String,
         extractDir: File?,
         preserveNoteIds: Boolean,
+        suppressReminderSchedule: Boolean = false,
     ): Int {
         val root = JSONObject(text)
         val arr = root.optJSONArray("notes") ?: return 0
@@ -303,6 +371,7 @@ class BackupIo(
                 note = noteForInsert,
                 items = items,
                 attachments = nonRelAttachments,
+                suppressReminderSchedule = suppressReminderSchedule,
             )
             if (extractDir != null) {
                 if (picturePathForRelCopy != null) {
@@ -351,6 +420,7 @@ class BackupIo(
             visibility = runCatching { Visibility.valueOf(o.optString("visibility", Visibility.PRIVATE.name)) }
                 .getOrDefault(Visibility.PRIVATE),
             pictureUri = o.optStringOrNull("pictureUri"),
+            pictureHeroFraming = o.optStringOrNull("pictureHeroFraming"),
             locked = o.optBoolean("locked", false),
             iconKey = o.optStringOrNull("iconKey"),
             actions = o.optJSONArray("actions")?.let { decodeActions(it) } ?: emptyList(),
@@ -414,14 +484,21 @@ class BackupIo(
             read == 4 && header[0] == 0x50.toByte() && header[1] == 0x4b.toByte()
         } ?: false
 
-    private fun decodeActions(a: JSONArray): List<NoteAction> = List(a.length()) { i ->
-        val o = a.getJSONObject(i)
-        NoteAction(
-            type = ActionType.valueOf(o.getString("type")),
-            title = o.optString("title", ""),
-            details = o.optString("details", ""),
-            extra = o.optStringOrNull("extra"),
-        )
+    private fun decodeActions(a: JSONArray): List<NoteAction> {
+        val out = ArrayList<NoteAction>(a.length())
+        for (i in 0 until a.length()) {
+            val o = a.optJSONObject(i) ?: continue
+            val type = runCatching { ActionType.valueOf(o.optString("type", "")) }.getOrNull() ?: continue
+            out.add(
+                NoteAction(
+                    type = type,
+                    title = o.optString("title", ""),
+                    details = o.optString("details", ""),
+                    extra = o.optStringOrNull("extra"),
+                )
+            )
+        }
+        return out
     }
 
     private fun decodeStringArray(a: JSONArray): List<String> =

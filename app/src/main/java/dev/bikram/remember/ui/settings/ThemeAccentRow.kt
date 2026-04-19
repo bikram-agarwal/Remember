@@ -15,13 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ripple
@@ -34,14 +30,20 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.theme.seedColorFor
+import dev.bikram.remember.ui.components.RememberFilterChip
+import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 
 private val accentPresetOrder: List<ColorSource> = listOf(
     ColorSource.DEFAULT,
@@ -56,6 +58,8 @@ private val accentPresetOrder: List<ColorSource> = listOf(
     ColorSource.ROSE,
     ColorSource.SLATE,
 )
+
+private val paletteStyleOrder: List<PaletteStyleOpt> = PaletteStyleOpt.entries.toList()
 
 private fun colorSourceIsSeedBased(source: ColorSource): Boolean = when (source) {
     ColorSource.CUSTOM,
@@ -119,7 +123,7 @@ fun ThemeAccentRow(
                         color = borderColor,
                         shape = CircleShape,
                     )
-                    .clickable(
+                    .tapSoundClickable(
                         onClick = { onSelectPreset(source) },
                         indication = ripple(bounded = true),
                         interactionSource = remember { MutableInteractionSource() },
@@ -146,7 +150,7 @@ fun ThemeAccentRow(
                         color = borderColor,
                         shape = CircleShape,
                     )
-                    .combinedClickable(
+                    .tapSoundCombinedClickable(
                         onClick = { onSelectCustomHex(storedHex) },
                         onLongClick = { onCustomHexLongPress(storedHex) },
                         indication = ripple(bounded = true),
@@ -164,6 +168,7 @@ fun ThemeAccentRow(
             }
         }
         item(key = "add_custom_seed") {
+            val addCustomColorCd = stringResource(R.string.appearance_add_custom_color_cd)
             val addBorder = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
             Box(
                 modifier = Modifier
@@ -171,7 +176,7 @@ fun ThemeAccentRow(
                     .clip(CircleShape)
                     .border(width = 1.dp, color = addBorder, shape = CircleShape)
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
-                    .clickable(
+                    .tapSoundClickable(
                         onClick = onAddCustomHexClick,
                         indication = ripple(bounded = true),
                         interactionSource = remember { MutableInteractionSource() },
@@ -179,11 +184,12 @@ fun ThemeAccentRow(
                     .semantics { role = Role.Button },
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.Outlined.Add,
-                    contentDescription = stringResource(R.string.appearance_add_custom_color_cd),
+                RememberMaterialRoundedSymbol(
+                    name = "add",
+                    size = 26.dp,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(26.dp),
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.semantics { contentDescription = addCustomColorCd },
                 )
             }
         }
@@ -232,11 +238,11 @@ private fun ThemeAccentCircleContent(source: ColorSource) {
                 ),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Filled.Palette,
-                contentDescription = null,
+            RememberMaterialRoundedSymbol(
+                name = "palette",
+                size = 22.dp,
                 tint = Color.White.copy(alpha = 0.92f),
-                modifier = Modifier.size(22.dp),
+                weight = FontWeight.Medium,
             )
         }
         else -> {
@@ -263,8 +269,8 @@ fun ThemePaletteStyleRow(
         modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        items(PaletteStyleOpt.entries.toList(), key = { it.name }) { style ->
-            FilterChip(
+        items(paletteStyleOrder, key = { it.name }) { style ->
+            RememberFilterChip(
                 selected = selected == style,
                 onClick = { if (enabled) onSelect(style) },
                 enabled = enabled,

@@ -13,12 +13,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -26,9 +24,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.data.TagPalette
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.LocalTagColors
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 /** Parse "#RRGGBB" into a Compose Color. Returns null if invalid. */
 fun parseHexColor(hex: String): Color? = runCatching {
@@ -44,6 +47,8 @@ fun tagColor(tag: String): Color {
     return hex?.let { parseHexColor(it) } ?: TagPalette.defaultFor(key)
 }
 
+private val TagAccentStripShape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp)
+
 /** Left edge of note cards: colored strip from tag palette (gradient when several tags). */
 @Composable
 fun TagAccentCardStrip(
@@ -51,17 +56,22 @@ fun TagAccentCardStrip(
     modifier: Modifier = Modifier,
 ) {
     if (tags.isEmpty()) return
-    val orderedColors = tags.map { tagColor(it) }.take(4)
-    val shape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp)
-    val brush: Brush = when (orderedColors.size) {
-        1 -> SolidColor(orderedColors[0])
-        else -> Brush.verticalGradient(orderedColors)
+    val tagColorMap = LocalTagColors.current
+    val brush = remember(tags, tagColorMap) {
+        val orderedColors = tags.map { tag ->
+            val key = tag.trim().lowercase()
+            tagColorMap[key]?.let { parseHexColor(it) } ?: TagPalette.defaultFor(key)
+        }.take(4)
+        when (orderedColors.size) {
+            1 -> SolidColor(orderedColors[0])
+            else -> Brush.verticalGradient(orderedColors)
+        }
     }
     Box(
         modifier = modifier
             .width(5.dp)
             .fillMaxHeight()
-            .clip(shape)
+            .clip(TagAccentStripShape)
             .background(brush),
     )
 }
@@ -73,10 +83,16 @@ fun TagAccentEditorStrip(tags: List<String>) {
         Spacer(Modifier.height(12.dp))
         return
     }
-    val orderedColors = tags.map { tagColor(it) }.take(4)
-    val brush: Brush = when (orderedColors.size) {
-        1 -> SolidColor(orderedColors[0])
-        else -> Brush.horizontalGradient(orderedColors)
+    val tagColorMap = LocalTagColors.current
+    val brush = remember(tags, tagColorMap) {
+        val orderedColors = tags.map { tag ->
+            val key = tag.trim().lowercase()
+            tagColorMap[key]?.let { parseHexColor(it) } ?: TagPalette.defaultFor(key)
+        }.take(4)
+        when (orderedColors.size) {
+            1 -> SolidColor(orderedColors[0])
+            else -> Brush.horizontalGradient(orderedColors)
+        }
     }
     Box(
         modifier = Modifier
@@ -112,7 +128,7 @@ fun TagChipFilled(
         modifier = modifier
             .alpha(if (faded) 0.4f else 1f)
             .background(color, RoundedCornerShape(if (compact) 8.dp else 14.dp))
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
+            .let { if (onClick != null) it.tapSoundClickable(onClick = onClick) else it }
             .padding(horizontal = horizontal, vertical = vertical),
     ) {
         Text(
@@ -123,13 +139,14 @@ fun TagChipFilled(
             maxLines = 1,
         )
         if (onRemove != null) {
-            Icon(
-                imageVector = Icons.Filled.Close,
-                contentDescription = "Remove $tag",
+            RememberMaterialRoundedSymbol(
+                name = "close",
+                size = 14.dp,
                 tint = contentColor,
+                weight = FontWeight.Medium,
                 modifier = Modifier
-                    .size(14.dp)
-                    .clickable(onClick = onRemove),
+                    .semantics { contentDescription = "Remove $tag" }
+                    .tapSoundClickable(onClick = onRemove),
             )
         }
     }

@@ -1,7 +1,6 @@
 package dev.bikram.remember.ui.edit
 
 import android.net.Uri
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -20,15 +19,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckBox
-import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -43,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,8 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -62,7 +53,12 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil3.compose.AsyncImage
+import dev.bikram.remember.R
+import dev.bikram.remember.ui.common.FullScreenImageDialog
+import dev.bikram.remember.ui.common.HeroFramingEditorDialog
+import dev.bikram.remember.ui.common.HeroFramedImage
+import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
@@ -70,6 +66,7 @@ import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.RecurrenceRule
+import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.Visibility as NoteVisibility
 import androidx.compose.ui.graphics.Color
@@ -82,6 +79,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.io.File
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 data class EditableItem(
     val localId: Long,
@@ -122,6 +125,12 @@ class EditListViewModel(
     private val _pictureUri = MutableStateFlow<String?>(null)
     val pictureUri: StateFlow<String?> = _pictureUri.asStateFlow()
 
+    private val _pictureRevision = MutableStateFlow(0L)
+    val pictureRevision: StateFlow<Long> = _pictureRevision.asStateFlow()
+
+    private val _pictureHeroFraming = MutableStateFlow<String?>(null)
+    val pictureHeroFraming: StateFlow<String?> = _pictureHeroFraming.asStateFlow()
+
     private val _iconKey = MutableStateFlow<String?>(null)
     val iconKey: StateFlow<String?> = _iconKey.asStateFlow()
 
@@ -137,6 +146,7 @@ class EditListViewModel(
     private var loadedId: Long? = noteId
     private var dirty: Boolean = false
     private var nextLocalId: Long = -1L
+    private val persistMutex = Mutex()
 
     init {
         if (noteId != null) {
@@ -144,16 +154,17 @@ class EditListViewModel(
                 val existing = repository.get(noteId) ?: return@launch
                 val n = existing.note
                 _title.value = n.title
-                _pinned.value = n.pinned
+                _pinned.value = n.pinned || n.tags.contains(RememberReservedTags.FAVORITE)
                 _reminderAt.value = n.reminderAt
-                _recurrence.value = n.recurrence
+                _recurrence.value = n.recurrence?.sanitized()
                 _importance.value = n.importance
                 _visibility.value = n.visibility
                 _locked.value = n.locked
                 _pictureUri.value = n.pictureUri
+                _pictureHeroFraming.value = n.pictureHeroFraming
                 _iconKey.value = n.iconKey
                 _actions.value = n.actions
-                _tags.value = n.tags
+                _tags.value = n.tags.filterNot { it == RememberReservedTags.FAVORITE }
                 _attachments.value = existing.attachments
                 _items.value = existing.items.map {
                     EditableItem(localId = it.id, text = it.text, checked = it.checked)
@@ -166,19 +177,34 @@ class EditListViewModel(
     fun togglePin()                          { _pinned.value = !_pinned.value; dirty = true }
     fun setReminder(at: Long?, rule: RecurrenceRule?) {
         _reminderAt.value = at
-        _recurrence.value = rule
+        _recurrence.value = rule?.sanitized()
         dirty = true
     }
     fun setImportance(v: Importance)         { _importance.value = v; dirty = true }
     fun setVisibility(v: NoteVisibility)     { _visibility.value = v; dirty = true }
     fun toggleLock()                         { _locked.value = !_locked.value; dirty = true }
-    fun setPictureUri(v: String?)            { _pictureUri.value = v; dirty = true }
+    fun setPictureUri(v: String?) {
+        _pictureUri.value = v
+        if (v == null) {
+            _pictureHeroFraming.value = null
+        }
+        _pictureRevision.value = _pictureRevision.value + 1L
+        dirty = true
+    }
+
+    fun setHeroWithFraming(pictureUri: String, framing: HeroFraming) {
+        _pictureUri.value = pictureUri
+        _pictureHeroFraming.value = framing.toJsonString()
+        _pictureRevision.value = _pictureRevision.value + 1L
+        dirty = true
+    }
+
     fun setIconKey(v: String?)               { _iconKey.value = v; dirty = true }
     fun setActions(v: List<NoteAction>)      { _actions.value = v; dirty = true }
-    fun setTags(v: List<String>)             { _tags.value = v; dirty = true }
+    fun setTags(v: List<String>)             { _tags.value = v.filterNot { it == RememberReservedTags.FAVORITE }; dirty = true }
 
     fun saveTagsWithColors(tags: List<String>, newColors: Map<String, String>) {
-        _tags.value = tags
+        _tags.value = tags.filterNot { it == RememberReservedTags.FAVORITE }
         dirty = true
         if (newColors.isNotEmpty()) {
             viewModelScope.launch {
@@ -243,16 +269,23 @@ class EditListViewModel(
         }
     }
 
+    private fun tagsForPersistence(): List<String> {
+        val base = _tags.value.filterNot { it == RememberReservedTags.FAVORITE }
+        return if (_pinned.value) (base + RememberReservedTags.FAVORITE).distinct()
+        else base
+    }
+
     private fun currentOptions() = NoteOptions(
         reminderAt = _reminderAt.value,
         recurrence = _recurrence.value,
         importance = _importance.value,
         visibility = _visibility.value,
         pictureUri = _pictureUri.value,
+        pictureHeroFraming = _pictureHeroFraming.value,
         locked = _locked.value,
         iconKey = _iconKey.value,
         actions = _actions.value,
-        tags = _tags.value,
+        tags = tagsForPersistence(),
     )
 
     private fun currentItems(): List<ChecklistItemEntity> {
@@ -270,43 +303,48 @@ class EditListViewModel(
     }
 
     suspend fun saveIfNeeded() {
-        val t = _title.value
-        val id = loadedId
-        val nonEmpty = _items.value.filter { it.text.isNotBlank() }
-        val entities = nonEmpty.mapIndexed { idx, item ->
-            ChecklistItemEntity(
-                id = 0,
-                noteId = id ?: 0L,
-                text = item.text,
-                checked = item.checked,
-                position = idx,
-            )
-        }
-        val empty = t.isBlank() && entities.isEmpty()
-        if (id == null) {
-            if (empty) return
-            val newId = repository.createList(t, 0, entities.map { it.text }, currentOptions())
-            if (nonEmpty.any { it.checked }) {
-                val saved = repository.get(newId)
-                saved?.items?.forEachIndexed { idx, it ->
-                    val want = nonEmpty.getOrNull(idx)?.checked ?: false
-                    if (want && !it.checked) repository.toggleItemChecked(it)
-                }
+        persistMutex.withLock {
+            val t = _title.value
+            val id = loadedId
+            val nonEmpty = _items.value.filter { it.text.isNotBlank() }
+            val entities = nonEmpty.mapIndexed { idx, item ->
+                ChecklistItemEntity(
+                    id = 0,
+                    noteId = id ?: 0L,
+                    text = item.text,
+                    checked = item.checked,
+                    position = idx,
+                )
             }
-            if (_pinned.value) repository.setPinned(newId, true)
-        } else {
-            if (!dirty) return
-            repository.updateList(id, t, 0, entities, currentOptions())
-            val cur = repository.get(id)?.note
-            if (cur != null && cur.pinned != _pinned.value) {
-                repository.setPinned(id, _pinned.value)
+            val empty = t.isBlank() && entities.isEmpty()
+            if (id == null) {
+                if (empty) return@withLock
+                val newId = repository.createList(t, 0, entities.map { it.text }, currentOptions())
+                if (nonEmpty.any { it.checked }) {
+                    val saved = repository.get(newId)
+                    saved?.items?.forEachIndexed { idx, it ->
+                        val want = nonEmpty.getOrNull(idx)?.checked ?: false
+                        if (want && !it.checked) repository.toggleItemChecked(it)
+                    }
+                }
+                if (_pinned.value) repository.setPinned(newId, true)
+            } else {
+                if (!dirty) return@withLock
+                repository.updateList(id, t, 0, entities, currentOptions())
+                val cur = repository.get(id)?.note
+                if (cur != null && cur.pinned != _pinned.value) {
+                    repository.setPinned(id, _pinned.value)
+                }
             }
         }
     }
 
     suspend fun trashCurrent() {
-        val id = loadedId ?: return
-        repository.moveToTrash(id)
+        persistMutex.withLock {
+            val id = loadedId ?: return@withLock
+            repository.moveToTrash(id)
+            dirty = false
+        }
     }
 
     companion object {
@@ -343,6 +381,8 @@ fun EditListRoute(
     val visibility by vm.visibility.collectAsStateWithLifecycle()
     val locked by vm.locked.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
+    val pictureRevision by vm.pictureRevision.collectAsStateWithLifecycle()
+    val pictureHeroFraming by vm.pictureHeroFraming.collectAsStateWithLifecycle()
     val iconKey by vm.iconKey.collectAsStateWithLifecycle()
     val actions by vm.actions.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
@@ -363,6 +403,8 @@ fun EditListRoute(
         visibility = visibility,
         locked = locked,
         pictureUri = pictureUri,
+        pictureRevision = pictureRevision,
+        pictureHeroFraming = pictureHeroFraming,
         iconKey = iconKey,
         actions = actions,
         tags = tags,
@@ -379,6 +421,7 @@ fun EditListRoute(
         onVisibilityChange = vm::setVisibility,
         onToggleLock = vm::toggleLock,
         onPictureChange = vm::setPictureUri,
+        onHeroCommitted = vm::setHeroWithFraming,
         onIconKeyChange = vm::setIconKey,
         onActionsChange = vm::setActions,
         onTagsChange = vm::setTags,
@@ -406,6 +449,8 @@ fun EditListScreen(
     visibility: NoteVisibility,
     locked: Boolean,
     pictureUri: String?,
+    pictureRevision: Long,
+    pictureHeroFraming: String?,
     iconKey: String?,
     actions: List<NoteAction>,
     tags: List<String>,
@@ -422,6 +467,7 @@ fun EditListScreen(
     onVisibilityChange: (NoteVisibility) -> Unit,
     onToggleLock: () -> Unit,
     onPictureChange: (String?) -> Unit,
+    onHeroCommitted: (String, HeroFraming) -> Unit,
     onIconKeyChange: (String?) -> Unit,
     onActionsChange: (List<NoteAction>) -> Unit,
     onTagsChange: (List<String>) -> Unit,
@@ -439,11 +485,11 @@ fun EditListScreen(
     var tagsPickerOpen by rememberSaveable { mutableStateOf(false) }
     var attachmentsPickerOpen by rememberSaveable { mutableStateOf(false) }
 
-    val context = LocalContext.current
-    val imagePicker = rememberImagePicker { uri ->
-        persistReadPermission(context, uri)
-        onPictureChange(uri.toString())
+    var pendingHeroSession by remember { mutableStateOf<Pair<String, File?>?>(null) }
+    val launchHeroImagePick = rememberHeroImagePickThenCopy { uriString, copiedFile ->
+        pendingHeroSession = uriString to copiedFile
     }
+    var pictureViewer by remember { mutableStateOf<Pair<String, Long>?>(null) }
 
     val titlePlaceholder = if (existing) "Untitled" else "New list"
     val blurStyle = rememberProgressiveBlurStyle(bottomExtra = 0.dp)
@@ -473,15 +519,24 @@ fun EditListScreen(
                     )
                     val iconSize = androidx.compose.ui.unit.lerp(28.dp, 22.dp, collapseFraction)
                     val iconGap = androidx.compose.ui.unit.lerp(12.dp, 8.dp, collapseFraction)
-                    val headerIcon = iconFor(iconKey)
+                    val headerSymbol = iconSymbolName(iconKey)
+                    val headerBrandDrawable = iconDrawableRes(iconKey)
                     val headerEmoji = iconEmojiPayload(iconKey)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        if (headerIcon != null) {
+                        if (headerSymbol != null) {
+                            RememberMaterialRoundedSymbol(
+                                name = headerSymbol,
+                                size = iconSize,
+                                tint = MaterialTheme.colorScheme.primary,
+                                weight = FontWeight.Medium,
+                            )
+                            Spacer(Modifier.width(iconGap))
+                        } else if (headerBrandDrawable != null) {
                             Icon(
-                                headerIcon,
+                                painterResource(headerBrandDrawable),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                                 modifier = Modifier.size(iconSize),
@@ -517,21 +572,37 @@ fun EditListScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    RememberIconButton(onClick = onBack) {
+                        RememberMaterialRoundedSymbol(
+                            name = "arrow_back",
+                            size = 24.dp,
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            weight = FontWeight.Medium,
+                        )
                     }
                 },
                 actions = {
-                    FilledTonalIconButton(onClick = onTogglePin) {
-                        Icon(
-                            if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                            contentDescription = "Pin",
+                    RememberFilledTonalIconButton(onClick = onTogglePin) {
+                        val pinHeartTint =
+                            if (pinned) MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        RememberMaterialRoundedSymbol(
+                            name = "favorite",
+                            size = 24.dp,
+                            tint = pinHeartTint,
+                            weight = FontWeight.Medium,
+                            opticalCenterYOffset = 1.5.dp,
                         )
                     }
                     if (existing) {
                         Spacer(Modifier.width(6.dp))
-                        FilledTonalIconButton(onClick = onTrash) {
-                            Icon(Icons.Filled.DeleteOutline, contentDescription = "Trash")
+                        RememberFilledTonalIconButton(onClick = onTrash) {
+                            RememberMaterialRoundedSymbol(
+                                name = "delete_outline",
+                                size = 24.dp,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                weight = FontWeight.Medium,
+                            )
                         }
                     }
                     Spacer(Modifier.width(4.dp))
@@ -552,7 +623,13 @@ fun EditListScreen(
             TagAccentEditorStrip(tags = tags)
             if (pictureUri != null) {
                 Spacer(Modifier.height(16.dp))
-                PictureHero(uri = pictureUri, onClear = { onPictureChange(null) })
+                PictureHero(
+                    uri = pictureUri,
+                    pictureRevision = pictureRevision,
+                    pictureHeroFraming = pictureHeroFraming,
+                    onClear = { onPictureChange(null) },
+                    onOpenFull = { pictureViewer = pictureUri to pictureRevision },
+                )
             }
             Spacer(Modifier.height(12.dp))
             Column(
@@ -570,10 +647,15 @@ fun EditListScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onAddItem() }
+                        .tapSoundClickable { onAddItem() }
                         .padding(vertical = 14.dp),
                 ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    RememberMaterialRoundedSymbol(
+                        name = "add",
+                        size = 24.dp,
+                        tint = MaterialTheme.colorScheme.primary,
+                        weight = FontWeight.Medium,
+                    )
                     Spacer(Modifier.width(12.dp))
                     Text(
                         "Add item",
@@ -593,11 +675,7 @@ fun EditListScreen(
                 attachmentCount = attachments.size,
                 onOpenReminder = { reminderPickerOpen = true },
                 onSetImportance = onImportanceChange,
-                onOpenPicture = {
-                    imagePicker.launch(
-                        PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)
-                    )
-                },
+                onOpenPicture = launchHeroImagePick,
                 onOpenIcon = { iconPickerOpen = true },
                 onOpenActions = { actionsPickerOpen = true },
                 onOpenTags = { tagsPickerOpen = true },
@@ -607,7 +685,7 @@ fun EditListScreen(
         }
 
         if (reminderPickerOpen) {
-            ReminderPickerDialog(
+            ReminderPickerSheet(
                 initialMillis = reminderAt,
                 initialRule = recurrence,
                 onConfirm = { at, rule ->
@@ -650,31 +728,67 @@ fun EditListScreen(
                 onRemove = onRemoveAttachment,
             )
         }
+        pictureViewer?.let { (uri, revision) ->
+            FullScreenImageDialog(
+                imageUri = uri,
+                imageCacheRevision = revision,
+                imageContentDescription = stringResource(R.string.viewer_cover_image_cd),
+                onDismiss = { pictureViewer = null },
+            )
+        }
+        pendingHeroSession?.let { (pickedUri, copiedFile) ->
+            HeroFramingEditorDialog(
+                imageUri = pickedUri,
+                pendingCopiedFile = copiedFile,
+                initialFraming = null,
+                onDismiss = {
+                    copiedFile?.delete()
+                    pendingHeroSession = null
+                },
+                onConfirm = { framing ->
+                    onHeroCommitted(pickedUri, framing)
+                    pendingHeroSession = null
+                },
+            )
+        }
     }
 }
 
 @Composable
-private fun PictureHero(uri: String, onClear: () -> Unit) {
+private fun PictureHero(
+    uri: String,
+    pictureRevision: Long,
+    pictureHeroFraming: String?,
+    onClear: () -> Unit,
+    onOpenFull: () -> Unit,
+) {
+    val framing = remember(pictureHeroFraming) { HeroFraming.fromJsonString(pictureHeroFraming) }
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .heightIn(max = 220.dp)
+            .height(220.dp)
             .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer),
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .tapSoundClickable(onClick = onOpenFull),
     ) {
-        AsyncImage(
-            model = uri,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxWidth(),
+        HeroFramedImage(
+            imageUri = uri,
+            framing = framing,
+            cacheRevision = pictureRevision,
+            modifier = Modifier.fillMaxSize(),
         )
-        FilledTonalIconButton(
+        RememberFilledTonalIconButton(
             onClick = onClear,
             modifier = Modifier
                 .padding(8.dp)
                 .align(Alignment.TopEnd),
         ) {
-            Icon(Icons.Filled.DeleteOutline, contentDescription = "Remove picture")
+            RememberMaterialRoundedSymbol(
+                name = "delete_outline",
+                size = 24.dp,
+                tint = MaterialTheme.colorScheme.onSurface,
+                weight = FontWeight.Medium,
+            )
         }
     }
 }
@@ -690,11 +804,12 @@ private fun ChecklistRow(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        IconButton(onClick = onToggle) {
-            Icon(
-                if (item.checked) Icons.Filled.CheckBox else Icons.Filled.CheckBoxOutlineBlank,
-                contentDescription = null,
+        RememberIconButton(onClick = onToggle) {
+            RememberMaterialRoundedSymbol(
+                name = if (item.checked) "check_box" else "check_box_outline_blank",
+                size = 24.dp,
                 tint = if (item.checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
             )
         }
         BasicTextField(
@@ -718,13 +833,13 @@ private fun ChecklistRow(
                 inner()
             },
         )
-        IconButton(onClick = onRemove) {
-            Icon(
-                Icons.Filled.Close,
-                contentDescription = "Remove",
+        RememberIconButton(onClick = onRemove) {
+            RememberMaterialRoundedSymbol(
+                name = "close",
+                size = 24.dp,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
             )
         }
     }
 }
-

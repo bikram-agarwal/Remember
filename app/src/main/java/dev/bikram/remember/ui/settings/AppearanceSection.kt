@@ -1,4 +1,5 @@
 package dev.bikram.remember.ui.settings
+import androidx.compose.material3.TextButton
 
 import android.os.Build
 import androidx.compose.foundation.background
@@ -7,8 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,12 +16,9 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BlurOn
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -30,7 +26,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,7 +37,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -56,12 +51,17 @@ import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import kotlinx.coroutines.launch
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberSwitch
+import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.components.RememberToggleButton
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun AppearanceSection(
     prefs: ThemePrefs,
@@ -77,7 +77,7 @@ fun AppearanceSection(
             horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
         ) {
             themePickerOrder.forEachIndexed { index, mode ->
-                ToggleButton(
+                RememberToggleButton(
                     checked = state.themeMode == mode,
                     onCheckedChange = { checked ->
                         if (checked) scope.launch { prefs.setThemeMode(mode) }
@@ -160,7 +160,7 @@ fun AppearanceSection(
                     title = stringResource(R.string.appearance_blur_title),
                     subtitle = stringResource(R.string.appearance_blur_subtitle),
                     checked = state.blurBars,
-                    icon = Icons.Filled.BlurOn,
+                    leadingMaterialSymbolName = "blur_on",
                     onCheckedChange = { scope.launch { prefs.setBlurBars(it) } },
                 )
             }
@@ -191,8 +191,8 @@ fun AppearanceSection(
             subtitle = hex,
             onDismiss = { pendingDelete = null },
             actions = {
-                TextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.common_cancel)) }
-                TextButton(onClick = {
+                RememberTextButton(onClick = { pendingDelete = null }) { Text(stringResource(R.string.common_cancel)) }
+                RememberTextButton(onClick = {
                     scope.launch { prefs.removeCustomSeed(hex) }
                     pendingDelete = null
                 }) { Text(stringResource(R.string.common_remove)) }
@@ -206,7 +206,7 @@ private fun AppearanceSettingsToggleItem(
     title: String,
     subtitle: String,
     checked: Boolean,
-    icon: ImageVector? = null,
+    leadingMaterialSymbolName: String? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     ListItem(
@@ -219,19 +219,19 @@ private fun AppearanceSettingsToggleItem(
                 maxLines = 2,
             )
         },
-        leadingContent = if (icon != null) {
+        leadingContent = if (leadingMaterialSymbolName != null) {
             {
-                Icon(
-                    icon,
-                    contentDescription = null,
+                RememberMaterialRoundedSymbol(
+                    name = leadingMaterialSymbolName,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    weight = FontWeight.Medium,
                 )
             }
         } else {
             null
         },
-        trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange) },
-        modifier = Modifier.clickable { onCheckedChange(!checked) },
+        trailingContent = { RememberSwitch(checked = checked, onCheckedChange = onCheckedChange) },
+        modifier = Modifier.tapSoundClickable { onCheckedChange(!checked) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )
 }
@@ -321,9 +321,9 @@ private fun CustomHexSheet(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = onDismiss) { Text("Cancel") }
+                    RememberTextButton(onClick = onDismiss) { Text("Cancel") }
                     Spacer(Modifier.size(8.dp))
-                    TextButton(
+                    RememberTextButton(
                         onClick = { onConfirm(normalized ?: draftHex.trim()) },
                         enabled = previewColor != null,
                     ) { Text("Add") }
@@ -350,12 +350,3 @@ private fun themeModeLabel(mode: ThemeMode): String = stringResource(
     },
 )
 
-// Dummy reference to silence unused import warnings.
-@Suppress("unused") private val FlowRowRef = @Composable {
-    FlowRow { }
-    Unit
-}
-
-// Dummy reference (ImageVector imported in icon params).
-@Suppress("unused") private val IconVectorRef: ImageVector
-    get() = Icons.Filled.BlurOn

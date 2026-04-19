@@ -23,13 +23,19 @@ data class NotesFilter(
 
 fun NotesFilter.matches(n: NoteWithItems): Boolean {
     val note = n.note
+    val visibleTags = RememberReservedTags.userVisibleTags(note.tags)
     val typeOk = when (type) {
         FilterType.ALL -> true
         FilterType.NOTE -> note.kind == NoteKind.NOTE
         FilterType.LIST -> note.kind == NoteKind.LIST
     }
     if (!typeOk) return false
-    if (tags.isNotEmpty() && !tags.all { t -> note.tags.any { it.equals(t, ignoreCase = true) } }) return false
+    if (tags.isNotEmpty() && !tags.all { filterTag ->
+            visibleTags.any { it.equals(filterTag, ignoreCase = true) }
+        }
+    ) {
+        return false
+    }
     hasReminder?.let { if ((note.reminderAt != null) != it) return false }
     hasPicture?.let { if ((!note.pictureUri.isNullOrBlank()) != it) return false }
     hasAttachment?.let { if (n.attachments.isNotEmpty() != it) return false }
@@ -38,6 +44,6 @@ fun NotesFilter.matches(n: NoteWithItems): Boolean {
     val needle = text.trim().lowercase()
     if (note.title.lowercase().contains(needle)) return true
     if (note.body.lowercase().contains(needle)) return true
-    if (note.tags.any { it.lowercase().contains(needle) }) return true
+    if (visibleTags.any { it.lowercase().contains(needle) }) return true
     return n.items.any { it.text.lowercase().contains(needle) }
 }

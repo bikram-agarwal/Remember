@@ -1,4 +1,5 @@
 package dev.bikram.remember.ui.settings
+import androidx.compose.material3.TextButton
 
 import android.Manifest
 import android.content.ClipData
@@ -40,22 +41,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.FolderOpen
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Shop
-import androidx.compose.material.icons.filled.SwipeLeft
-import androidx.compose.material.icons.filled.Vibration
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
@@ -74,21 +59,23 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -116,13 +103,22 @@ import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.semanticSwipeBackground
 import dev.bikram.remember.ui.theme.semanticSwipeIconTint
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import dev.bikram.remember.ui.components.AboutAuthorPhoto
 import dev.bikram.remember.ui.components.AppIconImage
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberOutlinedButton
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
+import dev.bikram.remember.ui.components.RememberSwitch
+import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -247,23 +243,28 @@ fun SettingsRoute() {
             )
         },
     ) { padding ->
-        val blurMod = blurStyle?.applyToScrollableList() ?: Modifier
+        val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
+        val topInset = padding.calculateTopPadding() + 8.dp
+        val bottomPadding = pillInset + 24.dp
+        val listContentPadding = remember(topInset, bottomPadding) {
+            PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = topInset,
+                bottom = bottomPadding,
+            )
+        }
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .then(blurMod),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = padding.calculateTopPadding() + 8.dp,
-                bottom = pillInset + 24.dp,
-            ),
+            contentPadding = listContentPadding,
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item(key = "appearance") {
                 Column {
                     SettingsSectionHeader(
-                        icon = Icons.Filled.Palette,
+                        materialSymbolName = "palette",
                         title = stringResource(R.string.settings_section_appearance),
                     )
                     Spacer(Modifier.height(8.dp))
@@ -274,14 +275,14 @@ fun SettingsRoute() {
             item(key = "touch") {
                 Column {
                     SettingsSectionHeader(
-                        icon = Icons.Filled.Vibration,
+                        materialSymbolName = "vibration",
                         title = stringResource(R.string.settings_touch_sound_section),
                     )
                     Spacer(Modifier.height(8.dp))
                     GroupedListColumn {
                         GroupedListItem(position = GroupPosition.FIRST) {
                             SettingsToggleRow(
-                                icon = Icons.Filled.Vibration,
+                                materialSymbolName = "vibration",
                                 title = stringResource(R.string.settings_haptic_feedback),
                                 subtitle = stringResource(R.string.settings_haptic_feedback_desc),
                                 checked = interactionState.hapticFeedbackEnabled,
@@ -308,14 +309,14 @@ fun SettingsRoute() {
                                     )
                                 },
                                 leadingContent = {
-                                    Icon(
-                                        Icons.Filled.Notifications,
-                                        contentDescription = null,
+                                    RememberMaterialRoundedSymbol(
+                                        name = "notifications",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        weight = FontWeight.Medium,
                                     )
                                 },
                                 trailingContent = {
-                                    Switch(
+                                    RememberSwitch(
                                         checked = notificationsGranted,
                                         onCheckedChange = { wantEnabled ->
                                             when {
@@ -334,7 +335,7 @@ fun SettingsRoute() {
                                         },
                                     )
                                 },
-                                modifier = Modifier.clickable {
+                                modifier = Modifier.tapSoundClickable {
                                     if (!notificationsGranted) {
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -367,14 +368,14 @@ fun SettingsRoute() {
                                     )
                                 },
                                 leadingContent = {
-                                    Icon(
-                                        Icons.Filled.Notifications,
-                                        contentDescription = null,
+                                    RememberMaterialRoundedSymbol(
+                                        name = "notifications",
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        weight = FontWeight.Medium,
                                     )
                                 },
                                 trailingContent = {
-                                    Switch(
+                                    RememberSwitch(
                                         checked = isIgnoringBatteryOptimizations,
                                         onCheckedChange = { wantEnabled ->
                                             if (wantEnabled && !isIgnoringBatteryOptimizations) {
@@ -389,7 +390,7 @@ fun SettingsRoute() {
                                         },
                                     )
                                 },
-                                modifier = Modifier.clickable {
+                                modifier = Modifier.tapSoundClickable {
                                     if (!isIgnoringBatteryOptimizations) {
                                         val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                                             data = Uri.parse("package:${context.packageName}")
@@ -410,7 +411,7 @@ fun SettingsRoute() {
             item(key = "swipe") {
                 Column {
                     SettingsSectionHeader(
-                        icon = Icons.Filled.SwipeLeft,
+                        materialSymbolName = "swipe_left",
                         title = stringResource(R.string.settings_swipe_section),
                     )
                     Spacer(Modifier.height(8.dp))
@@ -466,21 +467,37 @@ fun SettingsRoute() {
 
             item(key = "backup") {
                 val internalStorageDisplayName = stringResource(R.string.filesystem_folder_picker_internal_storage)
-                val folderLabel = backupState.exportFolderUri.takeIf { it.isNotBlank() }?.let { treeUriString ->
-                    exportFolderDisplayLabel(context, treeUriString, internalStorageDisplayName)
-                } ?: stringResource(R.string.settings_choose_export_folder)
+                val chooseFolderLabel = stringResource(R.string.settings_choose_export_folder)
+                val resolvedFolderLabel by produceState(
+                    initialValue = backupState.exportFolderUri.takeIf { it.isNotBlank() }
+                        ?.let { internalStorageDisplayName } ?: chooseFolderLabel,
+                    backupState.exportFolderUri,
+                    internalStorageDisplayName,
+                    chooseFolderLabel,
+                ) {
+                    val uriString = backupState.exportFolderUri
+                    value = if (uriString.isBlank()) {
+                        chooseFolderLabel
+                    } else {
+                        withContext(Dispatchers.IO) {
+                            exportFolderDisplayLabel(context, uriString, internalStorageDisplayName)
+                        }
+                    }
+                }
+                val folderLabel = resolvedFolderLabel
                 val exportFolderReady = backupState.exportFolderUri.isNotBlank()
                 val autoExportSwitchEnabled = exportFolderReady || backupState.autoExportOnChange
                 val scheduledExportSwitchEnabled = exportFolderReady || backupState.scheduledExportEnabled
 
                 Column {
                     SettingsSectionHeader(
-                        icon = Icons.Filled.Save,
+                        materialSymbolName = "save",
                         title = stringResource(R.string.settings_backup_section),
                     )
                     Spacer(Modifier.height(8.dp))
                     GroupedListColumn {
                         GroupedListItem(position = GroupPosition.FIRST) {
+                            val chooseExportFolderCd = stringResource(R.string.settings_choose_export_folder)
                             ListItem(
                                 headlineContent = {
                                     Text(folderLabel, style = MaterialTheme.typography.bodyLarge)
@@ -495,11 +512,14 @@ fun SettingsRoute() {
                                     )
                                 },
                                 trailingContent = {
-                                    OutlinedButton(onClick = { folderLauncher.launch(null) }) {
-                                        Icon(
-                                            Icons.Filled.FolderOpen,
-                                            contentDescription = stringResource(R.string.settings_choose_export_folder),
-                                            modifier = Modifier.size(18.dp),
+                                    RememberOutlinedButton(onClick = { folderLauncher.launch(null) }) {
+                                        RememberMaterialRoundedSymbol(
+                                            name = "folder_open",
+                                            size = 18.dp,
+                                            weight = FontWeight.Medium,
+                                            modifier = Modifier.semantics {
+                                                contentDescription = chooseExportFolderCd
+                                            },
                                         )
                                     }
                                 },
@@ -565,6 +585,7 @@ fun SettingsRoute() {
                             )
                         }
                         GroupedListItem(position = GroupPosition.LAST) {
+                            val backupHelpCd = stringResource(R.string.settings_backup_help_icon_cd)
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -576,7 +597,7 @@ fun SettingsRoute() {
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    OutlinedButton(
+                                    RememberOutlinedButton(
                                         onClick = {
                                             importMergeLauncher.launch(
                                                 arrayOf("application/zip", "application/json"),
@@ -586,7 +607,7 @@ fun SettingsRoute() {
                                     ) {
                                         Text(stringResource(R.string.settings_import_rules))
                                     }
-                                    OutlinedButton(
+                                    RememberOutlinedButton(
                                         onClick = {
                                             exportLauncher.launch(container.backupIo.suggestedBackupFileName())
                                         },
@@ -609,7 +630,7 @@ fun SettingsRoute() {
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .fillMaxHeight()
-                                            .clickable {
+                                            .tapSoundClickable {
                                                 importReplaceLauncher.launch(
                                                     arrayOf("application/zip", "application/json"),
                                                 )
@@ -627,14 +648,15 @@ fun SettingsRoute() {
                                             .align(Alignment.CenterEnd)
                                             .fillMaxHeight()
                                             .width(40.dp)
-                                            .clickable { showBackupHelp = true },
+                                            .tapSoundClickable { showBackupHelp = true },
                                         contentAlignment = Alignment.Center,
                                     ) {
-                                        Icon(
-                                            Icons.Filled.Info,
-                                            contentDescription = stringResource(R.string.settings_backup_help_icon_cd),
-                                            modifier = Modifier.size(20.dp),
+                                        RememberMaterialRoundedSymbol(
+                                            name = "info",
+                                            size = 20.dp,
                                             tint = restoreLabelColor.copy(alpha = 0.75f),
+                                            weight = FontWeight.Medium,
+                                            modifier = Modifier.semantics { contentDescription = backupHelpCd },
                                         )
                                     }
                                 }
@@ -647,14 +669,14 @@ fun SettingsRoute() {
             item(key = "security") {
                 Column {
                     SettingsSectionHeader(
-                        icon = Icons.Filled.Security,
+                        materialSymbolName = "security",
                         title = stringResource(R.string.settings_section_security),
                     )
                     Spacer(Modifier.height(8.dp))
                     GroupedListColumn {
                         GroupedListItem(position = GroupPosition.FIRST) {
                             ToggleRow(
-                                icon = Icons.Filled.Lock,
+                                materialSymbolName = "lock",
                                 title = stringResource(R.string.settings_app_lock_title),
                                 subtitle = if (lockState.enabled) {
                                     stringResource(R.string.settings_app_lock_enabled)
@@ -670,7 +692,7 @@ fun SettingsRoute() {
                         }
                         GroupedListItem(position = GroupPosition.LAST) {
                             ToggleRow(
-                                icon = Icons.Filled.Fingerprint,
+                                materialSymbolName = "fingerprint",
                                 title = stringResource(R.string.settings_biometric_title),
                                 subtitle = when {
                                     !biometricAvailable -> stringResource(R.string.settings_biometric_no_hardware)
@@ -690,7 +712,7 @@ fun SettingsRoute() {
             item(key = "about") {
                 Column(modifier = Modifier.padding(top = 24.dp)) {
                     SettingsSectionHeader(
-                        icon = Icons.Filled.Info,
+                        materialSymbolName = "info",
                         title = stringResource(R.string.settings_section_about),
                     )
                     Spacer(Modifier.height(8.dp))
@@ -718,7 +740,7 @@ fun SettingsRoute() {
             title = { Text(stringResource(R.string.settings_restore_confirm_title)) },
             text = { Text(stringResource(R.string.settings_restore_confirm_body)) },
             confirmButton = {
-                TextButton(
+                RememberTextButton(
                     onClick = {
                         pendingRestoreUri = null
                         scope.launch {
@@ -735,7 +757,7 @@ fun SettingsRoute() {
                 }
             },
             dismissButton = {
-                TextButton(onClick = { pendingRestoreUri = null }) {
+                RememberTextButton(onClick = { pendingRestoreUri = null }) {
                     Text(stringResource(R.string.common_cancel))
                 }
             },
@@ -748,7 +770,7 @@ fun SettingsRoute() {
             title = { Text(stringResource(R.string.settings_backup_help_title)) },
             text = { Text(stringResource(R.string.settings_backup_help_body)) },
             confirmButton = {
-                TextButton(onClick = { showBackupHelp = false }) {
+                RememberTextButton(onClick = { showBackupHelp = false }) {
                     Text(stringResource(R.string.common_ok))
                 }
             },
@@ -795,7 +817,7 @@ private fun BackupFolderSettingsToggleItem(
             )
         },
         trailingContent = {
-            Switch(
+            RememberSwitch(
                 checked = checked,
                 onCheckedChange = { enabled ->
                     when {
@@ -807,7 +829,7 @@ private fun BackupFolderSettingsToggleItem(
                 enabled = switchInteractive,
             )
         },
-        modifier = Modifier.clickable {
+        modifier = Modifier.tapSoundClickable {
             if (!switchEnabled) {
                 onDisabledInteraction?.invoke()
             } else {
@@ -819,16 +841,16 @@ private fun BackupFolderSettingsToggleItem(
 }
 
 @Composable
-private fun SettingsSectionHeader(icon: ImageVector, title: String) {
+private fun SettingsSectionHeader(materialSymbolName: String, title: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(18.dp),
+        RememberMaterialRoundedSymbol(
+            name = materialSymbolName,
+            size = 18.dp,
             tint = MaterialTheme.colorScheme.primary,
+            weight = FontWeight.Medium,
         )
         Text(
             text = title,
@@ -840,7 +862,7 @@ private fun SettingsSectionHeader(icon: ImageVector, title: String) {
 
 @Composable
 private fun SettingsToggleRow(
-    icon: ImageVector,
+    materialSymbolName: String,
     title: String,
     subtitle: String,
     checked: Boolean,
@@ -858,19 +880,23 @@ private fun SettingsToggleRow(
             )
         },
         leadingContent = {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            RememberMaterialRoundedSymbol(
+                name = materialSymbolName,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
+            )
         },
         trailingContent = {
-            Switch(checked = checked, onCheckedChange = onCheckedChange)
+            RememberSwitch(checked = checked, onCheckedChange = onCheckedChange)
         },
-        modifier = Modifier.clickable { onCheckedChange(!checked) },
+        modifier = Modifier.tapSoundClickable { onCheckedChange(!checked) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     )
 }
 
 @Composable
 private fun ToggleRow(
-    icon: ImageVector,
+    materialSymbolName: String,
     title: String,
     subtitle: String,
     checked: Boolean,
@@ -881,15 +907,15 @@ private fun ToggleRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .let { modifier -> if (enabled) modifier.clickable { onChange(!checked) } else modifier }
+            .let { modifier -> if (enabled) modifier.tapSoundClickable { onChange(!checked) } else modifier }
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            icon,
-            contentDescription = null,
+        RememberMaterialRoundedSymbol(
+            name = materialSymbolName,
+            size = 24.dp,
             tint = MaterialTheme.colorScheme.primary.copy(alpha = alpha),
-            modifier = Modifier.size(24.dp),
+            weight = FontWeight.Medium,
         )
         Spacer(Modifier.size(16.dp))
         Column(Modifier.weight(1f)) {
@@ -904,7 +930,7 @@ private fun ToggleRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
             )
         }
-        Switch(
+        RememberSwitch(
             checked = checked,
             onCheckedChange = if (enabled) onChange else null,
             enabled = enabled,
@@ -919,11 +945,11 @@ private fun NoteSwipeActionDropdown(
     onSelect: (NoteSwipeAction) -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    OutlinedButton(onClick = { expanded = true }) {
+    RememberOutlinedButton(onClick = { expanded = true }) {
         Text(noteSwipeActionLabel(current))
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             NoteSwipeAction.entries.filter { it != excluded }.forEach { action ->
-                DropdownMenuItem(
+                RememberDropdownMenuItem(
                     text = { Text(noteSwipeActionLabel(action)) },
                     onClick = {
                         onSelect(action)
@@ -977,11 +1003,11 @@ private fun NoteSwipePreviewCard(
             contentAlignment = Alignment.CenterStart,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = swipeStartToEnd.previewIcon(),
-                    contentDescription = null,
+                RememberMaterialRoundedSymbol(
+                    name = swipeStartToEnd.materialSymbolName,
+                    size = 20.dp,
                     tint = swipeStartToEnd.semanticSwipeIconTint(),
-                    modifier = Modifier.size(20.dp),
+                    weight = FontWeight.Medium,
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
@@ -1007,11 +1033,11 @@ private fun NoteSwipePreviewCard(
                     color = swipeEndToStart.semanticSwipeIconTint(),
                 )
                 Spacer(Modifier.width(6.dp))
-                Icon(
-                    imageVector = swipeEndToStart.previewIcon(),
-                    contentDescription = null,
+                RememberMaterialRoundedSymbol(
+                    name = swipeEndToStart.materialSymbolName,
+                    size = 20.dp,
                     tint = swipeEndToStart.semanticSwipeIconTint(),
-                    modifier = Modifier.size(20.dp),
+                    weight = FontWeight.Medium,
                 )
             }
         }
@@ -1031,13 +1057,6 @@ private fun NoteSwipePreviewCard(
             )
         }
     }
-}
-
-private fun NoteSwipeAction.previewIcon(): ImageVector = when (this) {
-    NoteSwipeAction.OPEN -> Icons.Filled.Edit
-    NoteSwipeAction.TRASH -> Icons.Filled.Delete
-    NoteSwipeAction.DUPLICATE -> Icons.Filled.ContentCopy
-    NoteSwipeAction.TOGGLE_PIN -> Icons.Filled.PushPin
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -1097,7 +1116,7 @@ private fun AboutSettingsBlock() {
                         modifier = Modifier
                             .size(84.dp)
                             .clip(authorShape)
-                            .combinedClickable(
+                            .tapSoundCombinedClickable(
                                 onClick = {
                                     runCatching {
                                         context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(profileUrl)))
@@ -1127,7 +1146,7 @@ private fun AboutSettingsBlock() {
                             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                             modifier = Modifier
                                 .clip(aboutPillShape)
-                                .combinedClickable(
+                                .tapSoundCombinedClickable(
                                     onClick = {
                                         runCatching {
                                             context.startActivity(
@@ -1143,11 +1162,11 @@ private fun AboutSettingsBlock() {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Shop,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
+                                RememberMaterialRoundedSymbol(
+                                    name = "store",
+                                    size = 20.dp,
                                     tint = MaterialTheme.colorScheme.primary,
+                                    weight = FontWeight.Medium,
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
@@ -1166,7 +1185,7 @@ private fun AboutSettingsBlock() {
                                 contentColor = MaterialTheme.colorScheme.onPrimary,
                                 modifier = Modifier
                                     .clip(aboutPillShape)
-                                    .combinedClickable(
+                                    .tapSoundCombinedClickable(
                                         onClick = {
                                             runCatching {
                                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(repoUrl)))
@@ -1202,7 +1221,7 @@ private fun AboutSettingsBlock() {
                             contentColor = MaterialTheme.colorScheme.onPrimary,
                             modifier = Modifier
                                 .clip(aboutPillShape)
-                                .combinedClickable(
+                                .tapSoundCombinedClickable(
                                     onClick = {
                                         runCatching {
                                             context.startActivity(
@@ -1218,11 +1237,11 @@ private fun AboutSettingsBlock() {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center,
                             ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Shop,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(20.dp),
+                                RememberMaterialRoundedSymbol(
+                                    name = "store",
+                                    size = 20.dp,
                                     tint = MaterialTheme.colorScheme.onPrimary,
+                                    weight = FontWeight.Medium,
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
@@ -1241,7 +1260,7 @@ private fun AboutSettingsBlock() {
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                                 modifier = Modifier
                                     .clip(aboutPillShape)
-                                    .combinedClickable(
+                                    .tapSoundCombinedClickable(
                                         onClick = {
                                             runCatching {
                                                 context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(repoUrl)))

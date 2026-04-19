@@ -5,6 +5,9 @@ localdocs/
 devRelease.lnk
 release.lnk 
 
+# font_subset: full variable font (~14 MB) and generated TTFs (subset_font.py)
+font_subset/*.ttf
+
 # Machine-local Android SDK path (never commit)
 local.properties
 

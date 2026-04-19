@@ -1,4 +1,5 @@
 package dev.bikram.remember.ui.edit
+import androidx.compose.material3.TextButton
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,13 +23,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,7 +41,9 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.TagPalette
@@ -53,6 +52,9 @@ import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.components.parseHexColor
 import kotlinx.coroutines.flow.collect
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 private val SwatchCorner = RoundedCornerShape(10.dp)
 private val PillCorner = RoundedCornerShape(12.dp)
@@ -231,11 +233,11 @@ fun TagEditorSheet(
                 },
             )
             Spacer(Modifier.weight(1f))
-            TextButton(onClick = onDismiss) {
+            RememberTextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.tag_editor_cancel))
             }
             Spacer(Modifier.size(8.dp))
-            Button(onClick = { commitOnSave() }) {
+            RememberButton(onClick = { commitOnSave() }) {
                 Text(stringResource(R.string.tag_editor_save))
             }
         }
@@ -331,14 +333,14 @@ private fun ColorGrid(
                                 },
                                 shape = SwatchCorner,
                             )
-                            .clickable { onSelect(hex) },
+                            .tapSoundClickable { onSelect(hex) },
                         contentAlignment = Alignment.Center,
                     ) {
                         if (selected) {
-                            Icon(
-                                imageVector = Icons.Filled.Check,
-                                contentDescription = null,
+                            RememberMaterialRoundedSymbol(
+                                name = "check",
                                 tint = TagPalette.textOn(color),
+                                weight = FontWeight.Medium,
                                 modifier = Modifier.padding(4.dp),
                             )
                         }

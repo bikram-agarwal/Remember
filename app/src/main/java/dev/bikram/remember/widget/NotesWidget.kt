@@ -1,4 +1,5 @@
 package dev.bikram.remember.widget
+import androidx.compose.foundation.clickable
 
 import android.content.ComponentName
 import android.content.Context

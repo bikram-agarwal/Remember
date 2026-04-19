@@ -1,4 +1,5 @@
 package dev.bikram.remember.ui.home
+import androidx.compose.material3.IconButton
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,18 +22,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Inbox
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalIconButton
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -43,6 +36,7 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -51,6 +45,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -64,6 +61,7 @@ import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.NotesFilter
@@ -73,6 +71,7 @@ import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.data.matches
 import dev.bikram.remember.R
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.EmptyNotesIllustration
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
@@ -88,6 +87,10 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import dev.bikram.remember.ui.components.RememberOutlinedButton
+import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
+import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 sealed class HomeListItem {
     data class Header(val label: String) : HomeListItem()
@@ -121,7 +124,10 @@ class HomeViewModel(
         viewOptionsFlow,
     ) { f, notes, opts ->
         val filtered = notes.filter { f.matches(it) }
-        val tags = notes.flatMap { it.note.tags }.distinct().sorted()
+        val tags = notes
+            .flatMap { RememberReservedTags.userVisibleTags(it.note.tags) }
+            .distinct()
+            .sorted()
         val arranged = arrangeItems(filtered, opts)
         HomeState(
             filter = f,
@@ -168,12 +174,18 @@ private fun arrangeItems(notes: List<NoteWithItems>, opts: ViewOptions): List<Ho
             }
         }
         GroupBy.TAG -> {
-            val tagged = sorted.filter { it.note.tags.isNotEmpty() }
-            val untagged = sorted.filter { it.note.tags.isEmpty() }
-            val tags = tagged.flatMap { it.note.tags }.distinct().sorted()
+            val tagged = sorted.filter { RememberReservedTags.userVisibleTags(it.note.tags).isNotEmpty() }
+            val untagged = sorted.filter { RememberReservedTags.userVisibleTags(it.note.tags).isEmpty() }
+            val tags = tagged
+                .flatMap { RememberReservedTags.userVisibleTags(it.note.tags) }
+                .distinct()
+                .sorted()
             buildList {
                 tags.forEach { tag ->
-                    val inTag = tagged.filter { it.note.tags.any { t -> t.equals(tag, ignoreCase = true) } }
+                    val inTag = tagged.filter {
+                        RememberReservedTags.userVisibleTags(it.note.tags)
+                            .any { tagName -> tagName.equals(tag, ignoreCase = true) }
+                    }
                     if (inTag.isNotEmpty()) {
                         add(HomeListItem.Header(tag))
                         inTag.forEach { add(HomeListItem.NoteRow(it, groupKey = "tag:$tag")) }
@@ -188,7 +200,7 @@ private fun arrangeItems(notes: List<NoteWithItems>, opts: ViewOptions): List<Ho
     }
 }
 
-/** Pinned always top. Within the pinned and non-pinned groups, apply sort key/dir. */
+/** Favorites (pinned) always top. Within favorite and non-favorite groups, apply sort key/dir. */
 private fun sortNotes(notes: List<NoteWithItems>, opts: ViewOptions): List<NoteWithItems> {
     val (pinned, rest) = notes.partition { it.note.pinned }
     val cmp = buildComparator(opts)
@@ -275,7 +287,6 @@ fun HomeScreen(
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var filterSheetOpen by rememberSaveable { mutableStateOf(false) }
     var viewOptionsOpen by rememberSaveable { mutableStateOf(false) }
-
     val blurStyle = rememberProgressiveBlurStyle()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
@@ -299,19 +310,27 @@ fun HomeScreen(
                     }
                 },
                 actions = {
-                    FilledTonalIconButton(onClick = {
+                    RememberFilledTonalIconButton(onClick = {
                         if (searchOpen && state.filter.text.isNotEmpty()) onQueryChange("")
                         searchOpen = !searchOpen
                     }) {
-                        Icon(
-                            if (searchOpen) Icons.Filled.Close else Icons.Filled.Search,
-                            contentDescription = if (searchOpen) "Close search" else "Search",
+                        RememberMaterialRoundedSymbol(
+                            name = if (searchOpen) "close" else "search",
+                            weight = FontWeight.Medium,
+                            modifier = Modifier.semantics {
+                                contentDescription =
+                                    if (searchOpen) "Close search" else "Search"
+                            },
                         )
                     }
                     if (!searchOpen) {
                         Spacer(Modifier.width(6.dp))
-                        FilledTonalIconButton(onClick = { viewOptionsOpen = true }) {
-                            Icon(Icons.Filled.Tune, contentDescription = "View options")
+                        RememberFilledTonalIconButton(onClick = { viewOptionsOpen = true }) {
+                            RememberMaterialRoundedSymbol(
+                                name = "tune",
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.semantics { contentDescription = "View options" },
+                            )
                         }
                     }
                     Spacer(Modifier.width(4.dp))
@@ -320,19 +339,23 @@ fun HomeScreen(
             )
         },
     ) { padding ->
-        val blurMod = blurStyle?.applyToScrollableList() ?: Modifier
-        val listHorizontalPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = padding.calculateTopPadding() + 4.dp,
-            bottom = bottomInset + 24.dp,
-        )
+        val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
+        val topInset = padding.calculateTopPadding() + 4.dp
+        val bottomPadding = bottomInset + 24.dp
+        val listContentPadding = remember(topInset, bottomPadding) {
+            PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = topInset,
+                bottom = bottomPadding,
+            )
+        }
         if (state.items.isEmpty()) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(blurMod)
-                    .padding(listHorizontalPadding),
+                    .padding(listContentPadding),
             ) {
                 if (state.filter.facetActive || state.filter.text.isNotBlank()) {
                     ActiveFilterChips(
@@ -364,11 +387,11 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(blurMod),
-                contentPadding = listHorizontalPadding,
+                contentPadding = listContentPadding,
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (state.filter.facetActive || state.filter.text.isNotBlank()) {
-                    item(key = "__chips__") {
+                    item(key = "__chips__", contentType = "chips") {
                         ActiveFilterChips(
                             filter = state.filter,
                             onChange = onFilterChange,
@@ -376,12 +399,21 @@ fun HomeScreen(
                         )
                     }
                 }
-                items(state.items, key = { item ->
-                    when (item) {
-                        is HomeListItem.Header -> "h:${item.label}"
-                        is HomeListItem.NoteRow -> "n:${item.groupKey}:${item.note.note.id}"
-                    }
-                }) { item ->
+                items(
+                    items = state.items,
+                    key = { item ->
+                        when (item) {
+                            is HomeListItem.Header -> "h:${item.label}"
+                            is HomeListItem.NoteRow -> "n:${item.groupKey}:${item.note.note.id}"
+                        }
+                    },
+                    contentType = { item ->
+                        when (item) {
+                            is HomeListItem.Header -> "header"
+                            is HomeListItem.NoteRow -> "noteRow"
+                        }
+                    },
+                ) { item ->
                     when (item) {
                         is HomeListItem.Header -> GroupHeader(item.label)
                         is HomeListItem.NoteRow -> SwipeableRememberNoteCard(
@@ -443,10 +475,10 @@ private fun InlineSearchField(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            Icons.Filled.Search,
-            contentDescription = null,
+        RememberMaterialRoundedSymbol(
+            name = "search",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            weight = FontWeight.Medium,
         )
         Spacer(Modifier.width(10.dp))
         BasicTextField(
@@ -477,16 +509,17 @@ private fun InlineSearchField(
                     else MaterialTheme.colorScheme.surfaceContainerHighest,
                     RoundedCornerShape(14.dp),
                 )
-                .clickable(onClick = onOpenFilter)
+                .tapSoundClickable(onClick = onOpenFilter)
                 .padding(horizontal = 10.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                Icons.Filled.FilterList,
-                contentDescription = "Filter",
-                modifier = Modifier.size(16.dp),
+            RememberMaterialRoundedSymbol(
+                name = "filter_list",
+                size = 16.dp,
                 tint = if (filterActive) MaterialTheme.colorScheme.onPrimaryContainer
                 else MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
+                modifier = Modifier.semantics { contentDescription = "Filter" },
             )
             Spacer(Modifier.width(4.dp))
             Text(
@@ -530,39 +563,39 @@ private fun NotesEmptyState(
                 modifier = Modifier.padding(horizontal = 24.dp),
             )
             Spacer(Modifier.height(24.dp))
-            Button(
+            RememberButton(
                 onClick = onCreateNote,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth(0.78f),
             ) {
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                RememberMaterialRoundedSymbol(
+                    name = "add",
+                    size = 20.dp,
+                    weight = FontWeight.Medium,
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.home_create_note))
             }
             Spacer(Modifier.height(12.dp))
-            OutlinedButton(
+            RememberOutlinedButton(
                 onClick = onCreateList,
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth(0.78f),
             ) {
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp),
+                RememberMaterialRoundedSymbol(
+                    name = "add",
+                    size = 20.dp,
+                    weight = FontWeight.Medium,
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.home_create_list))
             }
         } else {
-            Icon(
-                Icons.Filled.Inbox,
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
+            RememberMaterialRoundedSymbol(
+                name = "inbox",
+                size = 64.dp,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
             )
             Spacer(Modifier.height(16.dp))
             Text(

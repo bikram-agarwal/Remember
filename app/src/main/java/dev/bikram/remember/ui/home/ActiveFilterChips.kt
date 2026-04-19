@@ -6,17 +6,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.data.FilterType
 import dev.bikram.remember.data.NotesFilter
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.TagChipFilled
+import dev.bikram.remember.ui.components.RememberInputChip
 
 @Composable
 fun ActiveFilterChips(
@@ -54,19 +56,24 @@ fun ActiveFilterChips(
             DismissibleChip("Has attachment") { onChange(filter.copy(hasAttachment = null)) }
         }
         if (filter.pinned == true) {
-            DismissibleChip("Pinned") { onChange(filter.copy(pinned = null)) }
+            DismissibleChip("Favorites") { onChange(filter.copy(pinned = null)) }
         }
     }
 }
 
 @Composable
 private fun DismissibleChip(label: String, onDismiss: () -> Unit) {
-    InputChip(
+    RememberInputChip(
         selected = true,
         onClick = onDismiss,
         label = { Text(label) },
         trailingIcon = {
-            Icon(Icons.Filled.Close, contentDescription = "Remove", modifier = Modifier.size(16.dp))
+            RememberMaterialRoundedSymbol(
+                name = "close",
+                size = 16.dp,
+                weight = FontWeight.Medium,
+                modifier = Modifier.semantics { contentDescription = "Remove" },
+            )
         },
     )
 }

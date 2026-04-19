@@ -16,11 +16,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -35,10 +30,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import androidx.fragment.app.FragmentActivity
 import dev.bikram.remember.data.LockPrefs
 import kotlinx.coroutines.launch
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 @Composable
 fun LockScreen(
@@ -98,11 +96,11 @@ fun LockScreen(
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Icon(
-                    Icons.Filled.Lock,
-                    contentDescription = null,
-                    modifier = Modifier.size(40.dp),
+                RememberMaterialRoundedSymbol(
+                    name = "lock",
+                    size = 40.dp,
                     tint = MaterialTheme.colorScheme.primary,
+                    weight = FontWeight.Medium,
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
@@ -200,11 +198,11 @@ private fun Keypad(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             ActionKey(
-                icon = if (showBiometric) Icons.Filled.Fingerprint else null,
+                materialSymbolName = if (showBiometric) "fingerprint" else null,
                 onClick = if (showBiometric) onBiometric else { {} },
             )
             DigitKey("0", onClick = { onDigit("0") })
-            ActionKey(icon = Icons.AutoMirrored.Filled.Backspace, onClick = onBackspace)
+            ActionKey(materialSymbolName = "backspace", onClick = onBackspace)
         }
     }
 }
@@ -216,7 +214,7 @@ private fun DigitKey(digit: String, onClick: () -> Unit) {
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier
             .size(72.dp)
-            .clickable(onClick = onClick),
+            .tapSoundClickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
             Text(digit, style = MaterialTheme.typography.headlineSmall)
@@ -225,8 +223,8 @@ private fun DigitKey(digit: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun ActionKey(icon: androidx.compose.ui.graphics.vector.ImageVector?, onClick: () -> Unit) {
-    if (icon == null) {
+private fun ActionKey(materialSymbolName: String?, onClick: () -> Unit) {
+    if (materialSymbolName == null) {
         Spacer(Modifier.size(72.dp))
         return
     }
@@ -235,10 +233,14 @@ private fun ActionKey(icon: androidx.compose.ui.graphics.vector.ImageVector?, on
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         modifier = Modifier
             .size(72.dp)
-            .clickable(onClick = onClick),
+            .tapSoundClickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
-            Icon(icon, contentDescription = null)
+            RememberMaterialRoundedSymbol(
+                name = materialSymbolName,
+                tint = MaterialTheme.colorScheme.onSurface,
+                weight = FontWeight.Medium,
+            )
         }
     }
 }

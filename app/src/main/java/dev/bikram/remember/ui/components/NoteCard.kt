@@ -16,43 +16,44 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichText
+import dev.bikram.remember.R
+import dev.bikram.remember.data.RememberReservedTags
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.HeroFramedImage
+import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.edit.iconDrawableRes
 import dev.bikram.remember.ui.edit.iconEmojiPayload
-import dev.bikram.remember.ui.edit.iconFor
+import dev.bikram.remember.ui.edit.iconSymbolName
 import dev.bikram.remember.ui.common.ApplyRichEditorListIndent
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
 import dev.bikram.remember.ui.theme.elevatedCardColors
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 private val CardShape = RoundedCornerShape(20.dp)
 
@@ -63,22 +64,36 @@ fun NoteCard(
     modifier: Modifier = Modifier,
 ) {
     val cardColors = elevatedCardColors()
-    val hasTagStrip = note.note.tags.isNotEmpty()
+    val visibleTags = RememberReservedTags.userVisibleTags(note.note.tags)
+    val hasTagStrip = visibleTags.isNotEmpty()
     val heroEnabled = LocalHeroOnCards.current
     val showHero = heroEnabled && note.note.pictureUri != null
     val surface = MaterialTheme.colorScheme.surface
-    
+
     val richTextState = rememberRichTextState()
     ApplyRichEditorListIndent(richTextState)
     androidx.compose.runtime.LaunchedEffect(note.note.body) {
         richTextState.setMarkdown(note.note.body)
     }
+    val pinnedIconDescription = stringResource(R.string.notecard_pinned_cd)
+
+    val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
+    val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
+    val sharedModifier = if (sharedScope != null && navScope != null) {
+        with(sharedScope) {
+            Modifier.sharedBounds(
+                sharedContentState = rememberSharedContentState(key = "note-card-${note.note.id}"),
+                animatedVisibilityScope = navScope
+            )
+        }
+    } else Modifier
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
+            .then(sharedModifier)
             .clip(CardShape)
-            .clickable(onClick = onClick),
+            .tapSoundClickable(onClick = onClick),
         shape = CardShape,
         color = if (showHero) Color.Transparent else cardColors.containerColor,
         contentColor = cardColors.contentColor,
@@ -87,23 +102,42 @@ fun NoteCard(
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
             if (showHero) {
-                HeroBackground(uri = note.note.pictureUri!!, scrimTop = surface.copy(alpha = 0.50f), scrimBottom = surface.copy(alpha = 0.85f))
+                HeroBackground(
+                    uri = note.note.pictureUri!!,
+                    framing = remember(note.note.pictureHeroFraming) {
+                        HeroFraming.fromJsonString(note.note.pictureHeroFraming)
+                    },
+                    cacheRevision = note.note.updatedAt,
+                    scrimTop = surface.copy(alpha = 0.38f),
+                    scrimBottom = surface.copy(alpha = 0.72f),
+                )
             }
             Row(modifier = Modifier.height(intrinsicSize = androidx.compose.foundation.layout.IntrinsicSize.Min)) {
                 if (hasTagStrip && !showHero) {
-                    TagAccentCardStrip(tags = note.note.tags)
+                    TagAccentCardStrip(tags = visibleTags)
                 }
                 Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 18.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val customIcon = iconFor(note.note.iconKey)
+                        val headerSymbol = iconSymbolName(note.note.iconKey)
+                        val headerBrandDrawable = iconDrawableRes(note.note.iconKey)
                         val cardEmoji = iconEmojiPayload(note.note.iconKey)
-                        if (customIcon != null) {
+                        if (headerSymbol != null) {
+                            RememberMaterialRoundedSymbol(
+                                name = headerSymbol,
+                                size = 18.dp,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.alpha(0.75f),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        } else if (headerBrandDrawable != null) {
                             Icon(
-                                customIcon,
+                                painterResource(headerBrandDrawable),
                                 contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.size(18.dp).alpha(0.75f),
                             )
                             Spacer(Modifier.width(8.dp))
@@ -115,10 +149,12 @@ fun NoteCard(
                             )
                             Spacer(Modifier.width(8.dp))
                         } else if (note.note.kind == NoteKind.LIST) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.List,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp).alpha(0.65f),
+                            RememberMaterialRoundedSymbol(
+                                name = "checklist",
+                                size = 18.dp,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.alpha(0.65f),
                             )
                             Spacer(Modifier.width(8.dp))
                         }
@@ -131,10 +167,15 @@ fun NoteCard(
                             overflow = TextOverflow.Ellipsis,
                         )
                         if (note.note.pinned) {
-                            Icon(
-                                Icons.Filled.PushPin,
-                                contentDescription = "Pinned",
-                                modifier = Modifier.size(16.dp).alpha(0.75f),
+                            RememberMaterialRoundedSymbol(
+                                name = "favorite",
+                                size = 16.dp,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                weight = FontWeight.Medium,
+                                opticalCenterYOffset = 1.dp,
+                                modifier = Modifier
+                                    .semantics { contentDescription = pinnedIconDescription }
+                                    .alpha(0.75f),
                             )
                         }
                     }
@@ -159,7 +200,7 @@ fun NoteCard(
                         }
                         NoteKind.LIST -> ChecklistPreview(note.items)
                     }
-                    MetadataRow(note = note)
+                    MetadataRow(note = note, visibleTags = visibleTags)
                 }
             }
         }
@@ -167,14 +208,19 @@ fun NoteCard(
 }
 
 @Composable
-private fun BoxScope.HeroBackground(uri: String, scrimTop: Color, scrimBottom: Color) {
-    AsyncImage(
-        model = uri,
-        contentDescription = null,
-        contentScale = ContentScale.Crop,
-        modifier = Modifier
-            .matchParentSize()
-            .graphicsLayer { alpha = 0.32f },
+private fun BoxScope.HeroBackground(
+    uri: String,
+    framing: HeroFraming?,
+    cacheRevision: Long,
+    scrimTop: Color,
+    scrimBottom: Color,
+) {
+    HeroFramedImage(
+        imageUri = uri,
+        framing = framing,
+        cacheRevision = cacheRevision,
+        imageAlpha = 0.52f,
+        modifier = Modifier.matchParentSize(),
     )
     Box(
         modifier = Modifier
@@ -184,9 +230,9 @@ private fun BoxScope.HeroBackground(uri: String, scrimTop: Color, scrimBottom: C
 }
 
 @Composable
-private fun MetadataRow(note: NoteWithItems) {
-    val tags = note.note.tags.take(3)
-    val extraTags = (note.note.tags.size - tags.size).coerceAtLeast(0)
+private fun MetadataRow(note: NoteWithItems, visibleTags: List<String>) {
+    val tags = visibleTags.take(3)
+    val extraTags = (visibleTags.size - tags.size).coerceAtLeast(0)
     val hasReminder = note.note.reminderAt != null
     val hasPicture = note.note.pictureUri != null
     val hasAttachment = note.attachments.isNotEmpty()
@@ -217,24 +263,36 @@ private fun MetadataRow(note: NoteWithItems) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (hasReminder) {
-                Icon(
-                    Icons.Filled.Notifications,
-                    contentDescription = "Has reminder",
-                    modifier = Modifier.size(14.dp).alpha(0.6f),
+                RememberMaterialRoundedSymbol(
+                    name = "notifications",
+                    size = 14.dp,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier
+                        .semantics { contentDescription = "Has reminder" }
+                        .alpha(0.6f),
                 )
             }
             if (hasPicture) {
-                Icon(
-                    Icons.Filled.Image,
-                    contentDescription = "Has picture",
-                    modifier = Modifier.size(14.dp).alpha(0.6f),
+                RememberMaterialRoundedSymbol(
+                    name = "image",
+                    size = 14.dp,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier
+                        .semantics { contentDescription = "Has picture" }
+                        .alpha(0.6f),
                 )
             }
             if (hasAttachment) {
-                Icon(
-                    Icons.Filled.AttachFile,
-                    contentDescription = "Has attachment",
-                    modifier = Modifier.size(14.dp).alpha(0.6f),
+                RememberMaterialRoundedSymbol(
+                    name = "attach_file",
+                    size = 14.dp,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier
+                        .semantics { contentDescription = "Has attachment" }
+                        .alpha(0.6f),
                 )
             }
         }
@@ -259,10 +317,12 @@ private fun ChecklistPreview(items: List<ChecklistItemEntity>, limit: Int = 4) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         items.take(limit).forEach { item ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    if (item.checked) Icons.Filled.CheckCircle else Icons.Filled.RadioButtonUnchecked,
-                    contentDescription = null,
-                    modifier = Modifier.size(16.dp).alpha(if (item.checked) 0.6f else 0.85f),
+                RememberMaterialRoundedSymbol(
+                    name = if (item.checked) "check_circle" else "radio_button_unchecked",
+                    size = 16.dp,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.alpha(if (item.checked) 0.6f else 0.85f),
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
@@ -286,4 +346,3 @@ private fun ChecklistPreview(items: List<ChecklistItemEntity>, limit: Int = 4) {
         }
     }
 }
-

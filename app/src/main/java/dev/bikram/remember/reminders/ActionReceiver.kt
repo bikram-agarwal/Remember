@@ -15,36 +15,44 @@ import dev.bikram.remember.R
 import dev.bikram.remember.RememberApp
 import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.NoteRepository
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.launch
 
 class ActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1L)
         val index = intent.getIntExtra(EXTRA_ACTION_INDEX, -1)
         if (noteId <= 0L || index < 0) return
+        val pendingResult = goAsync()
         val app = context.applicationContext as RememberApp
-        val note = runBlocking { app.container.noteRepository.get(noteId) }?.note ?: return
-        val action = note.actions.getOrNull(index) ?: return
+        val repository = app.container.noteRepository
+        app.container.applicationScope.launch {
+            try {
+                val note = repository.get(noteId)?.note ?: return@launch
+                val action = note.actions.getOrNull(index) ?: return@launch
 
-        val fired = try {
-            fire(context, app.container.noteRepository, noteId, action)
-        } catch (t: Throwable) {
-            val message = t.message.orEmpty().ifBlank { context.getString(R.string.common_empty) }
-            Toast.makeText(
-                context,
-                context.getString(R.string.action_receiver_run_error, message),
-                Toast.LENGTH_SHORT,
-            ).show()
-            false
-        }
+                val fired = try {
+                    fire(context, repository, noteId, action)
+                } catch (t: Throwable) {
+                    val message = t.message.orEmpty().ifBlank { context.getString(R.string.common_empty) }
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.action_receiver_run_error, message),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+                    false
+                }
 
-        if (fired) {
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.cancel(noteId.toInt())
+                if (fired) {
+                    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    nm.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
+                }
+            } finally {
+                pendingResult.finish()
+            }
         }
     }
 
-    private fun fire(
+    private suspend fun fire(
         context: Context,
         repository: NoteRepository,
         noteId: Long,
@@ -58,30 +66,27 @@ class ActionReceiver : BroadcastReceiver() {
             return true
         }
         if (action.type == ActionType.MARK_AS_DONE) {
-            return runBlocking { repository.clearReminderFromNotificationAction(noteId) }
+            return repository.clearReminderFromNotificationAction(noteId)
         }
 
-        val intent: Intent? = when (action.type) {
+        val intent: Intent = when (action.type) {
             ActionType.CALL_NUMBER -> callIntent(context, action.details)
             ActionType.SEND_MESSAGE -> Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${action.details}"))
             ActionType.SEND_EMAIL -> Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${action.details}"))
             ActionType.GET_DIRECTIONS -> Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(action.details)}"))
             ActionType.OPEN_LINK -> Intent(Intent.ACTION_VIEW, Uri.parse(normalizeUrl(action.details)))
-            ActionType.OPEN_APP -> context.packageManager.getLaunchIntentForPackage(action.details)
-            ActionType.OPEN_SHORTCUT -> runCatching { Intent.parseUri(action.details, Intent.URI_INTENT_SCHEME) }.getOrNull()
-            ActionType.SHARE_CONTENT -> Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
-                putExtra(Intent.EXTRA_TEXT, action.details)
-            }.let {
-                Intent.createChooser(
-                    it,
-                    action.title.ifBlank { context.getString(R.string.share_chooser_generic) },
-                )
-            }
-            ActionType.COPY_TO_CLIPBOARD,
-            ActionType.MARK_AS_DONE -> null
+            ActionType.OPEN_APP -> context.packageManager.getLaunchIntentForPackage(action.details) ?: return false
+            ActionType.OPEN_SHORTCUT -> runCatching { Intent.parseUri(action.details, Intent.URI_INTENT_SCHEME) }
+                .getOrNull() ?: return false
+            ActionType.SHARE_CONTENT -> Intent.createChooser(
+                Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, action.details)
+                },
+                action.title.ifBlank { context.getString(R.string.share_chooser_generic) },
+            )
+            ActionType.COPY_TO_CLIPBOARD, ActionType.MARK_AS_DONE -> return false
         }
-        if (intent == null) return false
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
         return true

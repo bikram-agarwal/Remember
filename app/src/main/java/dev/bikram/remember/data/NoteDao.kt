@@ -53,6 +53,9 @@ interface NoteDao {
     @Query("SELECT id FROM notes")
     suspend fun allNoteIds(): List<Long>
 
+    @Query("SELECT id FROM notes WHERE trashed = 1")
+    suspend fun trashedNoteIds(): List<Long>
+
     @Query("DELETE FROM notes")
     suspend fun deleteAllNotes()
 

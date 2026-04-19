@@ -12,12 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,12 +19,13 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.semanticSwipeBackground
 import dev.bikram.remember.ui.theme.semanticSwipeIconTint
 
@@ -71,11 +66,11 @@ fun SwipeableRememberNoteCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (fromStart) {
-                        Icon(
-                            imageVector = action.previewIcon(),
-                            contentDescription = null,
+                        RememberMaterialRoundedSymbol(
+                            name = action.materialSymbolName,
+                            size = 20.dp,
                             tint = tint,
-                            modifier = Modifier.size(20.dp),
+                            weight = FontWeight.Medium,
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
@@ -90,11 +85,11 @@ fun SwipeableRememberNoteCard(
                             color = tint,
                         )
                         Spacer(Modifier.width(6.dp))
-                        Icon(
-                            imageVector = action.previewIcon(),
-                            contentDescription = null,
+                        RememberMaterialRoundedSymbol(
+                            name = action.materialSymbolName,
+                            size = 20.dp,
                             tint = tint,
-                            modifier = Modifier.size(20.dp),
+                            weight = FontWeight.Medium,
                         )
                     }
                 }
@@ -106,13 +101,6 @@ fun SwipeableRememberNoteCard(
             onClick = { onOpenNote(note) },
         )
     }
-}
-
-private fun NoteSwipeAction.previewIcon(): ImageVector = when (this) {
-    NoteSwipeAction.OPEN -> Icons.Filled.Edit
-    NoteSwipeAction.TRASH -> Icons.Filled.Delete
-    NoteSwipeAction.DUPLICATE -> Icons.Filled.ContentCopy
-    NoteSwipeAction.TOGGLE_PIN -> Icons.Filled.PushPin
 }
 
 @Composable

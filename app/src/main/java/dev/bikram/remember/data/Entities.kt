@@ -84,6 +84,8 @@ data class NoteEntity(
     val importance: Importance = Importance.DEFAULT,
     val visibility: Visibility = Visibility.PRIVATE,
     val pictureUri: String? = null,
+    /** JSON from [dev.bikram.remember.ui.common.HeroFraming.toJsonString]; null = legacy center crop. */
+    val pictureHeroFraming: String? = null,
     val locked: Boolean = false,
     val iconKey: String? = null,
     val actions: List<NoteAction> = emptyList(),

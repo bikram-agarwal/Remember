@@ -6,6 +6,8 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -72,7 +74,7 @@ class Converters {
 
 @Database(
     entities = [NoteEntity::class, ChecklistItemEntity::class, NoteAttachmentEntity::class],
-    version = 1,
+    version = 2,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -82,9 +84,19 @@ abstract class RememberDatabase : RoomDatabase() {
     abstract fun attachmentDao(): AttachmentDao
 
     companion object {
+        /** Adds nullable hero framing JSON without recreating the notes table. */
+        private val migration1To2: Migration = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE notes ADD COLUMN pictureHeroFraming TEXT",
+                )
+            }
+        }
+
         fun build(context: Context): RememberDatabase =
             Room.databaseBuilder(context, RememberDatabase::class.java, "remember.db")
-                .fallbackToDestructiveMigration(true)
+                .addMigrations(migration1To2)
+                .fallbackToDestructiveMigration(false)
                 .build()
     }
 }

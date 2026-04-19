@@ -22,8 +22,6 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.theme.LocalBlurBars
 import dev.bikram.remember.ui.theme.ProgressiveBlurStyle
 
-enum class BlurDirection { TOP, BOTTOM }
-
 private val dualEdgeBlurAgsl = """
     uniform shader content;
     uniform float blurRadius;
@@ -83,12 +81,28 @@ fun Modifier.progressiveBlur(
     overlayAlpha: Float = 0.28f,
     overlayAlphaBottom: Float = overlayAlpha,
 ): Modifier = composed {
-    val overlayColorTop = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlpha)
-    val overlayColorBottom = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = overlayAlphaBottom)
+    val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
+    val overlayColorTop = remember(surfaceContainer, overlayAlpha) {
+        surfaceContainer.copy(alpha = overlayAlpha)
+    }
+    val overlayColorBottom = remember(surfaceContainer, overlayAlphaBottom) {
+        surfaceContainer.copy(alpha = overlayAlphaBottom)
+    }
+    val topBrushColors = remember(overlayColorTop) { listOf(overlayColorTop, Color.Transparent) }
+    val bottomBrushColors = remember(overlayColorBottom) { listOf(Color.Transparent, overlayColorBottom) }
+    val topBrush = remember(topBrushColors, topHeight) {
+        if (topHeight > 0f) {
+            Brush.verticalGradient(colors = topBrushColors, endY = topHeight)
+        } else {
+            null
+        }
+    }
 
     val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && blurRadius > 0f) {
+        // Cache the RuntimeShader for the lifetime of this modifier; the graphicsLayer block
+        // ran on every property invalidation and was allocating a fresh native shader each time.
+        val shader = remember { RuntimeShader(dualEdgeBlurAgsl) }
         Modifier.graphicsLayer {
-            val shader = RuntimeShader(dualEdgeBlurAgsl)
             shader.setFloatUniform("blurRadius", blurRadius)
             shader.setFloatUniform("topHeight", topHeight)
             shader.setFloatUniform("bottomHeight", bottomHeight)
@@ -103,18 +117,13 @@ fun Modifier.progressiveBlur(
     val gradientModifier = if (showGradientOverlay) {
         Modifier.drawWithContent {
             drawContent()
-            if (topHeight > 0f) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = listOf(overlayColorTop, Color.Transparent),
-                        endY = topHeight,
-                    ),
-                )
+            if (topBrush != null) {
+                drawRect(brush = topBrush)
             }
             if (bottomHeight > 0f) {
                 drawRect(
                     brush = Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, overlayColorBottom),
+                        colors = bottomBrushColors,
                         startY = size.height - bottomHeight,
                     ),
                 )

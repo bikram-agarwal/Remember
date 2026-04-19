@@ -26,6 +26,7 @@ class AppContainer(context: Context) {
         itemDao = db.checklistItemDao(),
         attachmentDao = db.attachmentDao(),
         scheduler = reminderScheduler,
+        database = db,
     )
     val lockPrefs: LockPrefs = LockPrefs(appContext)
     val themePrefs: ThemePrefs = ThemePrefs(appContext)

@@ -1,4 +1,6 @@
 package dev.bikram.remember.ui.edit
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.TextButton
 
 import android.content.Intent
 import androidx.compose.foundation.clickable
@@ -11,29 +13,13 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.AppShortcut
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContactPhone
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +28,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -51,18 +39,22 @@ import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.dataLabelRes
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.data.NoteAction
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberOutlinedButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
-fun ActionType.icon(): ImageVector = when (this) {
-    ActionType.CALL_NUMBER -> Icons.Filled.Phone
-    ActionType.SEND_MESSAGE -> Icons.AutoMirrored.Filled.Send
-    ActionType.SEND_EMAIL -> Icons.Filled.Email
-    ActionType.GET_DIRECTIONS -> Icons.Filled.Navigation
-    ActionType.OPEN_LINK -> Icons.Filled.Link
-    ActionType.OPEN_APP -> Icons.Filled.Apps
-    ActionType.OPEN_SHORTCUT -> Icons.Filled.AppShortcut
-    ActionType.COPY_TO_CLIPBOARD -> Icons.Filled.ContentCopy
-    ActionType.SHARE_CONTENT -> Icons.Filled.Share
-    ActionType.MARK_AS_DONE -> Icons.Filled.Check
+fun ActionType.materialSymbolName(): String = when (this) {
+    ActionType.CALL_NUMBER -> "call"
+    ActionType.SEND_MESSAGE -> "send"
+    ActionType.SEND_EMAIL -> "mail"
+    ActionType.GET_DIRECTIONS -> "directions"
+    ActionType.OPEN_LINK -> "link"
+    ActionType.OPEN_APP -> "apps"
+    ActionType.OPEN_SHORTCUT -> "app_shortcut"
+    ActionType.COPY_TO_CLIPBOARD -> "content_copy"
+    ActionType.SHARE_CONTENT -> "share"
+    ActionType.MARK_AS_DONE -> "check"
 }
 
 @Composable
@@ -83,8 +75,8 @@ fun ActionPicker(
         subtitle = stringResource(R.string.actions_sheet_subtitle),
         onDismiss = onDismiss,
         actions = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-            TextButton(onClick = { onConfirm(draft) }) { Text(stringResource(R.string.common_save)) }
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            RememberTextButton(onClick = { onConfirm(draft) }) { Text(stringResource(R.string.common_save)) }
         },
     ) {
         Column(
@@ -139,6 +131,7 @@ private fun ActionRow(
     action: NoteAction,
     onRemove: () -> Unit,
 ) {
+    val removeActionCd = stringResource(R.string.common_remove)
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -148,11 +141,11 @@ private fun ActionRow(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                action.type.icon(),
-                contentDescription = null,
+            RememberMaterialRoundedSymbol(
+                name = action.type.materialSymbolName(),
+                size = 22.dp,
                 tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp),
+                weight = FontWeight.Medium,
             )
             Spacer(Modifier.size(12.dp))
             Column(Modifier.weight(1f)) {
@@ -172,11 +165,12 @@ private fun ActionRow(
                     )
                 }
             }
-            IconButton(onClick = onRemove) {
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = stringResource(R.string.common_remove),
+            RememberIconButton(onClick = onRemove) {
+                RememberMaterialRoundedSymbol(
+                    name = "delete",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.semantics { contentDescription = removeActionCd },
                 )
             }
         }
@@ -190,17 +184,17 @@ private fun AddActionRow(onClick: () -> Unit) {
         color = MaterialTheme.colorScheme.primaryContainer,
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
+            .tapSoundClickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
-            Icon(
-                Icons.Filled.Add,
-                contentDescription = null,
+            RememberMaterialRoundedSymbol(
+                name = "add",
                 tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                weight = FontWeight.Medium,
             )
             Spacer(Modifier.size(8.dp))
             Text(
@@ -221,7 +215,7 @@ private fun TypePickerDialog(
         title = stringResource(R.string.actions_add_sheet_title),
         onDismiss = onDismiss,
         actions = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
@@ -229,15 +223,15 @@ private fun TypePickerDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onPick(t) }
+                        .tapSoundClickable { onPick(t) }
                         .padding(horizontal = 8.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(
-                        t.icon(),
-                        contentDescription = null,
+                    RememberMaterialRoundedSymbol(
+                        name = t.materialSymbolName(),
+                        size = 22.dp,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(22.dp),
+                        weight = FontWeight.Medium,
                     )
                     Spacer(Modifier.size(14.dp))
                     Text(
@@ -351,11 +345,11 @@ private fun ContactBackedEditor(
     EditorShell(
         type = type,
         body = {
-            OutlinedButton(
+            RememberOutlinedButton(
                 onClick = { pickWith(launcher) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Filled.ContactPhone, contentDescription = null)
+                RememberMaterialRoundedSymbol(name = "contacts", weight = FontWeight.Medium)
                 Spacer(Modifier.size(8.dp))
                 Text(stringResource(R.string.actions_pick_contacts))
             }
@@ -394,11 +388,11 @@ private fun AppBackedEditor(
     EditorShell(
         type = type,
         body = {
-            OutlinedButton(
+            RememberOutlinedButton(
                 onClick = { pickerOpen = true },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Filled.Apps, contentDescription = null)
+                RememberMaterialRoundedSymbol(name = "apps", weight = FontWeight.Medium)
                 Spacer(Modifier.size(8.dp))
                 Text(
                     if (pkg.isBlank()) {
@@ -462,11 +456,11 @@ private fun ShortcutBackedEditor(
     EditorShell(
         type = type,
         body = {
-            OutlinedButton(
+            RememberOutlinedButton(
                 onClick = { appPickerOpen = true },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Icon(Icons.Filled.AppShortcut, contentDescription = null)
+                RememberMaterialRoundedSymbol(name = "app_shortcut", weight = FontWeight.Medium)
                 Spacer(Modifier.size(8.dp))
                 Text(
                     if (uri.isBlank()) {
@@ -520,8 +514,8 @@ private fun EditorShell(
         title = stringResource(type.labelRes()),
         onDismiss = onDismiss,
         actions = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-            TextButton(enabled = readyToSave, onClick = onSave) { Text(stringResource(R.string.common_add)) }
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            RememberTextButton(enabled = readyToSave, onClick = onSave) { Text(stringResource(R.string.common_add)) }
         },
     ) {
         Column(
@@ -529,7 +523,11 @@ private fun EditorShell(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(type.icon(), contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                RememberMaterialRoundedSymbol(
+                    name = type.materialSymbolName(),
+                    tint = MaterialTheme.colorScheme.primary,
+                    weight = FontWeight.Medium,
+                )
                 Spacer(Modifier.size(10.dp))
                 Text(
                     stringResource(type.labelRes()),

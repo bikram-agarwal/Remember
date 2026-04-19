@@ -1,4 +1,5 @@
 package dev.bikram.remember.ui.home
+import androidx.compose.material3.TextButton
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +18,6 @@ import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +25,8 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.data.FilterType
 import dev.bikram.remember.data.NotesFilter
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberSwitch
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -38,7 +40,7 @@ fun FilterSheet(
         title = "Filter",
         onDismiss = onDismiss,
         actions = {
-            TextButton(onClick = { onChange(filter.copy(
+            RememberTextButton(onClick = { onChange(filter.copy(
                 type = FilterType.ALL,
                 tags = emptySet(),
                 hasReminder = null,
@@ -46,7 +48,7 @@ fun FilterSheet(
                 hasAttachment = null,
                 pinned = null,
             )) }) { Text("Clear") }
-            TextButton(onClick = onDismiss) { Text("Done") }
+            RememberTextButton(onClick = onDismiss) { Text("Done") }
         },
     ) {
         Section("Type")
@@ -94,7 +96,7 @@ fun FilterSheet(
         ToggleRow("Has attachment", filter.hasAttachment == true) { on ->
             onChange(filter.copy(hasAttachment = if (on) true else null))
         }
-        ToggleRow("Pinned", filter.pinned == true) { on ->
+        ToggleRow("Favorites", filter.pinned == true) { on ->
             onChange(filter.copy(pinned = if (on) true else null))
         }
     }
@@ -123,7 +125,7 @@ private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Un
             style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.weight(1f),
         )
-        Switch(checked = checked, onCheckedChange = onChange)
+        RememberSwitch(checked = checked, onCheckedChange = onChange)
     }
 }
 

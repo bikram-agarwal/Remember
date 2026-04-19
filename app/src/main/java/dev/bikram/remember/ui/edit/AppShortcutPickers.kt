@@ -1,4 +1,5 @@
 package dev.bikram.remember.ui.edit
+import androidx.compose.material3.TextButton
 
 import android.app.Activity
 import android.content.ComponentName
@@ -23,7 +24,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import dev.bikram.remember.ui.common.AppBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +41,8 @@ import androidx.core.content.IntentCompat
 import androidx.core.graphics.drawable.toBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 // Intent.EXTRA_SHORTCUT_* constants are deprecated on the SDK; keys are stable for CREATE_SHORTCUT results.
 private const val EXTRA_LEGACY_SHORTCUT_INTENT = "android.intent.extra.shortcut.INTENT"
@@ -85,7 +87,7 @@ fun AppPickerDialog(
         onDismiss = onDismiss,
         scrollable = false,
         actions = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            RememberTextButton(onClick = onDismiss) { Text("Cancel") }
         },
     ) {
         Box(
@@ -129,7 +131,7 @@ private fun AppRow(app: AppChoice, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
+            .tapSoundClickable(onClick = onClick)
             .padding(horizontal = 4.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
