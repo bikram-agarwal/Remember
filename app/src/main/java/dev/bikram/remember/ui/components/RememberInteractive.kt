@@ -36,6 +36,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SingleChoiceSegmentedButtonRowScope
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 
 @Composable
@@ -509,8 +511,38 @@ fun RememberDropdownMenuItem(
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun androidx.compose.material3.SingleChoiceSegmentedButtonRowScope.RememberSegmentedButton(
+    selected: Boolean,
+    onClick: () -> Unit,
+    shape: Shape,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    colors: androidx.compose.material3.SegmentedButtonColors = androidx.compose.material3.SegmentedButtonDefaults.colors(),
+    border: BorderStroke = androidx.compose.material3.SegmentedButtonDefaults.borderStroke(colors.activeBorderColor),
+    interactionSource: MutableInteractionSource? = null,
+    icon: @Composable () -> Unit = { androidx.compose.material3.SegmentedButtonDefaults.Icon(selected) },
+    label: @Composable () -> Unit
+) {
+    val playTap = rememberPlayTapSound()
+    this.SegmentedButton(
+        selected = selected,
+        onClick = { playTap(); onClick() },
+        shape = shape,
+        modifier = modifier,
+        enabled = enabled,
+        colors = colors,
+        border = border,
+        interactionSource = interactionSource,
+        icon = icon,
+        label = label
+    )
+}
+
 @Composable
 fun RememberTab(
+
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,

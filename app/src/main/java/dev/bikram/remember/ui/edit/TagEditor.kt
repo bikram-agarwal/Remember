@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -121,7 +122,7 @@ fun TagEditorSheet(
         tags.any { it.equals(trimmedDraft, ignoreCase = true) }
 
     AppBottomSheet(
-        title = stringResource(R.string.tags_title),
+        title = stringResource(R.string.options_tags),
         onDismiss = onDismiss,
         actions = null,
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
@@ -166,7 +167,7 @@ fun TagEditorSheet(
             Box(
                 modifier = Modifier
                     .height(FieldHeight)
-                    .clip(PillCorner)
+                    .clip(CircleShape)
                     .background(chosenColor)
                     .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center,
@@ -234,11 +235,11 @@ fun TagEditorSheet(
             )
             Spacer(Modifier.weight(1f))
             RememberTextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.tag_editor_cancel))
+                Text(stringResource(R.string.common_cancel))
             }
             Spacer(Modifier.size(8.dp))
             RememberButton(onClick = { commitOnSave() }) {
-                Text(stringResource(R.string.tag_editor_save))
+                Text(stringResource(R.string.common_save))
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -246,7 +247,7 @@ fun TagEditorSheet(
 }
 
 @Composable
-private fun CompactOutlinedField(
+internal fun CompactOutlinedField(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
@@ -299,7 +300,7 @@ private fun CompactOutlinedField(
 }
 
 @Composable
-private fun ColorGrid(
+internal fun ColorGrid(
     selectedHex: String?,
     onSelect: (String) -> Unit,
 ) {
@@ -339,9 +340,9 @@ private fun ColorGrid(
                         if (selected) {
                             RememberMaterialRoundedSymbol(
                                 name = "check",
+                                size = 20.dp,
                                 tint = TagPalette.textOn(color),
                                 weight = FontWeight.Medium,
-                                modifier = Modifier.padding(4.dp),
                             )
                         }
                     }
@@ -351,7 +352,7 @@ private fun ColorGrid(
     }
 }
 
-private fun paletteHex(color: Color): String {
+internal fun paletteHex(color: Color): String {
     val argb = android.graphics.Color.argb(
         255,
         (color.red * 255).toInt(),

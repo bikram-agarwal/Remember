@@ -3,15 +3,25 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
 
 import android.text.format.DateFormat
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -27,6 +37,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,6 +59,7 @@ import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +80,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import dev.bikram.remember.R
@@ -76,7 +90,6 @@ import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import android.app.AlarmManager
@@ -96,6 +109,11 @@ import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -109,8 +127,12 @@ fun ReminderPickerSheet(
     val initial = initialMillis ?: (now + 60 * 60 * 1000L)
     val initialCal = remember(initial) { Calendar.getInstance().apply { timeInMillis = initial } }
 
-    // Date
-    var selectedDate by rememberSaveable { mutableStateOf(initial) }
+    // Date: always store Material's "UTC start-of-Gregorian-day" millis (same as DatePicker
+    // output). [initial] is a wall-clock reminder instant on reopen; normalizing avoids the pill
+    // jumping to the next calendar day when that instant falls on the next day in UTC.
+    var selectedDate by rememberSaveable {
+        mutableStateOf(pickerDayMillisForLocalWallClock(initial))
+    }
     var dateDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -312,19 +334,32 @@ fun ReminderPickerSheet(
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
             if (initialMillis != null) {
-                RememberFilledTonalButton(onClick = { onConfirm(null, null) }) { Text("Clear") }
+                RememberFilledTonalButton(onClick = { onConfirm(null, null) }) { Text(stringResource(R.string.common_clear)) }
             }
-            RememberFilledTonalButton(onClick = onDismiss) { Text("Cancel") }
-            RememberButton(onClick = {
+            RememberFilledTonalButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            
+            val isDoneEnabled = run {
+                if (repeatOn) {
+                    if (unit == RecurrenceUnit.WEEK && daysOfWeek.isEmpty()) return@run false
+                    if (endKind == RecurrenceEndKind.ON_DATE && endDate == null) return@run false
+                    if (endKind == RecurrenceEndKind.AFTER_COUNT && (endCountText.toIntOrNull() == null || endCountText.toInt() < 1)) return@run false
+                    if (intervalText.toIntOrNull() == null || intervalText.toInt() < 1) return@run false
+                }
+                true
+            }
+            
+            RememberButton(
+                enabled = isDoneEnabled,
+                onClick = {
                 val hour24 = if (reminderTimeExplicit) reminderHour else 18
                 val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
-                val fireAt = Calendar.getInstance().apply {
-                    timeInMillis = selectedDate
-                    set(Calendar.HOUR_OF_DAY, hour24)
-                    set(Calendar.MINUTE, minuteVal)
-                    set(Calendar.SECOND, 0)
-                    set(Calendar.MILLISECOND, 0)
-                }.timeInMillis
+                val selectedDay =
+                    Instant.ofEpochMilli(selectedDate).atZone(ZoneOffset.UTC).toLocalDate()
+                val fireAt = selectedDay
+                    .atTime(LocalTime.of(hour24, minuteVal))
+                    .atZone(ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
                 val rule = if (!repeatOn) null else {
                     val interval = intervalText.toIntOrNull()?.coerceIn(1, 999) ?: 1
                     val mode: MonthlyMode? = if (unit == RecurrenceUnit.MONTH) {
@@ -347,7 +382,7 @@ fun ReminderPickerSheet(
                     )
                 }
                 onConfirm(fireAt, rule)
-            }) { Text("Done") }
+            }) { Text(stringResource(R.string.common_done)) }
         }
         Spacer(Modifier.height(8.dp))
     }
@@ -360,9 +395,19 @@ fun ReminderPickerSheet(
         )
     }
     if (endDateDialogOpen) {
+        // Fallback has to be pre-normalized to UTC-midnight because CalendarPickerDialog
+        // feeds [initial] straight to rememberDatePickerState, and Material's DatePicker
+        // decodes that millis in UTC to pick the displayed day. A raw "now + 30 days" epoch
+        // is a wall-clock instant, so in negative-offset zones near midnight local it would
+        // render the grid one day ahead of what the user expects. endDate itself is already
+        // UTC-midnight (DatePicker round-trip) so it doesn't need the helper.
         CalendarPickerDialog(
-            initial = endDate ?: (now + 30L * 24 * 60 * 60 * 1000L),
-            onConfirm = { endDate = it; endDateDialogOpen = false },
+            initial = endDate ?: pickerDayMillisForLocalWallClock(now + 30L * 24 * 60 * 60 * 1000L),
+            onConfirm = {
+                endDate = it
+                endKind = RecurrenceEndKind.ON_DATE
+                endDateDialogOpen = false
+            },
             onDismiss = { endDateDialogOpen = false },
         )
     }
@@ -384,8 +429,12 @@ fun ReminderPickerSheet(
 
 private enum class MonthlyKind { BY_DAY, BY_WEEKDAY }
 
-// Pre-fill / fallback occurrence count for AFTER_COUNT mode. Used both when first opening
+// Saveable replacement for Material's [DisplayMode], which is a @JvmInline value class and
+// therefore has no default Saver - trying to `rememberSaveable { mutableStateOf(DisplayMode.X) }`
+// crashes with IllegalArgumentException. We store this enum instead and translate at the
+// DatePicker boundary.
 // the picker and as a sanity floor when the user submits an empty / unparseable field.
+// Pre-fill / fallback occurrence count for AFTER_COUNT mode. Used both when first opening
 private const val DEFAULT_END_COUNT = 10
 
 @Composable
@@ -411,63 +460,103 @@ private fun formatTime12h(hour24: Int, minute: Int): String {
  * Full-screen-width [Dialog] plus capped-width [Surface] (same pattern as the time picker).
  * Avoids [DatePickerDialog] so the headline gets top padding, the grid gets enough width
  * for all seven columns, and action buttons sit in a tight row instead of a tall footer slot.
+ *
+ * The header (date text + mode-toggle pencil/calendar icon) is a custom row aligned
+ * [Alignment.CenterVertically] instead of Material's built-in headline slot + showModeToggle.
+ * This fixes the misalignment caused by headline top-padding vs a center-aligned icon toggle.
+ *
+ * Switching between calendar-grid and text-input modes is driven externally via an
+ * [AnimatedContent] keyed on our own [DisplayMode] state. Each branch holds its own
+ * [rememberDatePickerState] locked to one mode, so the transition is a true crossfade / slide
+ * animated with the M3 Expressive [androidx.compose.material3.MotionScheme]. Selection is
+ * preserved across mode switches through a shared [selectedMillis] state.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CalendarPickerDialog(
+internal fun CalendarPickerDialog(
     initial: Long,
     onConfirm: (Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val state = rememberDatePickerState(initialSelectedDateMillis = initial)
-    val headlineFormatter = remember { DatePickerDefaults.dateFormatter() }
+
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        ),
     ) {
-        Surface(
-            shape = MaterialTheme.shapes.extraLarge,
-            tonalElevation = 6.dp,
+        // By wrapping the content in a full-screen box, we force the Android Dialog Window to
+        // be full-screen. This means that when the DatePicker switches modes and changes its
+        // content height, we use pure Compose `animateContentSize` on the inner Surface.
+        // If we didn't do this, the Android WindowManager would try to resize the dialog window
+        // mid-animation, causing severe (2-3 seconds) stuttering on many devices.
+        Box(
             modifier = Modifier
-                .widthIn(min = 328.dp, max = 400.dp)
-                .wrapContentHeight()
-                .padding(16.dp),
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onDismiss
+                ),
+            contentAlignment = Alignment.Center
         ) {
-            // Negative spacing between the DatePicker and the action row swallows the
-            // extra bottom padding the M3 DatePicker bakes in below its month grid,
-            // so the Cancel/OK row sits flush against the calendar.
-            Column(verticalArrangement = Arrangement.spacedBy((-12).dp)) {
-                DatePicker(
-                    modifier = Modifier.fillMaxWidth(),
-                    state = state,
-                    title = null,
-                    headline = {
-                        DatePickerDefaults.DatePickerHeadline(
-                            selectedDateMillis = state.selectedDateMillis,
-                            displayMode = state.displayMode,
-                            dateFormatter = headlineFormatter,
+            Surface(
+                shape = MaterialTheme.shapes.extraLarge,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .widthIn(min = 328.dp, max = 400.dp)
+                    .wrapContentHeight()
+                    .animateContentSize(
+                        animationSpec = spring<androidx.compose.ui.unit.IntSize>(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    )
+                    .padding(horizontal = 16.dp)
+                    .clickable(
+                        // Catch clicks on the surface so they don't leak to the dismiss background
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {}
+                    ),
+            ) {
+                MaterialTheme(
+                    typography = MaterialTheme.typography.copy(
+                        displayLarge = MaterialTheme.typography.headlineMedium,
+                        headlineLarge = MaterialTheme.typography.headlineMedium,
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    ) {
+                        DatePicker(
+                            state = state,
+                            title = null,
+                            showModeToggle = true,
+                            modifier = Modifier.padding(top = 16.dp),
+                            colors = DatePickerDefaults.colors(
+                                containerColor = Color.Transparent,
+                                dividerColor = Color.Transparent,
+                            )
+                        )
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 4.dp),
-                        )
-                    },
-                    showModeToggle = false,
-                    colors = DatePickerDefaults.colors(dividerColor = Color.Transparent),
-                )
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 0.dp),
-                    horizontalArrangement = Arrangement.End,
-                ) {
-                    RememberTextButton(onClick = onDismiss) {
-                        Text(stringResource(R.string.common_cancel))
-                    }
-                    RememberTextButton(
-                        onClick = { state.selectedDateMillis?.let(onConfirm) },
-                        enabled = state.selectedDateMillis != null,
-                    ) {
-                        Text(stringResource(R.string.common_ok))
+                                .padding(horizontal = 8.dp),
+                            horizontalArrangement = Arrangement.End,
+                        ) {
+                            RememberTextButton(onClick = onDismiss) {
+                                Text(stringResource(R.string.common_cancel))
+                            }
+                            RememberTextButton(
+                                onClick = { state.selectedDateMillis?.let(onConfirm) },
+                                enabled = state.selectedDateMillis != null,
+                            ) {
+                                Text(stringResource(R.string.common_ok))
+                            }
+                        }
                     }
                 }
             }
@@ -480,7 +569,7 @@ private fun CalendarPickerDialog(
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun ReminderTimePickerDialog(
+internal fun ReminderTimePickerDialog(
     initialHour: Int,
     initialMinute: Int,
     onDismiss: () -> Unit,
@@ -624,13 +713,14 @@ private fun PillRow(
         // Reserve the trailing slot so rows with and without Clear match height/width.
         Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
             if (onClear != null) {
+                val cdClear = stringResource(R.string.common_clear)
                 RememberIconButton(onClick = onClear, modifier = Modifier.size(36.dp)) {
                     RememberMaterialRoundedSymbol(
                         name = "close",
                         size = 18.dp,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         weight = FontWeight.Medium,
-                        modifier = Modifier.semantics { contentDescription = "Clear" },
+                        modifier = Modifier.semantics { contentDescription = cdClear },
                     )
                 }
             }
@@ -745,7 +835,7 @@ private fun RepeatConfig(
                         ) {
                                 (1..31).forEach { d ->
                                     RememberDropdownMenuItem(
-                                        text = { Text("On day $d") },
+                                        text = { Text(stringResource(R.string.reminder_on_day, d)) },
                                         onClick = { onDayOfMonth(d); onDayOfMonthMenuOpen(false) },
                                     )
                                 }
@@ -811,7 +901,7 @@ private fun RepeatConfig(
             RadioOption(
                 selected = endKind == RecurrenceEndKind.NEVER,
                 onSelect = { onEndKind(RecurrenceEndKind.NEVER) },
-            ) { Text("Never", style = MaterialTheme.typography.bodyLarge) }
+            ) { Text(stringResource(R.string.reminder_never), style = MaterialTheme.typography.bodyLarge) }
             RadioOption(
                 selected = endKind == RecurrenceEndKind.ON_DATE,
                 onSelect = { onEndKind(RecurrenceEndKind.ON_DATE) },
@@ -821,7 +911,7 @@ private fun RepeatConfig(
                     label = endDate?.let { formatDate(it) } ?: "Pick end date",
                     hasValue = endDate != null && endKind == RecurrenceEndKind.ON_DATE,
                     onClick = {
-                        if (endKind == RecurrenceEndKind.ON_DATE) onOpenEndDatePicker()
+                        onOpenEndDatePicker()
                     },
                 )
             }
@@ -1059,26 +1149,39 @@ private fun weekdayShort(weekday: Int): String = when (weekday) {
     else -> ""
 }
 
-// SimpleDateFormat is locale-sensitive, so we re-create it whenever the locale used to build it
-// changes. Allocating a new formatter for every pill label call (every recomposition) showed up
-// in profiles, so we cache the most recent (locale -> formatter) pair instead.
-private object DateFormatterCache {
+/**
+ * Material [DatePicker] reports and expects millis at **start of the selected day in UTC**
+ * (not the user's reminder wall-clock instant). Map a real instant to that encoding using the
+ * **local** calendar date so reopening a saved reminder keeps the same day as on the grid.
+ */
+private fun pickerDayMillisForLocalWallClock(wallClockEpochMillis: Long): Long {
+    val zone = ZoneId.systemDefault()
+    val localDate = Instant.ofEpochMilli(wallClockEpochMillis).atZone(zone).toLocalDate()
+    return localDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+}
+
+// Material DatePicker encodes the chosen calendar day at UTC midnight. Format using that UTC
+// calendar date so the pill matches the grid; combine with wall time in the system zone for
+// [fireAt] above.
+private object LocalDatePillFormatterCache {
     private var cachedLocale: Locale? = null
-    private var cachedFormatter: SimpleDateFormat? = null
+    private var cachedFormatter: DateTimeFormatter? = null
 
     @Synchronized
-    fun get(locale: Locale): SimpleDateFormat {
+    fun get(locale: Locale): DateTimeFormatter {
         val current = cachedFormatter
         if (current != null && cachedLocale == locale) return current
-        val fresh = SimpleDateFormat("EEE, MMM d, yyyy", locale)
+        val fresh = DateTimeFormatter.ofPattern("EEE, MMM d, yyyy", locale)
         cachedLocale = locale
         cachedFormatter = fresh
         return fresh
     }
 }
 
-private fun formatDate(millis: Long): String =
-    DateFormatterCache.get(Locale.getDefault()).format(millis)
+private fun formatDate(millis: Long): String {
+    val localDate = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+    return LocalDatePillFormatterCache.get(Locale.getDefault()).format(localDate)
+}
 
 private fun repeatSummary(
     unit: RecurrenceUnit,

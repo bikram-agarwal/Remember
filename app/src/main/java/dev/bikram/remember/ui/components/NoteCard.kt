@@ -1,6 +1,8 @@
 package dev.bikram.remember.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +40,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
@@ -47,6 +53,8 @@ import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
+import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.iconDrawableRes
 import dev.bikram.remember.ui.edit.iconEmojiPayload
 import dev.bikram.remember.ui.edit.iconSymbolName
@@ -54,6 +62,7 @@ import dev.bikram.remember.ui.common.ApplyRichEditorListIndent
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
 import dev.bikram.remember.ui.theme.elevatedCardColors
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 
 private val CardShape = RoundedCornerShape(20.dp)
 
@@ -62,6 +71,8 @@ fun NoteCard(
     note: NoteWithItems,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    selected: Boolean = false,
 ) {
     val cardColors = elevatedCardColors()
     val visibleTags = RememberReservedTags.userVisibleTags(note.note.tags)
@@ -88,12 +99,24 @@ fun NoteCard(
         }
     } else Modifier
 
+    val selectionBorderColor = MaterialTheme.colorScheme.primary
+    val selectionBorder = if (selected) {
+        Modifier.border(BorderStroke(2.dp, selectionBorderColor), CardShape)
+    } else {
+        Modifier
+    }
+    val clickableModifier = if (onLongClick != null) {
+        Modifier.tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
+    } else {
+        Modifier.tapSoundClickable(onClick = onClick)
+    }
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .then(sharedModifier)
             .clip(CardShape)
-            .tapSoundClickable(onClick = onClick),
+            .then(selectionBorder)
+            .then(clickableModifier),
         shape = CardShape,
         color = if (showHero) Color.Transparent else cardColors.containerColor,
         contentColor = cardColors.contentColor,
@@ -150,7 +173,16 @@ fun NoteCard(
                             Spacer(Modifier.width(8.dp))
                         } else if (note.note.kind == NoteKind.LIST) {
                             RememberMaterialRoundedSymbol(
-                                name = "checklist",
+                                name = DEFAULT_LIST_HEADER_SYMBOL,
+                                size = 18.dp,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.alpha(0.65f),
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        } else if (note.note.kind == NoteKind.NOTE) {
+                            RememberMaterialRoundedSymbol(
+                                name = DEFAULT_NOTE_HEADER_SYMBOL,
                                 size = 18.dp,
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 weight = FontWeight.Medium,
@@ -159,7 +191,10 @@ fun NoteCard(
                             Spacer(Modifier.width(8.dp))
                         }
                         Text(
-                            text = note.note.title.ifBlank { "Untitled" },
+                            text = note.note.title.ifBlank {
+                                if (note.note.kind == NoteKind.NOTE) stringResource(R.string.edit_note_title_new)
+                                else stringResource(R.string.edit_list_title_new)
+                            },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f),
@@ -192,7 +227,7 @@ fun NoteCard(
                                 )
                             } else {
                                 Text(
-                                    text = "Empty note",
+                                    text = stringResource(R.string.common_empty_note),
                                     style = MaterialTheme.typography.bodyMedium,
                                     modifier = Modifier.alpha(0.5f),
                                 )
@@ -201,6 +236,23 @@ fun NoteCard(
                         NoteKind.LIST -> ChecklistPreview(note.items)
                     }
                     MetadataRow(note = note, visibleTags = visibleTags)
+                }
+            }
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp)
+                        .size(24.dp)
+                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "check",
+                        size = 16.dp,
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        weight = FontWeight.Medium,
+                    )
                 }
             }
         }
@@ -233,10 +285,11 @@ private fun BoxScope.HeroBackground(
 private fun MetadataRow(note: NoteWithItems, visibleTags: List<String>) {
     val tags = visibleTags.take(3)
     val extraTags = (visibleTags.size - tags.size).coerceAtLeast(0)
-    val hasReminder = note.note.reminderAt != null
+    val reminderAt = note.note.reminderAt
+    val isRecurring = note.note.recurrence != null
     val hasPicture = note.note.pictureUri != null
     val hasAttachment = note.attachments.isNotEmpty()
-    val anyMetadata = tags.isNotEmpty() || hasReminder || hasPicture || hasAttachment
+    val anyMetadata = tags.isNotEmpty() || reminderAt != null || hasPicture || hasAttachment
     if (!anyMetadata) return
 
     Spacer(Modifier.height(10.dp))
@@ -262,41 +315,71 @@ private fun MetadataRow(note: NoteWithItems, visibleTags: List<String>) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (hasReminder) {
-                RememberMaterialRoundedSymbol(
-                    name = "notifications",
-                    size = 14.dp,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    weight = FontWeight.Medium,
-                    modifier = Modifier
-                        .semantics { contentDescription = "Has reminder" }
-                        .alpha(0.6f),
-                )
-            }
             if (hasPicture) {
+                val cdPicture = stringResource(R.string.notecard_picture_cd)
                 RememberMaterialRoundedSymbol(
                     name = "image",
                     size = 14.dp,
                     tint = MaterialTheme.colorScheme.onSurface,
                     weight = FontWeight.Medium,
                     modifier = Modifier
-                        .semantics { contentDescription = "Has picture" }
+                        .semantics { contentDescription = cdPicture }
                         .alpha(0.6f),
                 )
             }
             if (hasAttachment) {
+                val cdAttachment = stringResource(R.string.notecard_attachment_cd)
                 RememberMaterialRoundedSymbol(
                     name = "attach_file",
                     size = 14.dp,
                     tint = MaterialTheme.colorScheme.onSurface,
                     weight = FontWeight.Medium,
                     modifier = Modifier
-                        .semantics { contentDescription = "Has attachment" }
+                        .semantics { contentDescription = cdAttachment }
                         .alpha(0.6f),
+                )
+            }
+            // Reminder slot - last in the row (rightmost). Replaces the old generic
+            // notification icon with a short "MMM d" date string so the user reads the
+            // due date directly off the card. When the note is recurring, a tiny
+            // repeat icon precedes the date as a glanceable indicator.
+            if (reminderAt != null) {
+                val cdReminder = stringResource(R.string.notecard_reminder_cd)
+                if (isRecurring) {
+                    RememberMaterialRoundedSymbol(
+                        name = "repeat",
+                        size = 14.dp,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        weight = FontWeight.Medium,
+                        modifier = Modifier.alpha(0.6f),
+                    )
+                }
+                Text(
+                    text = formatShortReminderDate(reminderAt),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier
+                        .semantics { contentDescription = cdReminder }
+                        .alpha(0.85f),
                 )
             }
         }
     }
+}
+
+/**
+ * Short, glanceable due-date label used on note cards. "MMM d" by default ("Apr 27"),
+ * which is readable at the small card-metadata size without consuming a year column
+ * for dates the user is most likely to care about (the next 12 months). Anything
+ * past that horizon falls back to "MMM yyyy" so the card never silently shows a
+ * date in the wrong year.
+ */
+private fun formatShortReminderDate(epochMillis: Long): String {
+    val now = System.currentTimeMillis()
+    val twelveMonthsMs = 365L * 24 * 60 * 60 * 1000
+    val pattern = if (kotlin.math.abs(epochMillis - now) > twelveMonthsMs) "MMM yyyy" else "MMM d"
+    return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(epochMillis))
 }
 
 @Composable
@@ -305,7 +388,7 @@ private fun TagMini(label: String) {
 }
 
 @Composable
-private fun ChecklistPreview(items: List<ChecklistItemEntity>, limit: Int = 4) {
+private fun ChecklistPreview(items: List<ChecklistItemEntity>, limit: Int = 2) {
     if (items.isEmpty()) {
         Text(
             text = "Empty list",
@@ -314,9 +397,19 @@ private fun ChecklistPreview(items: List<ChecklistItemEntity>, limit: Int = 4) {
         )
         return
     }
+    // Room's @Relation returns items in primary-key order (insertion order), not user-visible
+    // order. Match the list editor: unchecked (active) rows first, then checked (completed),
+    // each block sorted by sortOrder so the home preview matches what the user sees after
+    // checking items off (they move to the completed section rather than staying in insertion
+    // order in the flat relation list).
+    val ordered =
+        items.filter { !it.checked }.sortedBy { it.sortOrder } +
+            items.filter { it.checked }.sortedBy { it.sortOrder }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        items.take(limit).forEach { item ->
+        ordered.take(limit).forEach { item ->
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // Indent children one gutter's width to mirror the editor hierarchy.
+                if (item.depth > 0) Spacer(Modifier.width(16.dp))
                 RememberMaterialRoundedSymbol(
                     name = if (item.checked) "check_circle" else "radio_button_unchecked",
                     size = 16.dp,
@@ -335,7 +428,7 @@ private fun ChecklistPreview(items: List<ChecklistItemEntity>, limit: Int = 4) {
                 )
             }
         }
-        val extra = items.size - limit
+        val extra = ordered.size - limit
         if (extra > 0) {
             Spacer(Modifier.height(2.dp))
             Text(

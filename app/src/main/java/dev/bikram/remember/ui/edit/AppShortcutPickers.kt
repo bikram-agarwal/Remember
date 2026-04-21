@@ -43,6 +43,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import androidx.compose.ui.res.stringResource
+import dev.bikram.remember.R
 
 // Intent.EXTRA_SHORTCUT_* constants are deprecated on the SDK; keys are stable for CREATE_SHORTCUT results.
 private const val EXTRA_LEGACY_SHORTCUT_INTENT = "android.intent.extra.shortcut.INTENT"
@@ -87,7 +89,7 @@ fun AppPickerDialog(
         onDismiss = onDismiss,
         scrollable = false,
         actions = {
-            RememberTextButton(onClick = onDismiss) { Text("Cancel") }
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
         },
     ) {
         Box(

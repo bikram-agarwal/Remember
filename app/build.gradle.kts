@@ -51,8 +51,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 30
         targetSdk = 36
-        versionCode = 20
-        versionName = "0.2.0"
+        versionCode = 40
+        versionName = "0.4.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -129,6 +129,7 @@ room {
 }
 
 dependencies {
+    implementation("sh.calvin.reorderable:reorderable:2.4.3")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)

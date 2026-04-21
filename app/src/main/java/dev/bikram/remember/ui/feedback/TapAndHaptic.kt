@@ -38,3 +38,11 @@ fun View.performLongPressHaptic() {
         vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
     }
 }
+
+fun View.performSaveHaptic() {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        performHapticFeedback(HapticFeedbackConstants.CONFIRM)
+    } else {
+        performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+    }
+}

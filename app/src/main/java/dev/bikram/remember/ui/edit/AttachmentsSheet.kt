@@ -50,6 +50,8 @@ import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import androidx.compose.ui.res.stringResource
+import dev.bikram.remember.R
 
 @Composable
 fun AttachmentsSheet(
@@ -68,11 +70,11 @@ fun AttachmentsSheet(
         )
     }
     AppBottomSheet(
-        title = "Attachments",
-        subtitle = "Attach any file — PDFs, docs, audio, video",
+        title = stringResource(R.string.options_attachments),
+        subtitle = stringResource(R.string.attachments_subtitle),
         onDismiss = onDismiss,
         actions = {
-            RememberTextButton(onClick = onDismiss) { Text("Done") }
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
         },
     ) {
         if (attachments.isEmpty()) {
@@ -95,7 +97,7 @@ fun AttachmentsSheet(
         ) {
             RememberMaterialRoundedSymbol(name = "attach_file", weight = FontWeight.Medium)
             Spacer(Modifier.size(8.dp))
-            Text("Add attachment")
+            Text(stringResource(R.string.attachments_add))
         }
     }
 }
@@ -198,12 +200,13 @@ private fun AttachmentRow(attachment: NoteAttachmentEntity, onRemove: () -> Unit
                     )
                 }
             }
+            val cdRemove = stringResource(R.string.common_remove)
             RememberIconButton(onClick = onRemove) {
                 RememberMaterialRoundedSymbol(
                     name = "delete_outline",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     weight = FontWeight.Medium,
-                    modifier = Modifier.semantics { contentDescription = "Remove" },
+                    modifier = Modifier.semantics { contentDescription = cdRemove },
                 )
             }
         }

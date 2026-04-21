@@ -52,7 +52,7 @@ fun AppBottomSheet(
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                     if (subtitle != null) {
-                        Spacer(Modifier.size(2.dp))
+                        Spacer(Modifier.size(6.dp))
                         Text(
                             subtitle,
                             style = MaterialTheme.typography.bodyMedium,

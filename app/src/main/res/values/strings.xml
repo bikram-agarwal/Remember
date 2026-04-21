@@ -6,6 +6,14 @@
     <string name="app_tagline">Notes, lists, reminders - done right</string>
 
     <!-- Common labels -->
+    <string name="action_clear">Clear</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_done">Done</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_reset">Reset</string>
+    <string name="action_save">Save</string>
+    <string name="action_empty">Empty</string>
+    <string name="action_add">Add</string>
     <string name="common_cancel">Cancel</string>
     <string name="common_save">Save</string>
     <string name="common_done">Done</string>
@@ -19,6 +27,10 @@
     <string name="edit_note_title_existing">Untitled</string>
     <string name="edit_note_body_placeholder">Type your note…</string>
     <string name="common_empty">Empty</string>
+    <string name="common_empty_note">Empty note</string>
+    <string name="common_undo">Undo</string>
+    <string name="edit_note_title_new">Untitled note</string>
+    <string name="edit_list_title_new">Untitled list</string>
 
     <!-- Toasts and transient feedback -->
     <string name="toast_export_failed">Export failed</string>
@@ -26,6 +38,7 @@
     <string name="toast_imported_notes">Imported %1$d notes</string>
     <string name="toast_action_failed">Could not run action: %1$s</string>
     <string name="toast_copied">Copied</string>
+    <string name="changes_saved">Changes saved</string>
     <string name="toast_about_link_copied">Link copied</string>
     <string name="clipboard_default_label">Copied</string>
 
@@ -40,6 +53,9 @@
     <string name="widget_empty">No notes yet</string>
 
     <!-- Lock and PIN -->
+    <string name="action_use_pin">Use PIN</string>
+    <string name="label_pin">PIN</string>
+    <string name="label_confirm">Confirm</string>
     <string name="lock_title_unlock">Unlock Remember</string>
     <string name="lock_use_pin">Use PIN</string>
     <string name="lock_enter_pin">Enter your PIN</string>
@@ -50,6 +66,8 @@
     <string name="pin_confirm_label">Confirm</string>
 
     <!-- Main navigation and home -->
+    <string name="cd_close_search">Close search</string>
+    <string name="cd_search">Search</string>
     <string name="main_tab_notes">Notes</string>
     <string name="main_tab_history">History</string>
     <string name="main_tab_settings">Settings</string>
@@ -72,12 +90,18 @@
     <string name="home_create_list">Create list</string>
 
     <!-- Filter and view options -->
+    <string name="cd_view_options">View options</string>
+    <string name="cd_filter">Filter</string>
     <string name="filter_title">Filter</string>
     <string name="view_options_title">View options</string>
     <string name="view_options_subtitle">Change how your notes are sorted and grouped</string>
     <string name="view_options_reset">Reset</string>
 
     <!-- Note cards -->
+    <string name="cd_has_reminder">Has reminder</string>
+    <string name="cd_has_picture">Has picture</string>
+    <string name="cd_has_attachment">Has attachment</string>
+    <string name="cd_note_hero_image">Note hero image</string>
     <string name="notecard_pinned_cd">Favorite</string>
     <string name="notecard_reminder_cd">Has reminder</string>
     <string name="notecard_picture_cd">Has picture</string>
@@ -90,23 +114,141 @@
     <string name="toast_open_attachment_failed">No app can open this file</string>
 
     <!-- Note editor toolbar -->
+    <string name="checked_items_count">%1$d Checked items</string>
+    <string name="edit_list_add_item">Add item</string>
+    <string name="edit_list_new_item_placeholder">New item</string>
+    <string name="rt_text_to_display">Text to display</string>
+    <string name="rt_url_hint">URL (e.g. https://...)</string>
+    <string name="rt_h1">H1</string>
+    <string name="rt_h2">H2</string>
+    <string name="rt_h3">H3</string>
+    <string name="rt_h1_cd">Heading 1</string>
+    <string name="rt_h2_cd">Heading 2</string>
+    <string name="rt_h3_cd">Heading 3</string>
+    <string name="rt_add_link">Add link</string>
+    <string name="rt_edit_link">Edit link</string>
+    <string name="cd_undo">Undo</string>
+    <string name="cd_redo">Redo</string>
+    <string name="cd_bold">Bold</string>
+    <string name="cd_italic">Italic</string>
+    <string name="cd_underline">Underline</string>
+    <string name="cd_strikethrough">Strikethrough</string>
+    <string name="cd_bullet_list">Bullet List</string>
+    <string name="cd_numbered_list">Numbered List</string>
+    <string name="cd_reorder_drag_handle">Reorder</string>
     <string name="edit_favorite_cd">Favorite</string>
     <string name="edit_trash_cd">Trash</string>
     <string name="edit_remove_picture_cd">Remove picture</string>
 
+    <!-- Editor bottom bar and archived state -->
+    <string name="edit_bottom_bar_edit">Edit</string>
+    <string name="edit_bottom_bar_done">Done</string>
+    <string name="edit_bottom_bar_favorite">Favorite</string>
+    <string name="edit_bottom_bar_archive">Archive</string>
+    <string name="edit_bottom_bar_notification">Notification</string>
+    <string name="edit_bottom_bar_unarchive">Unarchive</string>
+    <string name="edit_bottom_bar_trash">Trash</string>
+    <string name="edit_bottom_bar_mark_done">Mark done</string>
+    <string name="edit_bottom_bar_mark_not_done">Mark not done</string>
+    <string name="edit_bottom_bar_delete_forever">Delete forever</string>
+    <string name="edit_bottom_bar_restore">Restore</string>
+    <string name="edit_archived_banner_title">Archived</string>
+    <string name="edit_archived_banner_body">Unarchive to make changes</string>
+    <string name="edit_trashed_banner_title">In trash</string>
+    <string name="edit_trashed_banner_body">Restore to make changes</string>
+    <string name="edit_bottom_bar_edit_cd">Toggle edit mode</string>
+    <string name="edit_bottom_bar_favorite_cd">Toggle favorite</string>
+    <string name="edit_bottom_bar_archive_cd">Archive</string>
+    <string name="edit_bottom_bar_unarchive_cd">Unarchive</string>
+    <string name="edit_bottom_bar_trash_cd">Move to trash</string>
+    <string name="edit_bottom_bar_delete_forever_cd">Delete forever</string>
+    <string name="edit_bottom_bar_restore_cd">Restore from trash</string>
+    <string name="edit_save_cd">Save changes</string>
+    <string name="edit_delete_forever_dialog_title">Delete forever?</string>
+    <string name="edit_delete_forever_dialog_body">This note will be permanently deleted and cannot be recovered.</string>
+    <string name="edit_delete_forever_dialog_confirm">Delete</string>
+
     <!-- History (trash) -->
+    <string name="cd_restore">Restore</string>
+    <string name="cd_delete_forever">Delete forever</string>
     <string name="history_restore_cd">Restore</string>
     <string name="history_delete_forever_cd">Delete forever</string>
 
+    <!-- History -->
+    <string name="history_section_archive">Archive</string>
+    <string name="history_section_trash">Trash</string>
+    <string name="history_archive_empty_title">Nothing archived</string>
+    <string name="history_archive_empty_subtitle">Archived notes stay searchable and never get auto-deleted</string>
+    <string name="history_trash_empty_title">Trash is empty</string>
+    <string name="history_trash_empty_subtitle">Deleted notes land here first and stick around for 30 days</string>
+    <string name="history_both_empty_title">Nothing here</string>
+    <string name="history_both_empty_subtitle">Archived and trashed notes will show up on this tab</string>
+    <string name="history_trash_retention_notice">Notes in the trash are automatically deleted after 30 days</string>
+    <string name="history_unarchive_cd">Unarchive</string>
+    <string name="history_archive_move_to_trash_cd">Move to trash</string>
+    <string name="history_days_left">%1$d days left</string>
+    <string name="history_expires_today">Expires today</string>
+
+    <!-- Home: full-text search + bulk select -->
+    <string name="home_search_placeholder">Search</string>
+    <string name="home_search_section_archive">Archive</string>
+    <string name="home_search_section_trash">Trash</string>
+    <string name="home_search_section_badge_archive">ARCHIVE</string>
+    <string name="home_search_section_badge_trash">TRASH</string>
+    <string name="home_search_section_expand_cd">Expand %1$s section</string>
+    <string name="home_search_section_collapse_cd">Collapse %1$s section</string>
+    <string name="home_no_results_for">No results for \"%1$s\"</string>
+    <string name="home_no_results_hint">Try a shorter term, or check your filters</string>
+    <string name="home_no_results_filters_title">Nothing matches these filters</string>
+    <string name="home_no_results_filters_hint">Try adjusting search or filters</string>
+    <string name="home_nothing_here">Nothing to show here</string>
+    <string name="home_select_count">%1$d selected</string>
+    <string name="home_select_exit_cd">Exit selection</string>
+    <string name="home_bulk_archive">Archive</string>
+    <string name="home_bulk_trash">Move to trash</string>
+    <string name="home_bulk_tag">Tag / untag</string>
+    <string name="home_bulk_tag_sheet_title">Bulk edit tags</string>
+    <string name="home_bulk_tag_sheet_subtitle">Tap to cycle: (+) Add to all, (x) Remove from all, tap again to reset.</string>
+    <string name="home_bulk_tag_apply">Apply</string>
+    <string name="home_bulk_tag_new_section">New tag</string>
+    <string name="home_bulk_tag_create_pill">+ Create new tag</string>
+    <string name="home_bulk_tag_create_pill_cd">Create a new tag</string>
+    <string name="home_bulk_tag_stage">Add</string>
+    <string name="home_bulk_tag_existing_heading">Tags on your notes</string>
+    <string name="home_bulk_tag_no_existing">No saved tags yet. Tap Create new tag below to get started.</string>
+    <string name="home_bulk_archive_cd">Archive selected notes</string>
+    <string name="home_bulk_trash_cd">Move selected notes to trash</string>
+    <string name="home_bulk_tag_cd">Tag selected notes</string>
+
+    <!-- Quick capture persistent notification -->
+    <string name="quick_capture_channel_name">Quick capture</string>
+    <string name="quick_capture_channel_description">Persistent notification for fast note creation</string>
+    <string name="quick_capture_notification_title">New note</string>
+    <string name="quick_capture_notification_text">Tap to write a new note</string>
+    <string name="settings_quick_capture_section">Quick capture</string>
+    <string name="settings_quick_capture_title">Quick capture notification</string>
+    <string name="settings_quick_capture_subtitle">Pin a persistent notification that opens a blank note when tapped</string>
+    <string name="settings_quick_capture_enabled">Enabled</string>
+    <string name="settings_quick_capture_disabled">Disabled</string>
+
+    <!-- Widget additions -->
+    <string name="widget_section_pinned">Favorites</string>
+    <string name="widget_section_reminders">Upcoming reminders</string>
+    <string name="widget_section_empty_pinned">No favorites yet</string>
+    <string name="widget_section_empty_reminders">No upcoming reminders</string>
+
     <!-- Chips and tags on cards -->
+    <string name="cd_remove_tag">Remove %1$s</string>
     <string name="chip_remove_cd">Remove</string>
     <string name="remove_tag_cd">Remove %1$s</string>
 
     <!-- Editor options row -->
     <string name="options_icon">Icon</string>
+    <string name="options_icon_default_note">Note</string>
+    <string name="options_icon_default_checklist">Checklist</string>
     <string name="options_tags">Tags</string>
     <string name="options_reminder">Reminder</string>
-    <string name="options_actions">Actions</string>
+    <string name="options_actions">Notification Action</string>
     <string name="options_importance">Importance</string>
     <string name="options_picture">Picture</string>
     <string name="options_picture_none">No picture</string>
@@ -145,9 +287,8 @@
     <string name="tag_editor_duplicate">Already added</string>
 
     <!-- Note actions (sheet and editor) -->
-    <string name="actions_sheet_title">Actions</string>
-    <string name="actions_sheet_subtitle">Up to 3 quick actions attached to the notification</string>
-    <string name="actions_empty_hint">No actions yet. Add up to 3.</string>
+    <string name="actions_sheet_title">Notification Action</string>
+    <string name="actions_sheet_subtitle">Add a quick action to the notification</string>
     <string name="actions_add_sheet_title">Add action</string>
     <string name="actions_pick_contacts">Pick from contacts</string>
     <string name="actions_pick_app">Pick app</string>
@@ -170,6 +311,28 @@
     <string name="action_type_copy_to_clipboard">Copy to clipboard</string>
     <string name="action_type_share_content">Share content</string>
     <string name="action_type_mark_as_done">Mark as done</string>
+    <string name="action_type_snooze">Snooze</string>
+    <string name="action_field_snooze_blank">Snooze notification</string>
+
+    <string name="snooze_activity_title">Snooze until</string>
+    <string name="snooze_activity_subtitle">Pick a time</string>
+    <string name="snooze_activity_now_format">now • %1$s</string>
+    <string name="snooze_preset_soon">Soon</string>
+    <string name="snooze_preset_later_today">Later today</string>
+    <string name="snooze_preset_this_evening">This evening</string>
+    <string name="snooze_preset_late_tonight">Late tonight</string>
+    <string name="snooze_preset_tomorrow_morning">Tomorrow morning</string>
+    <string name="snooze_preset_tomorrow_afternoon">Tomorrow afternoon</string>
+    <string name="snooze_preset_tomorrow_evening">Tomorrow evening</string>
+    <string name="snooze_preset_next_week">Next week</string>
+    <string name="snooze_preset_pick_custom">Pick a specific time</string>
+    <string name="snooze_preset_pick_custom_subtitle">Date and time picker</string>
+    <string name="snooze_subtitle_in_minutes">in ~%1$d min</string>
+    <string name="snooze_subtitle_in_hours">in %1$dh</string>
+    <string name="snooze_subtitle_tonight">tonight</string>
+    <string name="snooze_toast_today">Reminder set for %1$s today</string>
+    <string name="snooze_toast_tomorrow">Reminder set for tomorrow at %1$s</string>
+    <string name="snooze_toast_future">Reminder set for %1$s at %2$s</string>
     <string name="action_field_phone_number">Phone number</string>
     <string name="action_field_email_address">Email address</string>
     <string name="action_field_address">Address or place</string>
@@ -181,6 +344,7 @@
     <string name="action_field_mark_done_blank" translatable="false" />
 
     <!-- Attachments and pickers -->
+    <string name="action_add_attachment">Add attachment</string>
     <string name="attachments_title">Attachments</string>
     <string name="attachments_subtitle">Attach any file — PDFs, docs, audio, video</string>
     <string name="attachments_add">Add attachment</string>
@@ -198,11 +362,16 @@
     <string name="reminder_time_input_mode_cd">Type time with keyboard</string>
     <string name="reminder_time_dial_mode_cd">Pick time with clock dial</string>
     <string name="reminder_pick_time">Set time</string>
+    <string name="reminder_pick_date">Pick date</string>
+    <string name="reminder_date_input_mode_cd">Type date with keyboard</string>
+    <string name="reminder_date_calendar_mode_cd">Pick date from calendar</string>
     <string name="app_picker_nothing_available">Nothing available</string>
     <string name="share_chooser_generic">Share</string>
     <string name="action_receiver_run_error">Couldn\'t run action: %1$s</string>
 
     <!-- Appearance (theme screen) -->
+    <string name="label_hex">Hex</string>
+    <string name="hint_hex">#FF5733 or FF5733</string>
     <string name="appearance_theme">Theme</string>
     <string name="appearance_theme_system">System</string>
     <string name="appearance_theme_light">Light</string>
@@ -269,10 +438,12 @@
     <string name="settings_swipe_right">Swipe right →</string>
     <string name="settings_swipe_left">← Swipe left</string>
     <string name="settings_swipe_preview_note">Note</string>
-    <string name="swipe_action_open">Open</string>
+    <string name="swipe_action_open">Edit</string>
     <string name="swipe_action_trash">Trash</string>
     <string name="swipe_action_duplicate">Duplicate</string>
     <string name="swipe_action_toggle_pin">Favorite</string>
+    <string name="swipe_action_mark_done">Mark done</string>
+    <string name="swipe_action_mark_not_done">Mark not done</string>
 
     <!-- Settings: backup and restore -->
     <string name="settings_backup_section">Backup &amp; restore</string>
@@ -314,17 +485,4 @@
     <string name="settings_star_on_github">Star on GitHub</string>
     <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
 
-    <!-- Note card colors (picker) -->
-    <string-array name="note_color_names">
-        <item>None</item>
-        <item>Rose</item>
-        <item>Peach</item>
-        <item>Sun</item>
-        <item>Lime</item>
-        <item>Mint</item>
-        <item>Sky</item>
-        <item>Orchid</item>
-        <item>Indigo</item>
-        <item>Stone</item>
-    </string-array>
 </resources>

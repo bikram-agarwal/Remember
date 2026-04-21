@@ -95,6 +95,7 @@ import dev.bikram.remember.data.BackupPreferencesState
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteSwipeAction
+import dev.bikram.remember.data.QuickCaptureState
 import dev.bikram.remember.ui.lock.PinSetupDialog
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
@@ -134,6 +135,9 @@ fun SettingsRoute() {
     val themeState = LocalThemeState.current
     val interactionState by container.interactionPrefs.state.collectAsStateWithLifecycle(
         initialValue = InteractionState(),
+    )
+    val quickCaptureState by container.quickCapturePrefs.state.collectAsStateWithLifecycle(
+        initialValue = QuickCaptureState(),
     )
 
     val biometricAvailable = remember(context) {
@@ -402,6 +406,29 @@ fun SettingsRoute() {
                                     }
                                 },
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+                            )
+                        }
+                    }
+                }
+            }
+
+            item(key = "quick_capture") {
+                Column {
+                    SettingsSectionHeader(
+                        materialSymbolName = "bolt",
+                        title = stringResource(R.string.settings_quick_capture_section),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    GroupedListColumn {
+                        GroupedListItem(position = GroupPosition.ONLY) {
+                            SettingsToggleRow(
+                                materialSymbolName = "bolt",
+                                title = stringResource(R.string.settings_quick_capture_title),
+                                subtitle = stringResource(R.string.settings_quick_capture_subtitle),
+                                checked = quickCaptureState.enabled,
+                                onCheckedChange = { enabled ->
+                                    scope.launch { container.quickCapturePrefs.setEnabled(enabled) }
+                                },
                             )
                         }
                     }
@@ -964,10 +991,11 @@ private fun NoteSwipeActionDropdown(
 @Composable
 private fun noteSwipeActionLabel(action: NoteSwipeAction): String = stringResource(
     when (action) {
-        NoteSwipeAction.OPEN -> R.string.swipe_action_open
-        NoteSwipeAction.TRASH -> R.string.swipe_action_trash
+        NoteSwipeAction.EDIT -> R.string.swipe_action_open
+        NoteSwipeAction.TRASH -> R.string.edit_trash_cd
         NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
-        NoteSwipeAction.TOGGLE_PIN -> R.string.swipe_action_toggle_pin
+        NoteSwipeAction.TOGGLE_PIN -> R.string.notecard_pinned_cd
+        NoteSwipeAction.MARK_DONE -> R.string.swipe_action_mark_done
     },
 )
 

@@ -2,6 +2,7 @@ package dev.bikram.remember.data
 
 import androidx.annotation.StringRes
 import androidx.room.Entity
+import androidx.room.Fts4
 import dev.bikram.remember.R
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -31,6 +32,7 @@ enum class ActionType {
     COPY_TO_CLIPBOARD,
     SHARE_CONTENT,
     MARK_AS_DONE,
+    SNOOZE,
 }
 
 @StringRes
@@ -45,6 +47,7 @@ fun ActionType.labelRes(): Int = when (this) {
     ActionType.COPY_TO_CLIPBOARD -> R.string.action_type_copy_to_clipboard
     ActionType.SHARE_CONTENT -> R.string.action_type_share_content
     ActionType.MARK_AS_DONE -> R.string.action_type_mark_as_done
+    ActionType.SNOOZE -> R.string.action_type_snooze
 }
 
 @StringRes
@@ -60,6 +63,7 @@ fun ActionType.dataLabelRes(): Int = when (this) {
     ActionType.COPY_TO_CLIPBOARD -> R.string.action_field_text_copy
     ActionType.SHARE_CONTENT -> R.string.action_field_text_share
     ActionType.MARK_AS_DONE -> R.string.action_field_mark_done_blank
+    ActionType.SNOOZE -> R.string.action_field_snooze_blank
 }
 
 data class NoteAction(
@@ -91,6 +95,47 @@ data class NoteEntity(
     val actions: List<NoteAction> = emptyList(),
     val tags: List<String> = emptyList(),
     val recurrence: RecurrenceRule? = null,
+    /**
+     * Distinct from [trashed]: archived notes are hidden from Home but remain searchable,
+     * never auto-deleted, and have no pinned state. Mutually exclusive with [trashed]:
+     * trashing an archived note clears its archive state, and vice versa.
+     */
+    val archived: Boolean = false,
+    /** Timestamp (epoch ms) when the row transitioned to [trashed] = true. Used for the 30-day auto-sweep. */
+    val trashedAt: Long? = null,
+    /**
+     * Wall-clock instant at which this note was marked done. Non-null = the note is in the
+     * "Done" bucket on Home; cards render struck-through and the bottom-pinned section
+     * collects them.
+     *
+     * Recurrence semantics: completing a recurring occurrence is NOT a transition to "done".
+     * The repository call that handles "mark this fire done" rolls [reminderAt] forward via
+     * [RecurrenceRule.nextAfter] and leaves [completedAt] null - the note stays active and
+     * reappears in the Today/Upcoming bucket for the next occurrence. A note only enters
+     * Done when it has no future occurrence (non-recurring, OR the rule has exhausted its
+     * end condition).
+     */
+    val completedAt: Long? = null,
+)
+
+/**
+ * Content-less FTS4 shadow table over [NoteEntity]. Only the text-bearing columns are
+ * indexed; everything else stays in `notes`. Triggers in the migration keep it in sync
+ * so application code doesn't have to maintain it manually.
+ *
+ * `tokenize = "unicode61 remove_diacritics 2"` gives diacritic-insensitive matching and
+ * sensible word breaking across the user's mixed-language content.
+ */
+@Entity(tableName = "notes_fts")
+@Fts4(
+    contentEntity = NoteEntity::class,
+    tokenizer = "unicode61",
+    tokenizerArgs = ["remove_diacritics=2"],
+)
+data class NoteFtsEntity(
+    val title: String,
+    val body: String,
+    val tags: String,
 )
 
 @Entity(
@@ -101,14 +146,27 @@ data class NoteEntity(
         childColumns = ["noteId"],
         onDelete = ForeignKey.CASCADE,
     )],
-    indices = [Index("noteId")],
+    indices = [Index("noteId"), Index("parentId")],
 )
 data class ChecklistItemEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val noteId: Long,
     val text: String,
     val checked: Boolean,
-    val position: Int,
+    /**
+     * Weighted sort position. Items are ordered by ascending [sortOrder] within each of the
+     * two logical sublists (active / completed). Using a Double lets us insert between two
+     * existing rows without rewriting every neighbour's position -- new values are chosen
+     * as the midpoint between siblings, or as max(sortOrder) + 1.0 when appended.
+     */
+    val sortOrder: Double,
+    /**
+     * Parent row id for one level of nesting. `null` means the row is a top-level parent.
+     * Children always share the same [noteId] as their parent.
+     */
+    val parentId: Long? = null,
+    /** 0 for top-level rows, 1 for children. Kept in sync with [parentId] presence. */
+    val depth: Int = 0,
 )
 
 @Entity(

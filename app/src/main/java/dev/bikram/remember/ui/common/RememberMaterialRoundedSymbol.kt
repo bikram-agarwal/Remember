@@ -20,12 +20,20 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 
-// Single shared FontFamily backed by app/src/main/res/font/material_symbols_rounded.ttf.
-// That file is a custom-built subset of Google Material Symbols Rounded (~140 KB)
-// containing ONLY the icons we actually reference, instanced at FILL=1, wght=500,
-// GRAD=0, opsz=24. See font_subset/ for the build pipeline.
-private val MaterialSymbolsRoundedFontFamily: FontFamily =
+// Two shared FontFamilies backed by app/src/main/res/font/. Both files are
+// custom-built subsets of Google Material Symbols Rounded (~100-300 KB each)
+// containing ONLY the icons we actually reference. They are pre-instanced at
+// wght=500, GRAD=0, opsz=24, and differ only in FILL:
+//   material_symbols_rounded.ttf           -> FILL=1 (filled)
+//   material_symbols_rounded_outlined.ttf  -> FILL=0 (outlined)
+// See font_subset/ for the build pipeline. Picking by FontFamily is the only
+// reliable way to get a truly unfilled outline; instancing collapses
+// "favorite_border"-style alt names into the same filled glyph shape.
+private val MaterialSymbolsRoundedFilledFontFamily: FontFamily =
     FontFamily(Font(R.font.material_symbols_rounded))
+
+private val MaterialSymbolsRoundedOutlinedFontFamily: FontFamily =
+    FontFamily(Font(R.font.material_symbols_rounded_outlined))
 
 private val FlatLineHeightStyle =
     LineHeightStyle(
@@ -34,14 +42,18 @@ private val FlatLineHeightStyle =
     )
 
 /**
- * Renders a [Google Material Symbol](https://fonts.google.com/icons) in the **Rounded** style
- * with filled presentation, matching the app's primary icon language.
+ * Renders a [Google Material Symbol](https://fonts.google.com/icons) in the **Rounded** style.
  *
- * Backed by an app-bundled subset font instead of pulling in a multi-MB icon library.
- * The font is pre-instanced at FILL=1, weight=500 (Medium), GRAD=0, opsz=24, so the
+ * Backed by app-bundled subset fonts instead of pulling in a multi-MB icon library.
+ * Both subsets are pre-instanced at weight=500 (Medium), GRAD=0, opsz=24, so the
  * [weight] and [grade] parameters are accepted for API compatibility but currently
- * have no visual effect; callers can keep passing them without changes.
+ * have no visual effect; callers can keep passing them without changes. To switch
+ * between filled and outlined presentations, pass [filled].
  *
+ * @param filled `true` renders from the filled TTF (FILL=1, default), `false` renders
+ *   from the outlined TTF (FILL=0). This is the only way to get a visually distinct
+ *   outlined glyph: the `_border` / `_outline` Material name aliases collapse to the
+ *   filled shape once FILL is instanced.
  * @param opticalCenterYOffset Downward shift for glyphs that sit high in the em box (Material
  *   Symbols often center on the cap height; dense marks like the heart can look optically high).
  */
@@ -53,11 +65,17 @@ fun RememberMaterialRoundedSymbol(
     tint: Color = LocalContentColor.current,
     @Suppress("UNUSED_PARAMETER") weight: FontWeight = FontWeight.Medium,
     @Suppress("UNUSED_PARAMETER") grade: Float = 0f,
+    filled: Boolean = true,
     opticalCenterYOffset: Dp = 0.dp,
 ) {
     val density = LocalDensity.current
     val fontSize = remember(size, density) { with(density) { size.toSp() } }
     val brush = remember(tint) { SolidColor(tint) }
+    val fontFamily = if (filled) {
+        MaterialSymbolsRoundedFilledFontFamily
+    } else {
+        MaterialSymbolsRoundedOutlinedFontFamily
+    }
     val layoutModifier =
         if (opticalCenterYOffset == 0.dp) {
             modifier
@@ -71,7 +89,7 @@ fun RememberMaterialRoundedSymbol(
             brush = brush,
             fontSize = fontSize,
             lineHeight = fontSize,
-            fontFamily = MaterialSymbolsRoundedFontFamily,
+            fontFamily = fontFamily,
             // Material Symbols icons are driven by the `rlig` feature (required ligatures).
             fontFeatureSettings = "\"rlig\" 1, \"liga\" 1",
             textAlign = TextAlign.Center,

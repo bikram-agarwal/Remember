@@ -47,6 +47,14 @@ class EditNoteViewModel(
     private val _pinned = MutableStateFlow(false)
     val pinned: StateFlow<Boolean> = _pinned.asStateFlow()
 
+    /**
+     * Snapshot of the underlying note's [dev.bikram.remember.data.NoteEntity.completedAt]
+     * as a boolean. Driven by the live DB observer in [init], so external completion
+     * via swipe / notification action / repository.markCompleted is reflected here too.
+     */
+    private val _completed = MutableStateFlow(false)
+    val completed: StateFlow<Boolean> = _completed.asStateFlow()
+
     private val _reminderAt = MutableStateFlow<Long?>(null)
     val reminderAt: StateFlow<Long?> = _reminderAt.asStateFlow()
 
@@ -84,6 +92,25 @@ class EditNoteViewModel(
     private val _attachments = MutableStateFlow<List<NoteAttachmentEntity>>(emptyList())
     val attachments: StateFlow<List<NoteAttachmentEntity>> = _attachments.asStateFlow()
 
+    /**
+     * Mirrors the underlying note's archived / trashed shelf. Used by the edit screen to flip
+     * into read-only mode and swap the bottom-bar action set. New notes always start on the
+     * active shelf.
+     */
+    private val _archived = MutableStateFlow(false)
+    val archived: StateFlow<Boolean> = _archived.asStateFlow()
+
+    private val _trashed = MutableStateFlow(false)
+    val trashed: StateFlow<Boolean> = _trashed.asStateFlow()
+
+    /**
+     * True once this session is backed by a database row ([loadedId] non-null). New drafts start
+     * false so the action bar omits archive/trash until the first save (or attachment create)
+     * assigns an id, without tying that UI to the navigation argument (which stays null).
+     */
+    private val _hasPersistedRow = MutableStateFlow(noteId != null)
+    val hasPersistedRow: StateFlow<Boolean> = _hasPersistedRow.asStateFlow()
+
     /** True after the initial DB load has populated the state flows (or immediately for a new note). */
     private val _loaded = MutableStateFlow(noteId == null)
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
@@ -99,18 +126,21 @@ class EditNoteViewModel(
         dirty = true
     }
 
+    private var originalNote: dev.bikram.remember.data.NoteEntity? = null
+
+    private fun syncHasPersistedRow() {
+        _hasPersistedRow.value = loadedId != null
+    }
+
     init {
         if (noteId != null) {
-            // Lock the persist mutex synchronously *before* launching the load. Otherwise a
-            // saveIfNeeded() / addAttachment() / removeAttachment() that wins the dispatcher
-            // race could observe the default StateFlow values (empty title/body, etc.) and
-            // overwrite the real note in the database while the load is still in flight.
             check(persistMutex.tryLock()) { "persistMutex must be unlocked at construction" }
             viewModelScope.launch {
                 try {
                     val existing = repository.get(noteId)
                     if (existing != null) {
                         val n = existing.note
+                        originalNote = n
                         _title.value = n.title
                         _body.value = n.body
                         _pinned.value = n.pinned || n.tags.contains(RememberReservedTags.FAVORITE)
@@ -125,11 +155,32 @@ class EditNoteViewModel(
                         _actions.value = n.actions
                         _tags.value = n.tags.filterNot { it == RememberReservedTags.FAVORITE }
                         _attachments.value = existing.attachments
+                        _archived.value = n.archived
+                        _trashed.value = n.trashed
+                        _completed.value = n.completedAt != null
                     }
                 } finally {
                     // Leave loading when the load finishes: missing row, success, or thrown from get().
                     _loaded.value = true
                     persistMutex.unlock()
+                }
+            }
+            // Live-mirror only the fields that can be written from OUTSIDE this VM
+            // while the editor is open: reminderAt + recurrence (snooze action,
+            // recurrence advance after a fire, mark-as-done from notification). The
+            // other fields are owned by this VM's user-input flow and would clobber
+            // unsaved drafts if we mirrored them too. Room's Flow only emits on
+            // actual row changes, so this is a single small distinct subscription -
+            // negligible battery impact, no polling.
+            viewModelScope.launch {
+                repository.observe(noteId).collect { row ->
+                    val n = row?.note ?: return@collect
+                    if (_reminderAt.value != n.reminderAt) _reminderAt.value = n.reminderAt
+                    val sanitized = n.recurrence?.sanitized()
+                    if (_recurrence.value != sanitized) _recurrence.value = sanitized
+                    if (_trashed.value != n.trashed) _trashed.value = n.trashed
+                    val isCompleted = n.completedAt != null
+                    if (_completed.value != isCompleted) _completed.value = isCompleted
                 }
             }
         }
@@ -234,6 +285,7 @@ class EditNoteViewModel(
                         options = currentOptions(),
                     )
                     loadedId = newId
+                    syncHasPersistedRow()
                     if (_pinned.value) repository.setPinned(newId, true)
                     newId
                 }
@@ -278,35 +330,102 @@ class EditNoteViewModel(
         recurrence = _recurrence.value,
     )
 
+    private fun hasNetChanges(): Boolean {
+        val id = loadedId
+        val t = _title.value
+        val b = _body.value
+        val opts = currentOptions()
+        val pinned = _pinned.value
+        if (id == null) {
+            return t.isNotBlank() || b.isNotBlank() || _attachments.value.isNotEmpty() || opts.pictureUri != null || opts.tags.isNotEmpty() || opts.reminderAt != null || opts.actions.isNotEmpty() || opts.iconKey != null
+        } else {
+            val old = originalNote ?: return true
+            if (t != old.title) return true
+            if (b != old.body) return true
+            if (pinned != old.pinned) return true
+            if (opts.reminderAt != old.reminderAt) return true
+            if (opts.importance != old.importance) return true
+            if (opts.visibility != old.visibility) return true
+            if (opts.pictureUri != old.pictureUri) return true
+            if (opts.pictureHeroFraming != old.pictureHeroFraming) return true
+            if (opts.locked != old.locked) return true
+            if (opts.iconKey != old.iconKey) return true
+            if (opts.actions != old.actions) return true
+            if (opts.tags != old.tags) return true
+            if (opts.recurrence != old.recurrence) return true
+            return false
+        }
+    }
+
     /**
      * Persist the in-memory state. Safe to call from ON_STOP, onDispose, or any other
      * lifecycle hook; concurrent calls serialize through [persistMutex] so we never
      * insert the same draft note twice.
      */
-    suspend fun saveIfNeeded(): Boolean {
+    suspend fun saveIfNeeded(untitledName: String): (suspend () -> Unit)? {
         return persistMutex.withLock {
+            if (!hasNetChanges()) {
+                dirty = false
+                return@withLock null
+            }
             val titleValue = _title.value
             val bodyValue = _body.value
             val id = loadedId
-            val empty = titleValue.isBlank() && bodyValue.isBlank()
+            val finalTitle = titleValue.ifBlank { untitledName }
             if (id == null) {
-                if (empty) return@withLock false
+                if (!dirty) return@withLock null
                 val epochAtWrite = mutationEpoch.get()
-                val newId = repository.createNote(titleValue, bodyValue, 0, currentOptions())
+                val newId = repository.createNote(finalTitle, bodyValue, 0, currentOptions())
                 loadedId = newId
+                syncHasPersistedRow()
+                if (titleValue.isBlank()) _title.value = finalTitle
                 if (_pinned.value) repository.setPinned(newId, true)
                 if (mutationEpoch.get() == epochAtWrite) dirty = false
-                true
+                
+                originalNote = repository.get(newId)?.note
+                
+                return@withLock {
+                    repository.moveToTrash(newId)
+                }
             } else {
-                if (!dirty) return@withLock false
+                if (!dirty) return@withLock null
                 val epochAtWrite = mutationEpoch.get()
-                repository.updateNote(id, titleValue, bodyValue, 0, currentOptions())
+                repository.updateNote(id, finalTitle, bodyValue, 0, currentOptions())
+                if (titleValue.isBlank()) _title.value = finalTitle
                 val cur = repository.get(id)?.note
                 if (cur != null && cur.pinned != _pinned.value) {
                     repository.setPinned(id, _pinned.value)
                 }
                 if (mutationEpoch.get() == epochAtWrite) dirty = false
-                true
+                
+                val old = originalNote
+                originalNote = repository.get(id)?.note
+                
+                if (old != null) {
+                    return@withLock {
+                        repository.updateNote(
+                            id = id,
+                            title = old.title,
+                            body = old.body,
+                            colorIndex = old.colorIndex,
+                            options = NoteOptions(
+                                reminderAt = old.reminderAt,
+                                importance = old.importance,
+                                visibility = old.visibility,
+                                pictureUri = old.pictureUri,
+                                pictureHeroFraming = old.pictureHeroFraming,
+                                locked = old.locked,
+                                iconKey = old.iconKey,
+                                actions = old.actions,
+                                tags = old.tags,
+                                recurrence = old.recurrence
+                            )
+                        )
+                        repository.setPinned(id, old.pinned)
+                    }
+                } else {
+                    return@withLock null
+                }
             }
         }
     }
@@ -315,6 +434,74 @@ class EditNoteViewModel(
         persistMutex.withLock {
             val id = loadedId ?: return@withLock
             repository.moveToTrash(id)
+            dirty = false
+            _trashed.value = true
+            _archived.value = false
+        }
+    }
+
+    /**
+     * Flip the note's done state from inside the editor's bottom bar. Routes through
+     * [NoteRepository.markCompleted] / [NoteRepository.markIncomplete] so recurrence
+     * is honored - completing a recurring note rolls it forward instead of moving it
+     * to Done. The live observer in [init] picks up the new value and updates
+     * [completed] automatically; we don't have to mutate it here.
+     */
+    suspend fun toggleCompleted() {
+        val id = loadedId ?: return
+        if (_completed.value) {
+            repository.markIncomplete(id)
+        } else {
+            repository.markCompleted(id)
+        }
+    }
+
+    /**
+     * Flip the note to the archive shelf. Unlike [trashCurrent] this is not a destructive
+     * operation, so the edit screen stays open and drops into read-only mode via the
+     * [archived] state flow.
+     */
+    suspend fun archiveCurrent(untitledName: String) {
+        // Persist any in-flight edits first so the archive snapshot matches what the user sees.
+        saveIfNeeded(untitledName)
+        persistMutex.withLock {
+            val id = loadedId ?: return@withLock
+            repository.archiveNote(id)
+            _archived.value = true
+            dirty = false
+        }
+    }
+
+    suspend fun unarchiveCurrent() {
+        persistMutex.withLock {
+            val id = loadedId ?: return@withLock
+            repository.unarchiveNote(id)
+            _archived.value = false
+            dirty = false
+        }
+    }
+
+    suspend fun restoreFromTrashCurrent() {
+        persistMutex.withLock {
+            val id = loadedId ?: return@withLock
+            repository.restoreFromTrash(id)
+            _trashed.value = false
+            dirty = false
+        }
+    }
+
+    suspend fun fireNotification(context: android.content.Context, untitledName: String) {
+        saveIfNeeded(untitledName)
+        val id = loadedId ?: return
+        val note = repository.get(id)?.note ?: return
+        dev.bikram.remember.reminders.ReminderReceiver.showNotification(context, note)
+        android.widget.Toast.makeText(context, "Notification created", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    suspend fun deleteForeverCurrent() {
+        persistMutex.withLock {
+            val id = loadedId ?: return@withLock
+            repository.deleteForever(id)
             dirty = false
         }
     }

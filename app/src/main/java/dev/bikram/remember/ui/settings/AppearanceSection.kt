@@ -118,7 +118,7 @@ fun AppearanceSection(
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = stringResource(R.string.settings_palette_style),
+            text = stringResource(R.string.appearance_palette_style),
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -312,8 +312,8 @@ private fun CustomHexSheet(
                     value = draftHex,
                     onValueChange = { draftHex = it.filter { ch -> ch != '\n' } },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Hex") },
-                    placeholder = { Text("#FF5733 or FF5733") },
+                    label = { Text(stringResource(R.string.tags_hex_label)) },
+                    placeholder = { Text(stringResource(R.string.appearance_hex_placeholder)) },
                     singleLine = true,
                 )
                 Row(
@@ -321,12 +321,12 @@ private fun CustomHexSheet(
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    RememberTextButton(onClick = onDismiss) { Text("Cancel") }
+                    RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
                     Spacer(Modifier.size(8.dp))
                     RememberTextButton(
                         onClick = { onConfirm(normalized ?: draftHex.trim()) },
                         enabled = previewColor != null,
-                    ) { Text("Add") }
+                    ) { Text(stringResource(R.string.common_add)) }
                 }
             }
         }

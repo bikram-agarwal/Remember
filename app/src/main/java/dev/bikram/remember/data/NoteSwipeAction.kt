@@ -5,8 +5,10 @@ enum class NoteSwipeAction(
     /** Google Material Symbols ligature for [dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol]. */
     val materialSymbolName: String,
 ) {
-    OPEN("edit"),
+    EDIT("edit"),
     TRASH("delete"),
     DUPLICATE("content_copy"),
     TOGGLE_PIN("favorite"),
+    /** Mark task done. Recurrence-aware via [NoteRepository.markCompleted]. */
+    MARK_DONE("check_circle"),
 }

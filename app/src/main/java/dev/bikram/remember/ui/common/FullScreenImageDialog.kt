@@ -23,16 +23,26 @@ import coil3.compose.AsyncImage
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.components.RememberIconButton
 
+/**
+ * Full-screen image viewer. When [onDelete] is non-null, a delete button is shown at the top-start
+ * corner (opposite the close button). Tapping it invokes [onDelete] and then dismisses the viewer,
+ * so callers don't need to coordinate the dismiss themselves.
+ */
 @Composable
 fun FullScreenImageDialog(
     imageUri: String,
     imageCacheRevision: Long = 0L,
     imageContentDescription: String,
     onDismiss: () -> Unit,
+    onDelete: (() -> Unit)? = null,
 ) {
     val closeLabel = stringResource(R.string.common_back)
     val closeSemantics = remember(closeLabel) {
         Modifier.semantics { contentDescription = closeLabel }
+    }
+    val deleteLabel = stringResource(R.string.edit_remove_picture_cd)
+    val deleteSemantics = remember(deleteLabel) {
+        Modifier.semantics { contentDescription = deleteLabel }
     }
     val imageRequest = rememberHeroImageRequest(imageUri, imageCacheRevision, maxSidePx = 4096)
     Dialog(
@@ -50,6 +60,29 @@ fun FullScreenImageDialog(
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize(),
                 )
+                if (onDelete != null) {
+                    RememberIconButton(
+                        onClick = {
+                            onDelete()
+                            onDismiss()
+                        },
+                        modifier = Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp)
+                            .then(deleteSemantics),
+                        colors = IconButtonDefaults.iconButtonColors(
+                            containerColor = Color.Black.copy(alpha = 0.45f),
+                            contentColor = Color.White,
+                        ),
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "delete_outline",
+                            size = 24.dp,
+                            tint = Color.White,
+                            weight = FontWeight.Medium,
+                        )
+                    }
+                }
                 RememberIconButton(
                     onClick = onDismiss,
                     modifier = Modifier

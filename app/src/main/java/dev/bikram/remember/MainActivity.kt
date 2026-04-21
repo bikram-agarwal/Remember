@@ -5,6 +5,11 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -88,6 +93,8 @@ private fun AppRoot(container: dev.bikram.remember.di.AppContainer) {
         initialValue = dev.bikram.remember.data.LockPrefs.State(),
     )
     var unlocked by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    
     if (lockState.enabled && lockState.hasPin && !unlocked) {
         LockScreen(
             biometricEnabled = lockState.biometric,
@@ -96,12 +103,18 @@ private fun AppRoot(container: dev.bikram.remember.di.AppContainer) {
             verify = { pin -> container.lockPrefs.verify(pin) },
         )
     } else {
-        RememberNavGraph(
-            repository = container.noteRepository,
-            themePrefs = container.themePrefs,
-            interactionPrefs = container.interactionPrefs,
-            appScope = container.applicationScope,
-            launchFlow = container.pendingLaunch,
-        )
+        androidx.compose.runtime.CompositionLocalProvider(
+            dev.bikram.remember.ui.theme.LocalSnackbarHostState provides snackbarHostState
+        ) {
+            androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
+                RememberNavGraph(
+                    repository = container.noteRepository,
+                    themePrefs = container.themePrefs,
+                    interactionPrefs = container.interactionPrefs,
+                    appScope = container.applicationScope,
+                    launchFlow = container.pendingLaunch,
+                )
+            }
+        }
     }
 }

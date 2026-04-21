@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import dev.bikram.remember.R
 import dev.bikram.remember.RememberApp
 import dev.bikram.remember.data.ActionType
+import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteRepository
 import kotlinx.coroutines.launch
 
@@ -21,17 +22,32 @@ class ActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1L)
         val index = intent.getIntExtra(EXTRA_ACTION_INDEX, -1)
-        if (noteId <= 0L || index < 0) return
+        if (noteId <= 0L || index < 0) {
+            return
+        }
         val pendingResult = goAsync()
         val app = context.applicationContext as RememberApp
         val repository = app.container.noteRepository
         app.container.applicationScope.launch {
             try {
-                val note = repository.get(noteId)?.note ?: return@launch
-                val action = note.actions.getOrNull(index) ?: return@launch
+                val noteWithItems = repository.get(noteId)
+                if (noteWithItems == null) return@launch
+                val note = noteWithItems.note
+                val action = if (index == 1) {
+                    NoteAction(ActionType.SNOOZE, context.getString(R.string.action_type_snooze), "")
+                } else if (index == 2) {
+                    NoteAction(ActionType.MARK_AS_DONE, context.getString(R.string.action_type_mark_as_done), "")
+                } else {
+                    note.actions.firstOrNull() ?: return@launch
+                }
 
-                val fired = try {
-                    fire(context, repository, noteId, action)
+                try {
+                    val closeIntent = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
+                    try {
+                        context.sendBroadcast(closeIntent)
+                    } catch (_: SecurityException) { }
+
+                    fire(context, repository, noteWithItems, action)
                 } catch (t: Throwable) {
                     val message = t.message.orEmpty().ifBlank { context.getString(R.string.common_empty) }
                     Toast.makeText(
@@ -39,12 +55,6 @@ class ActionReceiver : BroadcastReceiver() {
                         context.getString(R.string.action_receiver_run_error, message),
                         Toast.LENGTH_SHORT,
                     ).show()
-                    false
-                }
-
-                if (fired) {
-                    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    nm.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
                 }
             } finally {
                 pendingResult.finish()
@@ -55,18 +65,29 @@ class ActionReceiver : BroadcastReceiver() {
     private suspend fun fire(
         context: Context,
         repository: NoteRepository,
-        noteId: Long,
+        noteWithItems: dev.bikram.remember.data.NoteWithItems,
         action: dev.bikram.remember.data.NoteAction,
     ): Boolean {
+        val noteId = noteWithItems.note.id
         if (action.type == ActionType.COPY_TO_CLIPBOARD) {
             val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clipLabel = action.title.ifBlank { context.getString(R.string.clipboard_default_label) }
-            cm.setPrimaryClip(ClipData.newPlainText(clipLabel, action.details))
+            val clipLabel = action.title.ifBlank { context.getString(R.string.toast_copied) }
+            cm.setPrimaryClip(ClipData.newPlainText(clipLabel, getNoteContent(noteWithItems)))
             Toast.makeText(context, context.getString(R.string.toast_copied), Toast.LENGTH_SHORT).show()
             return true
         }
         if (action.type == ActionType.MARK_AS_DONE) {
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
             return repository.clearReminderFromNotificationAction(noteId)
+        }
+        if (action.type == ActionType.SNOOZE) {
+            val snoozeIntent = Intent(context, SnoozeActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                putExtra(SnoozeActivity.EXTRA_NOTE_ID, noteId)
+            }
+            context.startActivity(snoozeIntent)
+            return true
         }
 
         val intent: Intent = when (action.type) {
@@ -81,15 +102,26 @@ class ActionReceiver : BroadcastReceiver() {
             ActionType.SHARE_CONTENT -> Intent.createChooser(
                 Intent(Intent.ACTION_SEND).apply {
                     type = "text/plain"
-                    putExtra(Intent.EXTRA_TEXT, action.details)
+                    putExtra(Intent.EXTRA_TEXT, getNoteContent(noteWithItems))
                 },
                 action.title.ifBlank { context.getString(R.string.share_chooser_generic) },
             )
-            ActionType.COPY_TO_CLIPBOARD, ActionType.MARK_AS_DONE -> return false
+            ActionType.COPY_TO_CLIPBOARD, ActionType.MARK_AS_DONE, ActionType.SNOOZE, ActionType.SHARE_CONTENT -> return false
         }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
         return true
+    }
+
+    private fun getNoteContent(noteWithItems: dev.bikram.remember.data.NoteWithItems): String {
+        val note = noteWithItems.note
+        return if (note.kind == dev.bikram.remember.data.NoteKind.NOTE) {
+            note.body
+        } else {
+            noteWithItems.items.sortedBy { it.sortOrder }.joinToString("\n") { 
+                if (it.checked) "[x] ${it.text}" else "[ ] ${it.text}"
+            }
+        }
     }
 
     private fun callIntent(context: Context, number: String): Intent {

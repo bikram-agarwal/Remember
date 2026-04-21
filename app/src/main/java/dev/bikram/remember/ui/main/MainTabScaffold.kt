@@ -68,15 +68,17 @@ import dev.bikram.remember.ui.components.RememberFilledIconButton
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberFloatingActionButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import androidx.compose.ui.res.stringResource
+import dev.bikram.remember.R
 
 /**
  * Bottom tabs. Each [symbolName] must be listed by `font_subset/harvest_ligatures.py`
  * (then run `subset_font.py`) so the subset icon font actually contains that glyph.
  */
-enum class MainTab(val label: String, val symbolName: String) {
-    Notes("Notes", "notes"),
-    History("History", "history"),
-    Settings("Settings", "settings"),
+enum class MainTab(@param:androidx.annotation.StringRes val labelRes: Int, val symbolName: String) {
+    Notes(R.string.main_tab_notes, "notes"),
+    History(R.string.main_tab_history, "history"),
+    Settings(R.string.main_tab_settings, "settings"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -87,7 +89,7 @@ fun MainTabScaffold(
     interactionPrefs: InteractionPrefs,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
-    onOpenNote: (NoteWithItems) -> Unit,
+    onOpenNote: (NoteWithItems, Boolean) -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(MainTab.Notes) }
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
@@ -124,7 +126,7 @@ fun MainTabScaffold(
                     repository = repository,
                     themePrefs = themePrefs,
                     interactionPrefs = interactionPrefs,
-                    onOpenNote = onOpenNote,
+                    onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
                     onCreateNote = {
                         fabExpanded = false
                         onCreateNote()
@@ -134,7 +136,10 @@ fun MainTabScaffold(
                         onCreateList()
                     },
                 )
-                MainTab.History -> HistoryRoute(repository = repository)
+                MainTab.History -> HistoryRoute(
+                    repository = repository,
+                    onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
+                )
                 MainTab.Settings -> SettingsRoute()
             }
         }
@@ -198,19 +203,27 @@ fun MainTabScaffold(
             },
             modifier = Modifier.align(Alignment.BottomCenter),
         )
+        
+        androidx.compose.material3.SnackbarHost(
+            hostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(bottom = 80.dp) // Push it above the floating nav bar
+        )
     }
 
     if (clearTrashOpen) {
         AppBottomSheet(
-            title = "Empty trash?",
-            subtitle = "Permanently delete all trashed notes. This cannot be undone.",
+            title = stringResource(R.string.main_empty_trash_title),
+            subtitle = stringResource(R.string.main_empty_trash_subtitle),
             onDismiss = { clearTrashOpen = false },
             actions = {
-                RememberTextButton(onClick = { clearTrashOpen = false }) { Text("Cancel") }
+                RememberTextButton(onClick = { clearTrashOpen = false }) { Text(stringResource(R.string.common_cancel)) }
                 RememberTextButton(onClick = {
                     clearTrashOpen = false
                     scope.launch { repository.emptyTrash() }
-                }) { Text("Empty") }
+                }) { Text(stringResource(R.string.common_empty)) }
             },
         ) {
             // No body content — subtitle covers the warning.
@@ -275,12 +288,16 @@ private fun RememberFloatingNavBar(
                             size = 24.dp,
                             tint = LocalContentColor.current,
                             weight = FontWeight.Medium,
+                            // Selected tab renders from the FILL=1 subset; inactive tabs
+                            // render from the FILL=0 (outlined) subset so the pill reads
+                            // with the conventional filled/outline tab semantics.
+                            filled = selected,
                         )
                     }
                     if (labelWidth > 4.dp) {
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = item.label,
+                            text = stringResource(item.labelRes),
                             style = MaterialTheme.typography.labelLarge,
                             maxLines = 1,
                         )
@@ -318,7 +335,7 @@ private fun SpeedDialOverlay(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 SpeedDialItem("Checklist", "list", onPickList)
-                SpeedDialItem("Note", "sticky_note_2", onPickNote)
+                SpeedDialItem("Note", "note", onPickNote)
             }
         }
     }

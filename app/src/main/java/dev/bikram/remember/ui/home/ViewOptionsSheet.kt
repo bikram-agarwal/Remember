@@ -12,6 +12,7 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
+import dev.bikram.remember.ui.components.RememberSegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
@@ -30,6 +31,8 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import androidx.compose.ui.text.font.FontWeight
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
+import androidx.compose.ui.res.stringResource
+import dev.bikram.remember.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -39,12 +42,12 @@ fun ViewOptionsSheet(
     onDismiss: () -> Unit,
 ) {
     AppBottomSheet(
-        title = "View options",
-        subtitle = "Change how your notes are sorted and grouped",
+        title = stringResource(R.string.view_options_title),
+        subtitle = stringResource(R.string.view_options_subtitle),
         onDismiss = onDismiss,
         actions = {
-            RememberTextButton(onClick = { onChange(ViewOptions()) }) { Text("Reset") }
-            RememberTextButton(onClick = onDismiss) { Text("Done") }
+            RememberTextButton(onClick = { onChange(ViewOptions()) }) { Text(stringResource(R.string.action_reset)) }
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
         },
     ) {
         SectionLabel("Sort by")
@@ -60,7 +63,7 @@ fun ViewOptionsSheet(
                     SortKey.REMINDER to "Reminder",
                 )
                 keys.forEachIndexed { idx, (key, label) ->
-                    SegmentedButton(
+                    RememberSegmentedButton(
                         selected = viewOptions.sortKey == key,
                         onClick = { onChange(viewOptions.copy(sortKey = key)) },
                         shape = SegmentedButtonDefaults.itemShape(index = idx, count = keys.size),
@@ -97,7 +100,7 @@ fun ViewOptionsSheet(
                 GroupBy.TYPE to "Type",
             )
             groups.forEachIndexed { idx, (g, label) ->
-                SegmentedButton(
+                RememberSegmentedButton(
                     selected = viewOptions.groupBy == g,
                     onClick = { onChange(viewOptions.copy(groupBy = g)) },
                     shape = SegmentedButtonDefaults.itemShape(index = idx, count = groups.size),

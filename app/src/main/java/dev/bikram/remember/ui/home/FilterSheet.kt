@@ -14,6 +14,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
+import dev.bikram.remember.ui.components.RememberSegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Switch
@@ -27,6 +28,8 @@ import dev.bikram.remember.data.NotesFilter
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberSwitch
+import androidx.compose.ui.res.stringResource
+import dev.bikram.remember.R
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -37,7 +40,7 @@ fun FilterSheet(
     onDismiss: () -> Unit,
 ) {
     AppBottomSheet(
-        title = "Filter",
+        title = stringResource(R.string.filter_title),
         onDismiss = onDismiss,
         actions = {
             RememberTextButton(onClick = { onChange(filter.copy(
@@ -47,15 +50,15 @@ fun FilterSheet(
                 hasPicture = null,
                 hasAttachment = null,
                 pinned = null,
-            )) }) { Text("Clear") }
-            RememberTextButton(onClick = onDismiss) { Text("Done") }
+            )) }) { Text(stringResource(R.string.common_clear)) }
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
         },
     ) {
         Section("Type")
         SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
             val entries = FilterType.entries
             entries.forEachIndexed { idx, t ->
-                SegmentedButton(
+                RememberSegmentedButton(
                     selected = filter.type == t,
                     onClick = { onChange(filter.copy(type = t)) },
                     shape = SegmentedButtonDefaults.itemShape(index = idx, count = entries.size),

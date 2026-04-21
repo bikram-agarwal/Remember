@@ -12,7 +12,7 @@ import org.json.JSONObject
 
 data class InteractionState(
     val hapticFeedbackEnabled: Boolean = true,
-    val swipeStartToEnd: NoteSwipeAction = NoteSwipeAction.OPEN,
+    val swipeStartToEnd: NoteSwipeAction = NoteSwipeAction.EDIT,
     val swipeEndToStart: NoteSwipeAction = NoteSwipeAction.TRASH,
 )
 
@@ -31,7 +31,7 @@ class InteractionPrefs(private val context: Context) {
             hapticFeedbackEnabled = prefs[Keys.HAPTIC] ?: true,
             swipeStartToEnd = prefs[Keys.SWIPE_START_TO_END]
                 ?.let { runCatching { NoteSwipeAction.valueOf(it) }.getOrNull() }
-                ?: NoteSwipeAction.OPEN,
+                ?: NoteSwipeAction.EDIT,
             swipeEndToStart = prefs[Keys.SWIPE_END_TO_START]
                 ?.let { runCatching { NoteSwipeAction.valueOf(it) }.getOrNull() }
                 ?: NoteSwipeAction.TRASH,

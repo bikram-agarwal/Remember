@@ -19,6 +19,8 @@ import dev.bikram.remember.data.NotesFilter
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.components.RememberInputChip
+import androidx.compose.ui.res.stringResource
+import dev.bikram.remember.R
 
 @Composable
 fun ActiveFilterChips(
@@ -68,11 +70,12 @@ private fun DismissibleChip(label: String, onDismiss: () -> Unit) {
         onClick = onDismiss,
         label = { Text(label) },
         trailingIcon = {
+            val cdRemove = stringResource(R.string.common_remove)
             RememberMaterialRoundedSymbol(
                 name = "close",
                 size = 16.dp,
                 weight = FontWeight.Medium,
-                modifier = Modifier.semantics { contentDescription = "Remove" },
+                modifier = Modifier.semantics { contentDescription = cdRemove },
             )
         },
     )

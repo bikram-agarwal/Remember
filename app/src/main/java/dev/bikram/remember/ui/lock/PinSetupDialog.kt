@@ -19,6 +19,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.components.RememberTextButton
+import androidx.compose.ui.res.stringResource
+import dev.bikram.remember.R
 
 @Composable
 fun PinSetupDialog(
@@ -31,12 +33,12 @@ fun PinSetupDialog(
     val ready = pin.length in 4..6 && pin == confirm
 
     AppBottomSheet(
-        title = "Set up PIN",
-        subtitle = "Choose a 4–6 digit PIN to unlock Remember.",
+        title = stringResource(R.string.pin_setup_title),
+        subtitle = stringResource(R.string.pin_setup_subtitle),
         onDismiss = onDismiss,
         actions = {
-            RememberTextButton(onClick = onDismiss) { Text("Cancel") }
-            RememberTextButton(enabled = ready, onClick = { onConfirm(pin) }) { Text("Save") }
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            RememberTextButton(enabled = ready, onClick = { onConfirm(pin) }) { Text(stringResource(R.string.common_save)) }
         },
     ) {
         Column(
@@ -46,7 +48,7 @@ fun PinSetupDialog(
             OutlinedTextField(
                 value = pin,
                 onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) pin = it },
-                label = { Text("PIN") },
+                label = { Text(stringResource(R.string.pin_label)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
@@ -55,7 +57,7 @@ fun PinSetupDialog(
             OutlinedTextField(
                 value = confirm,
                 onValueChange = { if (it.length <= 6 && it.all(Char::isDigit)) confirm = it },
-                label = { Text("Confirm") },
+                label = { Text(stringResource(R.string.pin_confirm_label)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),

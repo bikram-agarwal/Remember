@@ -85,6 +85,14 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <activity
+            android:name=".reminders.SnoozeActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:theme="@style/Theme.Remember.Translucent" />
+
         <receiver
             android:name=".reminders.ReminderReceiver"
             android:exported="false" />

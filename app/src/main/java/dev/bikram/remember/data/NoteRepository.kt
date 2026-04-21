@@ -18,6 +18,21 @@ data class NoteOptions(
     val recurrence: RecurrenceRule? = null,
 )
 
+/**
+ * Save-side representation of a checklist row. Callers use [localKey] to express parent/child
+ * linkage between rows that may or may not already exist in the database: persisted rows carry
+ * their Room id as [localKey]; drafts assign a unique negative value. The repository remaps these
+ * keys to the real auto-generated ids after insert so [parentLocalKey] pointers survive.
+ */
+data class PersistableChecklistItem(
+    val localKey: Long,
+    val text: String,
+    val checked: Boolean,
+    val sortOrder: Double,
+    val parentLocalKey: Long? = null,
+    val depth: Int = 0,
+)
+
 class NoteRepository(
     private val noteDao: NoteDao,
     private val itemDao: ChecklistItemDao,
@@ -40,8 +55,44 @@ class NoteRepository(
         }
 
     fun observeTrashed(): Flow<List<NoteWithItems>> = noteDao.observeTrashed()
+    fun observeArchived(): Flow<List<NoteWithItems>> = noteDao.observeArchived()
     fun observe(id: Long): Flow<NoteWithItems?> = noteDao.observe(id)
     suspend fun get(id: Long): NoteWithItems? = noteDao.get(id)
+
+    /**
+     * FTS4 search across active notes. Empty / whitespace-only [query] returns an empty flow
+     * (callers should fall back to [observeActive] instead). The query is tokenised on
+     * whitespace, each term is escaped and turned into a prefix match (`term*`), so typing
+     * "buy mil" will match "buy milk" as soon as the user has typed the third letter.
+     */
+    fun searchNotes(query: String): Flow<List<NoteWithItems>> {
+        val fts = toFtsPrefixQuery(query)
+        return if (fts.isEmpty()) {
+            kotlinx.coroutines.flow.flowOf(emptyList())
+        } else {
+            noteDao.searchNotes(fts)
+        }
+    }
+
+    /** Same FTS prefix match as [searchNotes], but scoped to archived notes only. */
+    fun searchArchivedNotes(query: String): Flow<List<NoteWithItems>> {
+        val fts = toFtsPrefixQuery(query)
+        return if (fts.isEmpty()) {
+            kotlinx.coroutines.flow.flowOf(emptyList())
+        } else {
+            noteDao.searchArchived(fts)
+        }
+    }
+
+    /** Same FTS prefix match as [searchNotes], but scoped to trashed notes only. */
+    fun searchTrashedNotes(query: String): Flow<List<NoteWithItems>> {
+        val fts = toFtsPrefixQuery(query)
+        return if (fts.isEmpty()) {
+            kotlinx.coroutines.flow.flowOf(emptyList())
+        } else {
+            noteDao.searchTrashed(fts)
+        }
+    }
 
     suspend fun createNote(
         title: String,
@@ -103,12 +154,18 @@ class NoteRepository(
                 recurrence = options.recurrence?.sanitized(),
             )
         )
-        if (items.isNotEmpty()) {
+        val validItems = items.map { it.trim() }.filter { it.isNotEmpty() }
+        if (validItems.isNotEmpty()) {
             itemDao.insertAll(
-                items.mapIndexedNotNull { index, text ->
-                    val trimmed = text.trim()
-                    if (trimmed.isEmpty()) null
-                    else ChecklistItemEntity(noteId = id, text = trimmed, checked = false, position = index)
+                validItems.mapIndexed { index, text ->
+                    ChecklistItemEntity(
+                        noteId = id,
+                        text = text,
+                        checked = false,
+                        sortOrder = (index + 1).toDouble(),
+                        parentId = null,
+                        depth = 0,
+                    )
                 }
             )
         }
@@ -149,7 +206,7 @@ class NoteRepository(
         id: Long,
         title: String,
         colorIndex: Int,
-        items: List<ChecklistItemEntity>,
+        items: List<PersistableChecklistItem>,
         options: NoteOptions,
     ) {
         val applyUpdates: suspend () -> Boolean = {
@@ -175,13 +232,7 @@ class NoteRepository(
                     )
                 )
                 itemDao.deleteForNote(id)
-                if (items.isNotEmpty()) {
-                    itemDao.insertAll(
-                        items.mapIndexed { index, item ->
-                            item.copy(id = 0, noteId = id, position = index)
-                        }
-                    )
-                }
+                persistHierarchy(noteId = id, items = items)
                 true
             }
         }
@@ -213,6 +264,21 @@ class NoteRepository(
         n?.reminderAt?.let { scheduler?.schedule(id, it) }
     }
 
+    /**
+     * Move to the archive shelf. Mirrors [moveToTrash] for reminder-cancel behaviour:
+     * archived notes are considered "put away" so their alarms stop firing until unarchived.
+     */
+    suspend fun archiveNote(id: Long) {
+        noteDao.setArchived(id, true, clock())
+        scheduler?.cancel(id)
+    }
+
+    suspend fun unarchiveNote(id: Long) {
+        noteDao.setArchived(id, false, clock())
+        val n = noteDao.get(id)?.note
+        n?.reminderAt?.let { scheduler?.schedule(id, it) }
+    }
+
     suspend fun deleteForever(id: Long) {
         scheduler?.cancel(id)
         noteDao.deleteById(id)
@@ -221,6 +287,19 @@ class NoteRepository(
     suspend fun emptyTrash() {
         noteDao.trashedNoteIds().forEach { trashedId -> scheduler?.cancel(trashedId) }
         noteDao.emptyTrash()
+    }
+
+    /**
+     * Deletes trashed notes whose [NoteEntity.trashedAt] is older than [cutoffMillis].
+     * Called by the daily WorkManager sweep to implement the 30-day retention policy.
+     * Returns the number of ids that were purged (including those already missing a
+     * pending reminder so we don't try to cancel an unscheduled alarm).
+     */
+    suspend fun autoEmptyTrashOlderThan(cutoffMillis: Long): Int {
+        val ids = noteDao.trashedNoteIdsOlderThan(cutoffMillis)
+        ids.forEach { scheduler?.cancel(it) }
+        noteDao.deleteTrashedOlderThan(cutoffMillis)
+        return ids.size
     }
 
     /**
@@ -333,12 +412,22 @@ class NoteRepository(
     ): Long {
         val noteId = noteDao.insert(note)
         if (items.isNotEmpty()) {
-            itemDao.insertAll(
-                items
-                    .sortedBy { it.position }
-                    .map { item ->
-                        item.copy(id = 0, noteId = noteId)
-                    },
+            // Backup rows carry stable pre-export ids so parentId pointers can be remapped
+            // after Room assigns fresh autogenerated ids. Fall back to preserving input order
+            // via sortOrder when the import lacks explicit ids (legacy archives).
+            val sorted = items.sortedBy { it.sortOrder }
+            persistHierarchy(
+                noteId = noteId,
+                items = sorted.map { item ->
+                    PersistableChecklistItem(
+                        localKey = item.id,
+                        text = item.text,
+                        checked = item.checked,
+                        sortOrder = item.sortOrder,
+                        parentLocalKey = item.parentId,
+                        depth = item.depth,
+                    )
+                },
             )
         }
         attachments.forEach { attachment ->
@@ -350,6 +439,57 @@ class NoteRepository(
             note.reminderAt?.let { scheduler?.schedule(noteId, it) }
         }
         return noteId
+    }
+
+    /**
+     * Writes a flat list of rows that already carry weighted [PersistableChecklistItem.sortOrder]
+     * and [PersistableChecklistItem.parentLocalKey] relations. Works in two passes:
+     *
+     *  1. Insert every row with `parentId = null` so the table is always in a valid state, even
+     *     if the caller ordered children before their parents.
+     *  2. Re-update children with the freshly minted parent id resolved via [PersistableChecklistItem.localKey].
+     *
+     * Dangling pointers (children whose parent is missing from [items]) are left as top-level rows.
+     */
+    private suspend fun persistHierarchy(
+        noteId: Long,
+        items: List<PersistableChecklistItem>,
+    ) {
+        if (items.isEmpty()) return
+        val keyToRealId = mutableMapOf<Long, Long>()
+        // First pass: insert every row flat.
+        items.forEach { draft ->
+            val newId = itemDao.insert(
+                ChecklistItemEntity(
+                    id = 0,
+                    noteId = noteId,
+                    text = draft.text,
+                    checked = draft.checked,
+                    sortOrder = draft.sortOrder,
+                    parentId = null,
+                    depth = 0,
+                ),
+            )
+            // localKey 0 means "no stable key"; skip so it does not collide with other drafts.
+            if (draft.localKey != 0L) keyToRealId[draft.localKey] = newId
+        }
+        // Second pass: patch parentId / depth on children.
+        items.forEach { draft ->
+            val parentKey = draft.parentLocalKey ?: return@forEach
+            val realParentId = keyToRealId[parentKey] ?: return@forEach
+            val realId = keyToRealId[draft.localKey] ?: return@forEach
+            itemDao.update(
+                ChecklistItemEntity(
+                    id = realId,
+                    noteId = noteId,
+                    text = draft.text,
+                    checked = draft.checked,
+                    sortOrder = draft.sortOrder,
+                    parentId = realParentId,
+                    depth = draft.depth.coerceIn(0, 1),
+                ),
+            )
+        }
     }
 
     suspend fun updatePictureUri(noteId: Long, pictureUri: String?) {
@@ -406,15 +546,91 @@ class NoteRepository(
      * Stops future alarms for this note by clearing reminder and recurrence.
      */
     suspend fun clearReminderFromNotificationAction(noteId: Long): Boolean {
+        return markCompleted(noteId)
+    }
+
+    /**
+     * Mark a note done. Behavior depends on whether the note has a live recurrence rule:
+     *
+     * - **Recurring** (rule still has occurrences): roll [reminderAt] forward via
+     *   [advanceReminderOnFire] and leave [completedAt] null. The note stays active and
+     *   reappears in Today / Upcoming for the next occurrence. This is what the user means
+     *   by "I completed this fire of the reminder, but the task itself isn't done."
+     * - **Recurring but exhausted** (rule's end condition is consumed): the next-fire
+     *   computation returns null, the note has no future, so set [completedAt] = now and
+     *   route the note into the Done bucket.
+     * - **Non-recurring**: set [completedAt] = now and cancel any pending alarm.
+     *
+     * Returns true when a row was written.
+     */
+    suspend fun markCompleted(noteId: Long): Boolean {
         val existing = noteDao.get(noteId)?.note ?: return false
+        val sanitized = existing.recurrence?.sanitized()
+        if (sanitized != null) {
+            // Delegate to advanceReminderOnFire which already knows how to roll forward
+            // and clear the rule when exhausted. After it runs, re-read; if reminderAt is
+            // still null AND recurrence is null, the rule was exhausted and we should
+            // stamp completedAt so the note routes into Done.
+            advanceReminderOnFire(noteId)
+            val after = noteDao.get(noteId)?.note ?: return true
+            if (after.reminderAt == null && after.recurrence == null) {
+                noteDao.update(after.copy(completedAt = clock(), updatedAt = clock()))
+            }
+            return true
+        }
+        // Non-recurring: a single completion stamp is the whole transition.
         noteDao.update(
             existing.copy(
-                reminderAt = null,
-                recurrence = null,
+                completedAt = clock(),
                 updatedAt = clock(),
             ),
         )
         scheduler?.cancel(noteId)
         return true
     }
+
+    /**
+     * Restore a note from Done back to active. Clears [completedAt]; leaves [reminderAt]
+     * alone so the original reminder time (if any) returns. Used by undo on swipe-done.
+     */
+    suspend fun markIncomplete(noteId: Long): Boolean {
+        val existing = noteDao.get(noteId)?.note ?: return false
+        if (existing.completedAt == null) return false
+        noteDao.update(
+            existing.copy(
+                completedAt = null,
+                updatedAt = clock(),
+            ),
+        )
+        // Re-arm the alarm only if the saved reminder is still in the future. A past
+        // reminder time stays past (the note will land in Overdue next sync) - we
+        // intentionally don't bump it forward since the user was undoing, not snoozing.
+        existing.reminderAt?.let { at ->
+            if (at > clock()) scheduler?.schedule(noteId, at)
+        }
+        return true
+    }
+
+    companion object {
+        /** 30 days in milliseconds -- the retention window for trashed notes. */
+        const val TRASH_RETENTION_MILLIS: Long = 30L * 24L * 60L * 60L * 1000L
+    }
+}
+
+/**
+ * Tokenise [raw] into an FTS4-safe query string that performs prefix matching on every term.
+ * Strips characters FTS treats as syntax (quotes, parens, columns, operators) to avoid
+ * accidentally activating boolean operators when the user is just typing a search. Returns
+ * an empty string when there's nothing matchable left (caller substitutes an empty result).
+ */
+internal fun toFtsPrefixQuery(raw: String): String {
+    if (raw.isBlank()) return ""
+    val sanitised = raw
+        .replace(Regex("[\"'*:()\\-^]"), " ")
+        .trim()
+    if (sanitised.isEmpty()) return ""
+    return sanitised
+        .split(Regex("\\s+"))
+        .filter { it.isNotEmpty() }
+        .joinToString(separator = " ") { "$it*" }
 }

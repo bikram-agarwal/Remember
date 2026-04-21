@@ -4,8 +4,19 @@ import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import java.util.Locale
 
-/** Stored in note `iconKey`; payload is one or more emoji code units (keyboard / picker). */
+/** Stored in note `iconKey`; payload is one emoji grapheme (keyboard / picker). */
 const val ICON_EMOJI_PREFIX: String = "emoji:"
+
+/** Material Symbols ligature for rich-text notes with no custom [iconKey] (flat single icon). */
+const val DEFAULT_NOTE_HEADER_SYMBOL: String = "note"
+
+/** Material Symbols ligature for checklists with no custom [iconKey]. */
+const val DEFAULT_LIST_HEADER_SYMBOL: String = "checklist"
+
+/** Catalog key used when the note has no persisted [iconKey] (picker selection + labels). */
+fun defaultIconCatalogKey(isChecklist: Boolean): String =
+    if (isChecklist) "${ICON_SYMBOL_PREFIX}$DEFAULT_LIST_HEADER_SYMBOL"
+    else "${ICON_SYMBOL_PREFIX}$DEFAULT_NOTE_HEADER_SYMBOL"
 
 /** Stored in note `iconKey`; [Material Symbols](https://fonts.google.com/icons) ligature name. */
 const val ICON_SYMBOL_PREFIX: String = "symbol:"
@@ -76,11 +87,18 @@ fun iconDrawableRes(key: String?): Int? {
     return drawableResByKey[normalized]
 }
 
-fun iconEmojiPayload(iconKey: String?): String? =
-    iconKey
+fun iconEmojiPayload(iconKey: String?): String? {
+    val raw = iconKey
         ?.takeIf { it.startsWith(ICON_EMOJI_PREFIX) }
         ?.removePrefix(ICON_EMOJI_PREFIX)
         ?.takeIf { it.isNotBlank() }
+        ?: return null
+    val boundary = java.text.BreakIterator.getCharacterInstance()
+    boundary.setText(raw)
+    val start = boundary.first()
+    val end = boundary.next()
+    return raw.substring(start, end).takeIf { it.isNotBlank() }
+}
 
 fun humanizeIconKey(iconKey: String): String {
     val base = when {

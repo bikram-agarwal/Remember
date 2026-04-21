@@ -38,14 +38,20 @@ fun SwipeableRememberNoteCard(
     onOpenNote: (NoteWithItems) -> Unit,
     onSwipeAction: (NoteWithItems, NoteSwipeAction) -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    swipeEnabled: Boolean = true,
 ) {
     val swipeStart = interaction.swipeStartToEnd
     val swipeEnd = interaction.swipeEndToStart
+    val noteCompleted = note.note.completedAt != null
     DeliberateSwipeRevealCard(
         modifier = modifier.fillMaxWidth(),
         commitThresholdFraction = 0.35f,
         cardShape = NoteCardShape,
         hapticEnabled = interaction.hapticFeedbackEnabled,
+        allowSwipeStartToEnd = swipeEnabled,
+        allowSwipeEndToStart = swipeEnabled,
         onSwipeStartToEnd = { onSwipeAction(note, swipeStart) },
         onSwipeEndToStart = { onSwipeAction(note, swipeEnd) },
         backgroundContent = { fromStart ->
@@ -64,29 +70,37 @@ fun SwipeableRememberNoteCard(
                     .padding(horizontal = 16.dp),
                 contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
             ) {
+                // For MARK_DONE the FILL axis flips with completion state so the
+                // glyph itself reads done vs not-done at a glance:
+                //   active note  -> outlined check_circle (FILL=0) "Mark done"
+                //   completed    -> filled check_circle (FILL=1)   "Mark not done"
+                // All other actions ignore the flag.
+                val iconFilled = action == NoteSwipeAction.MARK_DONE && noteCompleted
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (fromStart) {
                         RememberMaterialRoundedSymbol(
                             name = action.materialSymbolName,
+                            filled = iconFilled,
                             size = 20.dp,
                             tint = tint,
                             weight = FontWeight.Medium,
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = action.labelString(),
+                            text = action.labelString(noteCompleted),
                             style = MaterialTheme.typography.labelMedium,
                             color = tint,
                         )
                     } else {
                         Text(
-                            text = action.labelString(),
+                            text = action.labelString(noteCompleted),
                             style = MaterialTheme.typography.labelMedium,
                             color = tint,
                         )
                         Spacer(Modifier.width(6.dp))
                         RememberMaterialRoundedSymbol(
                             name = action.materialSymbolName,
+                            filled = iconFilled,
                             size = 20.dp,
                             tint = tint,
                             weight = FontWeight.Medium,
@@ -99,16 +113,26 @@ fun SwipeableRememberNoteCard(
         NoteCard(
             note = note,
             onClick = { onOpenNote(note) },
+            selected = selected,
+            onLongClick = onLongClick,
         )
     }
 }
 
+/**
+ * The label shown on the swipe-reveal background. For [NoteSwipeAction.MARK_DONE]
+ * the label flips to "Mark not done" when the note is already completed, so the
+ * single configured swipe action visually advertises both directions of the toggle.
+ */
 @Composable
-private fun NoteSwipeAction.labelString(): String = stringResource(
+private fun NoteSwipeAction.labelString(noteCompleted: Boolean = false): String = stringResource(
     when (this) {
-        NoteSwipeAction.OPEN -> R.string.swipe_action_open
-        NoteSwipeAction.TRASH -> R.string.swipe_action_trash
+        NoteSwipeAction.EDIT -> R.string.swipe_action_open
+        NoteSwipeAction.TRASH -> R.string.edit_trash_cd
         NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
-        NoteSwipeAction.TOGGLE_PIN -> R.string.swipe_action_toggle_pin
+        NoteSwipeAction.TOGGLE_PIN -> R.string.notecard_pinned_cd
+        NoteSwipeAction.MARK_DONE ->
+            if (noteCompleted) R.string.swipe_action_mark_not_done
+            else R.string.swipe_action_mark_done
     },
 )

@@ -12,6 +12,7 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> = listOf(
         nameRes = R.string.icon_section_notes_ideas,
         icons = listOf(
             IconChoice(key = "${ICON_SYMBOL_PREFIX}note_add", symbolName = "note_add", drawableRes = null),
+            IconChoice(key = "${ICON_SYMBOL_PREFIX}checklist", symbolName = "checklist", drawableRes = null),
             IconChoice(key = "${ICON_SYMBOL_PREFIX}list", symbolName = "list", drawableRes = null),
             IconChoice(key = "${ICON_SYMBOL_PREFIX}lightbulb", symbolName = "lightbulb", drawableRes = null),
             IconChoice(key = "${ICON_SYMBOL_PREFIX}note", symbolName = "note", drawableRes = null),
@@ -396,6 +397,7 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> = listOf(
             IconChoice(key = "${ICON_SYMBOL_PREFIX}sticky_note_2", symbolName = "sticky_note_2", drawableRes = null),
             IconChoice(key = "${ICON_SYMBOL_PREFIX}cancel", symbolName = "cancel", drawableRes = null),
             IconChoice(key = "${ICON_SYMBOL_PREFIX}arrow_drop_down_circle", symbolName = "arrow_drop_down_circle", drawableRes = null),
+            IconChoice(key = "${ICON_SYMBOL_PREFIX}drag_indicator", symbolName = "drag_indicator", drawableRes = null),
             IconChoice(key = "${ICON_SYMBOL_PREFIX}menu", symbolName = "menu", drawableRes = null),
             IconChoice(key = "${ICON_SYMBOL_PREFIX}arrow_left", symbolName = "arrow_left", drawableRes = null),
             IconChoice(key = "${ICON_SYMBOL_PREFIX}arrow_right", symbolName = "arrow_right", drawableRes = null),

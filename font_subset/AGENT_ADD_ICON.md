@@ -1,6 +1,13 @@
 # Adding or changing Material Symbols icons (for coding agents)
 
-Remember renders icons with `RememberMaterialRoundedSymbol(name = "ligature_name", …)` using a **subset** TTF at `app/src/main/res/font/material_symbols_rounded.ttf`. If a ligature is missing from that file, the UI shows the raw string or a blank.
+Remember renders icons with `RememberMaterialRoundedSymbol(name = "ligature_name", …)` using **two** subset TTFs in `app/src/main/res/font/`:
+
+- `material_symbols_rounded.ttf` - filled variant (FILL=1, default)
+- `material_symbols_rounded_outlined.ttf` - outlined variant (FILL=0)
+
+Pass `filled = false` on `RememberMaterialRoundedSymbol` to render from the outlined TTF. Inside the app, prefer `filled = <state>` over the `if (state) "icon" else "icon_border"` pattern - the instanced subsets bake FILL into geometry, so a `_border` alt name alone will look identical to the filled glyph. Switching the font family is the only way to get a visually distinct outline.
+
+If a ligature is missing from either file, the UI shows the raw string or a blank.
 
 ## When you change Kotlin only (name already in the subset)
 

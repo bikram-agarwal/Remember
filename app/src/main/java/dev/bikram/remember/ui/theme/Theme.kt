@@ -94,11 +94,18 @@ private fun ColorScheme.toOled(): ColorScheme = copy(
     surfaceContainerHighest = Color(0xFF222222),
 )
 
+/**
+ * Pass [paintBackground] = false when the host activity is translucent (e.g. the snooze
+ * dialog floating over the home screen). The full-screen [GradientBackground] otherwise
+ * paints [scheme.background] across the whole window and hides the live wallpaper /
+ * caller activity behind it, defeating the translucent theme.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun RememberTheme(
     themeState: ThemeState = ThemeState(),
     interactionState: InteractionState = InteractionState(),
+    paintBackground: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -214,12 +221,14 @@ fun RememberTheme(
             Box(Modifier.fillMaxSize()) {
                 // Page background uses the UNTINTED scheme so fixedCardColors
                 // only affects cards, never the page.
-                GradientBackground(
-                    useGradient = themeState.useGradient,
-                    pageBackground = scheme.background,
-                    gradientBase = scheme.surface,
-                    gradientTop = scheme.primaryContainer,
-                )
+                if (paintBackground) {
+                    GradientBackground(
+                        useGradient = themeState.useGradient,
+                        pageBackground = scheme.background,
+                        gradientBase = scheme.surface,
+                        gradientTop = scheme.primaryContainer,
+                    )
+                }
                 content()
             }
         }

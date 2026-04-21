@@ -36,10 +36,13 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("materialSymbolName_param", re.compile(rf'materialSymbolName\s*:\s*String\??\s*=\s*{LIGATURE}')),
     ("leadingMaterialSymbolName", re.compile(rf'leadingMaterialSymbolName\s*=\s*{LIGATURE}')),
     ("symbolName_field", re.compile(rf'symbolName\s*=\s*{LIGATURE}')),
-    # MainTab entries use (label, symbolName) pairs, not `symbolName =`:
-    #   Notes("Notes", "notes"),
+    # MainTab entries use (labelRes, symbolName) pairs, not `symbolName =`. The
+    # first arg used to be a string literal ("Notes") but was migrated to a
+    # @StringRes int (R.string.main_tab_notes) when labels moved to strings.xml.
+    # Accept either form so the regex does not silently drop notes/history/
+    # settings and ship a missing icon.
     ("MainTab_enum_symbol", re.compile(
-        rf'\b(?:Notes|History|Settings)\(\s*"[^"]*",\s*{LIGATURE}\s*\)',
+        rf'\b(?:Notes|History|Settings)\(\s*(?:R\.string\.\w+|"[^"]*")\s*,\s*{LIGATURE}\s*\)',
     )),
     # `name = if (cond) "icon_a" else "icon_b"` on RememberMaterialRoundedSymbol rows
     # (the simpler `name = "x"` patterns stop at the first `)` inside the condition).

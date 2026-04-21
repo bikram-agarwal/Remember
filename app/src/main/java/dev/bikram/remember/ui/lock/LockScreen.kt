@@ -37,6 +37,7 @@ import androidx.fragment.app.FragmentActivity
 import dev.bikram.remember.data.LockPrefs
 import kotlinx.coroutines.launch
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.R
 
 @Composable
 fun LockScreen(
@@ -78,7 +79,7 @@ fun LockScreen(
         )
         val info = BiometricPrompt.PromptInfo.Builder()
             .setTitle("Unlock Remember")
-            .setNegativeButtonText("Use PIN")
+            .setNegativeButtonText(context.getString(R.string.lock_use_pin))
             .setAllowedAuthenticators(authenticators)
             .build()
         prompt.authenticate(info)
@@ -146,7 +147,7 @@ fun LockScreen(
                     )
                     val info = BiometricPrompt.PromptInfo.Builder()
                         .setTitle("Unlock Remember")
-                        .setNegativeButtonText("Use PIN")
+                        .setNegativeButtonText(context.getString(R.string.lock_use_pin))
                         .setAllowedAuthenticators(authenticators)
                         .build()
                     prompt.authenticate(info)

@@ -27,6 +27,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
+import dev.bikram.remember.data.RecurrenceRule
+import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.TagChipFilled
@@ -34,13 +36,17 @@ import java.text.DateFormat
 import java.util.Date
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import androidx.compose.ui.res.stringResource
+import dev.bikram.remember.R
 
 @Composable
 fun OptionsPanel(
     reminderAt: Long?,
+    recurrence: RecurrenceRule?,
     importance: Importance,
     pictureUri: String?,
     iconKey: String?,
+    isChecklist: Boolean,
     actions: List<NoteAction>,
     tags: List<String>,
     attachmentCount: Int,
@@ -52,6 +58,10 @@ fun OptionsPanel(
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
     modifier: Modifier = Modifier,
+    // When true (archived / trashed), the Importance row's internal bottom-sheet trigger is
+    // suppressed. Every OTHER row already no-ops through its caller-provided `onOpen*` lambda
+    // when read-only, but Importance owns its own sheet so the gate has to live here.
+    readOnly: Boolean = false,
 ) {
     var importanceOpen by rememberSaveable { mutableStateOf(false) }
 
@@ -67,13 +77,20 @@ fun OptionsPanel(
         ) {
             OptionRow(
                 symbolName = "emoji_symbols",
-                title = "Icon",
-                summary = iconLabelFor(iconKey) ?: "None",
+                title = stringResource(R.string.options_icon),
+                summary = iconLabelFor(iconKey)
+                    ?: stringResource(
+                        if (isChecklist) {
+                            R.string.options_icon_default_checklist
+                        } else {
+                            R.string.options_icon_default_note
+                        },
+                    ),
                 onClick = onOpenIcon,
             )
             OptionRow(
                 symbolName = "label",
-                title = "Tags",
+                title = stringResource(R.string.options_tags),
                 summary = if (tags.isEmpty()) "None" else "",
                 onClick = onOpenTags,
                 summaryContent = if (tags.isEmpty()) null else {
@@ -82,31 +99,34 @@ fun OptionsPanel(
             )
             OptionRow(
                 symbolName = "alarm",
-                title = "Reminder",
-                summary = reminderSummary(reminderAt),
+                title = stringResource(R.string.options_reminder),
+                summary = reminderSummary(reminderAt, recurrence),
                 onClick = onOpenReminder,
             )
             OptionRow(
-                symbolName = "bolt",
-                title = "Actions",
+                symbolName = actions.firstOrNull()?.type?.materialSymbolName() ?: "bolt",
+                title = stringResource(R.string.options_actions),
                 summary = actionsSummary(actions),
                 onClick = onOpenActions,
             )
             OptionRow(
                 symbolName = "priority_high",
-                title = "Importance",
+                title = stringResource(R.string.options_importance),
                 summary = importance.label(),
-                onClick = { importanceOpen = true },
+                // On archived / trashed shelves we keep the row visible (users should still
+                // see "this note was High importance") but make it inert. Passing null to
+                // OptionRow drops the clickable modifier entirely so there's no ripple.
+                onClick = if (readOnly) null else ({ importanceOpen = true }),
             )
             OptionRow(
                 symbolName = "add_a_photo",
-                title = "Picture",
+                title = stringResource(R.string.options_picture),
                 summary = if (pictureUri == null) "No picture" else "Attached",
                 onClick = onOpenPicture,
             )
             OptionRow(
                 symbolName = "attach_file",
-                title = "Attachments",
+                title = stringResource(R.string.options_attachments),
                 summary = attachmentsSummary(attachmentCount),
                 onClick = onOpenAttachments,
             )
@@ -115,7 +135,7 @@ fun OptionsPanel(
 
     if (importanceOpen) {
         ChoiceSheet(
-            title = "Importance",
+            title = stringResource(R.string.options_importance),
             options = Importance.entries.map { it to it.label() },
             selected = importance,
             onPick = { onSetImportance(it); importanceOpen = false },
@@ -192,7 +212,7 @@ private fun <T> ChoiceSheet(
         title = title,
         onDismiss = onDismiss,
         actions = {
-            RememberTextButton(onClick = onDismiss) { Text("Done") }
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
         },
     ) {
         options.forEach { (value, label) ->
@@ -220,10 +240,38 @@ private fun Importance.label(): String = when (this) {
     Importance.HIGH -> "High"
 }
 
-private fun reminderSummary(reminderAt: Long?): String {
+private fun reminderSummary(reminderAt: Long?, recurrence: RecurrenceRule?): String {
     if (reminderAt == null) return "None"
     val fmt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-    return fmt.format(Date(reminderAt))
+    val datePart = fmt.format(Date(reminderAt))
+    val rule = recurrence?.sanitized() ?: return datePart
+    val recurrenceLabel = compactRecurrenceLabel(rule)
+    return if (recurrenceLabel.isEmpty()) datePart else "$datePart  |  $recurrenceLabel"
+}
+
+/**
+ * Short, human-readable recurrence label for the reminder pill summary line. Mirrors
+ * the long-form summary the picker emits but keeps it to one or two words ("Daily",
+ * "Every 3 weeks", "Monthly") so the pill stays compact.
+ */
+private fun compactRecurrenceLabel(rule: RecurrenceRule): String {
+    val interval = rule.interval.coerceAtLeast(1)
+    return if (interval == 1) {
+        when (rule.unit) {
+            RecurrenceUnit.DAY -> "Daily"
+            RecurrenceUnit.WEEK -> "Weekly"
+            RecurrenceUnit.MONTH -> "Monthly"
+            RecurrenceUnit.YEAR -> "Yearly"
+        }
+    } else {
+        val unitLower = when (rule.unit) {
+            RecurrenceUnit.DAY -> "days"
+            RecurrenceUnit.WEEK -> "weeks"
+            RecurrenceUnit.MONTH -> "months"
+            RecurrenceUnit.YEAR -> "years"
+        }
+        "Every $interval $unitLower"
+    }
 }
 
 private fun actionsSummary(actions: List<NoteAction>): String = when (actions.size) {

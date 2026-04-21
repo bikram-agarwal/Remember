@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,6 +56,7 @@ fun ActionType.materialSymbolName(): String = when (this) {
     ActionType.COPY_TO_CLIPBOARD -> "content_copy"
     ActionType.SHARE_CONTENT -> "share"
     ActionType.MARK_AS_DONE -> "check"
+    ActionType.SNOOZE -> "snooze"
 }
 
 @Composable
@@ -68,60 +70,97 @@ fun ActionPicker(
 ) {
     var draft by remember { mutableStateOf(current) }
     var editorType by rememberSaveable { mutableStateOf<ActionType?>(null) }
-    var typePickerOpen by rememberSaveable { mutableStateOf(false) }
+    var editingIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var typePickerOpen by rememberSaveable { mutableStateOf(current.isEmpty()) }
+    val showMainSheet = current.isNotEmpty() || draft.isNotEmpty()
 
-    AppBottomSheet(
-        title = stringResource(R.string.actions_sheet_title),
-        subtitle = stringResource(R.string.actions_sheet_subtitle),
-        onDismiss = onDismiss,
-        actions = {
-            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-            RememberTextButton(onClick = { onConfirm(draft) }) { Text(stringResource(R.string.common_save)) }
-        },
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+    LaunchedEffect(showMainSheet, typePickerOpen, editorType) {
+        if (!showMainSheet && !typePickerOpen && editorType == null) {
+            onConfirm(draft)
+            onDismiss()
+        }
+    }
+
+    if (showMainSheet) {
+        AppBottomSheet(
+            title = stringResource(R.string.options_actions),
+            subtitle = stringResource(R.string.actions_sheet_subtitle),
+            onDismiss = onDismiss,
+            actions = {
+                RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+                RememberTextButton(onClick = { onConfirm(draft) }) { Text(stringResource(R.string.common_save)) }
+            },
         ) {
-            if (draft.isEmpty()) {
-                Text(
-                    stringResource(R.string.actions_empty_hint),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            } else {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 120.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 draft.forEachIndexed { idx, action ->
                     ActionRow(
                         action = action,
+                        onClick = {
+                            if (action.type != ActionType.COPY_TO_CLIPBOARD && action.type != ActionType.SHARE_CONTENT) {
+                                editingIndex = idx
+                                editorType = action.type
+                            }
+                        },
                         onRemove = { draft = draft.toMutableList().apply { removeAt(idx) } },
                     )
                 }
-            }
-            if (draft.size < 3) {
-                AddActionRow(onClick = { typePickerOpen = true })
+                if (draft.size < 1) {
+                    AddActionRow(onClick = { typePickerOpen = true })
+                }
             }
         }
     }
 
     if (typePickerOpen) {
+        val context = LocalContext.current
         TypePickerDialog(
             onPick = { type ->
                 typePickerOpen = false
-                editorType = type
+                if (type == ActionType.COPY_TO_CLIPBOARD || type == ActionType.SHARE_CONTENT) {
+                    val action = NoteAction(type, context.getString(type.labelRes()), "")
+                    val idx = editingIndex
+                    if (idx != null && idx in draft.indices) {
+                        val mut = draft.toMutableList()
+                        mut[idx] = action
+                        draft = mut
+                    } else {
+                        draft = (draft + action).take(1)
+                    }
+                    editingIndex = null
+                } else {
+                    editorType = type
+                }
             },
-            onDismiss = { typePickerOpen = false },
+            onDismiss = { 
+                typePickerOpen = false 
+            },
         )
     }
     editorType?.let { t ->
         DetailEditorDialog(
             type = t,
+            initialAction = editingIndex?.let { draft.getOrNull(it) },
             onConfirm = { action ->
-                draft = (draft + action).take(3)
+                val idx = editingIndex
+                if (idx != null && idx in draft.indices) {
+                    val mut = draft.toMutableList()
+                    mut[idx] = action
+                    draft = mut
+                } else {
+                    draft = (draft + action).take(1)
+                }
                 editorType = null
+                editingIndex = null
             },
-            onDismiss = { editorType = null },
+            onDismiss = { 
+                editorType = null 
+                editingIndex = null
+            },
         )
     }
 }
@@ -129,13 +168,14 @@ fun ActionPicker(
 @Composable
 private fun ActionRow(
     action: NoteAction,
+    onClick: () -> Unit,
     onRemove: () -> Unit,
 ) {
     val removeActionCd = stringResource(R.string.common_remove)
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().tapSoundClickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -219,7 +259,7 @@ private fun TypePickerDialog(
         },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            ActionType.entries.forEach { t ->
+            ActionType.entries.filter { it != ActionType.MARK_AS_DONE && it != ActionType.SNOOZE }.forEach { t ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -248,6 +288,7 @@ private fun TypePickerDialog(
 @Composable
 private fun DetailEditorDialog(
     type: ActionType,
+    initialAction: NoteAction?,
     onConfirm: (NoteAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -255,6 +296,7 @@ private fun DetailEditorDialog(
         ActionType.CALL_NUMBER, ActionType.SEND_MESSAGE ->
             ContactBackedEditor(
                 type = type,
+                initialAction = initialAction,
                 pickWith = { launcher -> launcher.launch(phonePickIntent()) },
                 launcherFactory = { onPicked -> rememberPhonePickLauncher(onPicked) },
                 onConfirm = onConfirm,
@@ -263,28 +305,30 @@ private fun DetailEditorDialog(
         ActionType.SEND_EMAIL ->
             ContactBackedEditor(
                 type = type,
+                initialAction = initialAction,
                 pickWith = { launcher -> launcher.launch(emailPickIntent()) },
                 launcherFactory = { onPicked -> rememberEmailPickLauncher(onPicked) },
                 onConfirm = onConfirm,
                 onDismiss = onDismiss,
             )
-        ActionType.OPEN_APP -> AppBackedEditor(type = type, onConfirm = onConfirm, onDismiss = onDismiss)
-        ActionType.OPEN_SHORTCUT -> ShortcutBackedEditor(type = type, onConfirm = onConfirm, onDismiss = onDismiss)
-        ActionType.MARK_AS_DONE -> SimpleEditor(type = type, showData = false, onConfirm = onConfirm, onDismiss = onDismiss)
-        else -> SimpleEditor(type = type, showData = true, onConfirm = onConfirm, onDismiss = onDismiss)
+        ActionType.OPEN_APP -> AppBackedEditor(type = type, initialAction = initialAction, onConfirm = onConfirm, onDismiss = onDismiss)
+        ActionType.OPEN_SHORTCUT -> ShortcutBackedEditor(type = type, initialAction = initialAction, onConfirm = onConfirm, onDismiss = onDismiss)
+        ActionType.MARK_AS_DONE, ActionType.COPY_TO_CLIPBOARD, ActionType.SHARE_CONTENT, ActionType.SNOOZE -> SimpleEditor(type = type, initialAction = initialAction, showData = false, onConfirm = onConfirm, onDismiss = onDismiss)
+        else -> SimpleEditor(type = type, initialAction = initialAction, showData = true, onConfirm = onConfirm, onDismiss = onDismiss)
     }
 }
 
 @Composable
 private fun SimpleEditor(
     type: ActionType,
+    initialAction: NoteAction?,
     showData: Boolean,
     onConfirm: (NoteAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    var title by rememberSaveable(type) { mutableStateOf(context.getString(type.labelRes())) }
-    var data by rememberSaveable { mutableStateOf("") }
+    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
+    var data by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
     val ready = title.isNotBlank() && (!showData || data.isNotBlank())
     EditorShell(
         type = type,
@@ -297,11 +341,17 @@ private fun SimpleEditor(
                 modifier = Modifier.fillMaxWidth(),
             )
             if (showData) {
+                val keyboardOptions = if (type == ActionType.OPEN_LINK) {
+                    androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri)
+                } else {
+                    androidx.compose.foundation.text.KeyboardOptions.Default
+                }
                 OutlinedTextField(
                     value = data,
                     onValueChange = { data = it },
                     label = { Text(type.dataLabelText()) },
                     singleLine = true,
+                    keyboardOptions = keyboardOptions,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -317,14 +367,15 @@ private fun SimpleEditor(
 @Composable
 private fun ContactBackedEditor(
     type: ActionType,
+    initialAction: NoteAction?,
     pickWith: (androidx.activity.result.ActivityResultLauncher<Intent>) -> Unit,
     launcherFactory: @Composable ((ContactPick) -> Unit) -> androidx.activity.result.ActivityResultLauncher<Intent>,
     onConfirm: (NoteAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    var title by rememberSaveable(type) { mutableStateOf(context.getString(type.labelRes())) }
-    var data by rememberSaveable { mutableStateOf("") }
+    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
+    var data by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
     val launcher = launcherFactory { pick ->
         val prefixRes = when (type) {
             ActionType.CALL_NUMBER -> R.string.action_contact_verb_call
@@ -377,13 +428,14 @@ private fun ContactBackedEditor(
 @Composable
 private fun AppBackedEditor(
     type: ActionType,
+    initialAction: NoteAction?,
     onConfirm: (NoteAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    var title by rememberSaveable(type) { mutableStateOf(context.getString(type.labelRes())) }
-    var pkg by rememberSaveable { mutableStateOf("") }
-    var pickerOpen by rememberSaveable { mutableStateOf(false) }
+    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
+    var pkg by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
+    var pickerOpen by rememberSaveable(type, initialAction) { mutableStateOf(initialAction == null) }
     val ready = title.isNotBlank() && pkg.isNotBlank()
     EditorShell(
         type = type,
@@ -428,9 +480,10 @@ private fun AppBackedEditor(
             onPick = { app ->
                 pkg = app.packageName
                 val defaultTitle = context.getString(type.labelRes())
-                if (title.isBlank() || title == defaultTitle) {
-                    title = context.getString(R.string.actions_open_app_title, app.label.toString())
-                }
+                val newTitle = if (title.isBlank() || title == defaultTitle) {
+                    context.getString(R.string.actions_open_app_title, app.label.toString())
+                } else title
+                onConfirm(NoteAction(type, newTitle, pkg, extra = newTitle))
                 pickerOpen = false
             },
             onDismiss = { pickerOpen = false },
@@ -441,16 +494,18 @@ private fun AppBackedEditor(
 @Composable
 private fun ShortcutBackedEditor(
     type: ActionType,
+    initialAction: NoteAction?,
     onConfirm: (NoteAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    var title by rememberSaveable(type) { mutableStateOf(context.getString(type.labelRes())) }
-    var uri by rememberSaveable { mutableStateOf("") }
-    var appPickerOpen by rememberSaveable { mutableStateOf(false) }
+    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
+    var uri by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
+    var appPickerOpen by rememberSaveable(type, initialAction) { mutableStateOf(initialAction == null) }
     val pickShortcut = rememberShortcutPickLauncher { pickedUri, label ->
         uri = pickedUri
         if (label.isNotBlank()) title = label
+        onConfirm(NoteAction(type, title, uri, extra = title))
     }
     val ready = title.isNotBlank() && uri.isNotBlank()
     EditorShell(

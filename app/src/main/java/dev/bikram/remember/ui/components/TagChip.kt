@@ -32,6 +32,8 @@ import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.LocalTagColors
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import androidx.compose.ui.res.stringResource
+import dev.bikram.remember.R
 
 /** Parse "#RRGGBB" into a Compose Color. Returns null if invalid. */
 fun parseHexColor(hex: String): Color? = runCatching {
@@ -119,6 +121,7 @@ fun TagChipFilled(
     onRemove: (() -> Unit)? = null,
     compact: Boolean = false,
 ) {
+    val cdRemoveTag = stringResource(R.string.remove_tag_cd, tag)
     val contentColor = TagPalette.textOn(color)
     val horizontal = if (compact) 8.dp else 12.dp
     val vertical = if (compact) 3.dp else 6.dp
@@ -145,7 +148,7 @@ fun TagChipFilled(
                 tint = contentColor,
                 weight = FontWeight.Medium,
                 modifier = Modifier
-                    .semantics { contentDescription = "Remove $tag" }
+                    .semantics { contentDescription = cdRemoveTag }
                     .tapSoundClickable(onClick = onRemove),
             )
         }

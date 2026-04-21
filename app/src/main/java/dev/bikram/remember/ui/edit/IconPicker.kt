@@ -62,9 +62,14 @@ fun IconPicker(
     current: String?,
     onPick: (String?) -> Unit,
     onDismiss: () -> Unit,
+    isChecklist: Boolean = false,
 ) {
     val resources = LocalContext.current.resources
-    val normalizedCurrent = remember(current) { normalizeIconKey(current) }
+    val defaultCatalogKey = remember(isChecklist) { defaultIconCatalogKey(isChecklist) }
+    val selectionKey = remember(current, isChecklist, defaultCatalogKey) {
+        if (current.isNullOrBlank()) defaultCatalogKey
+        else normalizeIconKey(current) ?: defaultCatalogKey
+    }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
@@ -178,8 +183,11 @@ fun IconPicker(
                             ) { _, choice ->
                                 IconTile(
                                     choice = choice,
-                                    selected = choice.key == normalizedCurrent,
-                                    onClick = { onPick(choice.key) },
+                                    selected = choice.key == selectionKey,
+                                    onClick = {
+                                        if (choice.key == defaultCatalogKey) onPick(null)
+                                        else onPick(choice.key)
+                                    },
                                 )
                             }
                         }
@@ -198,8 +206,11 @@ fun IconPicker(
                         ) { _, choice ->
                             IconTile(
                                 choice = choice,
-                                selected = choice.key == normalizedCurrent,
-                                onClick = { onPick(choice.key) },
+                                selected = choice.key == selectionKey,
+                                onClick = {
+                                    if (choice.key == defaultCatalogKey) onPick(null)
+                                    else onPick(choice.key)
+                                },
                             )
                         }
                     }
@@ -218,11 +229,23 @@ fun IconPicker(
             text = {
                 OutlinedTextField(
                     value = emojiDraft,
-                    onValueChange = { entered -> emojiDraft = entered.take(64) },
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = false,
-                    minLines = 2,
-                    maxLines = 4,
+                    onValueChange = { entered ->
+                        emojiDraft = when {
+                            entered.isEmpty() -> ""
+                            else -> {
+                                val boundary = java.text.BreakIterator.getCharacterInstance()
+                                boundary.setText(entered)
+                                val start = boundary.first()
+                                val end = boundary.next()
+                                entered.substring(start, end)
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 52.dp),
+                    singleLine = true,
+                    maxLines = 1,
                     placeholder = { Text(stringResource(R.string.icon_picker_emoji_dialog_hint)) },
                 )
             },
@@ -231,7 +254,14 @@ fun IconPicker(
                     onClick = {
                         val trimmed = emojiDraft.trim()
                         if (trimmed.isNotEmpty()) {
-                            onPick("$ICON_EMOJI_PREFIX$trimmed")
+                            val boundary = java.text.BreakIterator.getCharacterInstance()
+                            boundary.setText(trimmed)
+                            val start = boundary.first()
+                            val end = boundary.next()
+                            val single = trimmed.substring(start, end)
+                            if (single.isNotEmpty()) {
+                                onPick("$ICON_EMOJI_PREFIX$single")
+                            }
                             emojiDialogOpen = false
                             emojiDraft = ""
                         }

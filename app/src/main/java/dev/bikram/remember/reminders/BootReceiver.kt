@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import dev.bikram.remember.RememberApp
+import dev.bikram.remember.quickcapture.QuickCaptureNotifier
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -19,6 +20,13 @@ class BootReceiver : BroadcastReceiver() {
                 all.forEach { item ->
                     val at = item.note.reminderAt ?: return@forEach
                     if (at > now) scheduler.schedule(item.note.id, at)
+                }
+                // Re-post the quick-capture notification if the user has it enabled. The
+                // notification is cleared by the OS on reboot, and the flow-based observer
+                // may not fire quickly enough before the broadcast's pending-result window
+                // closes, so we read the snapshot and post synchronously here.
+                if (app.container.quickCapturePrefs.snapshot().enabled) {
+                    QuickCaptureNotifier.show(context)
                 }
             } finally {
                 pendingResult.finish()

@@ -41,7 +41,23 @@ class ReminderScheduler(private val context: Context) {
     companion object {
         const val ACTION_FIRE_REMINDER = "dev.bikram.remember.reminders.FIRE"
         const val EXTRA_NOTE_ID = "note_id"
-        const val CHANNEL_ID = "reminder"
+        // Channel IDs are versioned (_v2 suffix) because Android freezes channel
+        // settings - importance, sound, vibration - the moment a channel is first
+        // registered, and re-calling createNotificationChannel with the same id can NOT
+        // upgrade an existing low-importance channel to IMPORTANCE_HIGH. Bumping the
+        // suffix forces the system to register a brand-new channel so the HIGH variant
+        // actually delivers heads-up "pop on screen" notifications.
+        const val CHANNEL_ID_LOW = "reminder_low_v2"
+        const val CHANNEL_ID_DEFAULT = "reminder_default_v2"
+        const val CHANNEL_ID_HIGH = "reminder_high_v2"
+        // Legacy ids - we delete them on app start to clean up the user's notification
+        // settings UI rather than leaving stale channel rows behind.
+        val LEGACY_CHANNEL_IDS: List<String> = listOf(
+            "reminder",
+            "reminder_low",
+            "reminder_default",
+            "reminder_high",
+        )
 
         /**
          * Folds a note row id into the int range required for [PendingIntent] request codes and

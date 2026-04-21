@@ -8,6 +8,7 @@ import dev.bikram.remember.data.BackupPrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.RememberDatabase
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.reminders.ReminderScheduler
@@ -32,6 +33,7 @@ class AppContainer(context: Context) {
     val themePrefs: ThemePrefs = ThemePrefs(appContext)
     val interactionPrefs: InteractionPrefs = InteractionPrefs(appContext)
     val backupPrefs: BackupPrefs = BackupPrefs(appContext)
+    val quickCapturePrefs: QuickCapturePrefs = QuickCapturePrefs(appContext)
     val backupIo: BackupIo = BackupIo(
         context = appContext,
         repository = noteRepository,

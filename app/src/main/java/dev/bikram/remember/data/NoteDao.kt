@@ -19,13 +19,21 @@ data class NoteWithItems(
 @Dao
 interface NoteDao {
 
+    /**
+     * "Active" now means neither trashed nor archived -- archive is a hidden-but-kept state
+     * that behaves like a separate shelf from Home.
+     */
     @Transaction
-    @Query("SELECT * FROM notes WHERE trashed = 0 ORDER BY pinned DESC, updatedAt DESC")
+    @Query("SELECT * FROM notes WHERE trashed = 0 AND archived = 0 ORDER BY pinned DESC, updatedAt DESC")
     fun observeActive(): Flow<List<NoteWithItems>>
 
     @Transaction
     @Query("SELECT * FROM notes WHERE trashed = 1 ORDER BY updatedAt DESC")
     fun observeTrashed(): Flow<List<NoteWithItems>>
+
+    @Transaction
+    @Query("SELECT * FROM notes WHERE archived = 1 AND trashed = 0 ORDER BY updatedAt DESC")
+    fun observeArchived(): Flow<List<NoteWithItems>>
 
     @Transaction
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
@@ -34,6 +42,58 @@ interface NoteDao {
     @Transaction
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
     suspend fun get(id: Long): NoteWithItems?
+
+    /**
+     * Full-text search over active notes (no trashed, no archived). Uses an inner join against
+     * the FTS4 virtual table `notes_fts` via the `MATCH` operator. The query is passed straight
+     * through to FTS -- callers are responsible for sanitising (see [NoteRepository.searchNotes]).
+     */
+    @Transaction
+    @Query(
+        """
+        SELECT notes.* FROM notes
+        JOIN notes_fts ON notes.id = notes_fts.docid
+        WHERE notes_fts MATCH :ftsQuery
+          AND notes.trashed = 0
+          AND notes.archived = 0
+        ORDER BY notes.pinned DESC, notes.updatedAt DESC
+        """,
+    )
+    fun searchNotes(ftsQuery: String): Flow<List<NoteWithItems>>
+
+    /**
+     * FTS over archived (non-trashed) notes. Drives the collapsible "Archive (N)" section
+     * inside the main-tab search - these notes are still the user's but not in the active
+     * list, so they are surfaced only when the user expands the section.
+     */
+    @Transaction
+    @Query(
+        """
+        SELECT notes.* FROM notes
+        JOIN notes_fts ON notes.id = notes_fts.docid
+        WHERE notes_fts MATCH :ftsQuery
+          AND notes.archived = 1
+          AND notes.trashed = 0
+        ORDER BY notes.updatedAt DESC
+        """,
+    )
+    fun searchArchived(ftsQuery: String): Flow<List<NoteWithItems>>
+
+    /**
+     * FTS over trashed notes. Powers the collapsible "Trash (N)" section inside main-tab
+     * search so users can rediscover a recently-deleted note without leaving the tab.
+     */
+    @Transaction
+    @Query(
+        """
+        SELECT notes.* FROM notes
+        JOIN notes_fts ON notes.id = notes_fts.docid
+        WHERE notes_fts MATCH :ftsQuery
+          AND notes.trashed = 1
+        ORDER BY notes.trashedAt DESC
+        """,
+    )
+    fun searchTrashed(ftsQuery: String): Flow<List<NoteWithItems>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(note: NoteEntity): Long
@@ -44,8 +104,31 @@ interface NoteDao {
     @Query("UPDATE notes SET pinned = :pinned, updatedAt = :updatedAt WHERE id = :id")
     suspend fun setPinned(id: Long, pinned: Boolean, updatedAt: Long)
 
-    @Query("UPDATE notes SET trashed = :trashed, pinned = CASE WHEN :trashed THEN 0 ELSE pinned END, updatedAt = :updatedAt WHERE id = :id")
+    @Query(
+        "UPDATE notes " +
+            "SET trashed = :trashed, " +
+            "pinned = CASE WHEN :trashed THEN 0 ELSE pinned END, " +
+            "archived = CASE WHEN :trashed THEN 0 ELSE archived END, " +
+            "trashedAt = CASE WHEN :trashed THEN :updatedAt ELSE NULL END, " +
+            "updatedAt = :updatedAt " +
+            "WHERE id = :id",
+    )
     suspend fun setTrashed(id: Long, trashed: Boolean, updatedAt: Long)
+
+    /**
+     * Archiving clears pinned (parity with trash) and cannot coexist with trashed = 1;
+     * if the note was in the trash, archiving lifts it out first.
+     */
+    @Query(
+        "UPDATE notes " +
+            "SET archived = :archived, " +
+            "pinned = CASE WHEN :archived THEN 0 ELSE pinned END, " +
+            "trashed = CASE WHEN :archived THEN 0 ELSE trashed END, " +
+            "trashedAt = CASE WHEN :archived THEN NULL ELSE trashedAt END, " +
+            "updatedAt = :updatedAt " +
+            "WHERE id = :id",
+    )
+    suspend fun setArchived(id: Long, archived: Boolean, updatedAt: Long)
 
     @Query("DELETE FROM notes WHERE id = :id")
     suspend fun deleteById(id: Long)
@@ -56,17 +139,23 @@ interface NoteDao {
     @Query("SELECT id FROM notes WHERE trashed = 1")
     suspend fun trashedNoteIds(): List<Long>
 
+    @Query("SELECT id FROM notes WHERE trashed = 1 AND trashedAt IS NOT NULL AND trashedAt < :cutoff")
+    suspend fun trashedNoteIdsOlderThan(cutoff: Long): List<Long>
+
     @Query("DELETE FROM notes")
     suspend fun deleteAllNotes()
 
     @Query("DELETE FROM notes WHERE trashed = 1")
     suspend fun emptyTrash()
+
+    @Query("DELETE FROM notes WHERE trashed = 1 AND trashedAt IS NOT NULL AND trashedAt < :cutoff")
+    suspend fun deleteTrashedOlderThan(cutoff: Long)
 }
 
 @Dao
 interface ChecklistItemDao {
 
-    @Query("SELECT * FROM checklist_items WHERE noteId = :noteId ORDER BY position ASC")
+    @Query("SELECT * FROM checklist_items WHERE noteId = :noteId ORDER BY sortOrder ASC")
     suspend fun itemsFor(noteId: Long): List<ChecklistItemEntity>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

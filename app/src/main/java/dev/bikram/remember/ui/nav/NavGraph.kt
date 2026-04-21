@@ -28,11 +28,16 @@ object Routes {
     const val EDIT_LIST = "editList"
     const val ARG_ID = "id"
     const val ARG_PREFILL = "prefill"
-    fun editNote(id: Long?, prefill: String = ""): String {
+    const val ARG_FORCE_EDIT = "forceEdit"
+    fun editNote(id: Long?, prefill: String = "", forceEdit: Boolean = false): String {
         val p = if (prefill.isNotEmpty()) "&$ARG_PREFILL=${Uri.encode(prefill)}" else ""
-        return "$EDIT_NOTE?${ARG_ID}=${id ?: -1L}$p"
+        val f = if (forceEdit) "&$ARG_FORCE_EDIT=true" else ""
+        return "$EDIT_NOTE?${ARG_ID}=${id ?: -1L}$p$f"
     }
-    fun editList(id: Long?) = "$EDIT_LIST?${ARG_ID}=${id ?: -1L}"
+    fun editList(id: Long?, forceEdit: Boolean = false): String {
+        val f = if (forceEdit) "&${ARG_FORCE_EDIT}=true" else ""
+        return "$EDIT_LIST?${ARG_ID}=${id ?: -1L}$f"
+    }
 }
 
 @Composable
@@ -77,13 +82,13 @@ fun RememberNavGraph(
                         interactionPrefs = interactionPrefs,
                         onCreateNote = { navController.navigate(Routes.editNote(null)) },
                         onCreateList = { navController.navigate(Routes.editList(null)) },
-                        onOpenNote = { note -> navController.openEditRouteFor(note) },
+                        onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
                     )
                 }
             }
 
             composable(
-                route = "${Routes.EDIT_NOTE}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}",
+                route = "${Routes.EDIT_NOTE}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
                 arguments = listOf(
                     navArgument(Routes.ARG_ID) {
                         type = NavType.LongType
@@ -93,10 +98,15 @@ fun RememberNavGraph(
                         type = NavType.StringType
                         defaultValue = ""
                     },
+                    navArgument(Routes.ARG_FORCE_EDIT) {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
                 ),
             ) { entry ->
                 val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
                 val prefill = entry.arguments?.getString(Routes.ARG_PREFILL).orEmpty()
+                val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
                     LocalNavAnimatedVisibilityScope provides this@composable
@@ -107,21 +117,27 @@ fun RememberNavGraph(
                         appScope = appScope,
                         noteId = id.takeIf { it > 0 },
                         prefillBody = prefill,
+                        forceEdit = forceEdit,
                         onBack = { navController.popBackStack() },
                     )
                 }
             }
 
             composable(
-                route = "${Routes.EDIT_LIST}?${Routes.ARG_ID}={${Routes.ARG_ID}}",
+                route = "${Routes.EDIT_LIST}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
                 arguments = listOf(
                     navArgument(Routes.ARG_ID) {
                         type = NavType.LongType
                         defaultValue = -1L
-                    }
+                    },
+                    navArgument(Routes.ARG_FORCE_EDIT) {
+                        type = NavType.BoolType
+                        defaultValue = false
+                    },
                 ),
             ) { entry ->
                 val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
+                val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
                     LocalNavAnimatedVisibilityScope provides this@composable
@@ -131,6 +147,7 @@ fun RememberNavGraph(
                         themePrefs = themePrefs,
                         appScope = appScope,
                         noteId = id.takeIf { it > 0 },
+                        forceEdit = forceEdit,
                         onBack = { navController.popBackStack() },
                     )
                 }
@@ -139,10 +156,10 @@ fun RememberNavGraph(
     }
 }
 
-private fun NavController.openEditRouteFor(note: NoteWithItems) {
+private fun NavController.openEditRouteFor(note: NoteWithItems, forceEdit: Boolean = false) {
     val route = when (note.note.kind) {
-        NoteKind.NOTE -> Routes.editNote(note.note.id)
-        NoteKind.LIST -> Routes.editList(note.note.id)
+        NoteKind.NOTE -> Routes.editNote(note.note.id, forceEdit = forceEdit)
+        NoteKind.LIST -> Routes.editList(note.note.id, forceEdit = forceEdit)
     }
     navigate(route)
 }

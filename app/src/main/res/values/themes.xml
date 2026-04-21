@@ -1,4 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Remember" parent="android:Theme.Material.NoActionBar" />
+    <!--
+      Translucent activity theme used by SnoozeActivity. Three things matter here:
+
+      1. Parent must be a Material theme (NOT android:Theme.Translucent.NoTitleBar).
+         The legacy translucent parent does not honor windowDrawsSystemBarBackgrounds /
+         statusBarColor properly, so we ended up with opaque-black system bars even
+         after setting them transparent at runtime.
+      2. windowDrawsSystemBarBackgrounds=true lets us draw under the bars so the
+         transparent statusBarColor / navigationBarColor actually take effect.
+      3. enforceNavigationBarContrast / enforceStatusBarContrast=false stop Android
+         from compositing its own ~70% opaque scrim behind a transparent bar.
+    -->
+    <style name="Theme.Remember.Translucent" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">false</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:enforceNavigationBarContrast">false</item>
+        <item name="android:enforceStatusBarContrast">false</item>
+    </style>
 </resources>
