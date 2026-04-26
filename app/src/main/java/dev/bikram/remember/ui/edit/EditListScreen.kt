@@ -1,6 +1,9 @@
 package dev.bikram.remember.ui.edit
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -74,7 +77,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.bikram.remember.R
-import dev.bikram.remember.ui.common.FullScreenImageDialog
+import dev.bikram.remember.domain.checklist.EditableItem
+import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
@@ -126,7 +130,7 @@ fun EditListRoute(
     )
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
     val title by vm.title.collectAsStateWithLifecycle()
-    val pinned by vm.pinned.collectAsStateWithLifecycle()
+    val favorite by vm.favorite.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
     val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
@@ -149,6 +153,18 @@ fun EditListRoute(
     val undoMsg = androidx.compose.ui.res.stringResource(dev.bikram.remember.R.string.common_undo)
     val untitledName = androidx.compose.ui.res.stringResource(dev.bikram.remember.R.string.edit_list_title_new)
     val context = androidx.compose.ui.platform.LocalContext.current
+    val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
+    val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
+    val sharedModifier = if (sharedScope != null && navScope != null && noteId != null) {
+        with(sharedScope) {
+            Modifier.sharedBounds(
+                sharedContentState = rememberSharedContentState(key = "note-card-${noteId}"),
+                animatedVisibilityScope = navScope,
+            )
+        }
+    } else {
+        Modifier
+    }
 
     // Save path used by the top-bar Save icon while in edit mode. Runs saveIfNeeded
     // explicitly (vs. waiting for dispose) and flashes a toast so users get feedback
@@ -184,67 +200,70 @@ fun EditListRoute(
         }
     }
 
-    EditListScreen(
-        repository = repository,
-        title = title,
-        pinned = pinned,
-        items = items,
-        reminderAt = reminderAt,
-        recurrence = recurrence,
-        importance = importance,
-        visibility = visibility,
-        locked = locked,
-        pictureUri = pictureUri,
-        pictureRevision = pictureRevision,
-        pictureHeroFraming = pictureHeroFraming,
-        iconKey = iconKey,
-        actions = actions,
-        tags = tags,
-        attachments = attachments,
-        archived = archived,
-        trashed = trashed,
-        existing = noteId != null,
-        persistedForToolbar = hasPersistedRow,
-        forceEdit = forceEdit,
-        onTitleChange = vm::setTitle,
-        onTogglePin = vm::togglePin,
-        completed = completed,
-        onToggleCompleted = { appScope.launch { vm.toggleCompleted() } },
-        onAddItem = vm::addItem,
-        onItemTextChange = vm::updateItemText,
-        onItemToggle = vm::toggleChecked,
-        onItemRemove = vm::removeItem,
-        onReorderWithin = vm::reorderWithin,
-        onSetParent = vm::setParent,
-        onIndent = vm::indent,
-        onOutdent = vm::outdent,
-        onReminderChange = vm::setReminder,
-        onImportanceChange = vm::setImportance,
-        onVisibilityChange = vm::setVisibility,
-        onToggleLock = vm::toggleLock,
-        onPictureChange = vm::setPictureUri,
-        onHeroCommitted = vm::setHeroWithFraming,
-        onIconKeyChange = vm::setIconKey,
-        onActionsChange = vm::setActions,
-        onTagsChange = vm::setTags,
-        onTagsWithColorsChange = vm::saveTagsWithColors,
-        onAddAttachment = vm::addAttachment,
-        onRemoveAttachment = vm::removeAttachment,
-        onTrash = {
-            appScope.launch { vm.trashCurrent() }
-            onBack()
-        },
-        onArchive = { appScope.launch { vm.archiveCurrent(untitledName) } },
-        onNotification = { appScope.launch { vm.fireNotification(context, untitledName) } },
-        onUnarchive = { appScope.launch { vm.unarchiveCurrent() } },
-        onRestore = { appScope.launch { vm.restoreFromTrashCurrent() } },
-        onDeleteForever = {
-            appScope.launch { vm.deleteForeverCurrent() }
-            onBack()
-        },
-        onBack = onBack,
-        onSave = onExplicitSave,
-    )
+    androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
+        EditListScreen(
+            repository = repository,
+            title = title,
+            favorite = favorite,
+            items = items,
+            reminderAt = reminderAt,
+            recurrence = recurrence,
+            importance = importance,
+            visibility = visibility,
+            locked = locked,
+            pictureUri = pictureUri,
+            pictureRevision = pictureRevision,
+            pictureHeroFraming = pictureHeroFraming,
+            iconKey = iconKey,
+            actions = actions,
+            tags = tags,
+            attachments = attachments,
+            archived = archived,
+            trashed = trashed,
+            existing = noteId != null,
+            persistedForToolbar = hasPersistedRow,
+            forceEdit = forceEdit,
+            onTitleChange = vm::setTitle,
+            onToggleFavorite = vm::toggleFavorite,
+            completed = completed,
+            onToggleCompleted = { appScope.launch { vm.toggleCompleted() } },
+            onAddItem = vm::addItem,
+            onItemTextChange = vm::updateItemText,
+            onItemToggle = vm::toggleChecked,
+            onItemRemove = vm::removeItem,
+            onReorderWithin = vm::reorderWithin,
+            onSetParent = vm::setParent,
+            onIndent = vm::indent,
+            onOutdent = vm::outdent,
+            onReminderChange = vm::setReminder,
+            onImportanceChange = vm::setImportance,
+            onVisibilityChange = vm::setVisibility,
+            onToggleLock = vm::toggleLock,
+            onPictureChange = vm::setPictureUri,
+            onHeroCommitted = vm::setHeroWithFraming,
+            onIconKeyChange = vm::setIconKey,
+            onActionsChange = vm::setActions,
+            onTagsChange = vm::setTags,
+            onTagsWithColorsChange = vm::saveTagsWithColors,
+            onEditExistingTag = vm::editExistingTag,
+            onAddAttachment = vm::addAttachment,
+            onRemoveAttachment = vm::removeAttachment,
+            onTrash = {
+                appScope.launch { vm.trashCurrent() }
+                onBack()
+            },
+            onArchive = { appScope.launch { vm.archiveCurrent(untitledName) } },
+            onNotification = { appScope.launch { vm.fireNotification(context, untitledName) } },
+            onUnarchive = { appScope.launch { vm.unarchiveCurrent() } },
+            onRestore = { appScope.launch { vm.restoreFromTrashCurrent() } },
+            onDeleteForever = {
+                appScope.launch { vm.deleteForeverCurrent() }
+                onBack()
+            },
+            onBack = onBack,
+            onSave = onExplicitSave,
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -252,7 +271,7 @@ fun EditListRoute(
 fun EditListScreen(
     repository: NoteRepository,
     title: String,
-    pinned: Boolean,
+    favorite: Boolean,
     items: List<EditableItem>,
     reminderAt: Long?,
     recurrence: RecurrenceRule?,
@@ -273,7 +292,7 @@ fun EditListScreen(
     forceEdit: Boolean = false,
     completed: Boolean,
     onTitleChange: (String) -> Unit,
-    onTogglePin: () -> Unit,
+    onToggleFavorite: () -> Unit,
     onToggleCompleted: () -> Unit,
     onAddItem: () -> Unit,
     onItemTextChange: (Long, String) -> Unit,
@@ -302,6 +321,7 @@ fun EditListScreen(
     onActionsChange: (List<NoteAction>) -> Unit,
     onTagsChange: (List<String>) -> Unit,
     onTagsWithColorsChange: (List<String>, Map<String, String>) -> Unit,
+    onEditExistingTag: (String, String, String?, Boolean) -> Unit,
     onAddAttachment: (Uri, String, String?) -> Unit,
     onRemoveAttachment: (Long) -> Unit,
     onTrash: () -> Unit,
@@ -391,8 +411,7 @@ fun EditListScreen(
     }
 
     val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val imeVisible by remember { derivedStateOf { imeBottom > 0 } }
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
 
     // Edit mode replaces the action bar: the list's inline "Add item" and the top-bar Save
     // action take over, and the keyboard toolbar stays on the bottom unobstructed. Stacking
@@ -550,13 +569,13 @@ fun EditListScreen(
                 shelfState = shelfState,
                 existing = persistedForToolbar,
                 isEditMode = isEditMode,
-                pinned = pinned,
+                favorite = favorite,
                 completed = completed,
                 visible = actionBarVisible,
                 // Action bar is hidden while isEditMode, so this callback only fires from
                 // view mode - always turning edit mode ON. Save is owned by the top bar.
                 onToggleEdit = { if (!isEditMode) isEditMode = true else saveAndExitEditMode() },
-                onTogglePin = onTogglePin,
+                onToggleFavorite = onToggleFavorite,
                 onToggleCompleted = onToggleCompleted,
                 onArchive = onArchive,
                 onNotification = onNotification,
@@ -667,6 +686,7 @@ fun EditListScreen(
                         uri = pictureUri,
                         pictureRevision = pictureRevision,
                         pictureHeroFraming = pictureHeroFraming,
+                        viewerOpen = pictureViewer != null,
                         onOpenFull = { pictureViewer = pictureUri to pictureRevision },
                     )
                 }
@@ -920,6 +940,7 @@ fun EditListScreen(
                     onTagsWithColorsChange(newTags, newColors)
                     tagsPickerOpen = false
                 },
+                onEditExistingTag = onEditExistingTag,
                 onDismiss = { tagsPickerOpen = false },
             )
         }
@@ -931,17 +952,18 @@ fun EditListScreen(
                 onRemove = onRemoveAttachment,
             )
         }
-        pictureViewer?.let { (uri, revision) ->
-            FullScreenImageDialog(
-                imageUri = uri,
-                imageCacheRevision = revision,
-                imageContentDescription = stringResource(R.string.viewer_cover_image_cd),
-                onDismiss = { pictureViewer = null },
-                // Delete is only reachable on the active shelf - archived/trashed lists are
-                // read-only, so there's no delete affordance there.
-                onDelete = if (readOnly) null else ({ onPictureChange(null) }),
-            )
-        }
+        val viewerForOverlay = pictureViewer
+        FullScreenHeroImageOverlay(
+            visible = viewerForOverlay != null,
+            imageUri = viewerForOverlay?.first,
+            imageCacheRevision = viewerForOverlay?.second ?: 0L,
+            imageContentDescription = stringResource(R.string.viewer_cover_image_cd),
+        sharedElementKey = viewerForOverlay?.first?.let { uri -> "hero-image-$uri" },
+            onDismiss = { pictureViewer = null },
+            // Delete is only reachable on the active shelf - archived/trashed lists are
+            // read-only, so there's no delete affordance there.
+            onDelete = if (readOnly) null else ({ onPictureChange(null) }),
+        )
         pendingHeroSession?.let { (pickedUri, copiedFile) ->
             HeroFramingEditorDialog(
                 imageUri = pickedUri,
@@ -985,24 +1007,60 @@ private fun PictureHero(
     uri: String,
     pictureRevision: Long,
     pictureHeroFraming: String?,
+    viewerOpen: Boolean,
     onOpenFull: () -> Unit,
 ) {
     val framing = remember(pictureHeroFraming) { HeroFraming.fromJsonString(pictureHeroFraming) }
-    // No delete overlay on the inline hero: it competes visually with the hero image and
-    // invites accidental taps. Delete lives in the full-screen viewer.
+    val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
+
+    // Same-screen container transform requires both ends of sharedBounds to live in
+    // coordinated AnimatedVisibility / AnimatedContent scopes. The destination's nav
+    // scope is "always visible" while we're on this screen, so keying the inline hero
+    // to it leaves both copies (inline + overlay) reporting visibility at the same
+    // time and the bounds animation has no clean source-to-target driver. We wrap the
+    // inline hero in its own AnimatedVisibility(visible = !viewerOpen) and use that
+    // scope so opening the viewer cleanly hands the shared element off to the overlay.
+    //
+    // Outer Box keeps the layout slot at a constant height; only the inline content
+    // toggles, so the surrounding lazy column never reflows mid-transition.
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(220.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .tapSoundClickable(onClick = onOpenFull),
+            .height(220.dp),
     ) {
-        HeroFramedImage(
-            imageUri = uri,
-            framing = framing,
-            cacheRevision = pictureRevision,
-            modifier = Modifier.fillMaxSize(),
-        )
+        AnimatedVisibility(
+            visible = !viewerOpen,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            val sharedModifier = if (sharedScope != null) {
+                with(sharedScope) {
+                    Modifier.sharedBounds(
+                        sharedContentState = rememberSharedContentState(key = "hero-image-$uri"),
+                        animatedVisibilityScope = this@AnimatedVisibility,
+                    )
+                }
+            } else {
+                Modifier
+            }
+            // No delete overlay on the inline hero: it competes visually with the
+            // hero image and invites accidental taps. Delete lives in the full-screen
+            // viewer.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(sharedModifier)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .tapSoundClickable(onClick = onOpenFull),
+            ) {
+                HeroFramedImage(
+                    imageUri = uri,
+                    framing = framing,
+                    cacheRevision = pictureRevision,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
     }
 }

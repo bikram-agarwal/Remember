@@ -101,11 +101,14 @@ class SnoozeActivity : ComponentActivity() {
             val themeState by container.themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
             )
+            val tagColors by container.tagRepository.observeTagColorMap().collectAsStateWithLifecycle(
+                initialValue = emptyMap(),
+            )
             val interactionState by container.interactionPrefs.state.collectAsStateWithLifecycle(
                 initialValue = InteractionState(),
             )
             RememberTheme(
-                themeState = themeState,
+                themeState = themeState.copy(tagColors = tagColors),
                 interactionState = interactionState,
                 paintBackground = false,
             ) {
@@ -141,9 +144,6 @@ class SnoozeActivity : ComponentActivity() {
         ).show()
 
         lifecycleScope.launch {
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            nm.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
-
             val noteWithItems = repo.get(noteId)
             if (noteWithItems != null) {
                 val note = noteWithItems.note
@@ -175,6 +175,8 @@ class SnoozeActivity : ComponentActivity() {
                     repo.updateList(note.id, note.title, note.colorIndex, persistable, opts)
                 }
             }
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            nm.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
 
             finish()
         }

@@ -1,18 +1,21 @@
 package dev.bikram.remember.ui.home
-import androidx.compose.material3.IconButton
 
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,20 +33,24 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.Button
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,10 +63,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -82,15 +95,18 @@ import dev.bikram.remember.data.SortDir
 import dev.bikram.remember.data.SortKey
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ViewOptions
+import dev.bikram.remember.data.ViewOptionsPrefs
 import dev.bikram.remember.data.matches
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.EmptyFilterIllustration
 import dev.bikram.remember.ui.components.EmptyNotesIllustration
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -107,6 +123,7 @@ import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 
 sealed class HomeListItem {
     /**
@@ -120,7 +137,8 @@ sealed class HomeListItem {
         val label: String,
         val count: Int? = null,
         val stableKey: String = label,
-        val collapsible: Boolean = false,
+        val collapsible: Boolean = true,
+        @param:StringRes val labelRes: Int? = null,
     ) : HomeListItem()
     /**
      * [groupKey] disambiguates keys when the same note appears under multiple groups
@@ -135,6 +153,7 @@ sealed class HomeListItem {
 private enum class TopBarTitleTarget { Selection, Search, AppName }
 
 data class HomeState(
+    val loading: Boolean = true,
     val filter: NotesFilter = NotesFilter(),
     val items: List<HomeListItem> = emptyList(),
     val totalActive: Int = 0,
@@ -159,11 +178,11 @@ data class HomeState(
 class HomeViewModel(
     private val repository: NoteRepository,
     private val themePrefs: ThemePrefs,
+    private val viewOptionsPrefs: ViewOptionsPrefs,
 ) : ViewModel() {
     private val filter = MutableStateFlow(NotesFilter())
     private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
-    private val viewOptionsFlow = themePrefs.state
-        .map { it.viewOptions }
+    private val viewOptionsFlow = viewOptionsPrefs.state
         .distinctUntilChanged()
 
     /**
@@ -261,6 +280,7 @@ class HomeViewModel(
         val visibleIds = arranged.mapNotNull { (it as? HomeListItem.NoteRow)?.note?.note?.id }.toSet()
         val prunedSelection = selected.intersect(visibleIds)
         HomeState(
+            loading = false,
             filter = f,
             items = arranged,
             totalActive = allActive.size,
@@ -277,7 +297,7 @@ class HomeViewModel(
     fun setQuery(v: String) { filter.value = filter.value.copy(text = v) }
 
     fun setViewOptions(v: ViewOptions) {
-        viewModelScope.launch { themePrefs.setViewOptions(v) }
+        viewModelScope.launch { viewOptionsPrefs.setViewOptions(v) }
     }
 
     fun toggleSelection(noteId: Long) {
@@ -286,7 +306,23 @@ class HomeViewModel(
         }
     }
 
+    fun selectNotes(noteIds: Set<Long>) {
+        selectedIds.value = noteIds
+    }
+
     fun clearSelection() { selectedIds.value = emptySet() }
+
+    fun markSelectedDone() {
+        val ids = selectedIds.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { noteId ->
+                val existing = repository.get(noteId)?.note ?: return@forEach
+                if (existing.completedAt == null) repository.markCompleted(noteId)
+            }
+            selectedIds.value = emptySet()
+        }
+    }
 
     fun archiveSelected() {
         val ids = selectedIds.value.toList()
@@ -320,7 +356,7 @@ class HomeViewModel(
         val additions = addTags - removeTags
         viewModelScope.launch {
             newTagColors.forEach { (tagKey, hex) ->
-                themePrefs.setTagColor(tagKey, hex)
+                repository.tagRepository?.setTagColor(tagKey, hex) ?: themePrefs.setTagColor(tagKey, hex)
             }
             ids.forEach { noteId ->
                 val existing = repository.get(noteId) ?: return@forEach
@@ -351,11 +387,15 @@ class HomeViewModel(
     }
 
     companion object {
-        fun factory(repository: NoteRepository, themePrefs: ThemePrefs) =
+        fun factory(
+            repository: NoteRepository,
+            themePrefs: ThemePrefs,
+            viewOptionsPrefs: ViewOptionsPrefs,
+        ) =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    HomeViewModel(repository, themePrefs) as T
+                    HomeViewModel(repository, themePrefs, viewOptionsPrefs) as T
             }
     }
 }
@@ -395,19 +435,20 @@ private fun arrangeItems(notes: List<NoteWithItems>, opts: ViewOptions): List<Ho
     return buildList {
         if (overdue.isNotEmpty()) {
             add(HomeListItem.Header(
-                label = "Overdue",
+                label = "",
                 count = overdue.size,
                 stableKey = "OVERDUE",
+                labelRes = R.string.home_section_overdue,
             ))
             overdue.forEach { add(HomeListItem.NoteRow(it, groupKey = "OVERDUE")) }
         }
         addAll(arrangeMiddle(activeRest, opts, now))
         if (done.isNotEmpty()) {
             add(HomeListItem.Header(
-                label = "Done",
+                label = "",
                 count = done.size,
                 stableKey = "DONE",
-                collapsible = true,
+                labelRes = R.string.home_section_done,
             ))
             done.forEach { add(HomeListItem.NoteRow(it, groupKey = "DONE")) }
         }
@@ -425,17 +466,19 @@ private fun arrangeMiddle(
     opts: ViewOptions,
     now: Long,
 ): List<HomeListItem> {
-    val isReminderSort = opts.sortKey == SortKey.REMINDER
-    if (!isReminderSort) {
+    if (opts.groupBy != GroupBy.DATE) {
         // Without sub-section breakdown the user couldn't tell where Overdue ended -
         // cards directly below the Overdue header read as if they were also overdue.
-        // Insert an "Active" header to delimit the middle. GroupBy.TAG / GroupBy.TYPE
-        // already emit their own headers and don't need this prefix; only GroupBy.NONE
-        // relied on the (missing) sub-headers.
+        // Insert an "Active" header to delimit the middle when there is no other grouping.
         val grouped = arrangeByGroupBy(active, opts)
         return if (opts.groupBy == GroupBy.NONE && grouped.isNotEmpty()) {
             buildList {
-                add(HomeListItem.Header(label = "Active", count = active.size, stableKey = "ACTIVE"))
+                add(HomeListItem.Header(
+                    label = "",
+                    count = active.size,
+                    stableKey = "ACTIVE",
+                    labelRes = R.string.home_section_active,
+                ))
                 addAll(grouped)
             }
         } else {
@@ -443,7 +486,7 @@ private fun arrangeMiddle(
         }
     }
     // Reminder sort (either direction): always emit Today / Upcoming / No date
-    // sub-sections. "Today" is everything with a future reminder strictly before
+    // sub-sections when Group by Date is selected. "Today" is everything with a future reminder strictly before
     // tomorrow's local midnight (overdue is already lifted out above). Sort
     // direction controls the SECTION ORDER:
     //   asc  -> Today, Upcoming, No date    (earliest reminder first)
@@ -473,9 +516,14 @@ private fun arrangeMiddle(
 
     data class SectionDef(val label: String, val key: String, val items: List<NoteWithItems>)
     val ascendingSections = listOf(
-        SectionDef("Today", "TODAY", today),
-        SectionDef("Upcoming", "UPCOMING", upcoming),
-        SectionDef("No date", "NO_DATE", noDate),
+        SectionDef("", "TODAY", today),
+        SectionDef("", "UPCOMING", upcoming),
+        SectionDef("", "NO_DATE", noDate),
+    )
+    val sectionLabelRes = mapOf(
+        "TODAY" to R.string.home_section_today,
+        "UPCOMING" to R.string.home_section_upcoming,
+        "NO_DATE" to R.string.home_section_no_date,
     )
     val orderedSections = if (opts.sortDir == SortDir.ASC) ascendingSections else ascendingSections.reversed()
 
@@ -486,6 +534,7 @@ private fun arrangeMiddle(
                     label = section.label,
                     count = section.items.size,
                     stableKey = section.key,
+                    labelRes = sectionLabelRes[section.key],
                 ))
                 section.items.forEach {
                     add(HomeListItem.NoteRow(it, groupKey = section.key))
@@ -498,18 +547,29 @@ private fun arrangeMiddle(
 /** Existing GroupBy logic, now scoped to the active middle (post Overdue / Done extraction). */
 private fun arrangeByGroupBy(active: List<NoteWithItems>, opts: ViewOptions): List<HomeListItem> {
     return when (opts.groupBy) {
-        GroupBy.NONE -> active.map { HomeListItem.NoteRow(it) }
+        GroupBy.DATE -> active.map { HomeListItem.NoteRow(it) }
+        GroupBy.NONE -> active.map { HomeListItem.NoteRow(it, groupKey = "ACTIVE") }
         GroupBy.TYPE -> {
             val notesOnly = active.filter { it.note.kind == NoteKind.NOTE }
             val listsOnly = active.filter { it.note.kind == NoteKind.LIST }
             buildList {
                 if (notesOnly.isNotEmpty()) {
-                    add(HomeListItem.Header("Notes", count = notesOnly.size, stableKey = "TYPE_NOTE"))
-                    notesOnly.forEach { add(HomeListItem.NoteRow(it, groupKey = "NOTE")) }
+                    add(HomeListItem.Header(
+                        label = "",
+                        count = notesOnly.size,
+                        stableKey = "TYPE_NOTE",
+                        labelRes = R.string.home_section_notes,
+                    ))
+                    notesOnly.forEach { add(HomeListItem.NoteRow(it, groupKey = "TYPE_NOTE")) }
                 }
                 if (listsOnly.isNotEmpty()) {
-                    add(HomeListItem.Header("Lists", count = listsOnly.size, stableKey = "TYPE_LIST"))
-                    listsOnly.forEach { add(HomeListItem.NoteRow(it, groupKey = "LIST")) }
+                    add(HomeListItem.Header(
+                        label = "",
+                        count = listsOnly.size,
+                        stableKey = "TYPE_LIST",
+                        labelRes = R.string.home_section_lists,
+                    ))
+                    listsOnly.forEach { add(HomeListItem.NoteRow(it, groupKey = "TYPE_LIST")) }
                 }
             }
         }
@@ -527,24 +587,27 @@ private fun arrangeByGroupBy(active: List<NoteWithItems>, opts: ViewOptions): Li
                             .any { tagName -> tagName.equals(tag, ignoreCase = true) }
                     }
                     if (inTag.isNotEmpty()) {
-                        add(HomeListItem.Header(label = tag, count = inTag.size, stableKey = "TAG_$tag"))
-                        inTag.forEach { add(HomeListItem.NoteRow(it, groupKey = "tag:$tag")) }
+                        val sectionKey = "TAG_$tag"
+                        add(HomeListItem.Header(label = tag, count = inTag.size, stableKey = sectionKey))
+                        inTag.forEach { add(HomeListItem.NoteRow(it, groupKey = sectionKey)) }
                     }
                 }
                 if (untagged.isNotEmpty()) {
-                    add(HomeListItem.Header("Untagged", count = untagged.size, stableKey = "TAG_UNTAGGED"))
-                    untagged.forEach { add(HomeListItem.NoteRow(it, groupKey = "untagged")) }
+                    add(HomeListItem.Header(
+                        label = "",
+                        count = untagged.size,
+                        stableKey = "TAG_UNTAGGED",
+                        labelRes = R.string.home_section_untagged,
+                    ))
+                    untagged.forEach { add(HomeListItem.NoteRow(it, groupKey = "TAG_UNTAGGED")) }
                 }
             }
         }
     }
 }
 
-/** Favorites (pinned) always top. Within favorite and non-favorite groups, apply sort key/dir. */
 private fun sortNotes(notes: List<NoteWithItems>, opts: ViewOptions): List<NoteWithItems> {
-    val (pinned, rest) = notes.partition { it.note.pinned }
-    val cmp = buildComparator(opts)
-    return pinned.sortedWith(cmp) + rest.sortedWith(cmp)
+    return notes.sortedWith(buildComparator(opts))
 }
 
 private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
@@ -575,12 +638,15 @@ private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
 fun HomeRoute(
     repository: NoteRepository,
     themePrefs: ThemePrefs,
+    viewOptionsPrefs: ViewOptionsPrefs,
     interactionPrefs: InteractionPrefs,
     onOpenNote: (NoteWithItems, Boolean) -> Unit,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
 ) {
-    val vm: HomeViewModel = viewModel(factory = HomeViewModel.factory(repository, themePrefs))
+    val vm: HomeViewModel = viewModel(
+        factory = HomeViewModel.factory(repository, themePrefs, viewOptionsPrefs),
+    )
     val state by vm.state.collectAsStateWithLifecycle()
     val interaction by interactionPrefs.state.collectAsStateWithLifecycle(
         initialValue = InteractionState(),
@@ -599,8 +665,9 @@ fun HomeRoute(
                     NoteSwipeAction.EDIT -> onOpenNote(note, true)
                     NoteSwipeAction.TRASH -> repository.moveToTrash(note.note.id)
                     NoteSwipeAction.DUPLICATE -> repository.duplicateNote(note.note.id)
-                    NoteSwipeAction.TOGGLE_PIN ->
-                        repository.setPinned(note.note.id, !note.note.pinned)
+                    NoteSwipeAction.TOGGLE_FAVORITE ->
+                        repository.setFavorite(note.note.id, !note.note.favorite)
+                    NoteSwipeAction.ARCHIVE -> repository.archiveNote(note.note.id)
                     // The MARK_DONE swipe is a toggle: completed -> incomplete,
                     // incomplete -> completed. Recurrence-aware on the complete path
                     // (rolls reminder forward instead of going to Done).
@@ -615,7 +682,9 @@ fun HomeRoute(
             }
         },
         onToggleSelection = vm::toggleSelection,
+        onSelectAllVisible = vm::selectNotes,
         onClearSelection = vm::clearSelection,
+        onMarkSelectedDone = vm::markSelectedDone,
         onArchiveSelected = vm::archiveSelected,
         onTrashSelected = vm::trashSelected,
         onApplyTagsToSelection = vm::applyTagsToSelection,
@@ -635,7 +704,9 @@ fun HomeScreen(
     onOpenNote: (NoteWithItems) -> Unit,
     onSwipeAction: (NoteWithItems, NoteSwipeAction) -> Unit,
     onToggleSelection: (Long) -> Unit,
+    onSelectAllVisible: (Set<Long>) -> Unit,
     onClearSelection: () -> Unit,
+    onMarkSelectedDone: () -> Unit,
     onArchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
     onApplyTagsToSelection: (Set<String>, Set<String>, Map<String, String>) -> Unit,
@@ -645,18 +716,20 @@ fun HomeScreen(
     val topBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     var searchOpen by rememberSaveable { mutableStateOf(false) }
-    var filterSheetOpen by rememberSaveable { mutableStateOf(false) }
-    var viewOptionsOpen by rememberSaveable { mutableStateOf(false) }
     var tagSheetOpen by rememberSaveable { mutableStateOf(false) }
     // Collapsed by default so the search results feel focused on active notes. Each section
-    // remembers its own expansion state across rotation but resets per-session, which keeps
-    // the common "quick search" flow uncluttered.
+    // remembers its own expansion state when the user switches away and comes back.
     var archiveSectionExpanded by rememberSaveable { mutableStateOf(false) }
     var trashSectionExpanded by rememberSaveable { mutableStateOf(false) }
-    // Done section starts collapsed by default - the user has already finished those
-    // tasks, so they should not consume vertical space in the active flow. Tapping
-    // the header chevron expands; we persist the toggle across configuration changes.
-    var doneSectionCollapsed by rememberSaveable { mutableStateOf(true) }
+    // Every section header is collapsible. Done starts collapsed by default because those
+    // tasks are already finished; every other section starts expanded.
+    var collapsedSectionKeys by rememberSaveable { mutableStateOf(setOf("DONE")) }
+    val listState = rememberLazyListState()
+    val listScrollEnabled = rememberContentOverflowScrollEnabled(
+        listState = listState,
+        additionalScrollEnabled = topBarState.collapsedFraction > 0f,
+    )
+    val filterControlScrollState = rememberScrollState()
     val blurStyle = rememberProgressiveBlurStyle()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
@@ -665,10 +738,31 @@ fun HomeScreen(
     androidx.activity.compose.BackHandler(enabled = state.inSelectionMode) {
         onClearSelection()
     }
+    val displayedItems = remember(state.items, collapsedSectionKeys) {
+        state.items.filterNot { item ->
+            item is HomeListItem.NoteRow && item.groupKey in collapsedSectionKeys
+        }
+    }
+    val selectableVisibleIds = remember(displayedItems) {
+        displayedItems.mapNotNull { item ->
+            (item as? HomeListItem.NoteRow)?.note?.note?.id
+        }.toSet()
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
+        bottomBar = {
+            HomeSelectionActionBar(
+                visible = state.inSelectionMode,
+                selectedCount = state.selectedIds.size,
+                onTagSelected = { tagSheetOpen = true },
+                onMarkDoneSelected = onMarkSelectedDone,
+                onArchiveSelected = onArchiveSelected,
+                onTrashSelected = onTrashSelected,
+                bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
+            )
+        },
         topBar = {
             LargeTopAppBar(
                 colors = transparentLargeTopAppBarColors(),
@@ -716,8 +810,6 @@ fun HomeScreen(
                             TopBarTitleTarget.Search -> InlineSearchField(
                                 query = state.filter.text,
                                 onQueryChange = onQueryChange,
-                                filterActive = state.filter.facetActive,
-                                onOpenFilter = { filterSheetOpen = true },
                             )
                             TopBarTitleTarget.AppName -> Text(stringResource(R.string.app_name))
                         }
@@ -738,38 +830,30 @@ fun HomeScreen(
                 },
                 actions = {
                     if (state.inSelectionMode) {
-                        val cdArchive = stringResource(R.string.home_bulk_archive_cd)
-                        val cdTrash = stringResource(R.string.home_bulk_trash_cd)
-                        val cdTag = stringResource(R.string.home_bulk_tag_cd)
-                        RememberFilledTonalIconButton(onClick = { tagSheetOpen = true }) {
+                        val cdSelectAll = stringResource(R.string.home_select_all)
+                        RememberFilledTonalIconButton(
+                            onClick = { onSelectAllVisible(selectableVisibleIds) },
+                            enabled = selectableVisibleIds.isNotEmpty(),
+                        ) {
                             RememberMaterialRoundedSymbol(
-                                name = "label",
+                                name = "select_all",
                                 weight = FontWeight.Medium,
-                                modifier = Modifier.semantics { contentDescription = cdTag },
+                                modifier = Modifier.semantics { contentDescription = cdSelectAll },
                             )
                         }
                         Spacer(Modifier.width(6.dp))
-                        RememberFilledTonalIconButton(onClick = onArchiveSelected) {
+                        val cdUnselectAll = stringResource(R.string.home_unselect_all)
+                        RememberFilledTonalIconButton(onClick = onClearSelection) {
                             RememberMaterialRoundedSymbol(
-                                name = "archive",
+                                name = "deselect",
                                 weight = FontWeight.Medium,
-                                modifier = Modifier.semantics { contentDescription = cdArchive },
-                            )
-                        }
-                        Spacer(Modifier.width(6.dp))
-                        RememberFilledTonalIconButton(onClick = onTrashSelected) {
-                            RememberMaterialRoundedSymbol(
-                                name = "delete",
-                                weight = FontWeight.Medium,
-                                modifier = Modifier.semantics { contentDescription = cdTrash },
+                                modifier = Modifier.semantics { contentDescription = cdUnselectAll },
                             )
                         }
                         Spacer(Modifier.width(4.dp))
                     } else {
                         // Motion specs for the trailing action cluster. Matches the title
-                        // slot so the button icon swap and view-options button retraction
-                        // feel like one continuous gesture with the search field.
-                        val actionSpatial = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
+                        // slot so the search icon swap feels tied to the search field.
                         val actionFadeIn = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
                         val actionFadeOut = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
                         val scaleIconSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
@@ -797,25 +881,6 @@ fun HomeScreen(
                                 )
                             }
                         }
-                        AnimatedVisibility(
-                            visible = !searchOpen,
-                            enter = fadeIn(actionFadeIn) +
-                                expandHorizontally(actionSpatial, expandFrom = Alignment.End),
-                            exit = fadeOut(actionFadeOut) +
-                                shrinkHorizontally(actionSpatial, shrinkTowards = Alignment.End),
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Spacer(Modifier.width(6.dp))
-                                RememberFilledTonalIconButton(onClick = { viewOptionsOpen = true }) {
-                                    val cdViewOptions = stringResource(R.string.home_view_options_cd)
-                                    RememberMaterialRoundedSymbol(
-                                        name = "tune",
-                                        weight = FontWeight.Medium,
-                                        modifier = Modifier.semantics { contentDescription = cdViewOptions },
-                                    )
-                                }
-                            }
-                        }
                         Spacer(Modifier.width(4.dp))
                     }
                 },
@@ -838,20 +903,27 @@ fun HomeScreen(
         // is searching - only fall through to the empty-state screen if NOTHING matched.
         val hasExtendedMatches =
             state.archivedMatches.isNotEmpty() || state.trashedMatches.isNotEmpty()
-        if (state.items.isEmpty() && !hasExtendedMatches) {
+        val showEmptyState = !state.loading && state.items.isEmpty() && !hasExtendedMatches
+        val showFilterControls =
+            state.totalActive > 0 || state.filter.active || state.viewOptions != ViewOptions()
+        if (showEmptyState) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .then(blurMod)
                     .padding(listContentPadding),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                if (state.filter.facetActive || state.filter.text.isNotBlank()) {
+                if (showFilterControls) {
                     ActiveFilterChips(
                         filter = state.filter,
                         onChange = onFilterChange,
+                        viewOptions = state.viewOptions,
+                        onViewOptionsChange = onViewOptionsChange,
+                        availableTags = state.availableTags,
+                        scrollState = filterControlScrollState,
                         modifier = Modifier.fillMaxWidth(),
                     )
-                    Spacer(Modifier.height(12.dp))
                 }
                 Box(
                     modifier = Modifier
@@ -871,29 +943,29 @@ fun HomeScreen(
                 }
             }
         } else {
-            // Filter out Done rows when the Done section is collapsed. Header for
-            // Done is preserved (so the user can still tap to expand) but its rows
-            // are dropped from the LazyColumn input - LazyColumn only sees what we
-            // hand it, so this is purely additive.
-            val displayedItems = remember(state.items, doneSectionCollapsed) {
-                if (!doneSectionCollapsed) state.items
-                else state.items.filterNot { item ->
-                    item is HomeListItem.NoteRow && item.groupKey == "DONE"
-                }
-            }
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .then(blurMod),
                 contentPadding = listContentPadding,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+                userScrollEnabled = listScrollEnabled,
             ) {
-                if (state.filter.facetActive || state.filter.text.isNotBlank()) {
+                if (showFilterControls) {
                     item(key = "__chips__", contentType = "chips") {
                         ActiveFilterChips(
                             filter = state.filter,
                             onChange = onFilterChange,
-                            modifier = Modifier.fillMaxWidth(),
+                            viewOptions = state.viewOptions,
+                            onViewOptionsChange = onViewOptionsChange,
+                            availableTags = state.availableTags,
+                            scrollState = filterControlScrollState,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ),
                         )
                     }
                 }
@@ -914,17 +986,26 @@ fun HomeScreen(
                 ) { item ->
                     when (item) {
                         is HomeListItem.Header -> GroupHeader(
-                            label = item.label,
+                            label = item.labelRes?.let { stringResource(it) } ?: item.label,
                             count = item.count,
                             collapsible = item.collapsible,
-                            collapsed = item.collapsible && doneSectionCollapsed,
+                            collapsed = item.stableKey in collapsedSectionKeys,
                             onToggle = if (item.collapsible) {
-                                { doneSectionCollapsed = !doneSectionCollapsed }
+                                {
+                                    collapsedSectionKeys = if (item.stableKey in collapsedSectionKeys) {
+                                        collapsedSectionKeys - item.stableKey
+                                    } else {
+                                        collapsedSectionKeys + item.stableKey
+                                    }
+                                }
                             } else null,
                             // Bookend sections (Overdue at top, Done at bottom) stay
                             // put when the user reverses sort. The pin icon advertises
                             // that to avoid surprise.
                             pinned = item.stableKey == "OVERDUE" || item.stableKey == "DONE",
+                            modifier = Modifier.animateItem(
+                                placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                            ),
                         )
                         is HomeListItem.NoteRow -> {
                             val noteId = item.note.note.id
@@ -937,6 +1018,9 @@ fun HomeScreen(
                                     else onOpenNote(n)
                                 },
                                 onSwipeAction = onSwipeAction,
+                                modifier = Modifier.animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ),
                                 selected = isSelected,
                                 onLongClick = { onToggleSelection(noteId) },
                                 // Swipes are meaningless during bulk-select and would visually
@@ -957,6 +1041,9 @@ fun HomeScreen(
                             expanded = archiveSectionExpanded,
                             onToggle = { archiveSectionExpanded = !archiveSectionExpanded },
                             muted = false,
+                            modifier = Modifier.animateItem(
+                                placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                            ),
                         )
                     }
                     if (archiveSectionExpanded) {
@@ -972,6 +1059,9 @@ fun HomeScreen(
                                 onSwipeAction = onSwipeAction,
                                 badgeText = stringResource(R.string.home_search_section_badge_archive),
                                 badgeStyle = SectionBadgeStyle.ARCHIVE,
+                                modifier = Modifier.animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ),
                             )
                         }
                     }
@@ -986,6 +1076,9 @@ fun HomeScreen(
                             expanded = trashSectionExpanded,
                             onToggle = { trashSectionExpanded = !trashSectionExpanded },
                             muted = true,
+                            modifier = Modifier.animateItem(
+                                placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                            ),
                         )
                     }
                     if (trashSectionExpanded) {
@@ -1001,29 +1094,15 @@ fun HomeScreen(
                                 onSwipeAction = onSwipeAction,
                                 badgeText = stringResource(R.string.home_search_section_badge_trash),
                                 badgeStyle = SectionBadgeStyle.TRASH,
+                                modifier = Modifier.animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ),
                             )
                         }
                     }
                 }
             }
         }
-    }
-
-    if (filterSheetOpen) {
-        FilterSheet(
-            filter = state.filter,
-            availableTags = state.availableTags,
-            onChange = onFilterChange,
-            onDismiss = { filterSheetOpen = false },
-        )
-    }
-
-    if (viewOptionsOpen) {
-        ViewOptionsSheet(
-            viewOptions = state.viewOptions,
-            onChange = onViewOptionsChange,
-            onDismiss = { viewOptionsOpen = false },
-        )
     }
 
     if (tagSheetOpen) {
@@ -1036,6 +1115,102 @@ fun HomeScreen(
 }
 
 @Composable
+private fun HomeSelectionActionBar(
+    visible: Boolean,
+    selectedCount: Int,
+    onTagSelected: () -> Unit,
+    onMarkDoneSelected: () -> Unit,
+    onArchiveSelected: () -> Unit,
+    onTrashSelected: () -> Unit,
+    bottomPadding: androidx.compose.ui.unit.Dp,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = bottomPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = selectedCount.toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 10.dp),
+                    )
+                    val tagLabel = stringResource(R.string.home_bulk_tag)
+                    val cdTag = stringResource(R.string.home_bulk_tag_cd)
+                    RememberFilledTonalIconButton(
+                        onClick = onTagSelected,
+                        tooltipLabel = tagLabel,
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "label",
+                            weight = FontWeight.Medium,
+                            modifier = Modifier.semantics { contentDescription = cdTag },
+                        )
+                    }
+                    val markDoneLabel = stringResource(R.string.edit_bottom_bar_mark_done)
+                    val cdMarkDone = stringResource(R.string.home_bulk_mark_done_cd)
+                    RememberFilledTonalIconButton(
+                        onClick = onMarkDoneSelected,
+                        tooltipLabel = markDoneLabel,
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "check_circle",
+                            weight = FontWeight.Medium,
+                            modifier = Modifier.semantics { contentDescription = cdMarkDone },
+                        )
+                    }
+                    val archiveLabel = stringResource(R.string.edit_bottom_bar_archive)
+                    val cdArchive = stringResource(R.string.home_bulk_archive_cd)
+                    RememberFilledTonalIconButton(
+                        onClick = onArchiveSelected,
+                        tooltipLabel = archiveLabel,
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "archive",
+                            weight = FontWeight.Medium,
+                            modifier = Modifier.semantics { contentDescription = cdArchive },
+                        )
+                    }
+                    val trashLabel = stringResource(R.string.home_bulk_trash)
+                    val cdTrash = stringResource(R.string.home_bulk_trash_cd)
+                    RememberFilledTonalIconButton(
+                        onClick = onTrashSelected,
+                        tooltipLabel = trashLabel,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "delete",
+                            weight = FontWeight.Medium,
+                            modifier = Modifier.semantics { contentDescription = cdTrash },
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun GroupHeader(
     label: String,
     count: Int? = null,
@@ -1043,15 +1218,24 @@ private fun GroupHeader(
     collapsed: Boolean = false,
     onToggle: (() -> Unit)? = null,
     pinned: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
-    val baseModifier = Modifier
+    val baseModifier = modifier
         .fillMaxWidth()
         // More vertical breathing room than before. titleMedium is denser than
         // labelLarge, so the additional padding keeps the cards from butting against
         // the header text.
         .padding(top = 18.dp, bottom = 6.dp, start = 4.dp)
+    val headerInteractionSource = remember { MutableInteractionSource() }
+    val playTap = rememberPlayTapSound()
     val rowModifier = if (collapsible && onToggle != null) {
-        baseModifier.tapSoundClickable(onClick = onToggle)
+        baseModifier.clickable(
+            indication = null,
+            interactionSource = headerInteractionSource,
+        ) {
+            playTap()
+            onToggle()
+        }
     } else {
         baseModifier
     }
@@ -1099,6 +1283,7 @@ private fun GroupHeader(
             // font subset. animateFloatAsState handles the smooth rotation.
             val rotation by androidx.compose.animation.core.animateFloatAsState(
                 targetValue = if (collapsed) 0f else 90f,
+                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
                 label = "section_chevron_rotation",
             )
             RememberMaterialRoundedSymbol(
@@ -1118,9 +1303,21 @@ private fun GroupHeader(
 private fun InlineSearchField(
     query: String,
     onQueryChange: (String) -> Unit,
-    filterActive: Boolean,
-    onOpenFilter: () -> Unit,
 ) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var searchFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(query, selection = TextRange(query.length)))
+    }
+    LaunchedEffect(query) {
+        if (query != searchFieldValue.text) {
+            searchFieldValue = TextFieldValue(query, selection = TextRange(query.length))
+        }
+    }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1138,16 +1335,23 @@ private fun InlineSearchField(
         )
         Spacer(Modifier.width(10.dp))
         BasicTextField(
-            value = query,
-            onValueChange = onQueryChange,
+            value = searchFieldValue,
+            onValueChange = { newValue ->
+                searchFieldValue = newValue
+                if (newValue.text != query) onQueryChange(newValue.text)
+            },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             textStyle = MaterialTheme.typography.bodyLarge.copy(
                 color = MaterialTheme.colorScheme.onSurface,
             ),
-            modifier = Modifier.weight(1f),
+            modifier = Modifier
+                .weight(1f)
+                .focusRequester(focusRequester),
             decorationBox = { inner ->
-                if (query.isEmpty()) {
+                if (searchFieldValue.text.isEmpty()) {
                     Text(
                         stringResource(R.string.home_search_placeholder),
                         style = MaterialTheme.typography.bodyLarge,
@@ -1157,35 +1361,6 @@ private fun InlineSearchField(
                 inner()
             },
         )
-        Spacer(Modifier.width(8.dp))
-        val cdFilter = stringResource(R.string.home_filter_cd)
-        Row(
-            modifier = Modifier
-                .background(
-                    if (filterActive) MaterialTheme.colorScheme.primaryContainer
-                    else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    RoundedCornerShape(14.dp),
-                )
-                .tapSoundClickable(onClick = onOpenFilter)
-                .padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RememberMaterialRoundedSymbol(
-                name = "filter_list",
-                size = 16.dp,
-                tint = if (filterActive) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
-                modifier = Modifier.semantics { contentDescription = cdFilter },
-            )
-            Spacer(Modifier.width(4.dp))
-            Text(
-                stringResource(R.string.home_filter_cd),
-                style = MaterialTheme.typography.labelMedium,
-                color = if (filterActive) MaterialTheme.colorScheme.onPrimaryContainer
-                else MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
     }
 }
 
@@ -1210,6 +1385,7 @@ private fun SearchSectionPillDivider(
     expanded: Boolean,
     onToggle: () -> Unit,
     muted: Boolean,
+    modifier: Modifier = Modifier,
 ) {
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val chevronRotation by androidx.compose.animation.core.animateFloatAsState(
@@ -1217,8 +1393,8 @@ private fun SearchSectionPillDivider(
         animationSpec = spatialSpec,
         label = "sectionChevron",
     )
-    val cdExpand = stringResource(R.string.home_search_section_expand_cd, label)
-    val cdCollapse = stringResource(R.string.home_search_section_collapse_cd, label)
+    val cdExpand = stringResource(R.string.section_expand_cd, label)
+    val cdCollapse = stringResource(R.string.section_collapse_cd, label)
     val pillBackground = if (muted) MaterialTheme.colorScheme.surfaceContainerLow
     else MaterialTheme.colorScheme.surfaceContainerHigh
     val labelColor = if (muted) MaterialTheme.colorScheme.onSurfaceVariant
@@ -1228,7 +1404,7 @@ private fun SearchSectionPillDivider(
     val countColor = if (muted) MaterialTheme.colorScheme.onSurfaceVariant
     else MaterialTheme.colorScheme.onSecondaryContainer
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center,
@@ -1292,6 +1468,7 @@ private fun StateBadgedNoteCard(
     onSwipeAction: (NoteWithItems, NoteSwipeAction) -> Unit,
     badgeText: String,
     badgeStyle: SectionBadgeStyle,
+    modifier: Modifier = Modifier,
 ) {
     val bgColor = when (badgeStyle) {
         SectionBadgeStyle.ARCHIVE -> MaterialTheme.colorScheme.secondaryContainer
@@ -1301,7 +1478,7 @@ private fun StateBadgedNoteCard(
         SectionBadgeStyle.ARCHIVE -> MaterialTheme.colorScheme.onSecondaryContainer
         SectionBadgeStyle.TRASH -> MaterialTheme.colorScheme.onErrorContainer
     }
-    Box(modifier = Modifier.fillMaxWidth()) {
+    Box(modifier = modifier.fillMaxWidth()) {
         Box(modifier = Modifier.graphicsLayer { alpha = 0.88f }) {
             SwipeableRememberNoteCard(
                 note = note,
@@ -1387,13 +1564,8 @@ private fun NotesEmptyState(
                 Text(stringResource(R.string.home_create_list))
             }
         } else {
-            RememberMaterialRoundedSymbol(
-                name = "inbox",
-                size = 64.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
-            )
-            Spacer(Modifier.height(16.dp))
+            EmptyFilterIllustration()
+            Spacer(Modifier.height(18.dp))
             val titleText = when {
                 filter.text.isNotBlank() ->
                     stringResource(R.string.home_no_results_for, filter.text)

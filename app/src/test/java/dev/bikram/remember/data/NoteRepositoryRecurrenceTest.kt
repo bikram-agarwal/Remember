@@ -1,0 +1,241 @@
+package dev.bikram.remember.data
+
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Test
+import java.util.Calendar
+
+class NoteRepositoryRecurrenceTest {
+
+    @Test
+    fun `mark completed advances recurring reminder and keeps note active`() = runBlocking {
+        val reminderAt = calendarMillis(2026, Calendar.APRIL, 26, 8, 0)
+        val expectedNextReminder = calendarMillis(2026, Calendar.APRIL, 27, 8, 0)
+        val noteDao = FakeNoteDao(
+            NoteEntity(
+                id = 1L,
+                kind = NoteKind.NOTE,
+                title = "Daily task",
+                body = "",
+                colorIndex = 0,
+                favorite = false,
+                trashed = false,
+                createdAt = reminderAt,
+                updatedAt = reminderAt,
+                reminderAt = reminderAt,
+                recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY),
+            ),
+        )
+        val repository = NoteRepository(
+            noteDao = noteDao,
+            itemDao = FakeChecklistItemDao(),
+            attachmentDao = FakeAttachmentDao(),
+            clock = { reminderAt + 1_000L },
+        )
+
+        repository.markCompleted(1L)
+
+        val updated = noteDao.stored.note
+        assertEquals(expectedNextReminder, updated.reminderAt)
+        assertNotNull(updated.recurrence)
+        assertNull(updated.completedAt)
+    }
+
+    @Test
+    fun `mark completed stamps completedAt for one shot reminder`() = runBlocking {
+        val reminderAt = calendarMillis(2026, Calendar.APRIL, 26, 8, 0)
+        val completedAt = reminderAt + 1_000L
+        val noteDao = FakeNoteDao(
+            NoteEntity(
+                id = 1L,
+                kind = NoteKind.NOTE,
+                title = "One shot task",
+                body = "",
+                colorIndex = 0,
+                favorite = false,
+                trashed = false,
+                createdAt = reminderAt,
+                updatedAt = reminderAt,
+                reminderAt = reminderAt,
+            ),
+        )
+        val repository = NoteRepository(
+            noteDao = noteDao,
+            itemDao = FakeChecklistItemDao(),
+            attachmentDao = FakeAttachmentDao(),
+            clock = { completedAt },
+        )
+
+        repository.markCompleted(1L)
+
+        assertEquals(completedAt, noteDao.stored.note.completedAt)
+    }
+
+    @Test
+    fun `updating completed note with reminder restores it to active`() = runBlocking {
+        val completedAt = calendarMillis(2026, Calendar.APRIL, 26, 9, 0)
+        val newReminderAt = calendarMillis(2026, Calendar.APRIL, 27, 8, 0)
+        val noteDao = FakeNoteDao(
+            NoteEntity(
+                id = 1L,
+                kind = NoteKind.NOTE,
+                title = "Done task",
+                body = "",
+                colorIndex = 0,
+                favorite = false,
+                trashed = false,
+                createdAt = completedAt,
+                updatedAt = completedAt,
+                reminderAt = null,
+                completedAt = completedAt,
+            ),
+        )
+        val repository = NoteRepository(
+            noteDao = noteDao,
+            itemDao = FakeChecklistItemDao(),
+            attachmentDao = FakeAttachmentDao(),
+            clock = { completedAt + 1_000L },
+        )
+
+        repository.updateNote(
+            id = 1L,
+            title = "Done task",
+            body = "",
+            colorIndex = 0,
+            options = NoteOptions(
+                reminderAt = newReminderAt,
+                recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY),
+            ),
+        )
+
+        assertNull(noteDao.stored.note.completedAt)
+        assertEquals(newReminderAt, noteDao.stored.note.reminderAt)
+        assertNotNull(noteDao.stored.note.recurrence)
+    }
+
+    @Test
+    fun `updating completed list with reminder restores it to active`() = runBlocking {
+        val completedAt = calendarMillis(2026, Calendar.APRIL, 26, 9, 0)
+        val newReminderAt = calendarMillis(2026, Calendar.APRIL, 27, 8, 0)
+        val noteDao = FakeNoteDao(
+            NoteEntity(
+                id = 1L,
+                kind = NoteKind.LIST,
+                title = "Done list",
+                body = "",
+                colorIndex = 0,
+                favorite = false,
+                trashed = false,
+                createdAt = completedAt,
+                updatedAt = completedAt,
+                reminderAt = null,
+                completedAt = completedAt,
+            ),
+        )
+        val repository = NoteRepository(
+            noteDao = noteDao,
+            itemDao = FakeChecklistItemDao(),
+            attachmentDao = FakeAttachmentDao(),
+            clock = { completedAt + 1_000L },
+        )
+
+        repository.updateList(
+            id = 1L,
+            title = "Done list",
+            colorIndex = 0,
+            items = emptyList(),
+            options = NoteOptions(
+                reminderAt = newReminderAt,
+                recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY),
+            ),
+        )
+
+        assertNull(noteDao.stored.note.completedAt)
+        assertEquals(newReminderAt, noteDao.stored.note.reminderAt)
+        assertNotNull(noteDao.stored.note.recurrence)
+    }
+
+    private fun calendarMillis(
+        year: Int,
+        month: Int,
+        day: Int,
+        hour: Int,
+        minute: Int,
+    ): Long {
+        return Calendar.getInstance().apply {
+            set(Calendar.YEAR, year)
+            set(Calendar.MONTH, month)
+            set(Calendar.DAY_OF_MONTH, day)
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    private class FakeNoteDao(initialNote: NoteEntity) : NoteDao {
+        var stored = NoteWithItems(initialNote, emptyList())
+
+        override fun observeActive(): Flow<List<NoteWithItems>> = flowOf(listOf(stored))
+        override fun observeTrashed(): Flow<List<NoteWithItems>> = flowOf(emptyList())
+        override fun observeArchived(): Flow<List<NoteWithItems>> = flowOf(emptyList())
+        override fun observe(id: Long): Flow<NoteWithItems?> = flowOf(stored.takeIf { it.note.id == id })
+        override suspend fun get(id: Long): NoteWithItems? = stored.takeIf { it.note.id == id }
+        override suspend fun activeRemindersUntil(untilMillis: Long): List<NoteWithItems> {
+            val reminderAt = stored.note.reminderAt ?: return emptyList()
+            return if (
+                !stored.note.trashed &&
+                !stored.note.archived &&
+                stored.note.completedAt == null &&
+                reminderAt <= untilMillis
+            ) {
+                listOf(stored)
+            } else {
+                emptyList()
+            }
+        }
+        override fun searchNotes(ftsQuery: String): Flow<List<NoteWithItems>> = flowOf(emptyList())
+        override fun searchArchived(ftsQuery: String): Flow<List<NoteWithItems>> = flowOf(emptyList())
+        override fun searchTrashed(ftsQuery: String): Flow<List<NoteWithItems>> = flowOf(emptyList())
+        override suspend fun insert(note: NoteEntity): Long {
+            stored = NoteWithItems(note, emptyList())
+            return note.id
+        }
+        override suspend fun update(note: NoteEntity) {
+            stored = stored.copy(note = note)
+        }
+        override suspend fun setFavorite(id: Long, favorite: Boolean, updatedAt: Long) = Unit
+        override suspend fun updateTagCache(id: Long, tags: List<String>) = Unit
+        override suspend fun setTrashed(id: Long, trashed: Boolean, updatedAt: Long) = Unit
+        override suspend fun setArchived(id: Long, archived: Boolean, updatedAt: Long) = Unit
+        override suspend fun deleteById(id: Long) = Unit
+        override suspend fun allNoteIds(): List<Long> = listOf(stored.note.id)
+        override suspend fun trashedNoteIds(): List<Long> = emptyList()
+        override suspend fun archivedNoteIds(): List<Long> = emptyList()
+        override suspend fun trashedNoteIdsOlderThan(cutoff: Long): List<Long> = emptyList()
+        override suspend fun deleteAllNotes() = Unit
+        override suspend fun emptyTrash() = Unit
+        override suspend fun deleteTrashedOlderThan(cutoff: Long) = Unit
+    }
+
+    private class FakeChecklistItemDao : ChecklistItemDao {
+        override suspend fun itemsFor(noteId: Long): List<ChecklistItemEntity> = emptyList()
+        override suspend fun insert(item: ChecklistItemEntity): Long = item.id
+        override suspend fun insertAll(items: List<ChecklistItemEntity>) = Unit
+        override suspend fun update(item: ChecklistItemEntity) = Unit
+        override suspend fun deleteById(id: Long) = Unit
+        override suspend fun deleteForNote(noteId: Long) = Unit
+    }
+
+    private class FakeAttachmentDao : AttachmentDao {
+        override suspend fun attachmentsFor(noteId: Long): List<NoteAttachmentEntity> = emptyList()
+        override suspend fun insert(attachment: NoteAttachmentEntity): Long = attachment.id
+        override suspend fun insertAll(attachments: List<NoteAttachmentEntity>) = Unit
+        override suspend fun deleteById(id: Long) = Unit
+        override suspend fun deleteForNote(noteId: Long) = Unit
+    }
+}

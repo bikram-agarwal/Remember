@@ -10,6 +10,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Locale
 
 class Converters {
     @TypeConverter fun fromKind(kind: NoteKind): String = kind.name
@@ -78,8 +79,10 @@ class Converters {
         ChecklistItemEntity::class,
         NoteAttachmentEntity::class,
         NoteFtsEntity::class,
+        TagEntity::class,
+        NoteTagCrossRef::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -87,6 +90,7 @@ abstract class RememberDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
     abstract fun checklistItemDao(): ChecklistItemDao
     abstract fun attachmentDao(): AttachmentDao
+    abstract fun tagDao(): TagDao
 
     companion object {
         /** Adds nullable hero framing JSON without recreating the notes table. */
@@ -218,9 +222,101 @@ abstract class RememberDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Promotes user-visible tag names out of the `notes.tags` JSON cache into first-class
+         * tag rows plus note/tag relationships. The old column remains as a synced cache for
+         * FTS and compatibility while the repository layer becomes the source of writes.
+         */
+        private val migration5To6: Migration = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        normalizedName TEXT NOT NULL,
+                        colorHex TEXT,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_tags_normalizedName ON tags(normalizedName)",
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS note_tags (
+                        noteId INTEGER NOT NULL,
+                        tagId INTEGER NOT NULL,
+                        sortOrder INTEGER NOT NULL,
+                        PRIMARY KEY(noteId, tagId),
+                        FOREIGN KEY(noteId) REFERENCES notes(id) ON UPDATE NO ACTION ON DELETE CASCADE,
+                        FOREIGN KEY(tagId) REFERENCES tags(id) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_note_tags_noteId ON note_tags(noteId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_note_tags_tagId ON note_tags(tagId)")
+
+                val now = System.currentTimeMillis()
+                db.query("SELECT id, tags FROM notes").use { cursor ->
+                    val noteIdIndex = cursor.getColumnIndexOrThrow("id")
+                    val tagsIndex = cursor.getColumnIndexOrThrow("tags")
+                    while (cursor.moveToNext()) {
+                        val noteId = cursor.getLong(noteIdIndex)
+                        val rawTags = cursor.getString(tagsIndex).orEmpty()
+                        val seenForNote = LinkedHashSet<String>()
+                        decodeTagsForMigration(rawTags).forEachIndexed { tagIndex, rawName ->
+                            val tagName = rawName.trim()
+                            if (tagName.isBlank() || tagName == RememberReservedTags.FAVORITE) {
+                                return@forEachIndexed
+                            }
+                            val normalizedName = tagName.lowercase(Locale.ROOT)
+                            if (!seenForNote.add(normalizedName)) return@forEachIndexed
+                            db.execSQL(
+                                """
+                                INSERT OR IGNORE INTO tags(name, normalizedName, colorHex, createdAt, updatedAt)
+                                VALUES (?, ?, NULL, ?, ?)
+                                """.trimIndent(),
+                                arrayOf<Any>(tagName, normalizedName, now, now),
+                            )
+                            val tagId = db.query(
+                                "SELECT id FROM tags WHERE normalizedName = ? LIMIT 1",
+                                arrayOf(normalizedName),
+                            ).use { tagCursor ->
+                                if (tagCursor.moveToFirst()) tagCursor.getLong(0) else null
+                            } ?: return@forEachIndexed
+                            db.execSQL(
+                                """
+                                INSERT OR REPLACE INTO note_tags(noteId, tagId, sortOrder)
+                                VALUES (?, ?, ?)
+                                """.trimIndent(),
+                                arrayOf<Any>(noteId, tagId, tagIndex),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        private fun decodeTagsForMigration(value: String): List<String> {
+            if (value.isBlank()) return emptyList()
+            return runCatching {
+                val tagsArray = JSONArray(value)
+                List(tagsArray.length()) { tagIndex -> tagsArray.getString(tagIndex) }
+            }.getOrDefault(emptyList())
+        }
+
         fun build(context: Context): RememberDatabase =
             Room.databaseBuilder(context, RememberDatabase::class.java, "remember.db")
-                .addMigrations(migration1To2, migration2To3, migration3To4, migration4To5)
+                .addMigrations(
+                    migration1To2,
+                    migration2To3,
+                    migration3To4,
+                    migration4To5,
+                    migration5To6,
+                )
                 .fallbackToDestructiveMigration(false)
                 .build()
     }

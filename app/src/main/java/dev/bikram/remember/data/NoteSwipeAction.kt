@@ -8,7 +8,8 @@ enum class NoteSwipeAction(
     EDIT("edit"),
     TRASH("delete"),
     DUPLICATE("content_copy"),
-    TOGGLE_PIN("favorite"),
+    TOGGLE_FAVORITE("favorite"),
+    ARCHIVE("archive"),
     /** Mark task done. Recurrence-aware via [NoteRepository.markCompleted]. */
     MARK_DONE("check_circle"),
 }

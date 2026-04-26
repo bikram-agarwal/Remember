@@ -38,12 +38,22 @@ fun HeroFramedImage(
     val context = LocalContext.current
     val density = LocalDensity.current
     BoxWithConstraints(modifier = modifier) {
-        val containerW = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-        val containerH = constraints.maxHeight.toFloat().coerceAtLeast(1f)
-        val model = remember(imageUri, cacheRevision, containerW, containerH) {
+        val containerW = if (constraints.hasBoundedWidth) {
+            constraints.maxWidth.toFloat()
+        } else {
+            1080f
+        }.coerceIn(1f, 4096f)
+        val containerH = if (constraints.hasBoundedHeight) {
+            constraints.maxHeight.toFloat()
+        } else {
+            containerW / HERO_MASK_ASPECT_RATIO
+        }.coerceIn(1f, 4096f)
+        val requestWidthPx = (containerW * 2f).coerceIn(1f, 2048f).roundToInt()
+        val requestHeightPx = (containerH * 2f).coerceIn(1f, 2048f).roundToInt()
+        val model = remember(imageUri, cacheRevision, requestWidthPx, requestHeightPx) {
             ImageRequest.Builder(context)
                 .data(imageUri)
-                .size(coil3.size.Size.ORIGINAL)
+                .size(Size(requestWidthPx, requestHeightPx))
                 .memoryCacheKey("$imageUri#${cacheRevision}")
                 .diskCacheKey("$imageUri#${cacheRevision}")
                 .build()
@@ -51,7 +61,8 @@ fun HeroFramedImage(
         val painter = rememberAsyncImagePainter(model)
         val loadState by painter.state.collectAsStateWithLifecycle()
         val intrinsic: ComposeSize = painter.intrinsicSize
-        val ready = intrinsic.width > 0f && intrinsic.height > 0f &&
+        val ready = intrinsic.width.isFinite() && intrinsic.height.isFinite() &&
+            intrinsic.width > 0f && intrinsic.height > 0f &&
             loadState is AsyncImagePainter.State.Success
 
         if (!ready || framing == null) {
@@ -85,8 +96,16 @@ fun HeroFramedImage(
             val maxLeft = (containerW - viewportW) / 2f
             val minTop = (containerH + viewportH) / 2f - scaledH
             val maxTop = (containerH - viewportH) / 2f
-            val left = leftUnclamped.coerceIn(minLeft, maxLeft)
-            val top = topUnclamped.coerceIn(minTop, maxTop)
+            val left = if (minLeft <= maxLeft) {
+                leftUnclamped.coerceIn(minLeft, maxLeft)
+            } else {
+                (minLeft + maxLeft) / 2f
+            }
+            val top = if (minTop <= maxTop) {
+                topUnclamped.coerceIn(minTop, maxTop)
+            } else {
+                (minTop + maxTop) / 2f
+            }
             
             // requiredSize implicitly centers the content if it's larger than the parent.
             // We must subtract this centering offset so our calculated `left` and `top` are absolute.
@@ -95,8 +114,8 @@ fun HeroFramedImage(
             val finalLeft = left - centerOffsetX
             val finalTop = top - centerOffsetY
 
-            val widthDp = with(density) { scaledW.toDp() }
-            val heightDp = with(density) { scaledH.toDp() }
+            val widthDp = with(density) { scaledW.coerceIn(1f, 4096f).toDp() }
+            val heightDp = with(density) { scaledH.coerceIn(1f, 4096f).toDp() }
             Image(
                 painter = painter,
                 contentDescription = null,

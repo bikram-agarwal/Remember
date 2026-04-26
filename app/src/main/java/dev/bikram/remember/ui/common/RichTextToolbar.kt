@@ -379,7 +379,11 @@ private fun LinkDialog(
                     onDismiss()
                 }
             ) {
-                Text(if (editing) "Save" else "Add")
+                Text(
+                    stringResource(
+                        if (editing) R.string.rt_link_confirm_save else R.string.rt_link_confirm_add,
+                    ),
+                )
             }
         },
         dismissButton = {

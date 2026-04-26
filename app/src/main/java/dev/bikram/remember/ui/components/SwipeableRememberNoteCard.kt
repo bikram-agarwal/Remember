@@ -25,11 +25,12 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.data.SwipeGestureMode
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.semanticSwipeBackground
 import dev.bikram.remember.ui.theme.semanticSwipeIconTint
 
-private val NoteCardShape = RoundedCornerShape(20.dp)
+private val NoteCardShape = RoundedCornerShape(12.dp)
 
 @Composable
 fun SwipeableRememberNoteCard(
@@ -45,6 +46,50 @@ fun SwipeableRememberNoteCard(
     val swipeStart = interaction.swipeStartToEnd
     val swipeEnd = interaction.swipeEndToStart
     val noteCompleted = note.note.completedAt != null
+    val noteFavorite = note.note.favorite
+    if (!swipeEnabled) {
+        NoteCard(
+            note = note,
+            onClick = { onOpenNote(note) },
+            selected = selected,
+            onLongClick = onLongClick,
+            modifier = modifier,
+        )
+        return
+    }
+    if (interaction.swipeGestureMode == SwipeGestureMode.REVEAL_ACTIONS) {
+        MultiActionSwipeRevealCard(
+            modifier = modifier.fillMaxWidth(),
+            startActions = interaction.swipeStartToEndRevealActions
+                .filterNotNull()
+                .map { action ->
+                    action.revealTile(
+                        noteCompleted = noteCompleted,
+                        noteFavorite = noteFavorite,
+                        onClick = { onSwipeAction(note, action) },
+                    )
+                },
+            endActions = interaction.swipeEndToStartRevealActions
+                .filterNotNull()
+                .map { action ->
+                    action.revealTile(
+                        noteCompleted = noteCompleted,
+                        noteFavorite = noteFavorite,
+                        onClick = { onSwipeAction(note, action) },
+                    )
+                },
+            cardShape = NoteCardShape,
+            hapticEnabled = interaction.hapticFeedbackEnabled,
+        ) {
+            NoteCard(
+                note = note,
+                onClick = { onOpenNote(note) },
+                selected = selected,
+                onLongClick = onLongClick,
+            )
+        }
+        return
+    }
     DeliberateSwipeRevealCard(
         modifier = modifier.fillMaxWidth(),
         commitThresholdFraction = 0.35f,
@@ -75,7 +120,9 @@ fun SwipeableRememberNoteCard(
                 //   active note  -> outlined check_circle (FILL=0) "Mark done"
                 //   completed    -> filled check_circle (FILL=1)   "Mark not done"
                 // All other actions ignore the flag.
-                val iconFilled = action == NoteSwipeAction.MARK_DONE && noteCompleted
+                val iconFilled =
+                    action == NoteSwipeAction.MARK_DONE && noteCompleted ||
+                        action == NoteSwipeAction.TOGGLE_FAVORITE && noteFavorite
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (fromStart) {
                         RememberMaterialRoundedSymbol(
@@ -87,13 +134,13 @@ fun SwipeableRememberNoteCard(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = action.labelString(noteCompleted),
+                            text = action.labelString(noteCompleted, noteFavorite),
                             style = MaterialTheme.typography.labelMedium,
                             color = tint,
                         )
                     } else {
                         Text(
-                            text = action.labelString(noteCompleted),
+                            text = action.labelString(noteCompleted, noteFavorite),
                             style = MaterialTheme.typography.labelMedium,
                             color = tint,
                         )
@@ -125,14 +172,56 @@ fun SwipeableRememberNoteCard(
  * single configured swipe action visually advertises both directions of the toggle.
  */
 @Composable
-private fun NoteSwipeAction.labelString(noteCompleted: Boolean = false): String = stringResource(
+private fun NoteSwipeAction.labelString(
+    noteCompleted: Boolean = false,
+    noteFavorite: Boolean = false,
+): String = stringResource(
     when (this) {
         NoteSwipeAction.EDIT -> R.string.swipe_action_open
-        NoteSwipeAction.TRASH -> R.string.edit_trash_cd
+        NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
         NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
-        NoteSwipeAction.TOGGLE_PIN -> R.string.notecard_pinned_cd
+        NoteSwipeAction.TOGGLE_FAVORITE -> {
+            if (noteFavorite) R.string.swipe_action_unfavorite else R.string.swipe_action_toggle_favorite
+        }
+        NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
         NoteSwipeAction.MARK_DONE ->
             if (noteCompleted) R.string.swipe_action_mark_not_done
             else R.string.swipe_action_mark_done
     },
 )
+
+@Composable
+private fun NoteSwipeAction.revealTile(
+    noteCompleted: Boolean,
+    noteFavorite: Boolean,
+    onClick: () -> Unit,
+): SwipeRevealTile {
+    val iconFilled =
+        this == NoteSwipeAction.MARK_DONE && noteCompleted ||
+            this == NoteSwipeAction.TOGGLE_FAVORITE && noteFavorite
+    val labelRes = when (this) {
+        NoteSwipeAction.EDIT -> R.string.swipe_action_open
+        NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
+        NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
+        NoteSwipeAction.TOGGLE_FAVORITE -> {
+            if (noteFavorite) R.string.swipe_action_unfavorite else R.string.swipe_action_toggle_favorite
+        }
+        NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
+        NoteSwipeAction.MARK_DONE -> {
+            if (noteCompleted) {
+                R.string.swipe_action_mark_not_done
+            } else {
+                R.string.swipe_action_mark_done
+            }
+        }
+    }
+    return SwipeRevealTile(
+        key = name,
+        labelRes = labelRes,
+        symbolName = materialSymbolName,
+        backgroundColor = semanticSwipeBackground(),
+        contentColor = semanticSwipeIconTint(),
+        filled = iconFilled,
+        onClick = onClick,
+    )
+}

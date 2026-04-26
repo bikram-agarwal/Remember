@@ -1,12 +1,27 @@
 package dev.bikram.remember.reminders
 
 import android.app.AlarmManager
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import dev.bikram.remember.MainActivity
+import dev.bikram.remember.R
+import dev.bikram.remember.data.ChecklistItemEntity
+import dev.bikram.remember.data.NoteEntity
+import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.data.ReminderPrefs
+import dev.bikram.remember.ui.edit.iconEmojiPayload
+import java.util.Calendar
+import java.util.concurrent.atomic.AtomicInteger
 
-class ReminderScheduler(private val context: Context) {
+class ReminderScheduler(
+    private val context: Context,
+    private val reminderPrefs: ReminderPrefs? = null,
+) {
 
     fun schedule(noteId: Long, whenMillis: Long) {
         if (whenMillis <= System.currentTimeMillis()) return
@@ -17,12 +32,174 @@ class ReminderScheduler(private val context: Context) {
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMillis, pi)
         } else {
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMillis, pi)
+            val fallbackCount = inexactFallbackScheduleCounter.incrementAndGet()
+            Log.w(TAG, "Scheduled reminder with inexact alarm fallback. fallbackCount=$fallbackCount")
         }
     }
 
     fun cancel(noteId: Long) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         am.cancel(pendingIntent(noteId))
+    }
+
+    fun cancelNotification(noteId: Long) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(pendingRequestCodeForNote(noteId))
+    }
+
+    suspend fun refreshNotificationIfActive(note: NoteEntity, items: List<ChecklistItemEntity>) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationId = pendingRequestCodeForNote(note.id)
+        val active = notificationManager.activeNotifications.any { notification ->
+            notification.id == notificationId
+        }
+        if (active) {
+            ReminderReceiver.showNotification(
+                context = context,
+                note = note,
+                items = items,
+                keepUntilDone = keepReminderNotificationsUntilDone(),
+            )
+        }
+    }
+
+    suspend fun refreshSummaryNotification(notes: List<NoteWithItems>, nowMillis: Long) {
+        val summaryEnabled = reminderPrefs?.snapshot()?.reminderSummaryNotificationEnabled ?: false
+        if (!summaryEnabled || notes.isEmpty()) {
+            cancelSummaryNotification()
+            return
+        }
+        showSummaryNotification(notes, nowMillis)
+    }
+
+    fun cancelSummaryNotification() {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(SUMMARY_NOTIFICATION_ID)
+    }
+
+    suspend fun keepReminderNotificationsUntilDone(): Boolean {
+        return reminderPrefs?.snapshot()?.keepReminderNotificationsUntilDone ?: false
+    }
+
+    private fun showSummaryNotification(notes: List<NoteWithItems>, nowMillis: Long) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val sortedNotes = notes
+            .filter { noteWithItems -> noteWithItems.note.reminderAt != null }
+            .sortedBy { noteWithItems -> noteWithItems.note.reminderAt }
+        if (sortedNotes.isEmpty()) {
+            cancelSummaryNotification()
+            return
+        }
+
+        val inboxStyle = NotificationCompat.InboxStyle()
+        sortedNotes.take(SUMMARY_MAX_LINES).forEach { noteWithItems ->
+            inboxStyle.addLine(summaryLine(noteWithItems.note, nowMillis))
+        }
+        if (sortedNotes.size > SUMMARY_MAX_LINES) {
+            inboxStyle.setSummaryText(
+                context.getString(
+                    R.string.reminder_summary_more,
+                    sortedNotes.size - SUMMARY_MAX_LINES,
+                ),
+            )
+        }
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID_SUMMARY)
+            .setSmallIcon(R.drawable.ic_stat_remember)
+            .setContentTitle(context.getString(R.string.reminder_summary_title))
+            .setContentText(context.getString(R.string.reminder_summary_count, sortedNotes.size))
+            .setStyle(inboxStyle)
+            .setContentIntent(openAppPendingIntent())
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setSilent(true)
+            .setOnlyAlertOnce(true)
+            .build()
+        notificationManager.notify(SUMMARY_NOTIFICATION_ID, notification)
+    }
+
+    private fun summaryLine(note: NoteEntity, nowMillis: Long): String {
+        val reminderAt = note.reminderAt ?: nowMillis
+        val title = summaryTitle(note)
+        return context.getString(R.string.reminder_summary_line, summaryTimingLabel(reminderAt, nowMillis), title)
+    }
+
+    private fun summaryTitle(note: NoteEntity): String {
+        val title = note.title.ifBlank { context.getString(R.string.options_reminder) }
+        val emoji = iconEmojiPayload(note.iconKey) ?: return title
+        return "$emoji $title"
+    }
+
+    private fun summaryTimingLabel(reminderAt: Long, nowMillis: Long): String {
+        val todayStart = startOfDay(nowMillis)
+        val tomorrowStart = startOfTomorrow(nowMillis)
+        return when {
+            reminderAt < todayStart -> {
+                val overdueDays = daysBetween(startOfDay(reminderAt), todayStart).coerceAtLeast(1)
+                context.resources.getQuantityString(
+                    R.plurals.reminder_summary_overdue_days,
+                    overdueDays,
+                    overdueDays,
+                )
+            }
+            reminderAt < tomorrowStart -> context.getString(R.string.reminder_summary_due_today)
+            reminderAt - nowMillis < HOUR_MILLIS * 24 -> {
+                val hoursUntil = ((reminderAt - nowMillis + HOUR_MILLIS - 1) / HOUR_MILLIS)
+                    .coerceAtLeast(1)
+                    .toInt()
+                context.resources.getQuantityString(
+                    R.plurals.reminder_summary_in_hours,
+                    hoursUntil,
+                    hoursUntil,
+                )
+            }
+            else -> {
+                val daysUntil = daysBetween(todayStart, startOfDay(reminderAt)).coerceAtLeast(1)
+                context.resources.getQuantityString(
+                    R.plurals.reminder_summary_in_days,
+                    daysUntil,
+                    daysUntil,
+                )
+            }
+        }
+    }
+
+    private fun openAppPendingIntent(): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        return PendingIntent.getActivity(
+            context,
+            SUMMARY_NOTIFICATION_ID,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+    }
+
+    private fun startOfDay(millis: Long): Long {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = millis
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        return calendar.timeInMillis
+    }
+
+    private fun startOfTomorrow(nowMillis: Long): Long {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = startOfDay(nowMillis)
+            add(Calendar.DAY_OF_MONTH, 1)
+        }
+        return calendar.timeInMillis
+    }
+
+    private fun daysBetween(startMillis: Long, endMillis: Long): Int {
+        return ((endMillis - startMillis) / DAY_MILLIS).toInt()
     }
 
     private fun pendingIntent(noteId: Long): PendingIntent {
@@ -39,6 +216,9 @@ class ReminderScheduler(private val context: Context) {
     }
 
     companion object {
+        private const val TAG = "ReminderScheduler"
+        private val inexactFallbackScheduleCounter = AtomicInteger(0)
+
         const val ACTION_FIRE_REMINDER = "dev.bikram.remember.reminders.FIRE"
         const val EXTRA_NOTE_ID = "note_id"
         // Channel IDs are versioned (_v2 suffix) because Android freezes channel
@@ -50,6 +230,11 @@ class ReminderScheduler(private val context: Context) {
         const val CHANNEL_ID_LOW = "reminder_low_v2"
         const val CHANNEL_ID_DEFAULT = "reminder_default_v2"
         const val CHANNEL_ID_HIGH = "reminder_high_v2"
+        const val CHANNEL_ID_SUMMARY = "reminder_summary_v1"
+        const val SUMMARY_NOTIFICATION_ID = 0x524D4452
+        private const val SUMMARY_MAX_LINES = 7
+        private const val HOUR_MILLIS = 60L * 60L * 1000L
+        private const val DAY_MILLIS = 24L * HOUR_MILLIS
         // Legacy ids - we delete them on app start to clean up the user's notification
         // settings UI rather than leaving stale channel rows behind.
         val LEGACY_CHANNEL_IDS: List<String> = listOf(
@@ -58,6 +243,9 @@ class ReminderScheduler(private val context: Context) {
             "reminder_default",
             "reminder_high",
         )
+
+        val inexactFallbackScheduleCount: Int
+            get() = inexactFallbackScheduleCounter.get()
 
         /**
          * Folds a note row id into the int range required for [PendingIntent] request codes and
@@ -74,6 +262,11 @@ class ReminderScheduler(private val context: Context) {
          */
         fun pendingRequestCodeForNoteAction(noteId: Long, actionIndex: Int): Int {
             val salted = noteId xor ((actionIndex.toLong() + 1L) shl 48)
+            return (salted xor (salted ushr 32)).toInt()
+        }
+
+        fun pendingRequestCodeForDismiss(noteId: Long): Int {
+            val salted = noteId xor (0x4B4DL shl 32)
             return (salted xor (salted ushr 32)).toInt()
         }
     }

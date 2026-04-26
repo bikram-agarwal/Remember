@@ -2,6 +2,8 @@ package dev.bikram.remember.ui.edit
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -252,7 +254,20 @@ internal fun rememberEditorBodyBridge(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
                 bridge.flush()
-                appScope.launch { vm.saveIfNeeded(untitledName) }
+                appScope.launch {
+                    val undoAction = vm.saveIfNeeded(untitledName)
+                    if (undoAction != null) {
+                        val result = snackbarHostState.showSnackbar(
+                            message = changesSavedMsg,
+                            actionLabel = undoMsg,
+                            withDismissAction = true,
+                            duration = androidx.compose.material3.SnackbarDuration.Short
+                        )
+                        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                            undoAction()
+                        }
+                    }
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -705,6 +720,7 @@ internal fun EditNoteScrollableContent(
     isEditMode: Boolean,
     existing: Boolean,
     shelfState: NoteShelfState,
+    pictureViewerOpen: Boolean,
     onRequestEditMode: () -> Unit,
     onOpenReminder: () -> Unit,
     onOpenPicture: () -> Unit,
@@ -746,7 +762,11 @@ internal fun EditNoteScrollableContent(
         // above the note body so the "why is this disabled" hint is adjacent to the content it
         // gates, not buried at the top of the scroll above decorative chrome.
         TagAccentSection(vm)
-        PictureHeroSection(vm, onViewPictureFull = onViewPictureFull)
+        PictureHeroSection(
+            vm = vm,
+            viewerOpen = pictureViewerOpen,
+            onViewPictureFull = onViewPictureFull,
+        )
         when (shelfState) {
             NoteShelfState.ARCHIVED -> {
                 Spacer(Modifier.height(16.dp))
@@ -795,7 +815,11 @@ private fun TagAccentSection(vm: EditNoteViewModel) {
 }
 
 @Composable
-private fun PictureHeroSection(vm: EditNoteViewModel, onViewPictureFull: (String, Long) -> Unit) {
+private fun PictureHeroSection(
+    vm: EditNoteViewModel,
+    viewerOpen: Boolean,
+    onViewPictureFull: (String, Long) -> Unit,
+) {
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
     val pictureRevision by vm.pictureRevision.collectAsStateWithLifecycle()
     val pictureHeroFraming by vm.pictureHeroFraming.collectAsStateWithLifecycle()
@@ -805,6 +829,7 @@ private fun PictureHeroSection(vm: EditNoteViewModel, onViewPictureFull: (String
         uri = uri,
         pictureRevision = pictureRevision,
         pictureHeroFraming = pictureHeroFraming,
+        viewerOpen = viewerOpen,
         onOpenFull = { onViewPictureFull(uri, pictureRevision) },
     )
 }
@@ -855,37 +880,61 @@ private fun EditNotePictureHero(
     uri: String,
     pictureRevision: Long,
     pictureHeroFraming: String?,
+    viewerOpen: Boolean,
     onOpenFull: () -> Unit,
 ) {
     val framing = remember(pictureHeroFraming) { HeroFraming.fromJsonString(pictureHeroFraming) }
-
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
-    val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
-    val sharedModifier = if (sharedScope != null && navScope != null) {
-        with(sharedScope) {
-            Modifier.sharedBounds(
-                sharedContentState = rememberSharedContentState(key = "hero-image-${uri}"),
-                animatedVisibilityScope = navScope
-            )
-        }
-    } else Modifier
 
-    // No delete overlay on the inline hero: it competes visually with the hero image and
-    // invites accidental taps. Delete lives in the full-screen viewer (see EditNoteScreen).
+    // Same-screen container transform requires both ends of sharedBounds to live in
+    // coordinated AnimatedVisibility / AnimatedContent scopes. The destination's nav
+    // scope is "always visible" while we're on this screen, so keying the inline hero
+    // to it leaves both copies (inline + overlay) reporting visibility at the same
+    // time and the bounds animation has no clean source-to-target driver. We wrap the
+    // inline hero in its own AnimatedVisibility(visible = !viewerOpen) and use that
+    // scope so opening the viewer cleanly hands the shared element off to the overlay.
+    //
+    // Outer Box keeps the layout slot at a constant size; only the inline content
+    // toggles, so the surrounding scrollable column never reflows mid-transition.
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(HERO_MASK_ASPECT_RATIO)
-            .then(sharedModifier)
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .tapSoundClickable(onClick = onOpenFull),
+            .aspectRatio(HERO_MASK_ASPECT_RATIO),
     ) {
-        HeroFramedImage(
-            imageUri = uri,
-            framing = framing,
-            cacheRevision = pictureRevision,
-            modifier = Modifier.fillMaxSize(),
-        )
+        AnimatedVisibility(
+            visible = !viewerOpen,
+            enter = fadeIn(),
+            exit = fadeOut(),
+        ) {
+            val sharedModifier = if (sharedScope != null) {
+                with(sharedScope) {
+                    Modifier.sharedBounds(
+                        sharedContentState = rememberSharedContentState(key = "hero-image-$uri"),
+                        animatedVisibilityScope = this@AnimatedVisibility,
+                    )
+                }
+            } else {
+                Modifier
+            }
+
+            // No delete overlay on the inline hero: it competes visually with the
+            // hero image and invites accidental taps. Delete lives in the full-screen
+            // viewer (see EditNoteScreen).
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(sharedModifier)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainer)
+                    .tapSoundClickable(onClick = onOpenFull),
+            ) {
+                HeroFramedImage(
+                    imageUri = uri,
+                    framing = framing,
+                    cacheRevision = pictureRevision,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
     }
 }

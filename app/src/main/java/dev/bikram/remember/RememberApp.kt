@@ -31,11 +31,33 @@ class RememberApp : Application() {
         QuickCaptureNotifier.ensureChannel(this)
         scheduleWidgetRefreshes()
         observeQuickCapturePref()
+        observeReminderPrefs()
+        observeReminderSummarySource()
         container.backupExportCoordinator.start()
         container.applicationScope.launch {
             RememberBackupWork.updateSchedule(this@RememberApp, container.backupPrefs.snapshot())
+            container.noteRepository.refreshReminderSummaryNotification()
         }
         RememberTrashSweepWork.ensureScheduled(this)
+    }
+
+    private fun observeReminderPrefs() {
+        container.reminderPrefs.state
+            .distinctUntilChanged()
+            .onEach {
+                container.noteRepository.refreshActiveReminderNotifications()
+                container.noteRepository.refreshReminderSummaryNotification()
+            }
+            .launchIn(container.applicationScope)
+    }
+
+    private fun observeReminderSummarySource() {
+        container.noteRepository.observeActive()
+            .drop(1)
+            .onEach {
+                container.noteRepository.refreshReminderSummaryNotification()
+            }
+            .launchIn(container.applicationScope)
     }
 
     private fun observeQuickCapturePref() {
@@ -76,16 +98,16 @@ class RememberApp : Application() {
 
         val lowChannel = NotificationChannel(
             ReminderScheduler.CHANNEL_ID_LOW,
-            "Reminders (Low)",
+            getString(R.string.notification_channel_reminders_low),
             NotificationManager.IMPORTANCE_LOW,
-        ).apply { description = "Silent note reminders" }
+        ).apply { description = getString(R.string.notification_channel_reminders_low_desc) }
         nm.createNotificationChannel(lowChannel)
 
         val defaultChannel = NotificationChannel(
             ReminderScheduler.CHANNEL_ID_DEFAULT,
-            "Reminders (Normal)",
+            getString(R.string.notification_channel_reminders_normal),
             NotificationManager.IMPORTANCE_DEFAULT,
-        ).apply { description = "Note reminders" }
+        ).apply { description = getString(R.string.notification_channel_reminders_normal_desc) }
         nm.createNotificationChannel(defaultChannel)
 
         // For Android to flip on the per-channel "Pop on screen" (heads-up) toggle
@@ -95,10 +117,10 @@ class RememberApp : Application() {
         // user-attention sound that bypasses normal media-volume ducking rules.
         val highChannel = NotificationChannel(
             ReminderScheduler.CHANNEL_ID_HIGH,
-            "Reminders (High)",
+            getString(R.string.notification_channel_reminders_high),
             NotificationManager.IMPORTANCE_HIGH,
         ).apply {
-            description = "Important note reminders"
+            description = getString(R.string.notification_channel_reminders_high_desc)
             enableVibration(true)
             vibrationPattern = longArrayOf(0, 250, 200, 250)
             enableLights(true)
@@ -112,6 +134,17 @@ class RememberApp : Application() {
             )
         }
         nm.createNotificationChannel(highChannel)
+
+        val summaryChannel = NotificationChannel(
+            ReminderScheduler.CHANNEL_ID_SUMMARY,
+            getString(R.string.notification_channel_reminder_summary),
+            NotificationManager.IMPORTANCE_LOW,
+        ).apply {
+            description = getString(R.string.notification_channel_reminder_summary_desc)
+            setSound(null, null)
+            enableVibration(false)
+        }
+        nm.createNotificationChannel(summaryChannel)
     }
 
 }

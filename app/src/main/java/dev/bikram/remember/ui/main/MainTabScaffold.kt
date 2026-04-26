@@ -17,6 +17,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -47,18 +48,25 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.ThemePrefs
+import dev.bikram.remember.data.ViewOptionsPrefs
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
+import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
+import dev.bikram.remember.ui.history.HistorySection
 import dev.bikram.remember.ui.history.HistoryRoute
 import dev.bikram.remember.ui.home.HomeRoute
 import dev.bikram.remember.ui.settings.SettingsRoute
@@ -86,14 +94,21 @@ enum class MainTab(@param:androidx.annotation.StringRes val labelRes: Int, val s
 fun MainTabScaffold(
     repository: NoteRepository,
     themePrefs: ThemePrefs,
+    viewOptionsPrefs: ViewOptionsPrefs,
     interactionPrefs: InteractionPrefs,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
     onOpenNote: (NoteWithItems, Boolean) -> Unit,
+    onImportGoogleTasks: () -> Unit,
+    onOpenIntro: () -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(MainTab.Notes) }
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
     var clearTrashOpen by rememberSaveable { mutableStateOf(false) }
+    var moveArchiveToTrashOpen by rememberSaveable { mutableStateOf(false) }
+    var historySection by rememberSaveable { mutableStateOf(HistorySection.ARCHIVE) }
+    var historyVisibleItemCount by rememberSaveable { mutableStateOf(0) }
+    val tabStateHolder = rememberSaveableStateHolder()
     val context = LocalContext.current
 
     // Back handling: when the FAB speed dial is open, back closes it first.
@@ -121,26 +136,33 @@ fun MainTabScaffold(
             label = "tab",
             modifier = Modifier.fillMaxSize(),
         ) { current ->
-            when (current) {
-                MainTab.Notes -> HomeRoute(
-                    repository = repository,
-                    themePrefs = themePrefs,
-                    interactionPrefs = interactionPrefs,
-                    onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
-                    onCreateNote = {
-                        fabExpanded = false
-                        onCreateNote()
-                    },
-                    onCreateList = {
-                        fabExpanded = false
-                        onCreateList()
-                    },
-                )
-                MainTab.History -> HistoryRoute(
-                    repository = repository,
-                    onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
-                )
-                MainTab.Settings -> SettingsRoute()
+            tabStateHolder.SaveableStateProvider(current.name) {
+                when (current) {
+                    MainTab.Notes -> HomeRoute(
+                        repository = repository,
+                        themePrefs = themePrefs,
+                        viewOptionsPrefs = viewOptionsPrefs,
+                        interactionPrefs = interactionPrefs,
+                        onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
+                        onCreateNote = {
+                            fabExpanded = false
+                            onCreateNote()
+                        },
+                        onCreateList = {
+                            fabExpanded = false
+                            onCreateList()
+                        },
+                    )
+                    MainTab.History -> HistoryRoute(
+                        repository = repository,
+                        interactionPrefs = interactionPrefs,
+                        section = historySection,
+                        onSectionChange = { historySection = it },
+                        onVisibleItemCountChange = { historyVisibleItemCount = it },
+                        onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
+                    )
+                    MainTab.Settings -> SettingsRoute(onOpenIntro = onOpenIntro)
+                }
             }
         }
 
@@ -148,6 +170,7 @@ fun MainTabScaffold(
             SpeedDialOverlay(
                 onPickNote = { fabExpanded = false; onCreateNote() },
                 onPickList = { fabExpanded = false; onCreateList() },
+                onPickImport = { fabExpanded = false; onImportGoogleTasks() },
                 onDismiss = { fabExpanded = false },
             )
         }
@@ -155,29 +178,58 @@ fun MainTabScaffold(
         val (fabSymbolName, fabDesc, fabAction) = when (tab) {
             MainTab.Notes -> Triple(
                 if (fabExpanded) "close" else "add",
-                if (fabExpanded) "Close" else "Create",
+                if (fabExpanded) {
+                    stringResource(R.string.main_fab_close)
+                } else {
+                    stringResource(R.string.main_fab_create)
+                },
                 { fabExpanded = !fabExpanded },
             )
-            MainTab.History -> Triple(
-                "delete_sweep",
-                "Clear all",
-                { clearTrashOpen = true },
-            )
+            MainTab.History -> if (historySection == HistorySection.ARCHIVE) {
+                Triple(
+                    "delete_sweep",
+                    stringResource(R.string.common_move_to_trash),
+                    { moveArchiveToTrashOpen = true },
+                )
+            } else {
+                Triple(
+                    "delete_forever",
+                    stringResource(R.string.edit_bottom_bar_delete_forever),
+                    { clearTrashOpen = true },
+                )
+            }
             MainTab.Settings -> Triple(
                 "share",
-                "Share app",
+                stringResource(R.string.main_menu_share_app),
                 {
+                    val shareText = context.getString(R.string.main_share_text)
+                    val shareChooserTitle = context.getString(R.string.main_share_chooser_title)
                     val send = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
                         putExtra(
                             Intent.EXTRA_TEXT,
-                            "Remember - Notes, Lists, Reminders - Done right. " +
-                                "https://play.google.com/store/apps/details?id=dev.bikram.remember",
+                            shareText,
                         )
                     }
-                    context.startActivity(Intent.createChooser(send, "Share Remember"))
+                    context.startActivity(Intent.createChooser(send, shareChooserTitle))
                 },
             )
+        }
+        val fabEnabled = tab != MainTab.History || historyVisibleItemCount > 0
+        val fabContainerColor = if (fabEnabled) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        }
+        val fabContentColor = if (fabEnabled) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+        }
+        val fabIconSize = when {
+            tab == MainTab.History && historySection == HistorySection.TRASH -> 22.dp
+            tab == MainTab.History -> 24.dp
+            else -> 26.dp
         }
 
         RememberFloatingNavBar(
@@ -189,15 +241,18 @@ fun MainTabScaffold(
             fabContent = {
                 RememberFloatingActionButton(
                     onClick = fabAction,
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    enabled = fabEnabled,
+                    containerColor = fabContainerColor,
+                    contentColor = fabContentColor,
                     elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+                    tooltipLabel = fabDesc,
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = fabSymbolName,
-                        size = 26.dp,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        size = fabIconSize,
+                        tint = fabContentColor,
                         weight = FontWeight.Medium,
+                        modifier = Modifier.semantics { contentDescription = fabDesc },
                     )
                 }
             },
@@ -218,6 +273,8 @@ fun MainTabScaffold(
             title = stringResource(R.string.main_empty_trash_title),
             subtitle = stringResource(R.string.main_empty_trash_subtitle),
             onDismiss = { clearTrashOpen = false },
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
+            subtitleSpacing = 12.dp,
             actions = {
                 RememberTextButton(onClick = { clearTrashOpen = false }) { Text(stringResource(R.string.common_cancel)) }
                 RememberTextButton(onClick = {
@@ -227,6 +284,25 @@ fun MainTabScaffold(
             },
         ) {
             // No body content — subtitle covers the warning.
+        }
+    }
+
+    if (moveArchiveToTrashOpen) {
+        AppBottomSheet(
+            title = stringResource(R.string.main_move_archive_to_trash_title),
+            subtitle = stringResource(R.string.main_move_archive_to_trash_subtitle),
+            onDismiss = { moveArchiveToTrashOpen = false },
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
+            subtitleSpacing = 12.dp,
+            actions = {
+                RememberTextButton(onClick = { moveArchiveToTrashOpen = false }) { Text(stringResource(R.string.common_cancel)) }
+                RememberTextButton(onClick = {
+                    moveArchiveToTrashOpen = false
+                    scope.launch { repository.moveAllArchivedToTrash() }
+                }) { Text(stringResource(R.string.edit_bottom_bar_trash)) }
+            },
+        ) {
+            // No body content - subtitle covers the retention warning.
         }
     }
 }
@@ -313,6 +389,7 @@ private fun RememberFloatingNavBar(
 private fun SpeedDialOverlay(
     onPickNote: () -> Unit,
     onPickList: () -> Unit,
+    onPickImport: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val motion = MaterialTheme.motionScheme
@@ -334,8 +411,9 @@ private fun SpeedDialOverlay(
                 horizontalAlignment = Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                SpeedDialItem("Checklist", "list", onPickList)
-                SpeedDialItem("Note", "note", onPickNote)
+                SpeedDialItem(stringResource(R.string.main_speed_dial_import), "download", onPickImport)
+                SpeedDialItem(stringResource(R.string.main_speed_dial_checklist), DEFAULT_LIST_HEADER_SYMBOL, onPickList)
+                SpeedDialItem(stringResource(R.string.main_speed_dial_note), DEFAULT_NOTE_HEADER_SYMBOL, onPickNote)
             }
         }
     }

@@ -44,8 +44,8 @@ class EditNoteViewModel(
     private val _body = MutableStateFlow(if (noteId == null) prefillBody else "")
     val body: StateFlow<String> = _body.asStateFlow()
 
-    private val _pinned = MutableStateFlow(false)
-    val pinned: StateFlow<Boolean> = _pinned.asStateFlow()
+    private val _favorite = MutableStateFlow(false)
+    val favorite: StateFlow<Boolean> = _favorite.asStateFlow()
 
     /**
      * Snapshot of the underlying note's [dev.bikram.remember.data.NoteEntity.completedAt]
@@ -143,7 +143,7 @@ class EditNoteViewModel(
                         originalNote = n
                         _title.value = n.title
                         _body.value = n.body
-                        _pinned.value = n.pinned || n.tags.contains(RememberReservedTags.FAVORITE)
+                        _favorite.value = n.favorite || n.tags.contains(RememberReservedTags.FAVORITE)
                         _reminderAt.value = n.reminderAt
                         _recurrence.value = n.recurrence?.sanitized()
                         _importance.value = n.importance
@@ -198,8 +198,8 @@ class EditNoteViewModel(
         markDirty()
     }
 
-    fun togglePin() {
-        _pinned.value = !_pinned.value
+    fun toggleFavorite() {
+        _favorite.value = !_favorite.value
         markDirty()
     }
 
@@ -269,7 +269,27 @@ class EditNoteViewModel(
         setTags(tags)
         if (newColors.isNotEmpty()) {
             viewModelScope.launch {
-                newColors.forEach { (name, hex) -> themePrefs.setTagColor(name, hex) }
+                newColors.forEach { (name, hex) ->
+                    repository.tagRepository?.setTagColor(name, hex) ?: themePrefs.setTagColor(name, hex)
+                }
+            }
+        }
+    }
+
+    fun editExistingTag(oldName: String, newName: String, colorHex: String?, resetColor: Boolean) {
+        viewModelScope.launch {
+            val result = repository.tagRepository?.editTag(
+                oldName = oldName,
+                newName = newName,
+                colorHex = colorHex,
+                resetColor = resetColor,
+            ) ?: return@launch
+            val updatedTags = _tags.value.map { tagName ->
+                if (tagName.equals(result.oldName, ignoreCase = true)) result.newName else tagName
+            }.distinctBy { tagName -> tagName.lowercase() }
+            if (_tags.value != updatedTags) {
+                _tags.value = updatedTags
+                markDirty()
             }
         }
     }
@@ -286,7 +306,7 @@ class EditNoteViewModel(
                     )
                     loadedId = newId
                     syncHasPersistedRow()
-                    if (_pinned.value) repository.setPinned(newId, true)
+                    if (_favorite.value) repository.setFavorite(newId, true)
                     newId
                 }
                 repository.addAttachment(id, uri.toString(), name, mime)
@@ -313,7 +333,7 @@ class EditNoteViewModel(
 
     private fun tagsForPersistence(): List<String> {
         val base = _tags.value.filterNot { it == RememberReservedTags.FAVORITE }
-        return if (_pinned.value) (base + RememberReservedTags.FAVORITE).distinct()
+        return if (_favorite.value) (base + RememberReservedTags.FAVORITE).distinct()
         else base
     }
 
@@ -335,14 +355,14 @@ class EditNoteViewModel(
         val t = _title.value
         val b = _body.value
         val opts = currentOptions()
-        val pinned = _pinned.value
+        val favorite = _favorite.value
         if (id == null) {
             return t.isNotBlank() || b.isNotBlank() || _attachments.value.isNotEmpty() || opts.pictureUri != null || opts.tags.isNotEmpty() || opts.reminderAt != null || opts.actions.isNotEmpty() || opts.iconKey != null
         } else {
             val old = originalNote ?: return true
             if (t != old.title) return true
             if (b != old.body) return true
-            if (pinned != old.pinned) return true
+            if (favorite != old.favorite) return true
             if (opts.reminderAt != old.reminderAt) return true
             if (opts.importance != old.importance) return true
             if (opts.visibility != old.visibility) return true
@@ -379,7 +399,7 @@ class EditNoteViewModel(
                 loadedId = newId
                 syncHasPersistedRow()
                 if (titleValue.isBlank()) _title.value = finalTitle
-                if (_pinned.value) repository.setPinned(newId, true)
+                if (_favorite.value) repository.setFavorite(newId, true)
                 if (mutationEpoch.get() == epochAtWrite) dirty = false
                 
                 originalNote = repository.get(newId)?.note
@@ -393,8 +413,8 @@ class EditNoteViewModel(
                 repository.updateNote(id, finalTitle, bodyValue, 0, currentOptions())
                 if (titleValue.isBlank()) _title.value = finalTitle
                 val cur = repository.get(id)?.note
-                if (cur != null && cur.pinned != _pinned.value) {
-                    repository.setPinned(id, _pinned.value)
+                if (cur != null && cur.favorite != _favorite.value) {
+                    repository.setFavorite(id, _favorite.value)
                 }
                 if (mutationEpoch.get() == epochAtWrite) dirty = false
                 
@@ -421,7 +441,7 @@ class EditNoteViewModel(
                                 recurrence = old.recurrence
                             )
                         )
-                        repository.setPinned(id, old.pinned)
+                        repository.setFavorite(id, old.favorite)
                     }
                 } else {
                     return@withLock null
@@ -468,6 +488,7 @@ class EditNoteViewModel(
             val id = loadedId ?: return@withLock
             repository.archiveNote(id)
             _archived.value = true
+            _trashed.value = false
             dirty = false
         }
     }
@@ -495,7 +516,11 @@ class EditNoteViewModel(
         val id = loadedId ?: return
         val note = repository.get(id)?.note ?: return
         dev.bikram.remember.reminders.ReminderReceiver.showNotification(context, note)
-        android.widget.Toast.makeText(context, "Notification created", android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(
+            context,
+            context.getString(dev.bikram.remember.R.string.notification_created),
+            android.widget.Toast.LENGTH_SHORT,
+        ).show()
     }
 
     suspend fun deleteForeverCurrent() {

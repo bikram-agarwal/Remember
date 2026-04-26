@@ -1,9 +1,14 @@
 package dev.bikram.remember.ui.components
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonElevation
@@ -27,18 +32,120 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MenuItemColors
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SingleChoiceSegmentedButtonRowScope
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.TooltipState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SingleChoiceSegmentedButtonRowScope
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+
+private const val FloatingActionTooltipDismissMillis = 5_000L
+
+@Composable
+private fun RememberLongPressLabelTooltip(
+    label: String?,
+    enabled: Boolean,
+    content: @Composable () -> Unit,
+) {
+    if (label == null) {
+        content()
+        return
+    }
+
+    val tooltipState = rememberTooltipState(isPersistent = true)
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
+
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
+            TooltipAnchorPosition.Above,
+        ),
+        tooltip = {
+            PlainTooltip {
+                Box(
+                    modifier = Modifier.heightIn(min = 24.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label)
+                }
+            }
+        },
+        state = tooltipState,
+        modifier = Modifier.showLabelTooltipOnLongPress(
+            enabled = enabled,
+            tooltipState = tooltipState,
+            hapticEnabled = hapticEnabled,
+            view = view,
+        ),
+        enableUserInput = false,
+    ) {
+        content()
+    }
+}
+
+private fun Modifier.showLabelTooltipOnLongPress(
+    enabled: Boolean,
+    tooltipState: TooltipState,
+    hapticEnabled: Boolean,
+    view: android.view.View,
+): Modifier {
+    if (!enabled) return this
+
+    return pointerInput(tooltipState, hapticEnabled, view) {
+        coroutineScope {
+            awaitEachGesture {
+                val firstDown = awaitFirstDown(requireUnconsumed = false)
+                val releasedBeforeLongPress = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                    waitForUpOrCancellation(PointerEventPass.Initial)
+                }
+                if (releasedBeforeLongPress == null) {
+                    if (hapticEnabled) {
+                        view.performLongPressHaptic()
+                    }
+                    launch { tooltipState.show() }
+
+                    var labelFingerReleased = false
+                    while (!labelFingerReleased) {
+                        val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
+                        val activePointerChange = pointerEvent.changes.firstOrNull { pointerChange ->
+                            pointerChange.id == firstDown.id
+                        }
+                        activePointerChange?.consume()
+                        labelFingerReleased = activePointerChange?.pressed != true
+                    }
+
+                    launch {
+                        delay(FloatingActionTooltipDismissMillis)
+                        tooltipState.dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
 fun RememberToggleButton(
@@ -73,17 +180,23 @@ fun RememberIconButton(
     enabled: Boolean = true,
     colors: IconButtonColors = IconButtonDefaults.iconButtonColors(),
     interactionSource: MutableInteractionSource? = null,
+    tooltipLabel: String? = null,
     content: @Composable () -> Unit
 ) {
     val playTap = rememberPlayTapSound()
-    IconButton(
-        onClick = { playTap(); onClick() },
-        modifier = modifier,
+    RememberLongPressLabelTooltip(
+        label = tooltipLabel,
         enabled = enabled,
-        colors = colors,
-        interactionSource = interactionSource,
-        content = content
-    )
+    ) {
+        IconButton(
+            onClick = { playTap(); onClick() },
+            modifier = modifier,
+            enabled = enabled,
+            colors = colors,
+            interactionSource = interactionSource,
+            content = content
+        )
+    }
 }
 
 @Composable
@@ -94,18 +207,24 @@ fun RememberFilledIconButton(
     shape: Shape = IconButtonDefaults.filledShape,
     colors: IconButtonColors = IconButtonDefaults.filledIconButtonColors(),
     interactionSource: MutableInteractionSource? = null,
+    tooltipLabel: String? = null,
     content: @Composable () -> Unit
 ) {
     val playTap = rememberPlayTapSound()
-    FilledIconButton(
-        onClick = { playTap(); onClick() },
-        modifier = modifier,
+    RememberLongPressLabelTooltip(
+        label = tooltipLabel,
         enabled = enabled,
-        shape = shape,
-        colors = colors,
-        interactionSource = interactionSource,
-        content = content
-    )
+    ) {
+        FilledIconButton(
+            onClick = { playTap(); onClick() },
+            modifier = modifier,
+            enabled = enabled,
+            shape = shape,
+            colors = colors,
+            interactionSource = interactionSource,
+            content = content
+        )
+    }
 }
 
 @Composable
@@ -116,18 +235,24 @@ fun RememberFilledTonalIconButton(
     shape: Shape = IconButtonDefaults.filledShape,
     colors: IconButtonColors = IconButtonDefaults.filledTonalIconButtonColors(),
     interactionSource: MutableInteractionSource? = null,
+    tooltipLabel: String? = null,
     content: @Composable () -> Unit
 ) {
     val playTap = rememberPlayTapSound()
-    FilledTonalIconButton(
-        onClick = { playTap(); onClick() },
-        modifier = modifier,
+    RememberLongPressLabelTooltip(
+        label = tooltipLabel,
         enabled = enabled,
-        shape = shape,
-        colors = colors,
-        interactionSource = interactionSource,
-        content = content
-    )
+    ) {
+        FilledTonalIconButton(
+            onClick = { playTap(); onClick() },
+            modifier = modifier,
+            enabled = enabled,
+            shape = shape,
+            colors = colors,
+            interactionSource = interactionSource,
+            content = content
+        )
+    }
 }
 
 @Composable
@@ -246,24 +371,36 @@ fun RememberFilledTonalButton(
 fun RememberFloatingActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     shape: Shape = FloatingActionButtonDefaults.shape,
     containerColor: Color = FloatingActionButtonDefaults.containerColor,
     contentColor: Color = androidx.compose.material3.contentColorFor(containerColor),
     elevation: FloatingActionButtonElevation = FloatingActionButtonDefaults.elevation(),
     interactionSource: MutableInteractionSource? = null,
+    tooltipLabel: String? = null,
     content: @Composable () -> Unit
 ) {
     val playTap = rememberPlayTapSound()
-    FloatingActionButton(
-        onClick = { playTap(); onClick() },
-        modifier = modifier,
-        shape = shape,
-        containerColor = containerColor,
-        contentColor = contentColor,
-        elevation = elevation,
-        interactionSource = interactionSource,
-        content = content
-    )
+    RememberLongPressLabelTooltip(
+        label = tooltipLabel,
+        enabled = enabled,
+    ) {
+        FloatingActionButton(
+            onClick = {
+                if (enabled) {
+                    playTap()
+                    onClick()
+                }
+            },
+            modifier = modifier,
+            shape = shape,
+            containerColor = containerColor,
+            contentColor = contentColor,
+            elevation = elevation,
+            interactionSource = interactionSource,
+            content = content
+        )
+    }
 }
 
 @Composable

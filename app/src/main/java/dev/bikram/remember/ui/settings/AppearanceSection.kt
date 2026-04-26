@@ -265,12 +265,12 @@ private fun CustomHexSheet(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    text = "Custom accent color",
+                    text = stringResource(R.string.appearance_custom_accent_title),
                     style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(bottom = 4.dp),
                 )
                 Text(
-                    text = "Pick any hex color - Material You will generate a harmonized palette from it.",
+                    text = stringResource(R.string.appearance_custom_accent_body),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -279,7 +279,7 @@ private fun CustomHexSheet(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = "Preview",
+                        text = stringResource(R.string.appearance_preview),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -301,7 +301,7 @@ private fun CustomHexSheet(
                     Box(modifier = swatchModifier, contentAlignment = Alignment.Center) {
                         if (previewColor == null && draftHex.isNotBlank()) {
                             Text(
-                                text = "Invalid hex",
+                                text = stringResource(R.string.appearance_invalid_hex),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )

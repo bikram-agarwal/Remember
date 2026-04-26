@@ -2,7 +2,7 @@ package dev.bikram.remember.widget
 
 import android.content.Context
 import android.content.Intent
-import android.text.format.DateUtils
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -38,14 +38,16 @@ import dev.bikram.remember.R
 import dev.bikram.remember.RememberApp
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.ui.edit.iconEmojiPayload
+import java.util.Calendar
 import kotlinx.coroutines.flow.first
 
 /**
  * Two-section Glance widget:
- *   - Favorites (pinned active notes, up to [MAX_ROWS_PER_SECTION])
- *   - Upcoming reminders (active notes with a future [NoteEntity.reminderAt], soonest first)
+ *   - Favorites (active favorite notes, up to [MAX_FAVORITE_ROWS])
+ *   - Reminder summary (same overdue/upcoming window as the persistent summary notification)
  *
- * Tapping a row opens that note; tapping the plus icon starts a brand-new note.
+ * Tapping a row opens that note; the header actions create a new note or list.
  */
 class NotesWidget : GlanceAppWidget() {
 
@@ -53,32 +55,34 @@ class NotesWidget : GlanceAppWidget() {
         val app = context.applicationContext as RememberApp
         val active = app.container.noteRepository.observeActive().first()
         val now = System.currentTimeMillis()
-        val pinned = active
+        val favorites = active
             .asSequence()
-            .filter { it.note.pinned }
-            .take(MAX_ROWS_PER_SECTION)
+            .filter { it.note.favorite }
+            .take(MAX_FAVORITE_ROWS)
             .toList()
-        val upcoming = active
-            .asSequence()
-            .filter { (it.note.reminderAt ?: Long.MIN_VALUE) > now }
-            .sortedBy { it.note.reminderAt }
-            .take(MAX_ROWS_PER_SECTION)
-            .toList()
+        val reminderSummary = app.container.noteRepository.reminderSummaryItems(now)
+            .take(MAX_REMINDER_SUMMARY_ROWS)
         provideContent {
-            GlanceTheme { WidgetContent(pinned = pinned, upcoming = upcoming) }
+            GlanceTheme { WidgetContent(favorites = favorites, reminderSummary = reminderSummary, now = now) }
         }
     }
 
     @Composable
     private fun WidgetContent(
-        pinned: List<NoteWithItems>,
-        upcoming: List<NoteWithItems>,
+        favorites: List<NoteWithItems>,
+        reminderSummary: List<NoteWithItems>,
+        now: Long,
     ) {
         val context = LocalContext.current
         val newNoteIntent = Intent(context, MainActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            putExtra("action", "new_note")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            action = MainActivity.ACTION_SHORTCUT_NEW_NOTE
+            data = Uri.parse("remember://widget/new-note")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        val newListIntent = Intent(context, MainActivity::class.java).apply {
+            action = MainActivity.ACTION_SHORTCUT_NEW_LIST
+            data = Uri.parse("remember://widget/new-list")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         Column(
             modifier = GlanceModifier
@@ -101,33 +105,52 @@ class NotesWidget : GlanceAppWidget() {
                     modifier = GlanceModifier.defaultWeight(),
                 )
                 Image(
-                    provider = ImageProvider(R.drawable.ic_stat_note),
-                    contentDescription = context.getString(R.string.widget_new_note_cd),
+                    provider = ImageProvider(R.drawable.ic_widget_note_add),
+                    contentDescription = context.getString(R.string.widget_create_new_note),
                     modifier = GlanceModifier
                         .size(28.dp)
+                        .background(GlanceTheme.colors.primaryContainer)
+                        .cornerRadius(14.dp)
+                        .padding(4.dp)
                         .clickable(actionStartActivity(newNoteIntent)),
+                )
+                Spacer(GlanceModifier.width(8.dp))
+                Image(
+                    provider = ImageProvider(R.drawable.ic_widget_list_add),
+                    contentDescription = context.getString(R.string.widget_create_new_list),
+                    modifier = GlanceModifier
+                        .size(28.dp)
+                        .background(GlanceTheme.colors.primaryContainer)
+                        .cornerRadius(14.dp)
+                        .padding(4.dp)
+                        .clickable(actionStartActivity(newListIntent)),
                 )
             }
             Spacer(GlanceModifier.height(8.dp))
             // Single LazyColumn so both sections scroll together when the widget is tall.
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
                 item { SectionHeader(context.getString(R.string.widget_section_pinned)) }
-                if (pinned.isEmpty()) {
+                if (favorites.isEmpty()) {
                     item { SectionEmpty(context.getString(R.string.widget_section_empty_pinned)) }
                 } else {
-                    items(count = pinned.size) { i ->
-                        NoteRow(note = pinned[i], context = context, showReminder = false)
+                    items(count = favorites.size) { i ->
+                        NoteRow(note = favorites[i], context = context, showReminder = false)
                     }
                 }
                 item { Spacer(GlanceModifier.height(8.dp)) }
                 item { SectionHeader(context.getString(R.string.widget_section_reminders)) }
-                if (upcoming.isEmpty()) {
+                if (reminderSummary.isEmpty()) {
                     item {
                         SectionEmpty(context.getString(R.string.widget_section_empty_reminders))
                     }
                 } else {
-                    items(count = upcoming.size) { i ->
-                        NoteRow(note = upcoming[i], context = context, showReminder = true)
+                    items(count = reminderSummary.size) { index ->
+                        NoteRow(
+                            note = reminderSummary[index],
+                            context = context,
+                            showReminder = true,
+                            now = now,
+                        )
                     }
                 }
             }
@@ -164,11 +187,13 @@ class NotesWidget : GlanceAppWidget() {
         note: NoteWithItems,
         context: Context,
         showReminder: Boolean,
+        now: Long = System.currentTimeMillis(),
     ) {
         val openIntent = Intent(context, MainActivity::class.java).apply {
             action = Intent.ACTION_VIEW
+            data = Uri.parse("remember://widget/open/${note.note.id}")
             putExtra("open_note_id", note.note.id)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
         Row(
             modifier = GlanceModifier
@@ -203,7 +228,7 @@ class NotesWidget : GlanceAppWidget() {
                 )
                 val subline = when {
                     showReminder && note.note.reminderAt != null ->
-                        formatRelativeReminder(context, note.note.reminderAt!!)
+                        summaryLine(context, note, now)
                     else -> note.note.body.ifBlank { note.items.firstOrNull()?.text.orEmpty() }
                 }
                 if (subline.isNotBlank()) {
@@ -220,19 +245,80 @@ class NotesWidget : GlanceAppWidget() {
         }
     }
 
-    /** "in 3 hours", "tomorrow at 2:00 PM" etc. Uses [DateUtils] so it localises automatically. */
-    private fun formatRelativeReminder(context: Context, at: Long): String {
-        val now = System.currentTimeMillis()
-        return DateUtils.getRelativeDateTimeString(
-            context,
-            at,
-            DateUtils.MINUTE_IN_MILLIS,
-            DateUtils.WEEK_IN_MILLIS,
-            if (at - now < DateUtils.DAY_IN_MILLIS) DateUtils.FORMAT_SHOW_TIME else 0,
-        ).toString()
+    private fun summaryLine(context: Context, note: NoteWithItems, now: Long): String {
+        val reminderAt = note.note.reminderAt ?: now
+        val title = note.note.title.ifBlank {
+            if (note.note.kind == NoteKind.NOTE) {
+                context.getString(R.string.edit_note_title_new)
+            } else {
+                context.getString(R.string.edit_list_title_new)
+            }
+        }
+        val emojiTitle = iconEmojiPayload(note.note.iconKey)?.let { emoji -> "$emoji $title" } ?: title
+        return context.getString(R.string.reminder_summary_line, summaryTimingLabel(context, reminderAt, now), emojiTitle)
+    }
+
+    private fun summaryTimingLabel(context: Context, reminderAt: Long, now: Long): String {
+        val todayStart = startOfDay(now)
+        val tomorrowStart = startOfTomorrow(now)
+        return when {
+            reminderAt < todayStart -> {
+                val overdueDays = daysBetween(startOfDay(reminderAt), todayStart).coerceAtLeast(1)
+                context.resources.getQuantityString(
+                    R.plurals.reminder_summary_overdue_days,
+                    overdueDays,
+                    overdueDays,
+                )
+            }
+            reminderAt < tomorrowStart -> context.getString(R.string.reminder_summary_due_today)
+            reminderAt - now < HOUR_MILLIS * 24 -> {
+                val hoursUntil = ((reminderAt - now + HOUR_MILLIS - 1) / HOUR_MILLIS)
+                    .coerceAtLeast(1)
+                    .toInt()
+                context.resources.getQuantityString(
+                    R.plurals.reminder_summary_in_hours,
+                    hoursUntil,
+                    hoursUntil,
+                )
+            }
+            else -> {
+                val daysUntil = daysBetween(todayStart, startOfDay(reminderAt)).coerceAtLeast(1)
+                context.resources.getQuantityString(
+                    R.plurals.reminder_summary_in_days,
+                    daysUntil,
+                    daysUntil,
+                )
+            }
+        }
+    }
+
+    private fun startOfDay(millis: Long): Long {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = millis
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        return calendar.timeInMillis
+    }
+
+    private fun startOfTomorrow(now: Long): Long {
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = startOfDay(now)
+            add(Calendar.DAY_OF_MONTH, 1)
+        }
+        return calendar.timeInMillis
+    }
+
+    private fun daysBetween(startMillis: Long, endMillis: Long): Int {
+        return ((endMillis - startMillis) / DAY_MILLIS).toInt()
     }
 
     companion object {
-        private const val MAX_ROWS_PER_SECTION = 3
+        private const val MAX_FAVORITE_ROWS = 3
+        private const val MAX_REMINDER_SUMMARY_ROWS = 7
+        private const val HOUR_MILLIS = 60L * 60L * 1000L
+        private const val DAY_MILLIS = 24L * HOUR_MILLIS
     }
 }

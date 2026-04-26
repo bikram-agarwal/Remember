@@ -1,7 +1,6 @@
 package dev.bikram.remember.reminders
 
 import android.Manifest
-import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -42,6 +41,11 @@ class ActionReceiver : BroadcastReceiver() {
                 }
 
                 try {
+                    // ACTION_CLOSE_SYSTEM_DIALOGS was restricted to system apps in API 31+.
+                    // The broadcast is best-effort: it still works on older devices and on
+                    // permissive OEM builds, and we already swallow the SecurityException
+                    // when the platform refuses it.
+                    @Suppress("DEPRECATION")
                     val closeIntent = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
                     try {
                         context.sendBroadcast(closeIntent)
@@ -77,8 +81,6 @@ class ActionReceiver : BroadcastReceiver() {
             return true
         }
         if (action.type == ActionType.MARK_AS_DONE) {
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
             return repository.clearReminderFromNotificationAction(noteId)
         }
         if (action.type == ActionType.SNOOZE) {

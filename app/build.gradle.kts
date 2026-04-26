@@ -51,8 +51,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 30
         targetSdk = 36
-        versionCode = 40
-        versionName = "0.4.0"
+        versionCode = 50
+        versionName = "0.5.0"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -155,6 +155,14 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.documentfile)
+    // Google account picker + OAuth token mint for Google Tasks import.
+    // play-services-auth provides Identity Services (modern picker + Authorization API).
+    // androidx.credentials provides clearCredentialState() which is the only reliable way to
+    // force the modern picker to re-appear on "Switch account" without revoking the OAuth grant
+    // (revoking the grant breaks the freshly-issued tokens that come back after re-consent).
+    implementation(libs.play.services.auth)
+    implementation(libs.androidx.credentials)
+    implementation(libs.androidx.credentials.play.services.auth)
     // WYSIWYG Editor
     implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-rc13")
     debugImplementation(libs.androidx.ui.tooling)

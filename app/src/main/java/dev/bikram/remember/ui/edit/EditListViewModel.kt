@@ -14,6 +14,9 @@ import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.Visibility as NoteVisibility
+import dev.bikram.remember.domain.checklist.ChecklistEditResult
+import dev.bikram.remember.domain.checklist.ChecklistEditor
+import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.HeroFraming
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,26 +24,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-
-/**
- * View-model representation of one checklist row during editing. Carries:
- *  * [localId]: stable id for the lifetime of the editor. Persisted rows re-use their Room id;
- *    drafts use monotonically decreasing negative values.
- *  * [sortOrder]: weighted position. Two sublists (active / completed) are each sorted ascending
- *    on this field; insertions pick midpoints between neighbours so reorders never rewrite
- *    every row.
- *  * [parentLocalId] / [depth]: one-level nesting. `null` parent means the row is a top-level
- *    parent (depth 0); a non-null parent marks the row as a child (depth 1). No deeper nesting
- *    is supported.
- */
-data class EditableItem(
-    val localId: Long,
-    val text: String,
-    val checked: Boolean,
-    val sortOrder: Double,
-    val parentLocalId: Long? = null,
-    val depth: Int = 0,
-)
 
 class EditListViewModel(
     private val repository: NoteRepository,
@@ -51,8 +34,8 @@ class EditListViewModel(
     private val _title = MutableStateFlow("")
     val title: StateFlow<String> = _title.asStateFlow()
 
-    private val _pinned = MutableStateFlow(false)
-    val pinned: StateFlow<Boolean> = _pinned.asStateFlow()
+    private val _favorite = MutableStateFlow(false)
+    val favorite: StateFlow<Boolean> = _favorite.asStateFlow()
 
     /** Bool projection of NoteEntity.completedAt; same semantics as EditNoteViewModel.completed. */
     private val _completed = MutableStateFlow(false)
@@ -134,7 +117,7 @@ class EditListViewModel(
                 originalNote = n
                 originalItems = existing.items
                 _title.value = n.title
-                _pinned.value = n.pinned || n.tags.contains(RememberReservedTags.FAVORITE)
+                _favorite.value = n.favorite || n.tags.contains(RememberReservedTags.FAVORITE)
                 _reminderAt.value = n.reminderAt
                 _recurrence.value = n.recurrence?.sanitized()
                 _importance.value = n.importance
@@ -193,7 +176,7 @@ class EditListViewModel(
     }
 
     fun setTitle(v: String)                  { _title.value = v; dirty = true }
-    fun togglePin()                          { _pinned.value = !_pinned.value; dirty = true }
+    fun toggleFavorite()                     { _favorite.value = !_favorite.value; dirty = true }
     fun setReminder(at: Long?, rule: RecurrenceRule?) {
         _reminderAt.value = at
         _recurrence.value = rule?.sanitized()
@@ -227,7 +210,27 @@ class EditListViewModel(
         dirty = true
         if (newColors.isNotEmpty()) {
             viewModelScope.launch {
-                newColors.forEach { (name, hex) -> themePrefs.setTagColor(name, hex) }
+                newColors.forEach { (name, hex) ->
+                    repository.tagRepository?.setTagColor(name, hex) ?: themePrefs.setTagColor(name, hex)
+                }
+            }
+        }
+    }
+
+    fun editExistingTag(oldName: String, newName: String, colorHex: String?, resetColor: Boolean) {
+        viewModelScope.launch {
+            val result = repository.tagRepository?.editTag(
+                oldName = oldName,
+                newName = newName,
+                colorHex = colorHex,
+                resetColor = resetColor,
+            ) ?: return@launch
+            val updatedTags = _tags.value.map { tagName ->
+                if (tagName.equals(result.oldName, ignoreCase = true)) result.newName else tagName
+            }.distinctBy { tagName -> tagName.lowercase() }
+            if (_tags.value != updatedTags) {
+                _tags.value = updatedTags
+                dirty = true
             }
         }
     }
@@ -257,159 +260,42 @@ class EditListViewModel(
         dirty = true
     }
 
-    /**
-     * Parent-context toggle:
-     *
-     *  * Checking a PARENT cascades: the parent and all its children flip to checked. Their
-     *    relative [sortOrder] is preserved so the whole block keeps its internal arrangement
-     *    when it lands in the completed section.
-     *  * Checking a CHILD only flips that child. The parent stays where it is. A "ghost parent"
-     *    header is synthesised by the UI when rendering the completed section.
-     *  * Unchecking mirrors the above. Children keep their original [sortOrder] so they slot
-     *    back into the same relative place in active.
-     */
     fun toggleChecked(localId: Long) {
-        val list = _items.value
-        val target = list.firstOrNull { it.localId == localId } ?: return
-        val newChecked = !target.checked
-        val affectedIds: Set<Long> = if (target.depth == 0) {
-            // Parent toggle: cascade DOWN to every child that points at this parent.
-            buildSet {
-                add(target.localId)
-                list.forEach { if (it.parentLocalId == target.localId) add(it.localId) }
-            }
-        } else {
-            // Child toggle: flip just this child, then cascade UP to the parent if the parent's
-            // state should follow.
-            //
-            //   * Checking the LAST remaining unchecked child: the parent has nothing left
-            //     unchecked, so the whole branch is now complete and the parent auto-checks.
-            //   * Unchecking any child of a parent that was itself checked: the parent was only
-            //     checked because its cascade-down flipped it earlier (or because of a previous
-            //     "all children checked" cascade-up); either way, the branch is no longer fully
-            //     complete, so the parent comes back to unchecked alongside the child. This is
-            //     what lets the user uncheck a single child and see both parent and child return
-            //     to the active section together instead of leaving an orphan ghost behind.
-            buildSet {
-                add(target.localId)
-                val parentId = target.parentLocalId
-                val parent = parentId?.let { pid -> list.firstOrNull { it.localId == pid } }
-                if (parent != null) {
-                    if (newChecked) {
-                        val siblings = list.filter { it.parentLocalId == parentId }
-                        val allWillBeChecked = siblings.all { sib ->
-                            sib.localId == target.localId || sib.checked
-                        }
-                        if (allWillBeChecked && !parent.checked) add(parent.localId)
-                    } else {
-                        if (parent.checked) add(parent.localId)
-                    }
-                }
-            }
-        }
-        _items.value = list.map {
-            if (it.localId in affectedIds) it.copy(checked = newChecked) else it
-        }
-        dirty = true
+        applyChecklistEdit(
+            ChecklistEditor.toggleChecked(_items.value, localId),
+        )
     }
 
-    /**
-     * Drag-handle reorder within a single sublist (active or completed). [fromIndex]/[toIndex]
-     * are positions in the *filtered* list whose [EditableItem]s we receive as [visibleIds]. We
-     * compute a midpoint [sortOrder] between the new neighbours so the other rows never move.
-     *
-     * Children being dragged stay as children -- their [parentLocalId] is unchanged. To re-parent
-     * use [setParent] (wired up to the horizontal drag gesture).
-     */
     fun reorderWithin(visibleIds: List<Long>, fromIndex: Int, toIndex: Int) {
-        if (fromIndex == toIndex) return
-        if (fromIndex !in visibleIds.indices || toIndex !in visibleIds.indices) return
-        val movingId = visibleIds[fromIndex]
-        val list = _items.value
-        val movingItem = list.firstOrNull { it.localId == movingId } ?: return
-
-        // Work out the neighbours that will surround the moving row at its target position in the
-        // filtered list. Prev/next are taken from the *target arrangement* after removal/insert.
-        val rearranged = visibleIds.toMutableList().apply {
-            removeAt(fromIndex)
-            add(toIndex, movingId)
-        }
-        val prevId = rearranged.getOrNull(toIndex - 1)
-        val nextId = rearranged.getOrNull(toIndex + 1)
-        val prevOrder = prevId?.let { id -> list.first { it.localId == id }.sortOrder }
-        val nextOrder = nextId?.let { id -> list.first { it.localId == id }.sortOrder }
-
-        val newSort = when {
-            prevOrder != null && nextOrder != null -> (prevOrder + nextOrder) / 2.0
-            prevOrder != null -> prevOrder + 1.0
-            nextOrder != null -> nextOrder - 1.0
-            else -> movingItem.sortOrder
-        }
-        _items.value = list.map {
-            if (it.localId == movingId) it.copy(sortOrder = newSort) else it
-        }
-        dirty = true
+        applyChecklistEdit(
+            ChecklistEditor.reorderWithin(_items.value, visibleIds, fromIndex, toIndex),
+        )
     }
 
-    /**
-     * Horizontal drag re-parents a row. `newParentLocalId = null` promotes a child back to
-     * top-level (depth 0); a non-null value nests the row under that parent (depth 1). Nesting
-     * is capped at one level: if the requested parent is itself a child, we climb to its own
-     * parent instead. Children of the targeted row lose their children (can't happen here since
-     * depth is 1, but defensive).
-     */
     fun setParent(localId: Long, newParentLocalId: Long?) {
-        val list = _items.value
-        val target = list.firstOrNull { it.localId == localId } ?: return
-        // Resolve one-level cap: if the proposed parent is itself a child, fall back to its parent.
-        val resolvedParent = newParentLocalId?.let { requested ->
-            val candidate = list.firstOrNull { it.localId == requested } ?: return@let null
-            if (candidate.depth == 1) candidate.parentLocalId else candidate.localId
-        }
-        if (target.parentLocalId == resolvedParent) return
-        _items.value = list.map {
-            if (it.localId == localId) {
-                it.copy(
-                    parentLocalId = resolvedParent,
-                    depth = if (resolvedParent != null) 1 else 0,
-                )
-            } else it
-        }
-        dirty = true
+        applyChecklistEdit(
+            ChecklistEditor.setParent(_items.value, localId, newParentLocalId),
+        )
     }
 
-    /**
-     * Indent [localId] under the nearest prior top-level sibling in the CURRENT unchecked list.
-     *
-     * The anchor lookup has to run on the freshest copy of [_items] because the UI's horizontal
-     * drag gesture lives inside a `pointerInput(item.localId, item.depth)` block whose captured
-     * closure does NOT re-launch when a sibling is reordered. If we did the lookup in the UI,
-     * we'd see a stale `activeList` snapshot from the time the row was first composed, and the
-     * "item just above" could point to the wrong row. Keeping the lookup here means every
-     * invocation sees the current sortOrder and current depths. No-op if the item is already a
-     * child or there is no unchecked top-level row preceding it.
-     */
     fun indent(localId: Long) {
-        val list = _items.value
-        val target = list.firstOrNull { it.localId == localId } ?: return
-        if (target.depth != 0) return
-        val orderedActive = list
-            .filter { !it.checked }
-            .sortedBy { it.sortOrder }
-        val idx = orderedActive.indexOfFirst { it.localId == localId }
-        if (idx <= 0) return
-        val anchor = (idx - 1 downTo 0)
-            .map { orderedActive[it] }
-            .firstOrNull { it.depth == 0 }
-            ?: return
-        setParent(localId, anchor.localId)
+        applyChecklistEdit(
+            ChecklistEditor.indent(_items.value, localId),
+        )
     }
 
-    /** Promote [localId] back to depth 0. Mirror of [indent]. No-op if already at depth 0. */
     fun outdent(localId: Long) {
-        val target = _items.value.firstOrNull { it.localId == localId } ?: return
-        if (target.depth != 1) return
-        setParent(localId, null)
+        applyChecklistEdit(
+            ChecklistEditor.outdent(_items.value, localId),
+        )
+    }
+
+    private fun applyChecklistEdit(result: ChecklistEditResult) {
+        if (!result.changed) {
+            return
+        }
+        _items.value = result.items
+        dirty = true
     }
 
     fun removeItem(localId: Long) {
@@ -461,7 +347,7 @@ class EditListViewModel(
 
     private fun tagsForPersistence(): List<String> {
         val base = _tags.value.filterNot { it == RememberReservedTags.FAVORITE }
-        return if (_pinned.value) (base + RememberReservedTags.FAVORITE).distinct()
+        return if (_favorite.value) (base + RememberReservedTags.FAVORITE).distinct()
         else base
     }
 
@@ -519,14 +405,14 @@ class EditListViewModel(
         val t = _title.value
         val nonEmpty = _items.value.filter { it.text.isNotBlank() }
         val opts = currentOptions()
-        val pinned = _pinned.value
+        val favorite = _favorite.value
         if (id == null) {
             return t.isNotBlank() || nonEmpty.isNotEmpty() || _attachments.value.isNotEmpty() || opts.pictureUri != null || opts.tags.isNotEmpty() || opts.reminderAt != null || opts.actions.isNotEmpty() || opts.iconKey != null
         } else {
             val old = originalNote ?: return true
             val oldItems = originalItems
             if (t != old.title) return true
-            if (pinned != old.pinned) return true
+            if (favorite != old.favorite) return true
             if (opts.reminderAt != old.reminderAt) return true
             if (opts.importance != old.importance) return true
             if (opts.visibility != old.visibility) return true
@@ -584,7 +470,7 @@ class EditListViewModel(
                 if (persistable.any { it.checked || it.parentLocalKey != null || it.depth > 0 }) {
                     repository.updateList(newId, finalTitle, 0, persistable, currentOptions())
                 }
-                if (_pinned.value) repository.setPinned(newId, true)
+                if (_favorite.value) repository.setFavorite(newId, true)
                 dirty = false
 
                 val savedList = repository.get(newId)
@@ -599,8 +485,8 @@ class EditListViewModel(
                 repository.updateList(id, finalTitle, 0, persistable, currentOptions())
                 if (t.isBlank()) _title.value = finalTitle
                 val cur = repository.get(id)?.note
-                if (cur != null && cur.pinned != _pinned.value) {
-                    repository.setPinned(id, _pinned.value)
+                if (cur != null && cur.favorite != _favorite.value) {
+                    repository.setFavorite(id, _favorite.value)
                 }
                 dirty = false
 
@@ -640,7 +526,7 @@ class EditListViewModel(
                                 recurrence = old.recurrence
                             )
                         )
-                        repository.setPinned(id, old.pinned)
+                        repository.setFavorite(id, old.favorite)
                     }
                 } else {
                     return@withLock null
@@ -666,6 +552,7 @@ class EditListViewModel(
             val id = loadedId ?: return@withLock
             repository.archiveNote(id)
             _archived.value = true
+            _trashed.value = false
             dirty = false
         }
     }
@@ -691,9 +578,17 @@ class EditListViewModel(
     suspend fun fireNotification(context: android.content.Context, untitledName: String) {
         saveIfNeeded(untitledName)
         val id = loadedId ?: return
-        val note = repository.get(id)?.note ?: return
-        dev.bikram.remember.reminders.ReminderReceiver.showNotification(context, note)
-        android.widget.Toast.makeText(context, "Notification created", android.widget.Toast.LENGTH_SHORT).show()
+        val noteWithItems = repository.get(id) ?: return
+        dev.bikram.remember.reminders.ReminderReceiver.showNotification(
+            context,
+            noteWithItems.note,
+            noteWithItems.items,
+        )
+        android.widget.Toast.makeText(
+            context,
+            context.getString(dev.bikram.remember.R.string.notification_created),
+            android.widget.Toast.LENGTH_SHORT,
+        ).show()
     }
 
     suspend fun deleteForeverCurrent() {

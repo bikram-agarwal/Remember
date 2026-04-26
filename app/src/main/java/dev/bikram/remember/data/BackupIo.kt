@@ -27,6 +27,7 @@ class BackupIo(
     private val context: Context,
     private val repository: NoteRepository,
     private val themePrefs: ThemePrefs,
+    private val viewOptionsPrefs: ViewOptionsPrefs,
     private val lockPrefs: LockPrefs,
     private val interactionPrefs: InteractionPrefs,
     private val backupPrefs: BackupPrefs,
@@ -41,19 +42,23 @@ class BackupIo(
     fun suggestedBackupFileName(): String = "remember_backup_${backupStamp()}.zip"
 
     private suspend fun buildSettingsJson(): JSONObject =
-        SettingsBackup.exportJson(themePrefs, lockPrefs, interactionPrefs, backupPrefs)
+        SettingsBackup.exportJson(themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs)
 
     private suspend fun importSettingsFromJson(settingsJson: JSONObject?) {
-        SettingsBackup.importJson(settingsJson, themePrefs, lockPrefs, interactionPrefs, backupPrefs)
+        SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs)
     }
 
     private data class NotesSnapshot(val root: JSONObject, val noteCount: Int)
 
     private suspend fun snapshotNotes(): NotesSnapshot {
         val all = repository.observeActive().first() + repository.observeTrashed().first()
+        val tagColors = repository.tagRepository?.observeTagColorMap()?.first().orEmpty()
         val root = JSONObject().apply {
             put("version", SCHEMA_VERSION)
             put("exportedAt", System.currentTimeMillis())
+            put("tagColors", JSONObject().apply {
+                tagColors.forEach { (tagName, colorHex) -> put(tagName, colorHex) }
+            })
             put("notes", JSONArray().apply {
                 all.forEach { put(encode(it)) }
             })
@@ -69,7 +74,7 @@ class BackupIo(
             put("title", note.title)
             put("body", note.body)
             put("colorIndex", note.colorIndex)
-            put("pinned", note.pinned)
+            put("pinned", note.favorite)
             put("trashed", note.trashed)
             put("archived", note.archived)
             note.trashedAt?.let { put("trashedAt", it) }
@@ -236,6 +241,7 @@ class BackupIo(
                 )
             }
             importSettingsFromJson(payload.settingsJson)
+            repository.tagRepository?.synchronizeLegacyTagColors()
             count
         } finally {
             payload.extractRoot?.deleteRecursively()
@@ -337,7 +343,9 @@ class BackupIo(
             val settingsText = if (settingsFile.isFile) settingsFile.readText(Charsets.UTF_8) else null
             val settingsJson = settingsText?.let { runCatching { JSONObject(it) }.getOrNull() }
             importSettingsFromJson(settingsJson)
-            importFromJsonText(notesText, extractRoot, preserveNoteIds)
+            importFromJsonText(notesText, extractRoot, preserveNoteIds).also {
+                repository.tagRepository?.synchronizeLegacyTagColors()
+            }
         } finally {
             extractRoot.deleteRecursively()
         }
@@ -405,7 +413,17 @@ class BackupIo(
             }
             added++
         }
+        importTagColors(root.optJSONObject("tagColors"))
         return added
+    }
+
+    private suspend fun importTagColors(tagColorsJson: JSONObject?) {
+        if (tagColorsJson == null) return
+        val tagRepository = repository.tagRepository ?: return
+        tagColorsJson.keys().forEach { tagName ->
+            val colorHex = tagColorsJson.optString(tagName, "")
+            tagRepository.setTagColor(tagName, colorHex)
+        }
     }
 
     private fun decodeNoteEntity(o: JSONObject): NoteEntity {
@@ -416,7 +434,7 @@ class BackupIo(
             title = o.optString("title", ""),
             body = o.optString("body", ""),
             colorIndex = o.optInt("colorIndex", 0),
-            pinned = o.optBoolean("pinned", false),
+            favorite = o.optBoolean("pinned", false),
             trashed = o.optBoolean("trashed", false),
             archived = o.optBoolean("archived", false),
             trashedAt = o.optLongOrNull("trashedAt"),

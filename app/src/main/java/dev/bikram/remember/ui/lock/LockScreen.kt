@@ -1,10 +1,8 @@
 package dev.bikram.remember.ui.lock
 
-import android.app.Activity
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -42,6 +41,7 @@ import dev.bikram.remember.R
 @Composable
 fun LockScreen(
     biometricEnabled: Boolean,
+    hasPin: Boolean,
     /** Number of digits required before verifying (4–6), from [LockPrefs.State.pinLength]. */
     pinLength: Int = LockPrefs.MAX_PIN_LENGTH,
     verify: suspend (String) -> Boolean,
@@ -52,6 +52,7 @@ fun LockScreen(
     val requiredDigits = pinLength.coerceIn(LockPrefs.MIN_PIN_LENGTH, LockPrefs.MAX_PIN_LENGTH)
     var pin by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
+    val unlockTitle = stringResource(R.string.lock_title_unlock)
 
     fun tryUnlock() {
         scope.launch {
@@ -62,12 +63,16 @@ fun LockScreen(
         }
     }
 
-    LaunchedEffect(biometricEnabled) {
-        if (!biometricEnabled) return@LaunchedEffect
-        val activity = context as? FragmentActivity ?: return@LaunchedEffect
+    fun authenticateWithSystemUnlock() {
+        val activity = context as? FragmentActivity ?: return
         val mgr = BiometricManager.from(context)
-        val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK
-        if (mgr.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) return@LaunchedEffect
+        val authenticators = if (biometricEnabled) {
+            BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        } else {
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        }
+        if (mgr.canAuthenticate(authenticators) != BiometricManager.BIOMETRIC_SUCCESS) return
         val prompt = BiometricPrompt(
             activity,
             activity.mainExecutor,
@@ -78,11 +83,17 @@ fun LockScreen(
             },
         )
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock Remember")
-            .setNegativeButtonText(context.getString(R.string.lock_use_pin))
+            .setTitle(unlockTitle)
+            .setConfirmationRequired(false)
             .setAllowedAuthenticators(authenticators)
             .build()
         prompt.authenticate(info)
+    }
+
+    LaunchedEffect(biometricEnabled, hasPin) {
+        if (biometricEnabled || !hasPin) {
+            authenticateWithSystemUnlock()
+        }
     }
 
     Surface(
@@ -105,54 +116,45 @@ fun LockScreen(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    "Unlock Remember",
+                    unlockTitle,
                     style = MaterialTheme.typography.headlineSmall,
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    if (error) "Wrong PIN" else "Enter your PIN",
+                    when {
+                        error -> stringResource(R.string.lock_wrong_pin)
+                        hasPin -> stringResource(R.string.lock_enter_pin)
+                        else -> stringResource(R.string.lock_use_device_unlock)
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (error) MaterialTheme.colorScheme.error
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(24.dp))
-                PinDots(length = pin.length, max = requiredDigits)
+                if (hasPin) {
+                    PinDots(length = pin.length, max = requiredDigits)
+                }
             }
-            Keypad(
-                onDigit = {
-                    if (pin.length < requiredDigits) {
-                        pin += it
-                        error = false
-                        if (pin.length == requiredDigits) tryUnlock()
-                    }
-                },
-                onBackspace = {
-                    if (pin.isNotEmpty()) {
-                        pin = pin.dropLast(1); error = false
-                    }
-                },
-                showBiometric = biometricEnabled,
-                onBiometric = {
-                    // Triggers LaunchedEffect only on first compose; re-run:
-                    val activity = context as? FragmentActivity ?: return@Keypad
-                    val authenticators = BiometricManager.Authenticators.BIOMETRIC_WEAK
-                    val prompt = BiometricPrompt(
-                        activity,
-                        activity.mainExecutor,
-                        object : BiometricPrompt.AuthenticationCallback() {
-                            override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                                onUnlocked()
-                            }
-                        },
-                    )
-                    val info = BiometricPrompt.PromptInfo.Builder()
-                        .setTitle("Unlock Remember")
-                        .setNegativeButtonText(context.getString(R.string.lock_use_pin))
-                        .setAllowedAuthenticators(authenticators)
-                        .build()
-                    prompt.authenticate(info)
-                },
-            )
+            if (hasPin) {
+                Keypad(
+                    onDigit = {
+                        if (pin.length < requiredDigits) {
+                            pin += it
+                            error = false
+                            if (pin.length == requiredDigits) tryUnlock()
+                        }
+                    },
+                    onBackspace = {
+                        if (pin.isNotEmpty()) {
+                            pin = pin.dropLast(1); error = false
+                        }
+                    },
+                    showBiometric = biometricEnabled,
+                    onBiometric = { authenticateWithSystemUnlock() },
+                )
+            } else {
+                DeviceUnlockButton(onClick = { authenticateWithSystemUnlock() })
+            }
         }
     }
 }
@@ -170,6 +172,26 @@ private fun PinDots(length: Int, max: Int) {
                         if (filled) MaterialTheme.colorScheme.primary
                         else MaterialTheme.colorScheme.surfaceContainerHigh,
                     ),
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeviceUnlockButton(onClick: () -> Unit) {
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        modifier = Modifier
+            .size(96.dp)
+            .tapSoundClickable(onClick = onClick),
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
+            RememberMaterialRoundedSymbol(
+                name = "lock_open",
+                size = 36.dp,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                weight = FontWeight.Medium,
             )
         }
     }

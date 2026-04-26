@@ -12,11 +12,13 @@ Pipeline (runs twice, once per FILL value):
    plus its component glyphs; pyftsubset is run with --no-layout-closure so we
    do not pull in every ligature that shares the Latin alphabet.
 
-Outputs (both ~100-300 KB):
+Outputs (both ~100-300 KB, copied into app/src/main/res/font/):
   material_symbols_rounded_subset.ttf           (FILL=1, filled)
   material_symbols_rounded_outlined_subset.ttf  (FILL=0, outlined)
 
-Run AFTER `harvest_ligatures.py` so the ligature list is fresh.
+Run AFTER `harvest_ligatures.py` so the ligature list is fresh. After copying,
+the script deletes generated scratch files and harvest reports so the repo stays
+clean.
 """
 
 from __future__ import annotations
@@ -32,7 +34,10 @@ from fontTools.ttLib import TTFont
 from ligature_resolve import expand_wanted_icon_names
 
 HERE = Path(__file__).resolve().parent
+REPO = HERE.parent
+APP_FONT_DIR = REPO / "app" / "src" / "main" / "res" / "font"
 LIGATURES_FILE = HERE / "ligatures.txt"
+LIGATURES_REPORT_FILE = HERE / "ligatures_report.json"
 GLYPHS_EXPANDED_FILE = HERE / "glyphs_expanded.txt"
 
 # Two-variant output: filled keeps the original name so callers that don't opt
@@ -43,12 +48,14 @@ VARIANTS = [
         "fill": 1,
         "instanced": HERE / "material_symbols_rounded_instanced.ttf",
         "subset": HERE / "material_symbols_rounded_subset.ttf",
+        "resource": APP_FONT_DIR / "material_symbols_rounded.ttf",
     },
     {
         "name": "outlined",
         "fill": 0,
         "instanced": HERE / "material_symbols_rounded_outlined_instanced.ttf",
         "subset": HERE / "material_symbols_rounded_outlined_subset.ttf",
+        "resource": APP_FONT_DIR / "material_symbols_rounded_outlined.ttf",
     },
 ]
 
@@ -90,6 +97,35 @@ def run(args: list[str]) -> int:
     if result.returncode != 0:
         print(f"Command failed (exit {result.returncode}):", " ".join(args), file=sys.stderr)
     return result.returncode
+
+
+def copy_outputs_to_app() -> None:
+    APP_FONT_DIR.mkdir(parents=True, exist_ok=True)
+    for variant in VARIANTS:
+        shutil.copy2(variant["subset"], variant["resource"])
+        print(f"Copied {variant['subset'].name} -> {variant['resource'].relative_to(REPO)}")
+
+
+def cleanup_generated_files() -> None:
+    generated_files = [
+        GLYPHS_EXPANDED_FILE,
+        LIGATURES_FILE,
+        LIGATURES_REPORT_FILE,
+        HERE / "probe.txt",
+    ]
+    for variant in VARIANTS:
+        generated_files.append(variant["instanced"])
+        generated_files.append(variant["subset"])
+
+    for path in generated_files:
+        if path.exists():
+            path.unlink()
+            print(f"Deleted generated file: {path.relative_to(REPO)}")
+
+    pycache = HERE / "__pycache__"
+    if pycache.exists():
+        shutil.rmtree(pycache)
+        print(f"Deleted generated directory: {pycache.relative_to(REPO)}")
 
 
 def main() -> int:
@@ -176,9 +212,9 @@ def main() -> int:
         print(f"  Instanced: {inst_size / 1024 / 1024:.2f} MB")
         print(f"  Subset:    {out_size / 1024:.2f} KB ({out_size * 100 / src_size:.3f}% of source)")
 
-    print("Done. Copy both subset TTFs into app/src/main/res/font/:")
-    print("  material_symbols_rounded_subset.ttf          -> material_symbols_rounded.ttf")
-    print("  material_symbols_rounded_outlined_subset.ttf -> material_symbols_rounded_outlined.ttf")
+    copy_outputs_to_app()
+    cleanup_generated_files()
+    print("Done. App font resources are updated; generated font_subset scratch files were removed.")
     return 0
 
 

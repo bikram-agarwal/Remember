@@ -22,6 +22,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -34,6 +35,8 @@ fun AppBottomSheet(
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
     scrollable: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
+    subtitleSpacing: Dp = 6.dp,
+    titleActions: (@Composable RowScope.() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -46,13 +49,20 @@ fun AppBottomSheet(
                 Column(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
                 ) {
-                    Text(
-                        title,
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            title,
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
+                        )
+                        titleActions?.invoke(this)
+                    }
                     if (subtitle != null) {
-                        Spacer(Modifier.size(6.dp))
+                        Spacer(Modifier.size(subtitleSpacing))
                         Text(
                             subtitle,
                             style = MaterialTheme.typography.bodyMedium,

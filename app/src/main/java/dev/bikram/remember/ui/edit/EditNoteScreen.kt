@@ -49,6 +49,7 @@ import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.ThemePrefs
+import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import dev.bikram.remember.ui.components.NoteActionBottomBarContent
 import dev.bikram.remember.ui.components.NoteShelfState
@@ -152,7 +153,7 @@ fun EditNoteScreen(
 
     val archived by vm.archived.collectAsStateWithLifecycle()
     val trashed by vm.trashed.collectAsStateWithLifecycle()
-    val pinned by vm.pinned.collectAsStateWithLifecycle()
+    val favorite by vm.favorite.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
     val shelfState = when {
         trashed -> NoteShelfState.TRASHED
@@ -202,10 +203,6 @@ fun EditNoteScreen(
         onBack()
     }
 
-    androidx.activity.compose.BackHandler {
-        handleBack()
-    }
-
     // Hoisted scroll state so the bottom action bar can hide on scroll-down and re-show on
     // scroll-up. Also keyed off IME visibility so the rich-text toolbar has the stage alone
     // when the keyboard is open.
@@ -251,8 +248,7 @@ fun EditNoteScreen(
     }
 
     val density = LocalDensity.current
-    val imeBottom = WindowInsets.ime.getBottom(density)
-    val imeVisible by remember { derivedStateOf { imeBottom > 0 } }
+    val imeVisible = WindowInsets.ime.getBottom(density) > 0
 
     // Edit mode replaces the action bar: the rich-text formatting toolbar takes the bottom
     // slot and a Save button moves to the top bar. Stacking two bars at the bottom would
@@ -365,7 +361,7 @@ fun EditNoteScreen(
                         shelfState = shelfState,
                         existing = persistedForToolbar,
                         isEditMode = isEditMode,
-                        pinned = pinned,
+                        favorite = favorite,
                         completed = completed,
                         onToggleEdit = {
                             // Outside edit mode this turns edit mode ON. The SAVE path is
@@ -374,7 +370,7 @@ fun EditNoteScreen(
                             // side-effect to run here.
                             if (!isEditMode) isEditMode = true else saveAndExitEditMode()
                         },
-                        onTogglePin = { vm.togglePin() },
+                        onToggleFavorite = { vm.toggleFavorite() },
                         onToggleCompleted = {
                             appScope.launch { vm.toggleCompleted() }
                         },
@@ -413,6 +409,7 @@ fun EditNoteScreen(
             isEditMode = isEditMode,
             existing = existing,
             shelfState = shelfState,
+            pictureViewerOpen = pictureViewer != null,
             onRequestEditMode = { if (!readOnly) isEditMode = true },
             onOpenReminder = { reminderPickerOpen = true },
             onOpenPicture = launchHeroImagePick,
@@ -475,6 +472,7 @@ fun EditNoteScreen(
                     vm.saveTagsWithColors(newTags, newColors)
                     tagsPickerOpen = false
                 },
+                onEditExistingTag = vm::editExistingTag,
                 onDismiss = { tagsPickerOpen = false },
             )
         }
@@ -525,76 +523,17 @@ fun EditNoteScreen(
         }
     }
 
-    androidx.compose.animation.AnimatedVisibility(
-        visible = pictureViewer != null,
-        enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.scaleIn(initialScale = 0.8f),
-        exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.scaleOut(targetScale = 0.8f),
-    ) {
-        val viewer = pictureViewer
-        if (viewer != null) {
-            androidx.activity.compose.BackHandler {
-                pictureViewer = null
-            }
-            val imageRequest = dev.bikram.remember.ui.common.rememberHeroImageRequest(viewer.first, viewer.second, maxSidePx = 4096)
-            androidx.compose.material3.Surface(
-                color = Color.Black,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
-                    coil3.compose.AsyncImage(
-                        model = imageRequest,
-                        contentDescription = stringResource(R.string.cd_note_hero_image),
-                        contentScale = androidx.compose.ui.layout.ContentScale.Fit,
-                        modifier = Modifier.fillMaxSize(),
-                    )
-                    // Delete sits at top-start, opposite the close button at top-end. Only
-                    // shown on the active shelf - archived/trashed notes are read-only so
-                    // there's no delete affordance there.
-                    if (!readOnly) {
-                        val removePictureCd = stringResource(R.string.edit_remove_picture_cd)
-                        dev.bikram.remember.ui.components.RememberIconButton(
-                            onClick = {
-                                vm.setPictureUri(null)
-                                pictureViewer = null
-                            },
-                            modifier = Modifier
-                                .align(androidx.compose.ui.Alignment.TopStart)
-                                .padding(8.dp)
-                                .windowInsetsPadding(WindowInsets.systemBars)
-                                .semantics { contentDescription = removePictureCd },
-                            colors = androidx.compose.material3.IconButtonDefaults.iconButtonColors(
-                                containerColor = Color.Black.copy(alpha = 0.45f),
-                                contentColor = Color.White,
-                            ),
-                        ) {
-                            dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol(
-                                name = "delete_outline",
-                                size = 24.dp,
-                                tint = Color.White,
-                                weight = androidx.compose.ui.text.font.FontWeight.Medium,
-                            )
-                        }
-                    }
-                    dev.bikram.remember.ui.components.RememberIconButton(
-                        onClick = { pictureViewer = null },
-                        modifier = Modifier
-                            .align(androidx.compose.ui.Alignment.TopEnd)
-                            .padding(8.dp)
-                            .windowInsetsPadding(WindowInsets.systemBars),
-                        colors = androidx.compose.material3.IconButtonDefaults.iconButtonColors(
-                            containerColor = Color.Black.copy(alpha = 0.45f),
-                            contentColor = Color.White,
-                        ),
-                    ) {
-                        dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol(
-                            name = "close",
-                            size = 24.dp,
-                            tint = Color.White,
-                            weight = androidx.compose.ui.text.font.FontWeight.Medium,
-                        )
-                    }
-                }
-            }
-        }
-    }
+    val viewerForOverlay = pictureViewer
+    FullScreenHeroImageOverlay(
+        visible = viewerForOverlay != null,
+        imageUri = viewerForOverlay?.first,
+        imageCacheRevision = viewerForOverlay?.second ?: 0L,
+        imageContentDescription = stringResource(R.string.cd_note_hero_image),
+        sharedElementKey = viewerForOverlay?.first?.let { uri -> "hero-image-$uri" },
+        onDismiss = { pictureViewer = null },
+        onDelete = if (readOnly) null else ({
+            vm.setPictureUri(null)
+            pictureViewer = null
+        }),
+    )
 }

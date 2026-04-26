@@ -1,6 +1,7 @@
 package dev.bikram.remember.data
 
 import androidx.annotation.StringRes
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Fts4
 import dev.bikram.remember.R
@@ -80,7 +81,7 @@ data class NoteEntity(
     val title: String,
     val body: String,
     val colorIndex: Int,
-    val pinned: Boolean,
+    @ColumnInfo(name = "pinned") val favorite: Boolean,
     val trashed: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
@@ -97,7 +98,7 @@ data class NoteEntity(
     val recurrence: RecurrenceRule? = null,
     /**
      * Distinct from [trashed]: archived notes are hidden from Home but remain searchable,
-     * never auto-deleted, and have no pinned state. Mutually exclusive with [trashed]:
+     * never auto-deleted, and have no favorite state. Mutually exclusive with [trashed]:
      * trashing an archived note clears its archive state, and vice versa.
      */
     val archived: Boolean = false,
@@ -136,6 +137,44 @@ data class NoteFtsEntity(
     val title: String,
     val body: String,
     val tags: String,
+)
+
+@Entity(
+    tableName = "tags",
+    indices = [Index(value = ["normalizedName"], unique = true)],
+)
+data class TagEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val normalizedName: String,
+    val colorHex: String? = null,
+    val createdAt: Long,
+    val updatedAt: Long,
+)
+
+@Entity(
+    tableName = "note_tags",
+    primaryKeys = ["noteId", "tagId"],
+    foreignKeys = [
+        ForeignKey(
+            entity = NoteEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["noteId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+        ForeignKey(
+            entity = TagEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["tagId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
+    indices = [Index("noteId"), Index("tagId")],
+)
+data class NoteTagCrossRef(
+    val noteId: Long,
+    val tagId: Long,
+    val sortOrder: Int,
 )
 
 @Entity(

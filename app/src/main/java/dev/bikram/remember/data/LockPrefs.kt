@@ -56,6 +56,12 @@ class LockPrefs(private val context: Context) {
         }
     }
 
+    suspend fun enableDeviceCredential() {
+        context.lockDataStore.edit {
+            it[Keys.ENABLED] = true
+        }
+    }
+
     suspend fun disable() {
         context.lockDataStore.edit {
             it[Keys.ENABLED] = false

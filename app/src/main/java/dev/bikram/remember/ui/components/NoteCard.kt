@@ -64,7 +64,7 @@ import dev.bikram.remember.ui.theme.elevatedCardColors
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 
-private val CardShape = RoundedCornerShape(20.dp)
+private val CardShape = RoundedCornerShape(12.dp)
 
 @Composable
 fun NoteCard(
@@ -86,7 +86,7 @@ fun NoteCard(
     androidx.compose.runtime.LaunchedEffect(note.note.body) {
         richTextState.setMarkdown(note.note.body)
     }
-    val pinnedIconDescription = stringResource(R.string.notecard_pinned_cd)
+    val favoriteIconDescription = stringResource(R.string.notecard_favorite_cd)
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
@@ -105,6 +105,11 @@ fun NoteCard(
     } else {
         Modifier
     }
+    val favoriteBorder = if (note.note.favorite && !selected) {
+        Modifier.border(BorderStroke(1.dp, Color(0xFFFF9EBC).copy(alpha = 0.70f)), CardShape)
+    } else {
+        Modifier
+    }
     val clickableModifier = if (onLongClick != null) {
         Modifier.tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
     } else {
@@ -115,12 +120,13 @@ fun NoteCard(
             .fillMaxWidth()
             .then(sharedModifier)
             .clip(CardShape)
+            .then(favoriteBorder)
             .then(selectionBorder)
             .then(clickableModifier),
         shape = CardShape,
-        color = if (showHero) Color.Transparent else cardColors.containerColor,
+        color = cardColors.containerColor,
         contentColor = cardColors.contentColor,
-        tonalElevation = if (showHero) 0.dp else 1.dp,
+        tonalElevation = 1.dp,
         shadowElevation = 0.dp,
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -131,11 +137,17 @@ fun NoteCard(
                         HeroFraming.fromJsonString(note.note.pictureHeroFraming)
                     },
                     cacheRevision = note.note.updatedAt,
-                    scrimTop = surface.copy(alpha = 0.38f),
-                    scrimBottom = surface.copy(alpha = 0.72f),
+                    scrimTop = surface.copy(alpha = 0.20f),
+                    scrimBottom = surface.copy(alpha = 0.48f),
                 )
             }
-            Row(modifier = Modifier.height(intrinsicSize = androidx.compose.foundation.layout.IntrinsicSize.Min)) {
+            Row(
+                modifier = if (hasTagStrip && !showHero) {
+                    Modifier.height(intrinsicSize = androidx.compose.foundation.layout.IntrinsicSize.Min)
+                } else {
+                    Modifier
+                },
+            ) {
                 if (hasTagStrip && !showHero) {
                     TagAccentCardStrip(tags = visibleTags)
                 }
@@ -201,16 +213,16 @@ fun NoteCard(
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                         )
-                        if (note.note.pinned) {
+                        if (note.note.favorite) {
                             RememberMaterialRoundedSymbol(
                                 name = "favorite",
                                 size = 16.dp,
-                                tint = MaterialTheme.colorScheme.onSurface,
+                                tint = Color(0xFFFF9EBC),
                                 weight = FontWeight.Medium,
                                 opticalCenterYOffset = 1.dp,
                                 modifier = Modifier
-                                    .semantics { contentDescription = pinnedIconDescription }
-                                    .alpha(0.75f),
+                                    .semantics { contentDescription = favoriteIconDescription }
+                                    .alpha(0.90f),
                             )
                         }
                     }
@@ -271,7 +283,7 @@ private fun BoxScope.HeroBackground(
         imageUri = uri,
         framing = framing,
         cacheRevision = cacheRevision,
-        imageAlpha = 0.52f,
+        imageAlpha = 1f,
         modifier = Modifier.matchParentSize(),
     )
     Box(
@@ -305,7 +317,7 @@ private fun MetadataRow(note: NoteWithItems, visibleTags: List<String>) {
             tags.forEach { tag -> TagMini(tag) }
             if (extraTags > 0) {
                 Text(
-                    text = "+$extraTags",
+                    text = stringResource(R.string.notecard_extra_tags, extraTags),
                     style = MaterialTheme.typography.labelSmall,
                     modifier = Modifier.alpha(0.7f),
                 )
@@ -391,7 +403,7 @@ private fun TagMini(label: String) {
 private fun ChecklistPreview(items: List<ChecklistItemEntity>, limit: Int = 2) {
     if (items.isEmpty()) {
         Text(
-            text = "Empty list",
+            text = stringResource(R.string.notecard_empty_list),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.alpha(0.5f),
         )
@@ -432,7 +444,7 @@ private fun ChecklistPreview(items: List<ChecklistItemEntity>, limit: Int = 2) {
         if (extra > 0) {
             Spacer(Modifier.height(2.dp))
             Text(
-                text = "+ $extra more",
+                text = stringResource(R.string.notecard_extra_items, extra),
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.alpha(0.6f),
             )

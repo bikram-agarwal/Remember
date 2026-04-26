@@ -1,0 +1,741 @@
+package dev.bikram.remember.ui.onboarding
+
+import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.os.PowerManager
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import dev.bikram.remember.R
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberOutlinedButton
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun OnboardingPermissionsScreen(
+    onContinue: () -> Unit,
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val powerManager = remember {
+        context.getSystemService(Context.POWER_SERVICE) as PowerManager
+    }
+    var notificationsGranted by rememberSaveable {
+        mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
+    }
+    var ignoringBatteryOptimizations by remember {
+        mutableStateOf(powerManager.isIgnoringBatteryOptimizations(context.packageName))
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
+
+    DisposableEffect(lifecycleOwner, context, powerManager) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+                ignoringBatteryOptimizations = powerManager.isIgnoringBatteryOptimizations(context.packageName)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .systemBarsPadding(),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 26.dp)
+                .padding(top = 12.dp, bottom = 8.dp),
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                PermissionsHeroIllustration(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(250.dp),
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.onboarding_permissions_title),
+                    style = MaterialTheme.typography.headlineLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = scheme.onSurface,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text = stringResource(R.string.onboarding_permissions_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = scheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth(0.88f),
+                )
+                Spacer(Modifier.height(22.dp))
+                PermissionStatusCard(
+                    granted = notificationsGranted,
+                    title = stringResource(R.string.onboarding_permissions_notifications_title),
+                    body = stringResource(R.string.onboarding_permissions_notifications_body),
+                    iconName = "notifications",
+                    statusText = stringResource(R.string.onboarding_permissions_status_recommended),
+                    actionText = if (notificationsGranted) {
+                        stringResource(R.string.onboarding_permissions_enabled)
+                    } else {
+                        stringResource(R.string.onboarding_permissions_allow_notifications)
+                    },
+                    actionEnabled = !notificationsGranted,
+                    primaryAction = true,
+                    onAction = {
+                        when {
+                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.POST_NOTIFICATIONS,
+                                ) != PackageManager.PERMISSION_GRANTED ->
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
+                                context.startActivity(notificationSettingsIntent(context))
+                            else ->
+                                notificationsGranted = true
+                        }
+                    },
+                )
+                Spacer(Modifier.height(10.dp))
+                PermissionStatusCard(
+                    granted = ignoringBatteryOptimizations,
+                    title = stringResource(R.string.onboarding_permissions_reliable_title),
+                    body = stringResource(R.string.onboarding_permissions_reliable_body),
+                    iconName = "timer",
+                    statusText = stringResource(R.string.onboarding_permissions_status_optional),
+                    actionText = if (ignoringBatteryOptimizations) {
+                        stringResource(R.string.onboarding_permissions_enabled)
+                    } else {
+                        stringResource(R.string.onboarding_permissions_improve_reliability)
+                    },
+                    actionEnabled = !ignoringBatteryOptimizations,
+                    primaryAction = false,
+                    modifier = Modifier
+                        .fillMaxWidth(0.98f)
+                        .align(Alignment.CenterHorizontally),
+                    onAction = {
+                        runCatching {
+                            context.startActivity(batteryOptimizationIntent(context))
+                        }.onFailure {
+                            context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                        }
+                    },
+                )
+                Spacer(Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "verified_user",
+                        size = 18.dp,
+                        tint = scheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.onboarding_permissions_change_anytime_footer),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                    )
+                }
+                Spacer(Modifier.height(104.dp))
+            }
+        }
+
+        RememberButton(
+            onClick = onContinue,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+            shape = RoundedCornerShape(50),
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+        ) {
+            val motionScheme = MaterialTheme.motionScheme
+            AnimatedContent(
+                targetState = notificationsGranted,
+                modifier = Modifier.weight(1f),
+                transitionSpec = {
+                    (slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { it / 2 } +
+                        fadeIn(animationSpec = motionScheme.defaultEffectsSpec())) togetherWith
+                        (slideOutVertically(animationSpec = motionScheme.defaultSpatialSpec()) { -it / 2 } +
+                            fadeOut(animationSpec = motionScheme.defaultEffectsSpec()))
+                },
+                label = "permissionBottomCtaText",
+            ) { granted ->
+                Text(
+                    text = if (granted) {
+                        stringResource(R.string.onboarding_permissions_continue)
+                    } else {
+                        stringResource(R.string.onboarding_permissions_skip_for_now)
+                    },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+            RememberMaterialRoundedSymbol(
+                name = "chevron_right",
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun PermissionsHeroIllustration(
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = modifier.drawBehind {
+            drawCircle(
+                color = scheme.primary.copy(alpha = 0.18f),
+                radius = size.minDimension * 0.33f,
+                center = Offset(size.width * 0.46f, size.height * 0.56f),
+                style = Stroke(width = 1.5.dp.toPx()),
+            )
+            drawCircle(
+                color = scheme.primary.copy(alpha = 0.10f),
+                radius = size.minDimension * 0.22f,
+                center = Offset(size.width * 0.62f, size.height * 0.48f),
+                style = Stroke(width = 1.dp.toPx()),
+            )
+        },
+        contentAlignment = Alignment.Center,
+    ) {
+        DecorativeStar(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .offset(x = 64.dp, y = 48.dp),
+        )
+        DecorativeStar(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset(x = (-42).dp, y = 92.dp),
+            size = 22.dp,
+        )
+        DecorativeDot(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = 36.dp, y = 16.dp),
+            size = 6.dp,
+        )
+        DecorativeDot(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .offset(x = (-86).dp, y = (-52).dp),
+            size = 4.dp,
+        )
+
+        Surface(
+            modifier = Modifier
+                .size(92.dp)
+                .offset(y = (-62).dp),
+            shape = CircleShape,
+            color = scheme.primaryContainer,
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                RememberMaterialRoundedSymbol(
+                    name = "notifications",
+                    size = 46.dp,
+                    tint = scheme.onPrimaryContainer,
+                )
+            }
+        }
+
+        Surface(
+            modifier = Modifier
+                .size(58.dp)
+                .offset(x = (-72).dp, y = (-12).dp),
+            shape = CircleShape,
+            color = scheme.primary,
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                RememberMaterialRoundedSymbol(
+                    name = "notifications",
+                    size = 31.dp,
+                    tint = scheme.onPrimary,
+                    filled = false,
+                )
+            }
+        }
+
+        ChecklistIllustrationCard(
+            modifier = Modifier
+                .width(104.dp)
+                .height(128.dp)
+                .offset(x = 52.dp, y = (-12).dp)
+                .graphicsLayer { rotationZ = 10f },
+        )
+        NoteIllustrationCard(
+            modifier = Modifier
+                .width(146.dp)
+                .height(78.dp)
+                .offset(x = (-32).dp, y = 62.dp)
+                .graphicsLayer { rotationZ = 4f },
+        )
+    }
+}
+
+@Composable
+private fun ChecklistIllustrationCard(
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(14.dp),
+        color = scheme.primaryContainer,
+        tonalElevation = 8.dp,
+        shadowElevation = 8.dp,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            repeat(3) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "check_circle",
+                        size = 16.dp,
+                        tint = scheme.onPrimaryContainer.copy(alpha = 0.78f),
+                    )
+                    IllustrationLine(
+                        modifier = Modifier
+                            .height(4.dp)
+                            .weight(1f),
+                        color = scheme.onPrimaryContainer.copy(alpha = 0.35f),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoteIllustrationCard(
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = scheme.surfaceContainerHighest.copy(alpha = 0.92f),
+        tonalElevation = 4.dp,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, scheme.outlineVariant.copy(alpha = 0.45f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .background(scheme.primary, CircleShape),
+                )
+                IllustrationLine(
+                    modifier = Modifier
+                        .height(4.dp)
+                        .fillMaxWidth(0.72f),
+                    color = scheme.onSurfaceVariant.copy(alpha = 0.55f),
+                )
+            }
+            IllustrationLine(
+                modifier = Modifier
+                    .height(4.dp)
+                    .fillMaxWidth(0.54f),
+                color = scheme.onSurfaceVariant.copy(alpha = 0.35f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun IllustrationLine(
+    modifier: Modifier,
+    color: Color,
+) {
+    Box(
+        modifier = modifier.background(color, RoundedCornerShape(50)),
+    )
+}
+
+@Composable
+private fun DecorativeDot(
+    modifier: Modifier = Modifier,
+    size: Dp = 4.dp,
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.72f), CircleShape),
+    )
+}
+
+@Composable
+private fun DecorativeStar(
+    modifier: Modifier = Modifier,
+    size: Dp = 18.dp,
+) {
+    val sparkleColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
+    Box(
+        modifier = modifier
+            .size(size)
+            .drawBehind {
+                val centerX = this.size.width / 2f
+                val centerY = this.size.height / 2f
+                val radius = this.size.minDimension / 2f
+                val innerRadius = radius * 0.28f
+                val sparklePath = Path().apply {
+                    moveTo(centerX, centerY - radius)
+                    lineTo(centerX + innerRadius, centerY - innerRadius)
+                    lineTo(centerX + radius, centerY)
+                    lineTo(centerX + innerRadius, centerY + innerRadius)
+                    lineTo(centerX, centerY + radius)
+                    lineTo(centerX - innerRadius, centerY + innerRadius)
+                    lineTo(centerX - radius, centerY)
+                    lineTo(centerX - innerRadius, centerY - innerRadius)
+                    close()
+                }
+                drawPath(sparklePath, sparkleColor)
+            },
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun PermissionStatusCard(
+    granted: Boolean,
+    title: String,
+    body: String,
+    iconName: String,
+    statusText: String,
+    actionText: String,
+    actionEnabled: Boolean,
+    primaryAction: Boolean,
+    modifier: Modifier = Modifier,
+    onAction: () -> Unit,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val motionScheme = MaterialTheme.motionScheme
+    val cardPadding = if (primaryAction) 16.dp else 10.dp
+    val cardShape = if (primaryAction) 22.dp else 20.dp
+    val iconSize = if (primaryAction) 54.dp else 44.dp
+    val bodyStartPadding = iconSize + 10.dp
+    val topBodySpacing = if (primaryAction) 12.dp else 7.dp
+    val bottomActionSpacing = if (primaryAction) 14.dp else 9.dp
+    val actionVerticalPadding = if (primaryAction) 13.dp else 10.dp
+    val scale by animateFloatAsState(
+        targetValue = if (granted) 1.02f else 1f,
+        animationSpec = motionScheme.defaultSpatialSpec(),
+        label = "permissionCardScale",
+    )
+    val iconPulseScale by animateFloatAsState(
+        targetValue = if (granted) 1.08f else 1f,
+        animationSpec = motionScheme.defaultSpatialSpec(),
+        label = "permissionIconPulse",
+    )
+    val borderColor by animateColorAsState(
+        targetValue = if (granted) {
+            scheme.primary.copy(alpha = 0.72f)
+        } else {
+            scheme.surfaceTint.copy(alpha = 0.24f)
+        },
+        animationSpec = motionScheme.defaultEffectsSpec(),
+        label = "permissionCardBorder",
+    )
+    val containerColor = if (granted) {
+        lerp(scheme.primaryContainer, scheme.surface, 0.38f)
+    } else {
+        scheme.surfaceContainerHigh.copy(alpha = 0.92f)
+    }
+    val titleColor = if (granted) scheme.onPrimaryContainer else scheme.onSurface
+    val bodyColor = if (granted) scheme.onPrimaryContainer.copy(alpha = 0.86f) else scheme.onSurfaceVariant
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .scale(scale),
+        shape = RoundedCornerShape(cardShape),
+        border = BorderStroke(if (granted) 1.4.dp else 1.dp, borderColor),
+        colors = CardDefaults.cardColors(containerColor = containerColor),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (granted) 3.dp else 1.dp),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(cardPadding),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                PermissionIconBadge(
+                    granted = granted,
+                    iconName = iconName,
+                    iconSize = iconSize,
+                    pulseScale = iconPulseScale,
+                )
+                Text(
+                    text = title,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = titleColor,
+                )
+                StatusPill(
+                    text = statusText,
+                    emphasized = primaryAction,
+                )
+            }
+            Spacer(Modifier.height(topBodySpacing))
+            Text(
+                text = body,
+                modifier = Modifier.padding(start = bodyStartPadding),
+                style = MaterialTheme.typography.bodySmall,
+                color = bodyColor,
+            )
+            Spacer(Modifier.height(bottomActionSpacing))
+            AnimatedContent(
+                targetState = granted,
+                transitionSpec = {
+                    (slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { it / 2 } +
+                        fadeIn(animationSpec = motionScheme.defaultEffectsSpec())) togetherWith
+                        (slideOutVertically(animationSpec = motionScheme.defaultSpatialSpec()) { -it / 2 } +
+                            fadeOut(animationSpec = motionScheme.defaultEffectsSpec()))
+                },
+                label = "permissionCardAction",
+            ) { targetGranted ->
+                if (targetGranted) {
+                    RememberOutlinedButton(
+                        onClick = {},
+                        enabled = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            disabledContainerColor = scheme.surfaceContainerHighest,
+                            disabledContentColor = scheme.primary,
+                        ),
+                        border = BorderStroke(1.25.dp, scheme.primary.copy(alpha = 0.75f)),
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "check_circle",
+                                size = 20.dp,
+                                tint = scheme.primary,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = actionText,
+                                style = MaterialTheme.typography.labelLarge,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                    }
+                } else if (primaryAction) {
+                    RememberButton(
+                        onClick = onAction,
+                        enabled = actionEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = scheme.primaryContainer,
+                            contentColor = scheme.onPrimaryContainer,
+                        ),
+                    ) {
+                        Text(
+                            text = actionText,
+                            modifier = Modifier.fillMaxWidth(),
+                            style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                } else {
+                    RememberOutlinedButton(
+                        onClick = onAction,
+                        enabled = actionEnabled,
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(50),
+                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
+                    ) {
+                        Text(
+                            text = actionText,
+                            modifier = Modifier.fillMaxWidth(),
+                            style = MaterialTheme.typography.labelLarge,
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionIconBadge(
+    granted: Boolean,
+    iconName: String,
+    iconSize: Dp,
+    pulseScale: Float,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        modifier = Modifier
+            .size(iconSize)
+            .scale(pulseScale),
+        shape = CircleShape,
+        color = if (granted) scheme.primary else scheme.surfaceContainerHighest,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            RememberMaterialRoundedSymbol(
+                name = iconName,
+                size = 25.dp,
+                tint = if (granted) scheme.onPrimary else scheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun StatusPill(
+    text: String,
+    emphasized: Boolean,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (emphasized) {
+            scheme.primaryContainer
+        } else {
+            scheme.surfaceContainerHighest
+        },
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
+            color = if (emphasized) {
+                scheme.onPrimaryContainer
+            } else {
+                scheme.onSurfaceVariant
+            },
+        )
+    }
+}
+
+private fun notificationSettingsIntent(context: Context): Intent {
+    return Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    }
+}
+
+private fun batteryOptimizationIntent(context: Context): Intent {
+    return Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+        data = Uri.parse("package:${context.packageName}")
+    }
+}

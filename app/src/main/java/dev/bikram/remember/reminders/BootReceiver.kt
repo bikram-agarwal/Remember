@@ -16,11 +16,24 @@ class BootReceiver : BroadcastReceiver() {
         val now = System.currentTimeMillis()
         app.container.applicationScope.launch {
             try {
+                val keepUntilDone = app.container.reminderPrefs
+                    .snapshot()
+                    .keepReminderNotificationsUntilDone
                 val all = app.container.noteRepository.observeActive().first()
                 all.forEach { item ->
                     val at = item.note.reminderAt ?: return@forEach
-                    if (at > now) scheduler.schedule(item.note.id, at)
+                    if (at > now) {
+                        scheduler.schedule(item.note.id, at)
+                    } else if (item.note.completedAt == null) {
+                        ReminderReceiver.showNotification(
+                            context = context,
+                            note = item.note,
+                            items = item.items,
+                            keepUntilDone = keepUntilDone,
+                        )
+                    }
                 }
+                app.container.noteRepository.refreshReminderSummaryNotification()
                 // Re-post the quick-capture notification if the user has it enabled. The
                 // notification is cleared by the OS on reboot, and the flow-based observer
                 // may not fire quickly enough before the broadcast's pending-result window

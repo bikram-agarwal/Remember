@@ -16,6 +16,7 @@ import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.ui.edit.iconEmojiPayload
 import dev.bikram.remember.data.labelRes
 import kotlinx.coroutines.launch
 
@@ -34,11 +35,15 @@ class ReminderReceiver : BroadcastReceiver() {
                 val note = noteWithItems.note
                 if (note.trashed) return@launch
 
-                showNotification(context, note, noteWithItems.items)
-
-                // Reschedule the next occurrence for recurring reminders. This mutates
-                // note.reminderAt and (when the rule is exhausted) clears it.
-                repo.advanceReminderOnFire(noteId)
+                val keepUntilDone = app.container.reminderPrefs
+                    .snapshot()
+                    .keepReminderNotificationsUntilDone
+                showNotification(
+                    context = context,
+                    note = note,
+                    items = noteWithItems.items,
+                    keepUntilDone = keepUntilDone,
+                )
             } finally {
                 pendingResult.finish()
             }
@@ -50,6 +55,7 @@ class ReminderReceiver : BroadcastReceiver() {
             context: Context,
             note: NoteEntity,
             items: List<ChecklistItemEntity> = emptyList(),
+            keepUntilDone: Boolean = false,
         ) {
             if (note.trashed) return
 
@@ -63,14 +69,24 @@ class ReminderReceiver : BroadcastReceiver() {
             val builder = NotificationCompat.Builder(context, channelId)
                 .setSmallIcon(R.drawable.ic_stat_remember)
                 .setContentTitle(
-                    note.title.ifBlank { context.getString(R.string.options_reminder) },
+                    notificationTitle(context, note),
                 )
-                .setContentText(summary(context, note))
+                .setContentText(summary(context, note, items))
                 .setPriority(priorityFor(note.importance))
                 .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setContentIntent(openNotePendingIntent(context, note.id))
-                .setAutoCancel(true)
+                .setDeleteIntent(dismissPendingIntent(context, note.id).takeIf { keepUntilDone })
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setOnlyAlertOnce(true)
+
+            if (note.kind == NoteKind.LIST) {
+                builder.setStyle(
+                    NotificationCompat.BigTextStyle()
+                        .bigText(summary(context, note, items, expanded = true)),
+                )
+            }
 
             if (note.importance == Importance.HIGH) {
                 // Heads-up + on-lockscreen popup. setDefaults provides the sound /
@@ -102,12 +118,47 @@ class ReminderReceiver : BroadcastReceiver() {
             nm.notify(ReminderScheduler.pendingRequestCodeForNote(note.id), builder.build())
         }
 
-        private fun summary(context: Context, note: NoteEntity): String =
-            if (note.body.isNotBlank()) {
+        private fun notificationTitle(context: Context, note: NoteEntity): String {
+            val title = note.title.ifBlank { context.getString(R.string.options_reminder) }
+            val emoji = iconEmojiPayload(note.iconKey) ?: return title
+            return "$emoji $title"
+        }
+
+        private fun summary(
+            context: Context,
+            note: NoteEntity,
+            items: List<ChecklistItemEntity>,
+            expanded: Boolean = false,
+        ): String {
+            if (note.kind == NoteKind.LIST) {
+                val uncheckedItems = items
+                    .asSequence()
+                    .filterNot { it.checked }
+                    .sortedBy { it.sortOrder }
+                    .map { item ->
+                        val text = item.text.trim()
+                        if (item.depth > 0 && text.isNotBlank()) "  $text" else text
+                    }
+                    .filter { it.isNotBlank() }
+                    .toList()
+
+                if (uncheckedItems.isEmpty()) {
+                    return context.getString(R.string.reminder_notification_all_items_checked)
+                }
+
+                return if (expanded) {
+                    uncheckedItems.joinToString("\n")
+                } else {
+                    uncheckedItems.first().take(120)
+                }
+            }
+
+            return if (note.body.isNotBlank()) {
                 note.body.take(120)
             } else {
                 context.getString(R.string.reminder_notification_fallback)
             }
+        }
 
         /**
          * Build the text payload for a SHARE_CONTENT action so it can be baked into the
@@ -139,6 +190,19 @@ class ReminderReceiver : BroadcastReceiver() {
                 context,
                 ReminderScheduler.pendingRequestCodeForNote(noteId),
                 open,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        }
+
+        private fun dismissPendingIntent(context: Context, noteId: Long): PendingIntent {
+            val dismiss = Intent(context, ReminderDismissReceiver::class.java).apply {
+                action = ReminderDismissReceiver.ACTION_DISMISSED
+                putExtra(ReminderDismissReceiver.EXTRA_NOTE_ID, noteId)
+            }
+            return PendingIntent.getBroadcast(
+                context,
+                ReminderScheduler.pendingRequestCodeForDismiss(noteId),
+                dismiss,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }

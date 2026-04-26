@@ -12,9 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.ThemeState
@@ -39,11 +37,14 @@ class MainActivity : FragmentActivity() {
             val themeState by container.themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
             )
+            val tagColors by container.tagRepository.observeTagColorMap().collectAsStateWithLifecycle(
+                initialValue = emptyMap(),
+            )
             val interactionState by container.interactionPrefs.state.collectAsStateWithLifecycle(
                 initialValue = InteractionState(),
             )
             RememberTheme(
-                themeState = themeState,
+                themeState = themeState.copy(tagColors = tagColors),
                 interactionState = interactionState,
             ) {
                 AppRoot(container = container)
@@ -53,6 +54,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
@@ -90,16 +92,23 @@ class MainActivity : FragmentActivity() {
 @Composable
 private fun AppRoot(container: dev.bikram.remember.di.AppContainer) {
     val lockState by container.lockPrefs.state.collectAsStateWithLifecycle(
-        initialValue = dev.bikram.remember.data.LockPrefs.State(),
+        initialValue = null,
     )
-    var unlocked by remember { mutableStateOf(false) }
+    val unlocked by container.appUnlocked.collectAsStateWithLifecycle(initialValue = false)
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    val currentLockState = lockState
+
+    if (currentLockState == null) {
+        androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize())
+        return
+    }
     
-    if (lockState.enabled && lockState.hasPin && !unlocked) {
+    if (currentLockState.enabled && !unlocked) {
         LockScreen(
-            biometricEnabled = lockState.biometric,
-            pinLength = lockState.pinLength,
-            onUnlocked = { unlocked = true },
+            biometricEnabled = currentLockState.biometric,
+            hasPin = currentLockState.hasPin,
+            pinLength = currentLockState.pinLength,
+            onUnlocked = { container.appUnlocked.value = true },
             verify = { pin -> container.lockPrefs.verify(pin) },
         )
     } else {
@@ -109,7 +118,9 @@ private fun AppRoot(container: dev.bikram.remember.di.AppContainer) {
             androidx.compose.foundation.layout.Box(modifier = androidx.compose.ui.Modifier.fillMaxSize()) {
                 RememberNavGraph(
                     repository = container.noteRepository,
+                    onboardingPrefs = container.onboardingPrefs,
                     themePrefs = container.themePrefs,
+                    viewOptionsPrefs = container.viewOptionsPrefs,
                     interactionPrefs = container.interactionPrefs,
                     appScope = container.applicationScope,
                     launchFlow = container.pendingLaunch,

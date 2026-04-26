@@ -41,7 +41,7 @@ data class RecurrenceRule(
     /**
      * Compute the next fire time strictly after [afterMillis].
      * Returns null when the rule is exhausted by [endDate]. Count handling is done
-     * by the caller (see NoteRepository.advanceReminderOnFire).
+     * by the repository when the user completes an occurrence.
      */
     fun nextAfter(afterMillis: Long): Long? {
         val cal = Calendar.getInstance().apply { timeInMillis = afterMillis }

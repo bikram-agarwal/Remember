@@ -61,6 +61,7 @@ fun ChecklistScreen(
 ) {
     val state by viewModel.uiState.collectAsState()
     var newItemText by rememberSaveable { mutableStateOf("") }
+    val listState = rememberLazyListState()
 
     Scaffold(
         topBar = {
@@ -87,7 +88,7 @@ fun ChecklistScreen(
             // Single LazyColumn holds both sections so animateItem() can
             // animate rows moving across the section boundary.
             LazyColumn(
-                state = rememberLazyListState(),
+                state = listState,
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),

@@ -27,7 +27,7 @@ If a ligature is missing from either file, the UI shows the raw string or a blan
    This rescans `app/src/main/java` and writes `font_subset/ligatures.txt` plus `ligatures_report.json`.  
    If your new name is built only from variables (no string literal the regex can see), either add a literal in Kotlin (e.g. a comment line is NOT enough) or add a small explicit list in `harvest_ligatures.py` (see existing patterns: ternary `name = if`, `ActionType.* -> "…"`, etc.).
 
-3. **Subset** the font:
+3. **Subset, deploy, and clean up**:
 
    ```text
    python font_subset/subset_font.py
@@ -35,17 +35,23 @@ If a ligature is missing from either file, the UI shows the raw string or a blan
 
    Requires `fonttools` (`pip install fonttools`). Place the **full** variable `material_symbols_rounded.ttf` in `font_subset/` (from [Google Fonts](https://fonts.google.com/icons) / Material Symbols download), or set `MATERIAL_SYMBOLS_ROUNDED_TTF` to its path. See `subset_font.py` `SOURCE_TTF_CANDIDATES`.
 
-4. **Deploy** the output into the app:
+   This now copies both generated subset fonts into `app/src/main/res/font/` and deletes generated scratch/report files:
 
-   - Copy `font_subset/material_symbols_rounded_subset.ttf` to  
-     `app/src/main/res/font/material_symbols_rounded.ttf`  
-     (replace existing).
+   - `font_subset/material_symbols_rounded_instanced.ttf`
+   - `font_subset/material_symbols_rounded_outlined_instanced.ttf`
+   - `font_subset/material_symbols_rounded_subset.ttf`
+   - `font_subset/material_symbols_rounded_outlined_subset.ttf`
+   - `font_subset/glyphs_expanded.txt`
+   - `font_subset/ligatures.txt`
+   - `font_subset/ligatures_report.json`
+   - `font_subset/probe.txt`
+   - `font_subset/__pycache__/`
 
-5. **Build** the app (e.g. `:app:compileGithubDebugKotlin` or your flavor) and verify the icon on device/emulator.
+4. **Build** the app (e.g. `:app:compileGithubDebugKotlin` or your flavor) and verify the icon on device/emulator.
 
 ## Icon picker catalog only
 
-If the icon is **only** listed in `BundledMaterialSymbolIcons.kt`, harvesting picks up `symbolName = "…"`. Still run harvest + subset + copy if that symbol was not in the subset before.
+If the icon is **only** listed in `BundledMaterialSymbolIcons.kt`, harvesting picks up `symbolName = "…"`. Still run harvest + subset if that symbol was not in the subset before.
 
 ## Optional: search behavior
 

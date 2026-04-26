@@ -8,7 +8,7 @@ import java.util.Locale
 const val ICON_EMOJI_PREFIX: String = "emoji:"
 
 /** Material Symbols ligature for rich-text notes with no custom [iconKey] (flat single icon). */
-const val DEFAULT_NOTE_HEADER_SYMBOL: String = "note"
+const val DEFAULT_NOTE_HEADER_SYMBOL: String = "feed"
 
 /** Material Symbols ligature for checklists with no custom [iconKey]. */
 const val DEFAULT_LIST_HEADER_SYMBOL: String = "checklist"

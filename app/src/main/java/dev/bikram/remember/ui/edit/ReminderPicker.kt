@@ -2,6 +2,8 @@ package dev.bikram.remember.ui.edit
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.TextButton
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.text.format.DateFormat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
@@ -83,6 +85,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import dev.bikram.remember.R
 import dev.bikram.remember.data.MonthlyMode
 import dev.bikram.remember.data.RecurrenceEndKind
@@ -140,12 +146,21 @@ fun ReminderPickerSheet(
     var canScheduleExact by remember { 
         mutableStateOf(Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()) 
     }
+    var notificationsGranted by remember {
+        mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission(),
+    ) {
+        notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+    }
     
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 canScheduleExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
+                notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -212,6 +227,25 @@ fun ReminderPickerSheet(
         scrollable = true,
         actions = null,
     ) {
+        if (!notificationsGranted) {
+            NotificationPermissionRequiredCard(
+                onEnableNotifications = {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.POST_NOTIFICATIONS,
+                        ) != PackageManager.PERMISSION_GRANTED
+                    ) {
+                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    } else {
+                        context.startActivity(notificationSettingsIntent(context))
+                    }
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            return@AppBottomSheet
+        }
+
         // Date pill
         PillRow(
             materialSymbolName = "calendar_month",
@@ -319,7 +353,7 @@ fun ReminderPickerSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    "Exact alarms require permission. Tap to enable in Settings.",
+                    stringResource(R.string.reminder_exact_alarm_permission_prompt),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer,
                     modifier = Modifier.weight(1f)
@@ -427,6 +461,57 @@ fun ReminderPickerSheet(
     }
 }
 
+@Composable
+private fun NotificationPermissionRequiredCard(
+    onEnableNotifications: () -> Unit,
+) {
+    Surface(
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        tonalElevation = 4.dp,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = "notifications",
+                size = 40.dp,
+                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                weight = FontWeight.Medium,
+            )
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = stringResource(R.string.reminder_notifications_required_title),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = stringResource(R.string.reminder_notifications_required_body),
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            )
+            Spacer(Modifier.height(18.dp))
+            RememberButton(
+                onClick = onEnableNotifications,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.reminder_notifications_required_action))
+            }
+        }
+    }
+}
+
+private fun notificationSettingsIntent(context: Context): Intent {
+    return Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+        putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    }
+}
+
 private enum class MonthlyKind { BY_DAY, BY_WEEKDAY }
 
 // Saveable replacement for Material's [DisplayMode], which is a @JvmInline value class and
@@ -479,6 +564,7 @@ internal fun CalendarPickerDialog(
     onDismiss: () -> Unit,
 ) {
     val state = rememberDatePickerState(initialSelectedDateMillis = initial)
+    val datePickerContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -504,7 +590,8 @@ internal fun CalendarPickerDialog(
         ) {
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
-                tonalElevation = 6.dp,
+                color = datePickerContainerColor,
+                tonalElevation = 0.dp,
                 modifier = Modifier
                     .widthIn(min = 328.dp, max = 400.dp)
                     .wrapContentHeight()
@@ -537,7 +624,7 @@ internal fun CalendarPickerDialog(
                             showModeToggle = true,
                             modifier = Modifier.padding(top = 16.dp),
                             colors = DatePickerDefaults.colors(
-                                containerColor = Color.Transparent,
+                                containerColor = datePickerContainerColor,
                                 dividerColor = Color.Transparent,
                             )
                         )
@@ -622,8 +709,8 @@ internal fun ReminderTimePickerDialog(
                             .padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val timeInputModeCd = stringResource(R.string.reminder_time_input_mode_cd)
-                        val timeDialModeCd = stringResource(R.string.reminder_time_dial_mode_cd)
+                        val timeInputModeLabel = stringResource(R.string.reminder_time_input_mode)
+                        val timeDialModeLabel = stringResource(R.string.reminder_time_dial_mode)
                         TooltipBox(
                             positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
                                 TooltipAnchorPosition.Above,
@@ -632,9 +719,9 @@ internal fun ReminderTimePickerDialog(
                                 PlainTooltip {
                                     Text(
                                         text = if (showDial) {
-                                            stringResource(R.string.reminder_time_input_mode_cd)
+                                            timeInputModeLabel
                                         } else {
-                                            stringResource(R.string.reminder_time_dial_mode_cd)
+                                            timeDialModeLabel
                                         },
                                     )
                                 }
@@ -648,7 +735,7 @@ internal fun ReminderTimePickerDialog(
                                     name = if (showDial) "keyboard" else "schedule",
                                     weight = FontWeight.Medium,
                                     modifier = Modifier.semantics {
-                                        contentDescription = if (showDial) timeInputModeCd else timeDialModeCd
+                                        contentDescription = if (showDial) timeInputModeLabel else timeDialModeLabel
                                     },
                                 )
                             }

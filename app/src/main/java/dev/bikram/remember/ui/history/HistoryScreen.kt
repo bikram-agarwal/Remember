@@ -1,5 +1,11 @@
 package dev.bikram.remember.ui.history
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,25 +20,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -48,19 +56,27 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.bikram.remember.R
+import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.EmptyArchiveIllustration
+import dev.bikram.remember.ui.components.EmptyTrashIllustration
+import dev.bikram.remember.ui.components.MultiActionSwipeRevealCard
 import dev.bikram.remember.ui.components.NoteCard
-import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberSegmentedButton
+import dev.bikram.remember.ui.components.SwipeRevealTile
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
+import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -82,8 +98,35 @@ class HistoryViewModel(private val repository: NoteRepository) : ViewModel() {
     val archivedItems: StateFlow<List<NoteWithItems>> = repository.observeArchived()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
+    private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
+    val selectedIds: StateFlow<Set<Long>> = _selectedIds.asStateFlow()
+
+    fun toggleSelection(id: Long) {
+        _selectedIds.value = if (id in _selectedIds.value) {
+            _selectedIds.value - id
+        } else {
+            _selectedIds.value + id
+        }
+    }
+
+    fun selectNotes(ids: Set<Long>) {
+        _selectedIds.value = ids
+    }
+
+    fun clearSelection() {
+        _selectedIds.value = emptySet()
+    }
+
+    fun pruneSelection(validIds: Set<Long>) {
+        _selectedIds.value = _selectedIds.value.intersect(validIds)
+    }
+
     fun restore(note: NoteWithItems) {
         viewModelScope.launch { repository.restoreFromTrash(note.note.id) }
+    }
+
+    fun archiveFromTrash(note: NoteWithItems) {
+        viewModelScope.launch { repository.archiveNote(note.note.id) }
     }
 
     fun deleteForever(note: NoteWithItems) {
@@ -100,6 +143,51 @@ class HistoryViewModel(private val repository: NoteRepository) : ViewModel() {
 
     fun emptyTrash() {
         viewModelScope.launch { repository.emptyTrash() }
+    }
+
+    fun restoreSelected() {
+        val ids = _selectedIds.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { repository.restoreFromTrash(it) }
+            _selectedIds.value = emptySet()
+        }
+    }
+
+    fun archiveSelectedFromTrash() {
+        val ids = _selectedIds.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { repository.archiveNote(it) }
+            _selectedIds.value = emptySet()
+        }
+    }
+
+    fun unarchiveSelected() {
+        val ids = _selectedIds.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { repository.unarchiveNote(it) }
+            _selectedIds.value = emptySet()
+        }
+    }
+
+    fun moveSelectedArchivedToTrash() {
+        val ids = _selectedIds.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { repository.moveToTrash(it) }
+            _selectedIds.value = emptySet()
+        }
+    }
+
+    fun deleteSelectedForever() {
+        val ids = _selectedIds.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            ids.forEach { repository.deleteForever(it) }
+            _selectedIds.value = emptySet()
+        }
     }
 
     /**
@@ -129,14 +217,21 @@ class HistoryViewModel(private val repository: NoteRepository) : ViewModel() {
 @Composable
 fun HistoryRoute(
     repository: NoteRepository,
+    interactionPrefs: InteractionPrefs,
+    section: HistorySection,
+    onSectionChange: (HistorySection) -> Unit,
+    onVisibleItemCountChange: (Int) -> Unit,
     onOpenNote: (NoteWithItems, Boolean) -> Unit,
 ) {
     val vm: HistoryViewModel = viewModel(factory = HistoryViewModel.factory(repository))
     val trashed by vm.trashedItems.collectAsStateWithLifecycle()
     val archived by vm.archivedItems.collectAsStateWithLifecycle()
-    var section by androidx.compose.runtime.saveable.rememberSaveable {
-        androidx.compose.runtime.mutableStateOf(HistorySection.ARCHIVE)
-    }
+    val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
+        initialValue = dev.bikram.remember.data.InteractionState(),
+    )
+    val selectedIds by vm.selectedIds.collectAsStateWithLifecycle()
+    val archivedListState = rememberLazyListState()
+    val trashedListState = rememberLazyListState()
     val topBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     val blurStyle = rememberProgressiveBlurStyle()
@@ -148,94 +243,299 @@ fun HistoryRoute(
         HistorySection.ARCHIVE -> archived
         HistorySection.TRASH -> trashed
     }
+    val listState = when (section) {
+        HistorySection.ARCHIVE -> archivedListState
+        HistorySection.TRASH -> trashedListState
+    }
+    val listScrollEnabled = rememberContentOverflowScrollEnabled(
+        listState = listState,
+        additionalScrollEnabled = topBarState.collapsedFraction > 0f,
+    )
+    val selectableVisibleIds = remember(items) { items.map { it.note.id }.toSet() }
+    val inSelectionMode = selectedIds.isNotEmpty()
+
+    BackHandler(enabled = inSelectionMode) { vm.clearSelection() }
+    LaunchedEffect(section) { vm.clearSelection() }
+    LaunchedEffect(selectableVisibleIds) { vm.pruneSelection(selectableVisibleIds) }
+    LaunchedEffect(section, items.size) { onVisibleItemCountChange(items.size) }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
+        bottomBar = {
+            HistorySelectionActionBar(
+                visible = inSelectionMode,
+                section = section,
+                selectedCount = selectedIds.size,
+                onRestoreSelected = vm::restoreSelected,
+                onArchiveSelected = vm::archiveSelectedFromTrash,
+                onDeleteForeverSelected = vm::deleteSelectedForever,
+                onUnarchiveSelected = vm::unarchiveSelected,
+                onTrashSelected = vm::moveSelectedArchivedToTrash,
+                bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
+            )
+        },
         topBar = {
             LargeTopAppBar(
                 colors = transparentLargeTopAppBarColors(),
                 title = {
                     Text(
-                        text = stringResource(R.string.main_tab_history),
+                        text = if (inSelectionMode) {
+                            stringResource(R.string.home_select_count, selectedIds.size)
+                        } else {
+                            stringResource(R.string.main_tab_history)
+                        },
                         style = MaterialTheme.typography.headlineMedium,
                     )
+                },
+                navigationIcon = {
+                    if (inSelectionMode) {
+                        val cdExit = stringResource(R.string.home_select_exit_cd)
+                        RememberFilledTonalIconButton(onClick = vm::clearSelection) {
+                            RememberMaterialRoundedSymbol(
+                                name = "close",
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.semantics { contentDescription = cdExit },
+                            )
+                        }
+                        Spacer(Modifier.width(4.dp))
+                    }
+                },
+                actions = {
+                    if (inSelectionMode) {
+                        val cdSelectAll = stringResource(R.string.home_select_all)
+                        RememberFilledTonalIconButton(
+                            onClick = { vm.selectNotes(selectableVisibleIds) },
+                            enabled = selectableVisibleIds.isNotEmpty(),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "select_all",
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.semantics { contentDescription = cdSelectAll },
+                            )
+                        }
+                        Spacer(Modifier.width(6.dp))
+                        val cdUnselectAll = stringResource(R.string.home_unselect_all)
+                        RememberFilledTonalIconButton(onClick = vm::clearSelection) {
+                            RememberMaterialRoundedSymbol(
+                                name = "deselect",
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.semantics { contentDescription = cdUnselectAll },
+                            )
+                        }
+                        Spacer(Modifier.width(4.dp))
+                    }
                 },
                 scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
-        Column(
+        // The Box fills the full Scaffold area so the progressive blur (which fades content
+        // near the very top of the screen, behind the LargeTopAppBar) sees the same bounds
+        // it always has - applying blur here, not on the inner Column, keeps the fade band
+        // anchored to the top of the screen instead of riding down on top of the toggle.
+        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(blurMod)
-                .padding(
-                    top = padding.calculateTopPadding() + 4.dp,
-                    bottom = 0.dp,
-                ),
+                .then(blurMod),
         ) {
-            SingleChoiceSegmentedButtonRow(
+            Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .fillMaxSize()
+                    .padding(top = padding.calculateTopPadding() + 4.dp),
             ) {
-                val entries = HistorySection.entries
-                entries.forEachIndexed { index, entry ->
-                    RememberSegmentedButton(
-                        selected = section == entry,
-                        onClick = { section = entry },
-                        shape = SegmentedButtonDefaults.itemShape(index, entries.size),
-                        label = { Text(entry.label()) },
-                    )
-                }
-            }
-            if (section == HistorySection.TRASH && trashed.isNotEmpty()) {
-                RetentionNotice(
+                SingleChoiceSegmentedButtonRow(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                )
-            } else {
-                Spacer(Modifier.height(12.dp))
+                        .padding(horizontal = 16.dp),
+                ) {
+                    val entries = HistorySection.entries
+                    entries.forEachIndexed { index, entry ->
+                        RememberSegmentedButton(
+                            selected = section == entry,
+                            onClick = { onSectionChange(entry) },
+                            shape = SegmentedButtonDefaults.itemShape(index, entries.size),
+                            label = { Text(entry.label()) },
+                        )
+                    }
+                }
+                if (section == HistorySection.TRASH && trashed.isNotEmpty()) {
+                    RetentionNotice(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                    )
+                } else {
+                    Spacer(Modifier.height(12.dp))
+                }
+                if (items.isNotEmpty()) {
+                    LazyColumn(
+                        state = listState,
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = 4.dp,
+                            bottom = pillInset + 24.dp,
+                        ),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        userScrollEnabled = listScrollEnabled,
+                    ) {
+                        items(
+                            items = items,
+                            key = { it.note.id },
+                            contentType = { if (section == HistorySection.TRASH) "trashedRow" else "archivedRow" },
+                        ) { note ->
+                            val noteId = note.note.id
+                            val isSelected = noteId in selectedIds
+                            HistorySwipeCard(
+                                note = note,
+                                section = section,
+                                daysLeft = vm.daysLeftInTrash(note).takeIf { section == HistorySection.TRASH },
+                                hapticEnabled = interactionState.hapticFeedbackEnabled,
+                                onOpenNote = {
+                                    if (inSelectionMode) {
+                                        vm.toggleSelection(noteId)
+                                    } else {
+                                        onOpenNote(note, false)
+                                    }
+                                },
+                                onRestore = { vm.restore(note) },
+                                onArchive = { vm.archiveFromTrash(note) },
+                                onDeleteForever = { vm.deleteForever(note) },
+                                onUnarchive = { vm.unarchive(note) },
+                                onMoveToTrash = { vm.moveArchivedToTrash(note) },
+                                selected = isSelected,
+                                onLongClick = { vm.toggleSelection(noteId) },
+                                swipeEnabled = !inSelectionMode,
+                            )
+                        }
+                    }
+                }
             }
             if (items.isEmpty()) {
-                Box(
-                    modifier = Modifier.weight(1f).fillMaxSize(),
-                    contentAlignment = Alignment.Center,
+                // Top padding pushes the centre below the LargeTopAppBar; bottom padding
+                // raises it above the floating pill bar. The two together let Alignment.Center
+                // land on the true midpoint of the visible viewport instead of the midpoint
+                // of the full Scaffold area.
+                EmptyState(
+                    section = section,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .padding(top = padding.calculateTopPadding(), bottom = pillInset),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HistorySelectionActionBar(
+    visible: Boolean,
+    section: HistorySection,
+    selectedCount: Int,
+    onRestoreSelected: () -> Unit,
+    onArchiveSelected: () -> Unit,
+    onDeleteForeverSelected: () -> Unit,
+    onUnarchiveSelected: () -> Unit,
+    onTrashSelected: () -> Unit,
+    bottomPadding: androidx.compose.ui.unit.Dp,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = bottomPadding),
+        contentAlignment = Alignment.Center,
+    ) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+            exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+        ) {
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                tonalElevation = 6.dp,
+                shadowElevation = 8.dp,
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    EmptyState(section = section)
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(
-                        start = 16.dp,
-                        end = 16.dp,
-                        top = 4.dp,
-                        bottom = pillInset + 24.dp,
-                    ),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(
-                        items = items,
-                        key = { it.note.id },
-                        contentType = { if (section == HistorySection.TRASH) "trashedRow" else "archivedRow" },
-                    ) { note ->
-                        Column {
-                            NoteCard(note = note, onClick = { onOpenNote(note, false) })
-                            when (section) {
-                                HistorySection.TRASH -> TrashRowActions(
-                                    note = note,
-                                    daysLeft = vm.daysLeftInTrash(note),
-                                    onRestore = { vm.restore(note) },
-                                    onDeleteForever = { vm.deleteForever(note) },
-                                )
-                                HistorySection.ARCHIVE -> ArchiveRowActions(
-                                    onUnarchive = { vm.unarchive(note) },
-                                    onMoveToTrash = { vm.moveArchivedToTrash(note) },
-                                )
-                            }
+                    Text(
+                        text = selectedCount.toString(),
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(horizontal = 10.dp),
+                    )
+                    if (section == HistorySection.TRASH) {
+                        val restoreLabel = stringResource(R.string.edit_bottom_bar_restore)
+                        val cdRestore = stringResource(R.string.edit_bottom_bar_restore_cd)
+                        RememberFilledTonalIconButton(
+                            onClick = onRestoreSelected,
+                            tooltipLabel = restoreLabel,
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "restore_from_trash",
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.semantics { contentDescription = cdRestore },
+                            )
                         }
+                        val archiveLabel = stringResource(R.string.edit_bottom_bar_archive)
+                        val cdArchive = stringResource(R.string.edit_bottom_bar_archive_cd)
+                        RememberFilledTonalIconButton(
+                            onClick = onArchiveSelected,
+                            tooltipLabel = archiveLabel,
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "archive",
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.semantics { contentDescription = cdArchive },
+                            )
+                        }
+                    } else {
+                        val unarchiveLabel = stringResource(R.string.edit_bottom_bar_unarchive)
+                        val cdUnarchive = stringResource(R.string.edit_bottom_bar_unarchive_cd)
+                        RememberFilledTonalIconButton(
+                            onClick = onUnarchiveSelected,
+                            tooltipLabel = unarchiveLabel,
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "unarchive",
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.semantics { contentDescription = cdUnarchive },
+                            )
+                        }
+                        val trashLabel = stringResource(R.string.common_move_to_trash)
+                        val cdTrash = stringResource(R.string.history_archive_move_to_trash_cd)
+                        RememberFilledTonalIconButton(
+                            onClick = onTrashSelected,
+                            tooltipLabel = trashLabel,
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "delete_sweep",
+                                weight = FontWeight.Medium,
+                                modifier = Modifier.semantics { contentDescription = cdTrash },
+                            )
+                        }
+                    }
+                    val deleteForeverLabel = stringResource(R.string.edit_bottom_bar_delete_forever)
+                    val cdDeleteForever = stringResource(R.string.edit_bottom_bar_delete_forever_cd)
+                    RememberFilledTonalIconButton(
+                        onClick = onDeleteForeverSelected,
+                        tooltipLabel = deleteForeverLabel,
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                        ),
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "delete_forever",
+                            size = 20.dp,
+                            weight = FontWeight.Medium,
+                            modifier = Modifier.semantics { contentDescription = cdDeleteForever },
+                        )
                     }
                 }
             }
@@ -270,96 +570,149 @@ private fun RetentionNotice(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TrashRowActions(
+private fun HistorySwipeCard(
     note: NoteWithItems,
+    section: HistorySection,
     daysLeft: Int?,
+    hapticEnabled: Boolean,
+    onOpenNote: () -> Unit,
     onRestore: () -> Unit,
+    onArchive: () -> Unit,
     onDeleteForever: () -> Unit,
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (daysLeft != null) {
-            val label = if (daysLeft <= 0) {
-                stringResource(R.string.history_expires_today)
-            } else {
-                stringResource(R.string.history_days_left, daysLeft)
-            }
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (daysLeft <= 3) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.padding(start = 8.dp),
-            )
-        }
-        Spacer(Modifier.weight(1f))
-        val cdRestore = stringResource(R.string.history_restore_cd)
-        RememberIconButton(onClick = onRestore) {
-            RememberMaterialRoundedSymbol(
-                name = "restore_from_trash",
-                size = 24.dp,
-                tint = MaterialTheme.colorScheme.primary,
-                weight = FontWeight.Medium,
-                modifier = Modifier.semantics { contentDescription = cdRestore },
-            )
-        }
-        val cdDeleteForever = stringResource(R.string.history_delete_forever_cd)
-        RememberIconButton(onClick = onDeleteForever) {
-            RememberMaterialRoundedSymbol(
-                name = "delete_forever",
-                size = 24.dp,
-                tint = MaterialTheme.colorScheme.error,
-                weight = FontWeight.Medium,
-                modifier = Modifier.semantics { contentDescription = cdDeleteForever },
-            )
-        }
-    }
-}
-
-@Composable
-private fun ArchiveRowActions(
     onUnarchive: () -> Unit,
     onMoveToTrash: () -> Unit,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    swipeEnabled: Boolean = true,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 6.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.End,
-    ) {
-        val cdUnarchive = stringResource(R.string.history_unarchive_cd)
-        RememberIconButton(onClick = onUnarchive) {
-            RememberMaterialRoundedSymbol(
-                name = "unarchive",
-                size = 24.dp,
-                tint = MaterialTheme.colorScheme.primary,
-                weight = FontWeight.Medium,
-                modifier = Modifier.semantics { contentDescription = cdUnarchive },
+    if (!swipeEnabled) {
+        Box(Modifier.fillMaxWidth()) {
+            NoteCard(
+                note = note,
+                onClick = onOpenNote,
+                selected = selected,
+                onLongClick = onLongClick,
             )
+            if (daysLeft != null) {
+                TrashDaysLeftBadge(
+                    daysLeft = daysLeft,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp),
+                )
+            }
         }
-        val cdMoveToTrash = stringResource(R.string.history_archive_move_to_trash_cd)
-        RememberIconButton(onClick = onMoveToTrash) {
-            RememberMaterialRoundedSymbol(
-                name = "delete",
-                size = 24.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
-                modifier = Modifier.semantics { contentDescription = cdMoveToTrash },
+        return
+    }
+
+    val startActions = when (section) {
+        HistorySection.ARCHIVE -> listOf(
+            SwipeRevealTile(
+                key = "unarchive",
+                labelRes = R.string.edit_bottom_bar_unarchive,
+                symbolName = "unarchive",
+                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                onClick = onUnarchive,
+            ),
+        )
+        HistorySection.TRASH -> listOf(
+            SwipeRevealTile(
+                key = "restore",
+                labelRes = R.string.edit_bottom_bar_restore,
+                symbolName = "restore_from_trash",
+                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                onClick = onRestore,
+            ),
+            SwipeRevealTile(
+                key = "archive",
+                labelRes = R.string.edit_bottom_bar_archive,
+                symbolName = "archive",
+                backgroundColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                onClick = onArchive,
+            ),
+        )
+    }
+    val endActions = when (section) {
+        HistorySection.ARCHIVE -> listOf(
+            SwipeRevealTile(
+                key = "trash",
+                labelRes = R.string.edit_bottom_bar_trash,
+                symbolName = "delete",
+                backgroundColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                onClick = onMoveToTrash,
+            ),
+        )
+        HistorySection.TRASH -> listOf(
+            SwipeRevealTile(
+                key = "delete_forever",
+                labelRes = R.string.edit_bottom_bar_delete_forever,
+                symbolName = "delete_forever",
+                backgroundColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                onClick = onDeleteForever,
+            ),
+        )
+    }
+    MultiActionSwipeRevealCard(
+        startActions = startActions,
+        endActions = endActions,
+        cardShape = RoundedCornerShape(12.dp),
+        hapticEnabled = hapticEnabled,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Box(Modifier.fillMaxWidth()) {
+            NoteCard(
+                note = note,
+                onClick = onOpenNote,
+                selected = selected,
+                onLongClick = onLongClick,
             )
+            if (daysLeft != null) {
+                TrashDaysLeftBadge(
+                    daysLeft = daysLeft,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(10.dp),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun EmptyState(section: HistorySection) {
-    val iconName = if (section == HistorySection.ARCHIVE) "archive" else "delete_sweep"
+private fun TrashDaysLeftBadge(daysLeft: Int, modifier: Modifier = Modifier) {
+    val label = if (daysLeft <= 0) {
+        stringResource(R.string.history_expires_today)
+    } else {
+        stringResource(R.string.history_days_left, daysLeft)
+    }
+    Text(
+        text = label,
+        style = MaterialTheme.typography.labelSmall,
+        color = if (daysLeft <= 3) {
+            MaterialTheme.colorScheme.onErrorContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        modifier = modifier
+            .background(
+                if (daysLeft <= 3) {
+                    MaterialTheme.colorScheme.errorContainer
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainerHigh
+                },
+                RoundedCornerShape(999.dp),
+            )
+            .padding(horizontal = 10.dp, vertical = 4.dp),
+    )
+}
+
+@Composable
+private fun EmptyState(section: HistorySection, modifier: Modifier = Modifier) {
     val titleRes = if (section == HistorySection.ARCHIVE) {
         R.string.history_archive_empty_title
     } else {
@@ -372,15 +725,14 @@ private fun EmptyState(section: HistorySection) {
     }
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = Modifier.padding(horizontal = 24.dp),
+        modifier = modifier.padding(horizontal = 24.dp),
     ) {
-        RememberMaterialRoundedSymbol(
-            name = iconName,
-            size = 64.dp,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            weight = FontWeight.Medium,
-        )
-        Spacer(Modifier.height(16.dp))
+        if (section == HistorySection.ARCHIVE) {
+            EmptyArchiveIllustration()
+        } else {
+            EmptyTrashIllustration()
+        }
+        Spacer(Modifier.height(18.dp))
         Text(
             text = stringResource(titleRes),
             style = MaterialTheme.typography.headlineSmall,

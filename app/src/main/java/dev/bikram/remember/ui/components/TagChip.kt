@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -117,6 +118,7 @@ fun TagChipFilled(
     modifier: Modifier = Modifier,
     color: Color = tagColor(tag),
     faded: Boolean = false,
+    highlighted: Boolean = false,
     onClick: (() -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
     compact: Boolean = false,
@@ -125,12 +127,18 @@ fun TagChipFilled(
     val contentColor = TagPalette.textOn(color)
     val horizontal = if (compact) 8.dp else 12.dp
     val vertical = if (compact) 3.dp else 6.dp
+    val shape = RoundedCornerShape(if (compact) 8.dp else 14.dp)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         modifier = modifier
             .alpha(if (faded) 0.4f else 1f)
-            .background(color, RoundedCornerShape(if (compact) 8.dp else 14.dp))
+            .background(color, shape)
+            .border(
+                width = if (highlighted) 2.dp else 0.dp,
+                color = if (highlighted) MaterialTheme.colorScheme.primary else Color.Transparent,
+                shape = shape,
+            )
             .let { if (onClick != null) it.tapSoundClickable(onClick = onClick) else it }
             .padding(horizontal = horizontal, vertical = vertical),
     ) {
@@ -141,6 +149,14 @@ fun TagChipFilled(
             color = contentColor,
             maxLines = 1,
         )
+        if (highlighted) {
+            RememberMaterialRoundedSymbol(
+                name = "edit",
+                size = 14.dp,
+                tint = contentColor,
+                weight = FontWeight.Medium,
+            )
+        }
         if (onRemove != null) {
             RememberMaterialRoundedSymbol(
                 name = "close",

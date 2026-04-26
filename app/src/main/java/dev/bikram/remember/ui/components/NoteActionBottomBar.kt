@@ -70,11 +70,11 @@ fun NoteActionBottomBar(
     shelfState: NoteShelfState,
     existing: Boolean,
     isEditMode: Boolean,
-    pinned: Boolean,
+    favorite: Boolean,
     completed: Boolean,
     visible: Boolean,
     onToggleEdit: () -> Unit,
-    onTogglePin: () -> Unit,
+    onToggleFavorite: () -> Unit,
     onToggleCompleted: () -> Unit,
     onArchive: () -> Unit,
     onNotification: () -> Unit,
@@ -94,10 +94,10 @@ fun NoteActionBottomBar(
             shelfState = shelfState,
             existing = existing,
             isEditMode = isEditMode,
-            pinned = pinned,
+            favorite = favorite,
             completed = completed,
             onToggleEdit = onToggleEdit,
-            onTogglePin = onTogglePin,
+            onToggleFavorite = onToggleFavorite,
             onToggleCompleted = onToggleCompleted,
             onArchive = onArchive,
             onNotification = onNotification,
@@ -123,10 +123,10 @@ fun NoteActionBottomBarContent(
     shelfState: NoteShelfState,
     existing: Boolean,
     isEditMode: Boolean,
-    pinned: Boolean,
+    favorite: Boolean,
     completed: Boolean,
     onToggleEdit: () -> Unit,
-    onTogglePin: () -> Unit,
+    onToggleFavorite: () -> Unit,
     onToggleCompleted: () -> Unit,
     onArchive: () -> Unit,
     onNotification: () -> Unit,
@@ -153,7 +153,7 @@ fun NoteActionBottomBarContent(
             when (shelfState) {
                 NoteShelfState.ACTIVE -> {
                     EditActionItem(isEditMode = isEditMode, onClick = onToggleEdit)
-                    FavoriteActionItem(pinned = pinned, onClick = onTogglePin)
+                    FavoriteActionItem(favorite = favorite, onClick = onToggleFavorite)
                     if (existing) {
                         // Mark done / not done. Filled check_circle when completed,
                         // outlined when active, so the toggle state reads at a glance.
@@ -193,6 +193,11 @@ fun NoteActionBottomBarContent(
                         icon = "restore_from_trash",
                         label = stringResource(R.string.edit_bottom_bar_restore),
                         onClick = onRestore,
+                    )
+                    ActionItem(
+                        icon = "archive",
+                        label = stringResource(R.string.edit_bottom_bar_archive),
+                        onClick = onArchive,
                     )
                     ActionItem(
                         icon = "delete_forever",
@@ -374,11 +379,11 @@ private fun DoneActionItem(
 }
 
 /**
- * Favorite toggle: pulses on activate (scale bump + pink tint). When pinned, stays pink.
+ * Favorite toggle: pulses on activate (scale bump + pink tint). When favorited, stays pink.
  */
 @Composable
 private fun FavoriteActionItem(
-    pinned: Boolean,
+    favorite: Boolean,
     onClick: () -> Unit,
 ) {
     val hostView = LocalView.current
@@ -393,7 +398,7 @@ private fun FavoriteActionItem(
         label = "bottomBarFavScale",
     )
     val favColor by animateColorAsState(
-        targetValue = if (favPulsing || pinned) Color(0xFFFF9EBC) else MaterialTheme.colorScheme.onSurface,
+        targetValue = if (favPulsing || favorite) Color(0xFFFF9EBC) else MaterialTheme.colorScheme.onSurface,
         animationSpec = colorEffectsSpec,
         label = "bottomBarFavColor",
     )
@@ -403,7 +408,7 @@ private fun FavoriteActionItem(
             .clip(RoundedCornerShape(16.dp))
             .clickable(
                 onClick = {
-                    if (!pinned) {
+                    if (!favorite) {
                         favPulsing = true
                         if (hapticEnabled) hostView.performSaveHaptic()
                     }
@@ -416,12 +421,12 @@ private fun FavoriteActionItem(
     ) {
         // Shape + color together, so the favorite state reads clearly even for users who
         // can't distinguish the pink tint (color-blindness, high-contrast themes, grayscale).
-        // We swap the underlying FILL-instanced font family via `filled = pinned` rather
+        // We swap the underlying FILL-instanced font family via `filled = favorite` rather
         // than switching the ligature name, because in our instanced subset font both
         // "favorite" and "favorite_border" resolve to the same FILL=1 glyph.
         RememberMaterialRoundedSymbol(
             name = "favorite",
-            filled = pinned,
+            filled = favorite,
             size = 24.dp,
             tint = favColor,
             weight = FontWeight.Medium,

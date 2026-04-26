@@ -24,7 +24,7 @@ interface NoteDao {
      * that behaves like a separate shelf from Home.
      */
     @Transaction
-    @Query("SELECT * FROM notes WHERE trashed = 0 AND archived = 0 ORDER BY pinned DESC, updatedAt DESC")
+    @Query("SELECT * FROM notes WHERE trashed = 0 AND archived = 0 ORDER BY updatedAt DESC")
     fun observeActive(): Flow<List<NoteWithItems>>
 
     @Transaction
@@ -43,6 +43,20 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
     suspend fun get(id: Long): NoteWithItems?
 
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE trashed = 0
+          AND archived = 0
+          AND completedAt IS NULL
+          AND reminderAt IS NOT NULL
+          AND reminderAt <= :untilMillis
+        ORDER BY reminderAt ASC
+        """,
+    )
+    suspend fun activeRemindersUntil(untilMillis: Long): List<NoteWithItems>
+
     /**
      * Full-text search over active notes (no trashed, no archived). Uses an inner join against
      * the FTS4 virtual table `notes_fts` via the `MATCH` operator. The query is passed straight
@@ -56,7 +70,7 @@ interface NoteDao {
         WHERE notes_fts MATCH :ftsQuery
           AND notes.trashed = 0
           AND notes.archived = 0
-        ORDER BY notes.pinned DESC, notes.updatedAt DESC
+        ORDER BY notes.updatedAt DESC
         """,
     )
     fun searchNotes(ftsQuery: String): Flow<List<NoteWithItems>>
@@ -101,8 +115,11 @@ interface NoteDao {
     @Update
     suspend fun update(note: NoteEntity)
 
-    @Query("UPDATE notes SET pinned = :pinned, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun setPinned(id: Long, pinned: Boolean, updatedAt: Long)
+    @Query("UPDATE notes SET pinned = :favorite, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setFavorite(id: Long, favorite: Boolean, updatedAt: Long)
+
+    @Query("UPDATE notes SET tags = :tags WHERE id = :id")
+    suspend fun updateTagCache(id: Long, tags: List<String>)
 
     @Query(
         "UPDATE notes " +
@@ -138,6 +155,9 @@ interface NoteDao {
 
     @Query("SELECT id FROM notes WHERE trashed = 1")
     suspend fun trashedNoteIds(): List<Long>
+
+    @Query("SELECT id FROM notes WHERE archived = 1 AND trashed = 0")
+    suspend fun archivedNoteIds(): List<Long>
 
     @Query("SELECT id FROM notes WHERE trashed = 1 AND trashedAt IS NOT NULL AND trashedAt < :cutoff")
     suspend fun trashedNoteIdsOlderThan(cutoff: Long): List<Long>
@@ -191,4 +211,50 @@ interface AttachmentDao {
 
     @Query("DELETE FROM attachments WHERE noteId = :noteId")
     suspend fun deleteForNote(noteId: Long)
+}
+
+@Dao
+interface TagDao {
+
+    @Query("SELECT * FROM tags ORDER BY normalizedName ASC")
+    fun observeAllTags(): Flow<List<TagEntity>>
+
+    @Query(
+        """
+        SELECT DISTINCT tags.* FROM tags
+        INNER JOIN note_tags ON tags.id = note_tags.tagId
+        INNER JOIN notes ON notes.id = note_tags.noteId
+        WHERE notes.trashed = 0 AND notes.archived = 0
+        ORDER BY tags.normalizedName ASC
+        """,
+    )
+    fun observeActiveTags(): Flow<List<TagEntity>>
+
+    @Query(
+        """
+        SELECT tags.* FROM tags
+        INNER JOIN note_tags ON tags.id = note_tags.tagId
+        WHERE note_tags.noteId = :noteId
+        ORDER BY note_tags.sortOrder ASC, tags.normalizedName ASC
+        """,
+    )
+    suspend fun tagsForNote(noteId: Long): List<TagEntity>
+
+    @Query("SELECT * FROM tags WHERE normalizedName = :normalizedName LIMIT 1")
+    suspend fun getByNormalizedName(normalizedName: String): TagEntity?
+
+    @Query("SELECT noteId FROM note_tags WHERE tagId = :tagId")
+    suspend fun noteIdsForTag(tagId: Long): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertTag(tag: TagEntity): Long
+
+    @Update
+    suspend fun updateTag(tag: TagEntity)
+
+    @Query("DELETE FROM note_tags WHERE noteId = :noteId")
+    suspend fun deleteAssignmentsForNote(noteId: Long)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAssignments(assignments: List<NoteTagCrossRef>)
 }
