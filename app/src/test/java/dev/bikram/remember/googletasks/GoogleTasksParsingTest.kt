@@ -13,16 +13,17 @@ import java.time.Instant
  * via instrumented tests / manual QA because [GoogleTasksImporter] writes through Room.
  */
 class GoogleTasksParsingTest {
-
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-        coerceInputValues = true
-    }
+    private val json =
+        Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+            coerceInputValues = true
+        }
 
     @Test
     fun `parses task lists response with multiple lists`() {
-        val payload = """
+        val payload =
+            """
             {
               "kind": "tasks#taskLists",
               "items": [
@@ -30,7 +31,7 @@ class GoogleTasksParsingTest {
                 { "id": "def", "title": "Groceries" }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
         val parsed = json.decodeFromString(GoogleTaskListsResponse.serializer(), payload)
         assertEquals(2, parsed.items.size)
         assertEquals("My Tasks", parsed.items[0].title)
@@ -40,7 +41,8 @@ class GoogleTasksParsingTest {
 
     @Test
     fun `parses tasks response and tolerates unknown fields`() {
-        val payload = """
+        val payload =
+            """
             {
               "kind": "tasks#tasks",
               "items": [
@@ -68,7 +70,7 @@ class GoogleTasksParsingTest {
               ],
               "nextPageToken": "next123"
             }
-        """.trimIndent()
+            """.trimIndent()
         val parsed = json.decodeFromString(GoogleTasksResponse.serializer(), payload)
         assertEquals(3, parsed.items.size)
         assertEquals("next123", parsed.nextPageToken)
@@ -106,7 +108,8 @@ class GoogleTasksParsingTest {
 
     @Test
     fun `parses takeout task lists with nested tasks`() {
-        val payload = """
+        val payload =
+            """
             {
               "items": [
                 {
@@ -131,7 +134,7 @@ class GoogleTasksParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val parsed = GoogleTasksTakeoutParser().parse(payload)
 
@@ -145,7 +148,8 @@ class GoogleTasksParsingTest {
 
     @Test
     fun `parses takeout file with a direct tasks array`() {
-        val payload = """
+        val payload =
+            """
             {
               "tasks": [
                 {
@@ -155,19 +159,30 @@ class GoogleTasksParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val parsed = GoogleTasksTakeoutParser().parse(payload)
 
         assertEquals(1, parsed.taskLists.size)
         assertEquals("Google Tasks", parsed.taskLists.first().title)
-        assertEquals("Renew passport", parsed.tasks.first().task.title)
-        assertEquals("Bring photo", parsed.tasks.first().task.notes)
+        assertEquals(
+            "Renew passport",
+            parsed.tasks
+                .first()
+                .task.title,
+        )
+        assertEquals(
+            "Bring photo",
+            parsed.tasks
+                .first()
+                .task.notes,
+        )
     }
 
     @Test
     fun `collapses takeout recurring instances by recurrence id`() {
-        val payload = """
+        val payload =
+            """
             {
               "items": [
                 {
@@ -203,13 +218,23 @@ class GoogleTasksParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val parsed = GoogleTasksTakeoutParser(now = { Instant.parse("2026-05-01T00:00:00Z") }).parse(payload)
 
         assertEquals(1, parsed.tasks.size)
-        assertEquals("takeout-series:list-1:rec-weekly", parsed.tasks.first().task.id)
-        assertEquals("2026-05-02T10:00:00Z", parsed.tasks.first().task.due)
+        assertEquals(
+            "takeout-series:list-1:rec-weekly",
+            parsed.tasks
+                .first()
+                .task.id,
+        )
+        assertEquals(
+            "2026-05-02T10:00:00Z",
+            parsed.tasks
+                .first()
+                .task.due,
+        )
         assertEquals(3, parsed.stats.originalTaskCount)
         assertEquals(1, parsed.stats.importedTaskCount)
         assertEquals(2, parsed.stats.collapsedInstanceCount)
@@ -218,7 +243,8 @@ class GoogleTasksParsingTest {
 
     @Test
     fun `collapses completed historical recurrence representatives with same content`() {
-        val payload = """
+        val payload =
+            """
             {
               "items": [
                 {
@@ -257,18 +283,24 @@ class GoogleTasksParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val parsed = GoogleTasksTakeoutParser(now = { Instant.parse("2026-05-01T00:00:00Z") }).parse(payload)
 
         assertEquals(1, parsed.tasks.size)
-        assertEquals("Kitchen Cleaning", parsed.tasks.first().task.title)
+        assertEquals(
+            "Kitchen Cleaning",
+            parsed.tasks
+                .first()
+                .task.title,
+        )
         assertEquals(2, parsed.stats.collapsedInstanceCount)
     }
 
     @Test
     fun `skips empty takeout task shells`() {
-        val payload = """
+        val payload =
+            """
             {
               "items": [
                 {
@@ -289,19 +321,25 @@ class GoogleTasksParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val parsed = GoogleTasksTakeoutParser().parse(payload)
 
         assertEquals(1, parsed.tasks.size)
-        assertEquals("Real task", parsed.tasks.first().task.title)
+        assertEquals(
+            "Real task",
+            parsed.tasks
+                .first()
+                .task.title,
+        )
         assertEquals(2, parsed.stats.originalTaskCount)
         assertEquals(1, parsed.stats.importedTaskCount)
     }
 
     @Test
     fun `fallback recurrence collapse keeps different notes separate`() {
-        val payload = """
+        val payload =
+            """
             {
               "items": [
                 {
@@ -324,7 +362,7 @@ class GoogleTasksParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val parsed = GoogleTasksTakeoutParser().parse(payload)
 
@@ -335,7 +373,8 @@ class GoogleTasksParsingTest {
 
     @Test
     fun `fallback collapse handles repeated same content without recurrence metadata`() {
-        val payload = """
+        val payload =
+            """
             {
               "items": [
                 {
@@ -359,19 +398,25 @@ class GoogleTasksParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val parsed = GoogleTasksTakeoutParser(now = { Instant.parse("2026-04-15T00:00:00Z") }).parse(payload)
 
         assertEquals(1, parsed.tasks.size)
-        assertEquals("2026-05-01T00:00:00Z", parsed.tasks.first().task.due)
+        assertEquals(
+            "2026-05-01T00:00:00Z",
+            parsed.tasks
+                .first()
+                .task.due,
+        )
         assertEquals(1, parsed.stats.collapsedInstanceCount)
         assertEquals(1, parsed.stats.recurringSeriesCount)
     }
 
     @Test
     fun `same takeout title in different lists stays separate`() {
-        val payload = """
+        val payload =
+            """
             {
               "items": [
                 {
@@ -398,7 +443,7 @@ class GoogleTasksParsingTest {
                 }
               ]
             }
-        """.trimIndent()
+            """.trimIndent()
 
         val parsed = GoogleTasksTakeoutParser().parse(payload)
 

@@ -13,9 +13,13 @@ data class NotesFilter(
 ) {
     /** True if any non-text facet is narrowing the results. */
     val facetActive: Boolean
-        get() = type != FilterType.ALL || tags.isNotEmpty() ||
-            hasReminder != null || hasPicture != null ||
-            hasAttachment != null || favorite != null
+        get() =
+            type != FilterType.ALL ||
+                tags.isNotEmpty() ||
+                hasReminder != null ||
+                hasPicture != null ||
+                hasAttachment != null ||
+                favorite != null
 
     val active: Boolean
         get() = text.isNotBlank() || facetActive
@@ -24,13 +28,15 @@ data class NotesFilter(
 fun NotesFilter.matches(n: NoteWithItems): Boolean {
     val note = n.note
     val visibleTags = RememberReservedTags.userVisibleTags(note.tags)
-    val typeOk = when (type) {
-        FilterType.ALL -> true
-        FilterType.NOTE -> note.kind == NoteKind.NOTE
-        FilterType.LIST -> note.kind == NoteKind.LIST
-    }
+    val typeOk =
+        when (type) {
+            FilterType.ALL -> true
+            FilterType.NOTE -> note.kind == NoteKind.NOTE
+            FilterType.LIST -> note.kind == NoteKind.LIST
+        }
     if (!typeOk) return false
-    if (tags.isNotEmpty() && !tags.all { filterTag ->
+    if (tags.isNotEmpty() &&
+        !tags.all { filterTag ->
             visibleTags.any { it.equals(filterTag, ignoreCase = true) }
         }
     ) {

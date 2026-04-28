@@ -15,10 +15,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
@@ -60,24 +60,26 @@ fun SwipeableRememberNoteCard(
     if (interaction.swipeGestureMode == SwipeGestureMode.REVEAL_ACTIONS) {
         MultiActionSwipeRevealCard(
             modifier = modifier.fillMaxWidth(),
-            startActions = interaction.swipeStartToEndRevealActions
-                .filterNotNull()
-                .map { action ->
-                    action.revealTile(
-                        noteCompleted = noteCompleted,
-                        noteFavorite = noteFavorite,
-                        onClick = { onSwipeAction(note, action) },
-                    )
-                },
-            endActions = interaction.swipeEndToStartRevealActions
-                .filterNotNull()
-                .map { action ->
-                    action.revealTile(
-                        noteCompleted = noteCompleted,
-                        noteFavorite = noteFavorite,
-                        onClick = { onSwipeAction(note, action) },
-                    )
-                },
+            startActions =
+                interaction.swipeStartToEndRevealActions
+                    .filterNotNull()
+                    .map { action ->
+                        action.revealTile(
+                            noteCompleted = noteCompleted,
+                            noteFavorite = noteFavorite,
+                            onClick = { onSwipeAction(note, action) },
+                        )
+                    },
+            endActions =
+                interaction.swipeEndToStartRevealActions
+                    .filterNotNull()
+                    .map { action ->
+                        action.revealTile(
+                            noteCompleted = noteCompleted,
+                            noteFavorite = noteFavorite,
+                            onClick = { onSwipeAction(note, action) },
+                        )
+                    },
             cardShape = NoteCardShape,
             hapticEnabled = interaction.hapticFeedbackEnabled,
         ) {
@@ -108,11 +110,12 @@ fun SwipeableRememberNoteCard(
             )
             val tint = action.semanticSwipeIconTint()
             Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth()
-                    .background(backgroundColor)
-                    .padding(horizontal = 16.dp),
+                modifier =
+                    Modifier
+                        .fillMaxHeight()
+                        .fillMaxWidth()
+                        .background(backgroundColor)
+                        .padding(horizontal = 16.dp),
                 contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
             ) {
                 // For MARK_DONE the FILL axis flips with completion state so the
@@ -121,8 +124,10 @@ fun SwipeableRememberNoteCard(
                 //   completed    -> filled check_circle (FILL=1)   "Mark not done"
                 // All other actions ignore the flag.
                 val iconFilled =
-                    action == NoteSwipeAction.MARK_DONE && noteCompleted ||
-                        action == NoteSwipeAction.TOGGLE_FAVORITE && noteFavorite
+                    action == NoteSwipeAction.MARK_DONE &&
+                        noteCompleted ||
+                        action == NoteSwipeAction.TOGGLE_FAVORITE &&
+                        noteFavorite
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (fromStart) {
                         RememberMaterialRoundedSymbol(
@@ -175,20 +180,24 @@ fun SwipeableRememberNoteCard(
 private fun NoteSwipeAction.labelString(
     noteCompleted: Boolean = false,
     noteFavorite: Boolean = false,
-): String = stringResource(
-    when (this) {
-        NoteSwipeAction.EDIT -> R.string.swipe_action_open
-        NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
-        NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
-        NoteSwipeAction.TOGGLE_FAVORITE -> {
-            if (noteFavorite) R.string.swipe_action_unfavorite else R.string.swipe_action_toggle_favorite
-        }
-        NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
-        NoteSwipeAction.MARK_DONE ->
-            if (noteCompleted) R.string.swipe_action_mark_not_done
-            else R.string.swipe_action_mark_done
-    },
-)
+): String =
+    stringResource(
+        when (this) {
+            NoteSwipeAction.EDIT -> R.string.swipe_action_open
+            NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
+            NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
+            NoteSwipeAction.TOGGLE_FAVORITE -> {
+                if (noteFavorite) R.string.swipe_action_unfavorite else R.string.swipe_action_toggle_favorite
+            }
+            NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
+            NoteSwipeAction.MARK_DONE ->
+                if (noteCompleted) {
+                    R.string.swipe_action_mark_not_done
+                } else {
+                    R.string.swipe_action_mark_done
+                }
+        },
+    )
 
 @Composable
 private fun NoteSwipeAction.revealTile(
@@ -197,24 +206,27 @@ private fun NoteSwipeAction.revealTile(
     onClick: () -> Unit,
 ): SwipeRevealTile {
     val iconFilled =
-        this == NoteSwipeAction.MARK_DONE && noteCompleted ||
-            this == NoteSwipeAction.TOGGLE_FAVORITE && noteFavorite
-    val labelRes = when (this) {
-        NoteSwipeAction.EDIT -> R.string.swipe_action_open
-        NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
-        NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
-        NoteSwipeAction.TOGGLE_FAVORITE -> {
-            if (noteFavorite) R.string.swipe_action_unfavorite else R.string.swipe_action_toggle_favorite
-        }
-        NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
-        NoteSwipeAction.MARK_DONE -> {
-            if (noteCompleted) {
-                R.string.swipe_action_mark_not_done
-            } else {
-                R.string.swipe_action_mark_done
+        this == NoteSwipeAction.MARK_DONE &&
+            noteCompleted ||
+            this == NoteSwipeAction.TOGGLE_FAVORITE &&
+            noteFavorite
+    val labelRes =
+        when (this) {
+            NoteSwipeAction.EDIT -> R.string.swipe_action_open
+            NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
+            NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
+            NoteSwipeAction.TOGGLE_FAVORITE -> {
+                if (noteFavorite) R.string.swipe_action_unfavorite else R.string.swipe_action_toggle_favorite
+            }
+            NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
+            NoteSwipeAction.MARK_DONE -> {
+                if (noteCompleted) {
+                    R.string.swipe_action_mark_not_done
+                } else {
+                    R.string.swipe_action_mark_done
+                }
             }
         }
-    }
     return SwipeRevealTile(
         key = name,
         labelRes = labelRes,

@@ -1,0 +1,99 @@
+config:
+  validation: true
+  warningsAsErrors: false
+
+processors:
+  active: true
+
+console-reports:
+  active: true
+
+complexity:
+  active: true
+  ComplexCondition:
+    active: true
+    allowedConditions: 5
+  CyclomaticComplexMethod:
+    active: true
+    allowedComplexity: 90
+  LargeClass:
+    active: true
+    allowedLines: 900
+  LongMethod:
+    active: true
+    allowedLines: 150
+    excludes:
+      - "**/ui/**"
+      - "**/googletasks/GoogleTasksImportScreen.kt"
+  LongParameterList:
+    active: true
+    allowedFunctionParameters: 12
+    allowedConstructorParameters: 10
+    ignoreDefaultParameters: true
+  NestedBlockDepth:
+    active: true
+    allowedDepth: 5
+  TooManyFunctions:
+    active: false
+
+comments:
+  active: true
+
+coroutines:
+  active: true
+
+empty-blocks:
+  active: true
+
+exceptions:
+  active: true
+  SwallowedException:
+    active: false
+  TooGenericExceptionCaught:
+    active: false
+
+naming:
+  active: true
+  FunctionNaming:
+    active: true
+    ignoreAnnotated:
+      - Composable
+      - Test
+  MatchingDeclarationName:
+    active: false
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: "[A-Z][_A-Za-z0-9]*"
+
+performance:
+  active: true
+
+potential-bugs:
+  active: true
+
+style:
+  active: true
+  LoopWithTooManyJumpStatements:
+    active: false
+  MagicNumber:
+    active: false
+    ignoreNumbers:
+      - "-1"
+      - "0"
+      - "1"
+      - "2"
+    ignoreHashCodeFunction: true
+    ignorePropertyDeclaration: true
+    ignoreCompanionObjectPropertyDeclaration: true
+    ignoreAnnotation: true
+    ignoreNamedArgument: true
+  MaxLineLength:
+    active: false
+  ReturnCount:
+    active: false
+  UnusedPrivateClass:
+    active: true
+  UnusedPrivateFunction:
+    active: true
+  UnusedPrivateProperty:
+    active: true

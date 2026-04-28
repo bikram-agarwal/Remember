@@ -15,8 +15,11 @@ const val DEFAULT_LIST_HEADER_SYMBOL: String = "checklist"
 
 /** Catalog key used when the note has no persisted [iconKey] (picker selection + labels). */
 fun defaultIconCatalogKey(isChecklist: Boolean): String =
-    if (isChecklist) "${ICON_SYMBOL_PREFIX}$DEFAULT_LIST_HEADER_SYMBOL"
-    else "${ICON_SYMBOL_PREFIX}$DEFAULT_NOTE_HEADER_SYMBOL"
+    if (isChecklist) {
+        "${ICON_SYMBOL_PREFIX}$DEFAULT_LIST_HEADER_SYMBOL"
+    } else {
+        "${ICON_SYMBOL_PREFIX}$DEFAULT_NOTE_HEADER_SYMBOL"
+    }
 
 /** Stored in note `iconKey`; [Material Symbols](https://fonts.google.com/icons) ligature name. */
 const val ICON_SYMBOL_PREFIX: String = "symbol:"
@@ -51,18 +54,23 @@ val iconCatalog: List<IconCategory> =
     }
 
 private val symbolNameByKey: Map<String, String> =
-    iconCatalog.flatMap { it.icons }.mapNotNull { choice ->
-        choice.symbolName?.let { symbol -> choice.key to symbol }
-    }.toMap()
+    iconCatalog
+        .flatMap { it.icons }
+        .mapNotNull { choice ->
+            choice.symbolName?.let { symbol -> choice.key to symbol }
+        }.toMap()
 
 private val drawableResByKey: Map<String, Int> =
-    iconCatalog.flatMap { it.icons }.mapNotNull { choice ->
-        choice.drawableRes?.let { resId -> choice.key to resId }
-    }.toMap()
+    iconCatalog
+        .flatMap { it.icons }
+        .mapNotNull { choice ->
+            choice.drawableRes?.let { resId -> choice.key to resId }
+        }.toMap()
 
-private val legacySymbolIconKeyNormalizations: Map<String, String> = mapOf(
-    "${ICON_SYMBOL_PREFIX}try" to "${ICON_SYMBOL_PREFIX}currency_lira",
-)
+private val legacySymbolIconKeyNormalizations: Map<String, String> =
+    mapOf(
+        "${ICON_SYMBOL_PREFIX}try" to "${ICON_SYMBOL_PREFIX}currency_lira",
+    )
 
 /**
  * Returns the canonical catalog key for [iconKey], including legacy symbol keys that
@@ -88,11 +96,12 @@ fun iconDrawableRes(key: String?): Int? {
 }
 
 fun iconEmojiPayload(iconKey: String?): String? {
-    val raw = iconKey
-        ?.takeIf { it.startsWith(ICON_EMOJI_PREFIX) }
-        ?.removePrefix(ICON_EMOJI_PREFIX)
-        ?.takeIf { it.isNotBlank() }
-        ?: return null
+    val raw =
+        iconKey
+            ?.takeIf { it.startsWith(ICON_EMOJI_PREFIX) }
+            ?.removePrefix(ICON_EMOJI_PREFIX)
+            ?.takeIf { it.isNotBlank() }
+            ?: return null
     val boundary = java.text.BreakIterator.getCharacterInstance()
     boundary.setText(raw)
     val start = boundary.first()
@@ -101,13 +110,18 @@ fun iconEmojiPayload(iconKey: String?): String? {
 }
 
 fun humanizeIconKey(iconKey: String): String {
-    val base = when {
-        iconKey.startsWith(ICON_SYMBOL_PREFIX) ->
-            iconKey.removePrefix(ICON_SYMBOL_PREFIX)
-        iconKey.startsWith(ICON_DRAWABLE_PREFIX) ->
-            iconKey.removePrefix(ICON_DRAWABLE_PREFIX).removePrefix("ic_").removePrefix("action_").removePrefix("stat_")
-        else -> iconKey
-    }
+    val base =
+        when {
+            iconKey.startsWith(ICON_SYMBOL_PREFIX) ->
+                iconKey.removePrefix(ICON_SYMBOL_PREFIX)
+            iconKey.startsWith(ICON_DRAWABLE_PREFIX) ->
+                iconKey
+                    .removePrefix(ICON_DRAWABLE_PREFIX)
+                    .removePrefix("ic_")
+                    .removePrefix("action_")
+                    .removePrefix("stat_")
+            else -> iconKey
+        }
     if (base.isBlank()) return iconKey
     return base
         .split('_')

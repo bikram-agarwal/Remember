@@ -4,7 +4,7 @@ import org.json.JSONObject
 
 /**
  * User-controlled viewport into the single stored hero bitmap.
- * [focalX],[focalY] are normalized 0..1 in image space (point that sits at mask center).
+ * [focalX], [focalY] are normalized 0..1 in image space (point that sits at mask center).
  * [zoom] is >= 1, relative to the minimum uniform scale that covers the mask (cover scale).
  */
 data class HeroFraming(
@@ -12,11 +12,12 @@ data class HeroFraming(
     val focalY: Float = 0.5f,
     val zoom: Float = 1f,
 ) {
-    fun clamped(): HeroFraming = HeroFraming(
-        focalX = focalX.coerceIn(0f, 1f),
-        focalY = focalY.coerceIn(0f, 1f),
-        zoom = zoom.coerceIn(1f, 8f),
-    )
+    fun clamped(): HeroFraming =
+        HeroFraming(
+            focalX = focalX.coerceIn(0f, 1f),
+            focalY = focalY.coerceIn(0f, 1f),
+            zoom = zoom.coerceIn(1f, 8f),
+        )
 
     fun toJsonString(): String =
         JSONObject()

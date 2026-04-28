@@ -1,9 +1,5 @@
 package dev.bikram.remember.ui.edit
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.TextButton
-
 import android.content.Intent
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -14,12 +10,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import dev.bikram.remember.ui.common.AppBottomSheet
-import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,35 +22,38 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ActionType
+import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.dataLabelRes
 import dev.bikram.remember.data.labelRes
-import dev.bikram.remember.data.NoteAction
-import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
+import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 
-fun ActionType.materialSymbolName(): String = when (this) {
-    ActionType.CALL_NUMBER -> "call"
-    ActionType.SEND_MESSAGE -> "send"
-    ActionType.SEND_EMAIL -> "mail"
-    ActionType.GET_DIRECTIONS -> "directions"
-    ActionType.OPEN_LINK -> "link"
-    ActionType.OPEN_APP -> "apps"
-    ActionType.OPEN_SHORTCUT -> "app_shortcut"
-    ActionType.COPY_TO_CLIPBOARD -> "content_copy"
-    ActionType.SHARE_CONTENT -> "share"
-    ActionType.MARK_AS_DONE -> "check"
-    ActionType.SNOOZE -> "snooze"
-}
+fun ActionType.materialSymbolName(): String =
+    when (this) {
+        ActionType.CALL_NUMBER -> "call"
+        ActionType.SEND_MESSAGE -> "send"
+        ActionType.SEND_EMAIL -> "mail"
+        ActionType.GET_DIRECTIONS -> "directions"
+        ActionType.OPEN_LINK -> "link"
+        ActionType.OPEN_APP -> "apps"
+        ActionType.OPEN_SHORTCUT -> "app_shortcut"
+        ActionType.COPY_TO_CLIPBOARD -> "content_copy"
+        ActionType.SHARE_CONTENT -> "share"
+        ActionType.MARK_AS_DONE -> "check"
+        ActionType.SNOOZE -> "snooze"
+    }
 
 @Composable
 private fun ActionType.dataLabelText(): String = stringResource(dataLabelRes())
@@ -92,9 +88,10 @@ fun ActionPicker(
             },
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 120.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 120.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 draft.forEachIndexed { idx, action ->
@@ -136,8 +133,8 @@ fun ActionPicker(
                     editorType = type
                 }
             },
-            onDismiss = { 
-                typePickerOpen = false 
+            onDismiss = {
+                typePickerOpen = false
             },
         )
     }
@@ -157,8 +154,8 @@ fun ActionPicker(
                 editorType = null
                 editingIndex = null
             },
-            onDismiss = { 
-                editorType = null 
+            onDismiss = {
+                editorType = null
                 editingIndex = null
             },
         )
@@ -222,9 +219,10 @@ private fun AddActionRow(onClick: () -> Unit) {
     Surface(
         shape = RoundedCornerShape(12.dp),
         color = MaterialTheme.colorScheme.primaryContainer,
-        modifier = Modifier
-            .fillMaxWidth()
-            .tapSoundClickable(onClick = onClick),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .tapSoundClickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
@@ -261,10 +259,11 @@ private fun TypePickerDialog(
         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
             ActionType.entries.filter { it != ActionType.MARK_AS_DONE && it != ActionType.SNOOZE }.forEach { t ->
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .tapSoundClickable { onPick(t) }
-                        .padding(horizontal = 8.dp, vertical = 12.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .tapSoundClickable { onPick(t) }
+                            .padding(horizontal = 8.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RememberMaterialRoundedSymbol(
@@ -341,11 +340,13 @@ private fun SimpleEditor(
                 modifier = Modifier.fillMaxWidth(),
             )
             if (showData) {
-                val keyboardOptions = if (type == ActionType.OPEN_LINK) {
-                    androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri)
-                } else {
-                    androidx.compose.foundation.text.KeyboardOptions.Default
-                }
+                val keyboardOptions =
+                    if (type == ActionType.OPEN_LINK) {
+                        androidx.compose.foundation.text
+                            .KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri)
+                    } else {
+                        androidx.compose.foundation.text.KeyboardOptions.Default
+                    }
                 OutlinedTextField(
                     value = data,
                     onValueChange = { data = it },
@@ -376,22 +377,25 @@ private fun ContactBackedEditor(
     val context = LocalContext.current
     var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
     var data by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
-    val launcher = launcherFactory { pick ->
-        val prefixRes = when (type) {
-            ActionType.CALL_NUMBER -> R.string.action_contact_verb_call
-            ActionType.SEND_MESSAGE -> R.string.action_contact_verb_message
-            ActionType.SEND_EMAIL -> R.string.action_contact_verb_email
-            else -> null
+    val launcher =
+        launcherFactory { pick ->
+            val prefixRes =
+                when (type) {
+                    ActionType.CALL_NUMBER -> R.string.action_contact_verb_call
+                    ActionType.SEND_MESSAGE -> R.string.action_contact_verb_message
+                    ActionType.SEND_EMAIL -> R.string.action_contact_verb_email
+                    else -> null
+                }
+            if (prefixRes != null && pick.displayName.isNotBlank()) {
+                title =
+                    context.getString(
+                        R.string.actions_contact_title_format,
+                        context.getString(prefixRes),
+                        pick.displayName,
+                    )
+            }
+            data = pick.data
         }
-        if (prefixRes != null && pick.displayName.isNotBlank()) {
-            title = context.getString(
-                R.string.actions_contact_title_format,
-                context.getString(prefixRes),
-                pick.displayName,
-            )
-        }
-        data = pick.data
-    }
     val ready = title.isNotBlank() && data.isNotBlank()
     EditorShell(
         type = type,
@@ -480,9 +484,12 @@ private fun AppBackedEditor(
             onPick = { app ->
                 pkg = app.packageName
                 val defaultTitle = context.getString(type.labelRes())
-                val newTitle = if (title.isBlank() || title == defaultTitle) {
-                    context.getString(R.string.actions_open_app_title, app.label.toString())
-                } else title
+                val newTitle =
+                    if (title.isBlank() || title == defaultTitle) {
+                        context.getString(R.string.actions_open_app_title, app.label.toString())
+                    } else {
+                        title
+                    }
                 onConfirm(NoteAction(type, newTitle, pkg, extra = newTitle))
                 pickerOpen = false
             },
@@ -502,11 +509,12 @@ private fun ShortcutBackedEditor(
     var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
     var uri by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
     var appPickerOpen by rememberSaveable(type, initialAction) { mutableStateOf(initialAction == null) }
-    val pickShortcut = rememberShortcutPickLauncher { pickedUri, label ->
-        uri = pickedUri
-        if (label.isNotBlank()) title = label
-        onConfirm(NoteAction(type, title, uri, extra = title))
-    }
+    val pickShortcut =
+        rememberShortcutPickLauncher { pickedUri, label ->
+            uri = pickedUri
+            if (label.isNotBlank()) title = label
+            onConfirm(NoteAction(type, title, uri, extra = title))
+        }
     val ready = title.isNotBlank() && uri.isNotBlank()
     EditorShell(
         type = type,

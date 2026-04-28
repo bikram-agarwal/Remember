@@ -1,15 +1,11 @@
 package dev.bikram.remember.ui.edit
-import androidx.compose.material3.TextButton
-
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.graphics.drawable.Drawable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +20,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import dev.bikram.remember.ui.common.AppBottomSheet
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,15 +31,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.IntentCompat
 import androidx.core.graphics.drawable.toBitmap
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import dev.bikram.remember.R
+import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import androidx.compose.ui.res.stringResource
-import dev.bikram.remember.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // Intent.EXTRA_SHORTCUT_* constants are deprecated on the SDK; keys are stable for CREATE_SHORTCUT results.
 private const val EXTRA_LEGACY_SHORTCUT_INTENT = "android.intent.extra.shortcut.INTENT"
@@ -69,19 +65,20 @@ fun AppPickerDialog(
     var items by remember { mutableStateOf<List<AppChoice>?>(null) }
 
     LaunchedEffect(queryIntent.action) {
-        items = withContext(Dispatchers.IO) {
-            pm.queryIntentActivities(queryIntent, 0)
-                .mapNotNull { info: ResolveInfo ->
-                    val ai = info.activityInfo ?: return@mapNotNull null
-                    AppChoice(
-                        packageName = ai.packageName,
-                        componentName = ComponentName(ai.packageName, ai.name),
-                        label = info.loadLabel(pm).toString(),
-                        icon = info.loadIcon(pm),
-                    )
-                }
-                .sortedBy { it.label.lowercase() }
-        }
+        items =
+            withContext(Dispatchers.IO) {
+                pm
+                    .queryIntentActivities(queryIntent, 0)
+                    .mapNotNull { info: ResolveInfo ->
+                        val ai = info.activityInfo ?: return@mapNotNull null
+                        AppChoice(
+                            packageName = ai.packageName,
+                            componentName = ComponentName(ai.packageName, ai.name),
+                            label = info.loadLabel(pm).toString(),
+                            icon = info.loadIcon(pm),
+                        )
+                    }.sortedBy { it.label.lowercase() }
+            }
     }
 
     AppBottomSheet(
@@ -93,9 +90,10 @@ fun AppPickerDialog(
         },
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 200.dp, max = 520.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 200.dp, max = 520.dp),
         ) {
             val current = items
             when {
@@ -124,17 +122,24 @@ fun AppPickerDialog(
 }
 
 @Composable
-private fun AppRow(app: AppChoice, onClick: () -> Unit) {
-    val bmp = remember(app.componentName) {
-        try {
-            BitmapPainter(app.icon.toBitmap(96, 96).asImageBitmap())
-        } catch (_: Throwable) { null }
-    }
+private fun AppRow(
+    app: AppChoice,
+    onClick: () -> Unit,
+) {
+    val bmp =
+        remember(app.componentName) {
+            try {
+                BitmapPainter(app.icon.toBitmap(96, 96).asImageBitmap())
+            } catch (_: Throwable) {
+                null
+            }
+        }
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .tapSoundClickable(onClick = onClick)
-            .padding(horizontal = 4.dp, vertical = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .tapSoundClickable(onClick = onClick)
+                .padding(horizontal = 4.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (bmp != null) {
@@ -163,22 +168,29 @@ private fun AppRow(app: AppChoice, onClick: () -> Unit) {
 fun rememberShortcutPickLauncher(
     onPicked: (intentUri: String, label: String) -> Unit,
 ): (ComponentName) -> Unit {
-    val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
-        val data = result.data ?: return@rememberLauncherForActivityResult
-        val intent = IntentCompat.getParcelableExtra(data, EXTRA_LEGACY_SHORTCUT_INTENT, Intent::class.java)
-        intent ?: return@rememberLauncherForActivityResult
-        val label = data.getStringExtra(EXTRA_LEGACY_SHORTCUT_NAME).orEmpty()
-        val uri = try { intent.toUri(Intent.URI_INTENT_SCHEME) } catch (_: Throwable) { "" }
-        if (uri.isNotBlank()) onPicked(uri, label)
-    }
-    return { cn ->
-        val launch = Intent(Intent.ACTION_CREATE_SHORTCUT).apply {
-            addCategory(Intent.CATEGORY_DEFAULT)
-            component = cn
+    val launcher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult(),
+        ) { result ->
+            if (result.resultCode != Activity.RESULT_OK) return@rememberLauncherForActivityResult
+            val data = result.data ?: return@rememberLauncherForActivityResult
+            val intent = IntentCompat.getParcelableExtra(data, EXTRA_LEGACY_SHORTCUT_INTENT, Intent::class.java)
+            intent ?: return@rememberLauncherForActivityResult
+            val label = data.getStringExtra(EXTRA_LEGACY_SHORTCUT_NAME).orEmpty()
+            val uri =
+                try {
+                    intent.toUri(Intent.URI_INTENT_SCHEME)
+                } catch (_: Throwable) {
+                    ""
+                }
+            if (uri.isNotBlank()) onPicked(uri, label)
         }
+    return { cn ->
+        val launch =
+            Intent(Intent.ACTION_CREATE_SHORTCUT).apply {
+                addCategory(Intent.CATEGORY_DEFAULT)
+                component = cn
+            }
         launcher.launch(launch)
     }
 }

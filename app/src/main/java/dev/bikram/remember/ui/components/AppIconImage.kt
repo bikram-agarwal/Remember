@@ -27,16 +27,18 @@ fun AppIconImage(modifier: Modifier = Modifier) {
     val packageName = context.applicationContext.packageName
     val packageManager = context.packageManager
     val imageBitmap: ImageBitmap? by produceState<ImageBitmap?>(initialValue = null, packageName) {
-        value = withContext(Dispatchers.Default) {
-            val drawable = packageManager.getApplicationIcon(packageName)
-            val size = 256
-            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bmp ->
-                val canvas = Canvas(bmp)
-                drawable.setBounds(0, 0, size, size)
-                drawable.draw(canvas)
+        value =
+            withContext(Dispatchers.Default) {
+                val drawable = packageManager.getApplicationIcon(packageName)
+                val size = 256
+                val bitmap =
+                    Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bmp ->
+                        val canvas = Canvas(bmp)
+                        drawable.setBounds(0, 0, size, size)
+                        drawable.draw(canvas)
+                    }
+                bitmap.asImageBitmap()
             }
-            bitmap.asImageBitmap()
-        }
     }
     val bitmap = imageBitmap
     if (bitmap != null) {

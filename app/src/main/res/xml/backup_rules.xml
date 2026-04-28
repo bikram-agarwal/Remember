@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude
+        domain="file"
+        path="note_heroes/" />
+    <exclude
+        domain="file"
+        path="note_attachments/" />
+    <exclude
+        domain="file"
+        path="remember_backup/" />
+</full-backup-content>

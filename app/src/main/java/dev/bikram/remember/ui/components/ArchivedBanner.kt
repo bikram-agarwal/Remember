@@ -13,7 +13,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -33,26 +32,31 @@ fun ArchivedBanner(
     // ARCHIVED uses secondaryContainer: a neutral muted tint that reads "this item is in a
     // special shelf" without implying something positive happened (tertiaryContainer often
     // resolves to green in Material You, which signals success - wrong affordance for archive).
-    val containerColor = when (state) {
-        ArchivedBannerState.ARCHIVED -> MaterialTheme.colorScheme.secondaryContainer
-        ArchivedBannerState.TRASHED -> MaterialTheme.colorScheme.errorContainer
-    }
-    val contentColor = when (state) {
-        ArchivedBannerState.ARCHIVED -> MaterialTheme.colorScheme.onSecondaryContainer
-        ArchivedBannerState.TRASHED -> MaterialTheme.colorScheme.onErrorContainer
-    }
-    val iconName = when (state) {
-        ArchivedBannerState.ARCHIVED -> "archive"
-        ArchivedBannerState.TRASHED -> "delete_outline"
-    }
-    val titleRes = when (state) {
-        ArchivedBannerState.ARCHIVED -> R.string.edit_archived_banner_title
-        ArchivedBannerState.TRASHED -> R.string.edit_trashed_banner_title
-    }
-    val bodyRes = when (state) {
-        ArchivedBannerState.ARCHIVED -> R.string.edit_archived_banner_body
-        ArchivedBannerState.TRASHED -> R.string.edit_trashed_banner_body
-    }
+    val containerColor =
+        when (state) {
+            ArchivedBannerState.ARCHIVED -> MaterialTheme.colorScheme.secondaryContainer
+            ArchivedBannerState.TRASHED -> MaterialTheme.colorScheme.errorContainer
+        }
+    val contentColor =
+        when (state) {
+            ArchivedBannerState.ARCHIVED -> MaterialTheme.colorScheme.onSecondaryContainer
+            ArchivedBannerState.TRASHED -> MaterialTheme.colorScheme.onErrorContainer
+        }
+    val iconName =
+        when (state) {
+            ArchivedBannerState.ARCHIVED -> "archive"
+            ArchivedBannerState.TRASHED -> "delete_outline"
+        }
+    val titleRes =
+        when (state) {
+            ArchivedBannerState.ARCHIVED -> R.string.edit_archived_banner_title
+            ArchivedBannerState.TRASHED -> R.string.edit_trashed_banner_title
+        }
+    val bodyRes =
+        when (state) {
+            ArchivedBannerState.ARCHIVED -> R.string.edit_archived_banner_body
+            ArchivedBannerState.TRASHED -> R.string.edit_trashed_banner_body
+        }
 
     Surface(
         color = containerColor,

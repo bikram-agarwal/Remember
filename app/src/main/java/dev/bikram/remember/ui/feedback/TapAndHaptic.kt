@@ -10,7 +10,6 @@ import android.view.View
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 
-
 val LocalTapSound = staticCompositionLocalOf<() -> Unit> { { } }
 val LocalHapticEnabled = staticCompositionLocalOf { true }
 
@@ -29,11 +28,12 @@ fun View.playTapSound() {
  */
 fun View.performLongPressHaptic() {
     performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
-    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
-    } else {
-        context.getSystemService(Vibrator::class.java)
-    } ?: return
+    val vibrator =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+        } else {
+            context.getSystemService(Vibrator::class.java)
+        } ?: return
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK))
     }

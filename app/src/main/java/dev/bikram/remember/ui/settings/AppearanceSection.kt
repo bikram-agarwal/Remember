@@ -1,10 +1,8 @@
 package dev.bikram.remember.ui.settings
-import androidx.compose.material3.TextButton
 
 import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,21 +10,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,31 +31,30 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ColorSource
-import dev.bikram.remember.data.PaletteStyleOpt
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import kotlinx.coroutines.launch
-import dev.bikram.remember.ui.components.RememberTextButton
-import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.components.RememberToggleButton
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -82,14 +77,16 @@ fun AppearanceSection(
                     onCheckedChange = { checked ->
                         if (checked) scope.launch { prefs.setThemeMode(mode) }
                     },
-                    modifier = Modifier
-                        .weight(1f)
-                        .semantics { role = Role.RadioButton },
-                    shapes = when (index) {
-                        0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                        themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                        else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                    },
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .semantics { role = Role.RadioButton },
+                    shapes =
+                        when (index) {
+                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                            themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                        },
                 ) {
                     Text(
                         text = themeModeLabel(mode),
@@ -209,31 +206,38 @@ private fun AppearanceSettingsToggleItem(
     leadingMaterialSymbolName: String? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    ListItem(
-        headlineContent = { Text(title, style = MaterialTheme.typography.bodyLarge) },
-        supportingContent = {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .tapSoundClickable { onCheckedChange(!checked) }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (leadingMaterialSymbolName != null) {
+            RememberMaterialRoundedSymbol(
+                name = leadingMaterialSymbolName,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
+            )
+            Spacer(Modifier.width(16.dp))
+        }
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyLarge)
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
             )
-        },
-        leadingContent = if (leadingMaterialSymbolName != null) {
-            {
-                RememberMaterialRoundedSymbol(
-                    name = leadingMaterialSymbolName,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    weight = FontWeight.Medium,
-                )
-            }
-        } else {
-            null
-        },
-        trailingContent = { RememberSwitch(checked = checked, onCheckedChange = onCheckedChange) },
-        modifier = Modifier.tapSoundClickable { onCheckedChange(!checked) },
-        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-    )
+        }
+        Spacer(Modifier.width(16.dp))
+        Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
 }
 
 @Composable
@@ -243,22 +247,26 @@ private fun CustomHexSheet(
 ) {
     var draftHex by rememberSaveable { mutableStateOf("") }
     val normalized = normalizeHex(draftHex.trim())
-    val previewColor = normalized?.let {
-        runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
-    }
+    val previewColor =
+        normalized?.let {
+            runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
+        }
     val previewShape = RoundedCornerShape(12.dp)
     val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
 
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+        properties =
+            androidx.compose.ui.window
+                .DialogProperties(usePlatformDefaultWidth = false),
     ) {
         Surface(
             shape = MaterialTheme.shapes.extraLarge,
             tonalElevation = 6.dp,
-            modifier = Modifier
-                .widthIn(max = 400.dp)
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .widthIn(max = 400.dp)
+                    .padding(24.dp),
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
@@ -283,21 +291,22 @@ private fun CustomHexSheet(
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    val swatchModifier = Modifier
-                        .fillMaxWidth()
-                        .height(44.dp)
-                        .clip(previewShape)
-                        .then(
-                            if (previewColor != null) {
-                                Modifier
-                                    .background(previewColor)
-                                    .border(1.dp, outlineColor, previewShape)
-                            } else {
-                                Modifier
-                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                    .border(1.dp, outlineColor, previewShape)
-                            },
-                        )
+                    val swatchModifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .clip(previewShape)
+                            .then(
+                                if (previewColor != null) {
+                                    Modifier
+                                        .background(previewColor)
+                                        .border(1.dp, outlineColor, previewShape)
+                                } else {
+                                    Modifier
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .border(1.dp, outlineColor, previewShape)
+                                },
+                            )
                     Box(modifier = swatchModifier, contentAlignment = Alignment.Center) {
                         if (previewColor == null && draftHex.isNotBlank()) {
                             Text(
@@ -333,20 +342,21 @@ private fun CustomHexSheet(
     }
 }
 
-private val themePickerOrder = listOf(
-    ThemeMode.SYSTEM,
-    ThemeMode.LIGHT,
-    ThemeMode.DARK,
-    ThemeMode.BLACK,
-)
+private val themePickerOrder =
+    listOf(
+        ThemeMode.SYSTEM,
+        ThemeMode.LIGHT,
+        ThemeMode.DARK,
+        ThemeMode.BLACK,
+    )
 
 @Composable
-private fun themeModeLabel(mode: ThemeMode): String = stringResource(
-    when (mode) {
-        ThemeMode.SYSTEM -> R.string.appearance_theme_system
-        ThemeMode.LIGHT -> R.string.appearance_theme_light
-        ThemeMode.DARK -> R.string.appearance_theme_dark
-        ThemeMode.BLACK -> R.string.appearance_theme_black
-    },
-)
-
+private fun themeModeLabel(mode: ThemeMode): String =
+    stringResource(
+        when (mode) {
+            ThemeMode.SYSTEM -> R.string.appearance_theme_system
+            ThemeMode.LIGHT -> R.string.appearance_theme_light
+            ThemeMode.DARK -> R.string.appearance_theme_dark
+            ThemeMode.BLACK -> R.string.appearance_theme_black
+        },
+    )

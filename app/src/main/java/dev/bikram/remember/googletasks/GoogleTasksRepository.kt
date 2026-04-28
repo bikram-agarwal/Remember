@@ -15,19 +15,20 @@ class GoogleTasksRepository(
     private val api: GoogleTasksApi,
     private val auth: GoogleTasksAuthDelegate = DefaultGoogleTasksAuthDelegate,
 ) {
-
     suspend fun fetchTaskLists(
         firstAttemptToken: String,
-    ): GoogleTasksFetchResult<List<GoogleTaskList>> = fetchWithRetry(
-        firstAttemptToken = firstAttemptToken,
-    ) { token -> api.listTaskLists(token) }
+    ): GoogleTasksFetchResult<List<GoogleTaskList>> =
+        fetchWithRetry(
+            firstAttemptToken = firstAttemptToken,
+        ) { token -> api.listTaskLists(token) }
 
     suspend fun fetchTasks(
         firstAttemptToken: String,
         taskListId: String,
-    ): GoogleTasksFetchResult<List<GoogleTask>> = fetchWithRetry(
-        firstAttemptToken = firstAttemptToken,
-    ) { token -> api.listTasks(token, taskListId) }
+    ): GoogleTasksFetchResult<List<GoogleTask>> =
+        fetchWithRetry(
+            firstAttemptToken = firstAttemptToken,
+        ) { token -> api.listTasks(token, taskListId) }
 
     private suspend fun <T> fetchWithRetry(
         firstAttemptToken: String,
@@ -63,14 +64,16 @@ class GoogleTasksRepository(
         }
     }
 
-    private fun <T> GoogleTasksApiResult<T>.toFetchFailure(): GoogleTasksFetchResult<T> = when (this) {
-        is GoogleTasksApiResult.Success -> GoogleTasksFetchResult.Success(value)
-        GoogleTasksApiResult.Unauthorized -> GoogleTasksFetchResult.AuthError(
-            cause = IllegalStateException("Tasks API returned unauthorized after refresh"),
-        )
-        is GoogleTasksApiResult.NetworkError -> GoogleTasksFetchResult.Network(cause)
-        is GoogleTasksApiResult.Failure -> GoogleTasksFetchResult.Other(cause)
-    }
+    private fun <T> GoogleTasksApiResult<T>.toFetchFailure(): GoogleTasksFetchResult<T> =
+        when (this) {
+            is GoogleTasksApiResult.Success -> GoogleTasksFetchResult.Success(value)
+            GoogleTasksApiResult.Unauthorized ->
+                GoogleTasksFetchResult.AuthError(
+                    cause = IllegalStateException("Tasks API returned unauthorized after refresh"),
+                )
+            is GoogleTasksApiResult.NetworkError -> GoogleTasksFetchResult.Network(cause)
+            is GoogleTasksApiResult.Failure -> GoogleTasksFetchResult.Other(cause)
+        }
 }
 
 sealed class GoogleTasksFetchResult<out T> {
@@ -78,14 +81,25 @@ sealed class GoogleTasksFetchResult<out T> {
      * On success [refreshedAccessToken] is non-null only when an internal refresh happened. The
      * caller can stash it so subsequent fetches skip the first stale-token round-trip.
      */
-    data class Success<T>(val value: T, val refreshedAccessToken: String? = null) : GoogleTasksFetchResult<T>()
+    data class Success<T>(
+        val value: T,
+        val refreshedAccessToken: String? = null,
+    ) : GoogleTasksFetchResult<T>()
 
     /** Consent UI must be shown again. Forwarded as an IntentSenderRequest for the launcher. */
-    data class NeedsConsent(val request: IntentSenderRequest) : GoogleTasksFetchResult<Nothing>()
+    data class NeedsConsent(
+        val request: IntentSenderRequest,
+    ) : GoogleTasksFetchResult<Nothing>()
 
-    data class AuthError(val cause: Throwable) : GoogleTasksFetchResult<Nothing>()
+    data class AuthError(
+        val cause: Throwable,
+    ) : GoogleTasksFetchResult<Nothing>()
 
-    data class Network(val cause: Throwable) : GoogleTasksFetchResult<Nothing>()
+    data class Network(
+        val cause: Throwable,
+    ) : GoogleTasksFetchResult<Nothing>()
 
-    data class Other(val cause: Throwable) : GoogleTasksFetchResult<Nothing>()
+    data class Other(
+        val cause: Throwable,
+    ) : GoogleTasksFetchResult<Nothing>()
 }

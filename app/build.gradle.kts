@@ -8,10 +8,18 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.room)
+    alias(libs.plugins.androidx.baselineprofile)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.hilt)
+    alias(libs.plugins.ktlint)
 }
 
 kotlin {
-    jvmToolchain(libs.versions.java.get().toInt())
+    jvmToolchain(
+        libs.versions.java
+            .get()
+            .toInt(),
+    )
     compilerOptions {
         freeCompilerArgs.addAll(
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
@@ -30,7 +38,11 @@ if (keystorePropsFile.exists()) {
 }
 
 val releaseStoreFile =
-    keystoreProps.getProperty("storeFile")?.takeIf { it.isNotBlank() }?.let { rootProject.file(it) }?.takeIf { it.isFile }
+    keystoreProps
+        .getProperty("storeFile")
+        ?.takeIf { it.isNotBlank() }
+        ?.let { rootProject.file(it) }
+        ?.takeIf { it.isFile }
 val releaseStorePassword = keystoreProps.getProperty("storePassword")?.takeIf { it.isNotBlank() }
 val releaseKeyAlias = keystoreProps.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
 val releaseKeyPassword =
@@ -51,8 +63,9 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 30
         targetSdk = 36
-        versionCode = 50
-        versionName = "0.5.0"
+        versionCode = 60
+        versionName = "0.6.0"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
 
@@ -105,11 +118,15 @@ extensions.configure<ApplicationExtension>("android") {
             applicationIdSuffix = ".gh"
             buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
             buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
         }
         create("playstore") {
             dimension = "distribution"
             buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
             buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
         }
     }
 
@@ -122,10 +139,32 @@ extensions.configure<ApplicationExtension>("android") {
         compose = true
         buildConfig = true
     }
+
+    sourceSets {
+        getByName("androidTest") {
+            assets.directories.add("$projectDir/schemas")
+        }
+    }
 }
 
 room {
     schemaDirectory("$projectDir/schemas")
+}
+
+baselineProfile {
+    automaticGenerationDuringBuild = false
+    warnings {
+        maxAgpVersion = false
+    }
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.files("config/detekt/detekt.yml"))
+}
+
+ktlint {
+    android.set(true)
 }
 
 dependencies {
@@ -145,6 +184,11 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
+    implementation(libs.hilt.android)
+    implementation(libs.androidx.hilt.work)
+    implementation(libs.androidx.hilt.lifecycle.viewmodel.compose)
+    ksp(libs.hilt.compiler)
+    ksp(libs.androidx.hilt.compiler)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.biometric)
@@ -163,8 +207,16 @@ dependencies {
     implementation(libs.play.services.auth)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
+    implementation(libs.androidx.profileinstaller)
     // WYSIWYG Editor
     implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-rc13")
     debugImplementation(libs.androidx.ui.tooling)
+    baselineProfile(project(":baselineprofile"))
     testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.room.testing)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    add("playstoreImplementation", "com.google.android.play:app-update:2.1.0")
+    add("playstoreImplementation", "com.google.android.play:app-update-ktx:2.1.0")
 }

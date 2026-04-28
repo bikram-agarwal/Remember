@@ -23,9 +23,10 @@ fun rememberContentOverflowScrollEnabled(
                     val firstItemTop = visibleItems.minOf { item -> item.offset }
                     val lastItemBottom = visibleItems.maxOf { item -> item.offset + item.size }
                     val contentHeight = lastItemBottom - firstItemTop
-                    val viewportHeight = layoutInfo.viewportSize.height -
-                        layoutInfo.beforeContentPadding -
-                        layoutInfo.afterContentPadding
+                    val viewportHeight =
+                        layoutInfo.viewportSize.height -
+                            layoutInfo.beforeContentPadding -
+                            layoutInfo.afterContentPadding
                     contentHeight > viewportHeight.coerceAtLeast(0)
                 }
             }

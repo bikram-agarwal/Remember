@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -16,12 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -31,27 +27,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.bikram.remember.R
+import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberOutlinedButton
+import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
-import kotlinx.coroutines.launch
-import dev.bikram.remember.ui.components.RememberTextButton
-import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
-import androidx.compose.ui.res.stringResource
-import dev.bikram.remember.R
+import kotlinx.coroutines.launch
 
 @Composable
 fun AttachmentsSheet(
@@ -61,14 +58,15 @@ fun AttachmentsSheet(
     onRemove: (id: Long) -> Unit,
 ) {
     val context = LocalContext.current
-    val pickDoc = rememberDocumentPicker { uri ->
-        persistReadPermission(context, uri)
-        onAdd(
-            uri,
-            resolveDisplayName(context, uri),
-            resolveMimeType(context, uri),
-        )
-    }
+    val pickDoc =
+        rememberDocumentPicker { uri ->
+            persistReadPermission(context, uri)
+            onAdd(
+                uri,
+                resolveDisplayName(context, uri),
+                resolveMimeType(context, uri),
+            )
+        }
     AppBottomSheet(
         title = stringResource(R.string.options_attachments),
         subtitle = stringResource(R.string.attachments_subtitle),
@@ -104,7 +102,10 @@ fun AttachmentsSheet(
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun AttachmentRow(attachment: NoteAttachmentEntity, onRemove: () -> Unit) {
+private fun AttachmentRow(
+    attachment: NoteAttachmentEntity,
+    onRemove: () -> Unit,
+) {
     val context = LocalContext.current
     val sourceUri = remember(attachment.uri) { Uri.parse(attachment.uri) }
     val rowShape = RoundedCornerShape(12.dp)
@@ -119,16 +120,18 @@ private fun AttachmentRow(attachment: NoteAttachmentEntity, onRemove: () -> Unit
         label = "attachmentSavePulse",
     )
     val idleBackground = MaterialTheme.colorScheme.surfaceContainerHigh
-    val pressedBackground = lerp(
-        idleBackground,
-        MaterialTheme.colorScheme.primary,
-        0.22f,
-    )
-    val savingBackground = lerp(
-        idleBackground,
-        MaterialTheme.colorScheme.tertiaryContainer,
-        0.55f,
-    )
+    val pressedBackground =
+        lerp(
+            idleBackground,
+            MaterialTheme.colorScheme.primary,
+            0.22f,
+        )
+    val savingBackground =
+        lerp(
+            idleBackground,
+            MaterialTheme.colorScheme.tertiaryContainer,
+            0.55f,
+        )
     val blendedBase = if (pressed) pressedBackground else idleBackground
     val rowBackground by animateColorAsState(
         targetValue = lerp(blendedBase, savingBackground, savingMix),
@@ -142,36 +145,37 @@ private fun AttachmentRow(attachment: NoteAttachmentEntity, onRemove: () -> Unit
     Surface(
         shape = rowShape,
         color = rowBackground,
-        modifier = Modifier
-            .fillMaxWidth()
-            .scale(scaleFactor)
-            .clip(rowShape)
-            .tapSoundCombinedClickable(
-                interactionSource = rowInteractionSource,
-                indication = androidx.compose.material3.ripple(),
-                onClick = {
-                    playTap()
-                    openUriWithChooser(context, sourceUri, attachment.mimeType)
-                },
-                onLongClick = {
-                    if (hapticEnabled) hostView.performLongPressHaptic()
-                    scope.launch {
-                        savingPulse = true
-                        val start = System.currentTimeMillis()
-                        copyUriIntoDownloads(
-                            context,
-                            sourceUri,
-                            attachment.displayName,
-                            attachment.mimeType,
-                        )
-                        val elapsed = System.currentTimeMillis() - start
-                        if (elapsed < 400) {
-                            kotlinx.coroutines.delay(400 - elapsed)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .scale(scaleFactor)
+                .clip(rowShape)
+                .tapSoundCombinedClickable(
+                    interactionSource = rowInteractionSource,
+                    indication = androidx.compose.material3.ripple(),
+                    onClick = {
+                        playTap()
+                        openUriWithChooser(context, sourceUri, attachment.mimeType)
+                    },
+                    onLongClick = {
+                        if (hapticEnabled) hostView.performLongPressHaptic()
+                        scope.launch {
+                            savingPulse = true
+                            val start = System.currentTimeMillis()
+                            copyUriIntoDownloads(
+                                context,
+                                sourceUri,
+                                attachment.displayName,
+                                attachment.mimeType,
+                            )
+                            val elapsed = System.currentTimeMillis() - start
+                            if (elapsed < 400) {
+                                kotlinx.coroutines.delay(400 - elapsed)
+                            }
+                            savingPulse = false
                         }
-                        savingPulse = false
-                    }
-                },
-            ),
+                    },
+                ),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -199,6 +203,10 @@ private fun AttachmentRow(attachment: NoteAttachmentEntity, onRemove: () -> Unit
                         maxLines = 1,
                     )
                 }
+                Spacer(Modifier.size(6.dp))
+                MediaStorageChip(
+                    storedInApp = AppMediaStorage.isAppStoredMediaUri(context, attachment.uri),
+                )
             }
             val cdRemove = stringResource(R.string.common_remove)
             RememberIconButton(onClick = onRemove) {

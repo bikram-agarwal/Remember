@@ -18,6 +18,7 @@ import dev.bikram.remember.R
  */
 object QuickCaptureNotifier {
     const val CHANNEL_ID = "quick_capture"
+
     /** Stable ID so repeated posts replace the same notification instead of stacking. */
     private const val NOTIFICATION_ID = 9_001
 
@@ -26,16 +27,17 @@ object QuickCaptureNotifier {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val existing = nm.getNotificationChannel(CHANNEL_ID)
         if (existing != null) return
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            context.getString(R.string.quick_capture_channel_name),
-            NotificationManager.IMPORTANCE_LOW,
-        ).apply {
-            description = context.getString(R.string.quick_capture_channel_description)
-            setShowBadge(false)
-            enableVibration(false)
-            enableLights(false)
-        }
+        val channel =
+            NotificationChannel(
+                CHANNEL_ID,
+                context.getString(R.string.quick_capture_channel_name),
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                description = context.getString(R.string.quick_capture_channel_description)
+                setShowBadge(false)
+                enableVibration(false)
+                enableLights(false)
+            }
         nm.createNotificationChannel(channel)
     }
 
@@ -44,28 +46,32 @@ object QuickCaptureNotifier {
         val manager = NotificationManagerCompat.from(context)
         if (!manager.areNotificationsEnabled()) return
 
-        val tapIntent = Intent(context, MainActivity::class.java).apply {
-            action = MainActivity.ACTION_SHORTCUT_NEW_NOTE
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        val pending = PendingIntent.getActivity(
-            context,
-            NOTIFICATION_ID,
-            tapIntent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_remember)
-            .setContentTitle(context.getString(R.string.quick_capture_notification_title))
-            .setContentText(context.getString(R.string.quick_capture_notification_text))
-            .setContentIntent(pending)
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .setShowWhen(false)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setCategory(NotificationCompat.CATEGORY_REMINDER)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .build()
+        val tapIntent =
+            Intent(context, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_SHORTCUT_NEW_NOTE
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+        val pending =
+            PendingIntent.getActivity(
+                context,
+                NOTIFICATION_ID,
+                tapIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        val notification =
+            NotificationCompat
+                .Builder(context, CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_stat_remember)
+                .setContentTitle(context.getString(R.string.quick_capture_notification_title))
+                .setContentText(context.getString(R.string.quick_capture_notification_text))
+                .setContentIntent(pending)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setShowWhen(false)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setCategory(NotificationCompat.CATEGORY_REMINDER)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .build()
         runCatching { manager.notify(NOTIFICATION_ID, notification) }
     }
 

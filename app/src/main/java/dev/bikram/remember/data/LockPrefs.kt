@@ -20,13 +20,15 @@ import javax.crypto.spec.PBEKeySpec
 
 private val Context.lockDataStore by preferencesDataStore(name = "lock_prefs")
 
-class LockPrefs(private val context: Context) {
-
+class LockPrefs(
+    private val context: Context,
+) {
     private object Keys {
         val ENABLED = booleanPreferencesKey("enabled")
         val BIOMETRIC = booleanPreferencesKey("biometric")
         val PIN_HASH = stringPreferencesKey("pin_hash")
         val PIN_SALT = stringPreferencesKey("pin_salt")
+
         /** Digits the user chose when enabling lock (4–6). Absent legacy installs default in [toState]. */
         val PIN_LENGTH = intPreferencesKey("pin_length")
     }
@@ -42,10 +44,11 @@ class LockPrefs(private val context: Context) {
     val state: Flow<State> = context.lockDataStore.data.map { p -> p.toState() }
 
     suspend fun enable(pin: String) {
-        val saltAndHash = withContext(Dispatchers.Default) {
-            val salt = randomSalt()
-            salt to hashPin(pin, salt)
-        }
+        val saltAndHash =
+            withContext(Dispatchers.Default) {
+                val salt = randomSalt()
+                salt to hashPin(pin, salt)
+            }
         val (salt, hash) = saltAndHash
         val digitCount = pin.length.coerceIn(MIN_PIN_LENGTH, MAX_PIN_LENGTH)
         context.lockDataStore.edit {
@@ -89,11 +92,12 @@ class LockPrefs(private val context: Context) {
 
     private fun Preferences.toState(): State {
         val storedLength = this[Keys.PIN_LENGTH]
-        val pinLength = when {
-            storedLength != null -> storedLength.coerceIn(MIN_PIN_LENGTH, MAX_PIN_LENGTH)
-            this[Keys.PIN_HASH] != null -> DEFAULT_PIN_LENGTH
-            else -> DEFAULT_PIN_LENGTH
-        }
+        val pinLength =
+            when {
+                storedLength != null -> storedLength.coerceIn(MIN_PIN_LENGTH, MAX_PIN_LENGTH)
+                this[Keys.PIN_HASH] != null -> DEFAULT_PIN_LENGTH
+                else -> DEFAULT_PIN_LENGTH
+            }
         return State(
             enabled = this[Keys.ENABLED] ?: false,
             biometric = this[Keys.BIOMETRIC] ?: false,
@@ -110,13 +114,19 @@ class LockPrefs(private val context: Context) {
 
     private fun randomSalt(): ByteArray = ByteArray(16).also { SecureRandom().nextBytes(it) }
 
-    private fun hashPin(pin: String, salt: ByteArray): ByteArray {
+    private fun hashPin(
+        pin: String,
+        salt: ByteArray,
+    ): ByteArray {
         val spec = PBEKeySpec(pin.toCharArray(), salt, 50_000, 256)
         val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
         return factory.generateSecret(spec).encoded
     }
 
-    private fun constantTimeEquals(a: ByteArray, b: ByteArray): Boolean {
+    private fun constantTimeEquals(
+        a: ByteArray,
+        b: ByteArray,
+    ): Boolean {
         if (a.size != b.size) return false
         var r = 0
         for (i in a.indices) r = r or (a[i].toInt() xor b[i].toInt())

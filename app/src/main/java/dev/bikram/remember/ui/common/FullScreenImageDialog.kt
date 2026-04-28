@@ -7,10 +7,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -22,15 +25,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
@@ -51,20 +51,23 @@ fun FullScreenImageDialog(
     onDelete: (() -> Unit)? = null,
 ) {
     val closeLabel = stringResource(R.string.common_back)
-    val closeSemantics = remember(closeLabel) {
-        Modifier.semantics { contentDescription = closeLabel }
-    }
+    val closeSemantics =
+        remember(closeLabel) {
+            Modifier.semantics { contentDescription = closeLabel }
+        }
     val deleteLabel = stringResource(R.string.edit_remove_picture_cd)
-    val deleteSemantics = remember(deleteLabel) {
-        Modifier.semantics { contentDescription = deleteLabel }
-    }
+    val deleteSemantics =
+        remember(deleteLabel) {
+            Modifier.semantics { contentDescription = deleteLabel }
+        }
     val imageRequest = rememberHeroImageRequest(imageUri, imageCacheRevision, maxSidePx = 4096)
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false,
-        ),
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
     ) {
         Surface(color = Color.Black, modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize()) {
@@ -80,14 +83,16 @@ fun FullScreenImageDialog(
                             onDelete()
                             onDismiss()
                         },
-                        modifier = Modifier
-                            .align(Alignment.TopStart)
-                            .padding(8.dp)
-                            .then(deleteSemantics),
-                        colors = IconButtonDefaults.iconButtonColors(
-                            containerColor = Color.Black.copy(alpha = 0.45f),
-                            contentColor = Color.White,
-                        ),
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopStart)
+                                .padding(8.dp)
+                                .then(deleteSemantics),
+                        colors =
+                            IconButtonDefaults.iconButtonColors(
+                                containerColor = Color.Black.copy(alpha = 0.45f),
+                                contentColor = Color.White,
+                            ),
                     ) {
                         RememberMaterialRoundedSymbol(
                             name = "delete_outline",
@@ -99,14 +104,16 @@ fun FullScreenImageDialog(
                 }
                 RememberIconButton(
                     onClick = onDismiss,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(8.dp)
-                        .then(closeSemantics),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = Color.Black.copy(alpha = 0.45f),
-                        contentColor = Color.White,
-                    ),
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(8.dp)
+                            .then(closeSemantics),
+                    colors =
+                        IconButtonDefaults.iconButtonColors(
+                            containerColor = Color.Black.copy(alpha = 0.45f),
+                            contentColor = Color.White,
+                        ),
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = "close",
@@ -161,42 +168,47 @@ fun FullScreenHeroImageOverlay(
         val visibleImageUri = effectiveImageUri ?: return@AnimatedVisibility
         BackHandler(onBack = onDismiss)
         val closeLabel = stringResource(R.string.common_back)
-        val closeSemantics = remember(closeLabel) {
-            Modifier.semantics { contentDescription = closeLabel }
-        }
+        val closeSemantics =
+            remember(closeLabel) {
+                Modifier.semantics { contentDescription = closeLabel }
+            }
         val deleteLabel = stringResource(R.string.edit_remove_picture_cd)
-        val deleteSemantics = remember(deleteLabel) {
-            Modifier.semantics { contentDescription = deleteLabel }
-        }
+        val deleteSemantics =
+            remember(deleteLabel) {
+                Modifier.semantics { contentDescription = deleteLabel }
+            }
         val imageRequest = rememberHeroImageRequest(visibleImageUri, retainedCacheRevision, maxSidePx = 2048)
         val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
-        val imageModifier = if (sharedScope != null && effectiveSharedKey != null) {
-            with(sharedScope) {
-                // Default resizeMode (RemeasureToBounds): each end renders the image at
-                // its current animated bounds with its own ContentScale. Using
-                // scaleToBounds(FillBounds) here stretched the overlay's Fit-scaled
-                // image to fill the intermediate bounds during the transition, which
-                // looked off because the inline hero is rendered with HeroFramedImage's
-                // framed crop. Letting each side keep its native scaling reads as a
-                // smooth container transform.
-                Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(key = effectiveSharedKey),
-                    animatedVisibilityScope = this@AnimatedVisibility,
-                )
+        val imageModifier =
+            if (sharedScope != null && effectiveSharedKey != null) {
+                with(sharedScope) {
+                    // Default resizeMode (RemeasureToBounds): each end renders the image at
+                    // its current animated bounds with its own ContentScale. Using
+                    // scaleToBounds(FillBounds) here stretched the overlay's Fit-scaled
+                    // image to fill the intermediate bounds during the transition, which
+                    // looked off because the inline hero is rendered with HeroFramedImage's
+                    // framed crop. Letting each side keep its native scaling reads as a
+                    // smooth container transform.
+                    Modifier.sharedBounds(
+                        sharedContentState = rememberSharedContentState(key = effectiveSharedKey),
+                        animatedVisibilityScope = this@AnimatedVisibility,
+                    )
+                }
+            } else {
+                Modifier
             }
-        } else {
-            Modifier
-        }
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.82f)),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.82f)),
         ) {
             Surface(
                 color = Color.Transparent,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(imageModifier),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(imageModifier),
             ) {
                 AsyncImage(
                     model = imageRequest,
@@ -211,15 +223,17 @@ fun FullScreenHeroImageOverlay(
                         onDelete()
                         onDismiss()
                     },
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
-                        .windowInsetsPadding(WindowInsets.systemBars)
-                        .then(deleteSemantics),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = Color.Black.copy(alpha = 0.45f),
-                        contentColor = Color.White,
-                    ),
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .padding(8.dp)
+                            .windowInsetsPadding(WindowInsets.systemBars)
+                            .then(deleteSemantics),
+                    colors =
+                        IconButtonDefaults.iconButtonColors(
+                            containerColor = Color.Black.copy(alpha = 0.45f),
+                            contentColor = Color.White,
+                        ),
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = "delete_outline",
@@ -231,15 +245,17 @@ fun FullScreenHeroImageOverlay(
             }
             RememberIconButton(
                 onClick = onDismiss,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(8.dp)
-                    .windowInsetsPadding(WindowInsets.systemBars)
-                    .then(closeSemantics),
-                colors = IconButtonDefaults.iconButtonColors(
-                    containerColor = Color.Black.copy(alpha = 0.45f),
-                    contentColor = Color.White,
-                ),
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(8.dp)
+                        .windowInsetsPadding(WindowInsets.systemBars)
+                        .then(closeSemantics),
+                colors =
+                    IconButtonDefaults.iconButtonColors(
+                        containerColor = Color.Black.copy(alpha = 0.45f),
+                        contentColor = Color.White,
+                    ),
             ) {
                 RememberMaterialRoundedSymbol(
                     name = "close",

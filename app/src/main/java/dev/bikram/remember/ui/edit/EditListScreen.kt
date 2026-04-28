@@ -5,9 +5,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,26 +14,17 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import sh.calvin.reorderable.ReorderableItem
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -46,6 +34,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,80 +44,61 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.bikram.remember.R
-import dev.bikram.remember.domain.checklist.EditableItem
-import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
-import dev.bikram.remember.ui.common.HeroFramingEditorDialog
-import dev.bikram.remember.ui.common.HeroFramedImage
-import dev.bikram.remember.ui.common.HeroFraming
-import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
-import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.RecurrenceRule
-import dev.bikram.remember.data.RememberReservedTags
-import dev.bikram.remember.data.ThemePrefs
-import dev.bikram.remember.data.Visibility as NoteVisibility
-import androidx.compose.ui.graphics.Color
-import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
-import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.domain.checklist.EditableItem
+import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
+import dev.bikram.remember.ui.common.HeroFramedImage
+import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.common.HeroFramingEditorDialog
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.ArchivedBanner
 import dev.bikram.remember.ui.components.ArchivedBannerState
 import dev.bikram.remember.ui.components.NoteActionBottomBar
 import dev.bikram.remember.ui.components.NoteShelfState
+import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.TagAccentEditorStrip
+import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
+import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import sh.calvin.reorderable.ReorderableItem
 import java.io.File
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
-
 
 @Composable
 fun EditListRoute(
     repository: NoteRepository,
-    themePrefs: ThemePrefs,
     appScope: CoroutineScope,
     noteId: Long?,
     forceEdit: Boolean = false,
     onBack: () -> Unit,
 ) {
-    val vm: EditListViewModel = viewModel(
-        key = "editList-${noteId ?: 0L}",
-        factory = EditListViewModel.factory(repository, themePrefs, noteId),
-    )
+    val vm: EditListViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
     val title by vm.title.collectAsStateWithLifecycle()
     val favorite by vm.favorite.collectAsStateWithLifecycle()
@@ -136,8 +107,6 @@ fun EditListRoute(
     val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
     val recurrence by vm.recurrence.collectAsStateWithLifecycle()
     val importance by vm.importance.collectAsStateWithLifecycle()
-    val visibility by vm.visibility.collectAsStateWithLifecycle()
-    val locked by vm.locked.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
     val pictureRevision by vm.pictureRevision.collectAsStateWithLifecycle()
     val pictureHeroFraming by vm.pictureHeroFraming.collectAsStateWithLifecycle()
@@ -149,22 +118,29 @@ fun EditListRoute(
     val trashed by vm.trashed.collectAsStateWithLifecycle()
 
     val snackbarHostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current
-    val changesSavedMsg = androidx.compose.ui.res.stringResource(dev.bikram.remember.R.string.changes_saved)
-    val undoMsg = androidx.compose.ui.res.stringResource(dev.bikram.remember.R.string.common_undo)
-    val untitledName = androidx.compose.ui.res.stringResource(dev.bikram.remember.R.string.edit_list_title_new)
+    val changesSavedMsg =
+        androidx.compose.ui.res
+            .stringResource(dev.bikram.remember.R.string.changes_saved)
+    val undoMsg =
+        androidx.compose.ui.res
+            .stringResource(dev.bikram.remember.R.string.common_undo)
+    val untitledName =
+        androidx.compose.ui.res
+            .stringResource(dev.bikram.remember.R.string.edit_list_title_new)
     val context = androidx.compose.ui.platform.LocalContext.current
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
-    val sharedModifier = if (sharedScope != null && navScope != null && noteId != null) {
-        with(sharedScope) {
-            Modifier.sharedBounds(
-                sharedContentState = rememberSharedContentState(key = "note-card-${noteId}"),
-                animatedVisibilityScope = navScope,
-            )
+    val sharedModifier =
+        if (sharedScope != null && navScope != null && noteId != null) {
+            with(sharedScope) {
+                Modifier.sharedBounds(
+                    sharedContentState = rememberSharedContentState(key = "note-card-$noteId"),
+                    animatedVisibilityScope = navScope,
+                )
+            }
+        } else {
+            Modifier
         }
-    } else {
-        Modifier
-    }
 
     // Save path used by the top-bar Save icon while in edit mode. Runs saveIfNeeded
     // explicitly (vs. waiting for dispose) and flashes a toast so users get feedback
@@ -172,31 +148,33 @@ fun EditListRoute(
     val onExplicitSave: () -> Unit = {
         appScope.launch {
             if (vm.saveIfNeeded(untitledName) != null) {
-                android.widget.Toast.makeText(
-                    context,
-                    changesSavedMsg,
-                    android.widget.Toast.LENGTH_SHORT,
-                ).show()
+                android.widget.Toast
+                    .makeText(
+                        context,
+                        changesSavedMsg,
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
             }
         }
     }
 
     DisposableEffect(vm) {
-        onDispose { 
-            appScope.launch { 
+        onDispose {
+            appScope.launch {
                 val undoAction = vm.saveIfNeeded(untitledName)
                 if (undoAction != null) {
-                    val result = snackbarHostState.showSnackbar(
-                        message = changesSavedMsg,
-                        actionLabel = undoMsg,
-                        withDismissAction = true,
-                        duration = androidx.compose.material3.SnackbarDuration.Short
-                    )
+                    val result =
+                        snackbarHostState.showSnackbar(
+                            message = changesSavedMsg,
+                            actionLabel = undoMsg,
+                            withDismissAction = true,
+                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                        )
                     if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
                         undoAction()
                     }
                 }
-            } 
+            }
         }
     }
 
@@ -209,8 +187,6 @@ fun EditListRoute(
             reminderAt = reminderAt,
             recurrence = recurrence,
             importance = importance,
-            visibility = visibility,
-            locked = locked,
             pictureUri = pictureUri,
             pictureRevision = pictureRevision,
             pictureHeroFraming = pictureHeroFraming,
@@ -232,18 +208,14 @@ fun EditListRoute(
             onItemToggle = vm::toggleChecked,
             onItemRemove = vm::removeItem,
             onReorderWithin = vm::reorderWithin,
-            onSetParent = vm::setParent,
             onIndent = vm::indent,
             onOutdent = vm::outdent,
             onReminderChange = vm::setReminder,
             onImportanceChange = vm::setImportance,
-            onVisibilityChange = vm::setVisibility,
-            onToggleLock = vm::toggleLock,
             onPictureChange = vm::setPictureUri,
             onHeroCommitted = vm::setHeroWithFraming,
             onIconKeyChange = vm::setIconKey,
             onActionsChange = vm::setActions,
-            onTagsChange = vm::setTags,
             onTagsWithColorsChange = vm::saveTagsWithColors,
             onEditExistingTag = vm::editExistingTag,
             onAddAttachment = vm::addAttachment,
@@ -276,8 +248,6 @@ fun EditListScreen(
     reminderAt: Long?,
     recurrence: RecurrenceRule?,
     importance: Importance,
-    visibility: NoteVisibility,
-    locked: Boolean,
     pictureUri: String?,
     pictureRevision: Long,
     pictureHeroFraming: String?,
@@ -301,8 +271,6 @@ fun EditListScreen(
     /** Reorders within a single sublist. [visibleIds] is the filtered+sorted ordering the user
      *  actually sees (active OR completed), and from/to are indices within that list. */
     onReorderWithin: (visibleIds: List<Long>, fromIndex: Int, toIndex: Int) -> Unit,
-    /** Horizontal drag re-parent. `newParentLocalId = null` promotes back to top-level. */
-    onSetParent: (localId: Long, newParentLocalId: Long?) -> Unit,
     /**
      * Horizontal swipe-right indent. Picks the anchor parent from the CURRENT ViewModel state
      * so it can't see a stale `activeList` snapshot captured by a pointerInput closure. Swipe-
@@ -313,13 +281,10 @@ fun EditListScreen(
     onOutdent: (localId: Long) -> Unit,
     onReminderChange: (Long?, RecurrenceRule?) -> Unit,
     onImportanceChange: (Importance) -> Unit,
-    onVisibilityChange: (NoteVisibility) -> Unit,
-    onToggleLock: () -> Unit,
     onPictureChange: (String?) -> Unit,
     onHeroCommitted: (String, HeroFraming) -> Unit,
     onIconKeyChange: (String?) -> Unit,
     onActionsChange: (List<NoteAction>) -> Unit,
-    onTagsChange: (List<String>) -> Unit,
     onTagsWithColorsChange: (List<String>, Map<String, String>) -> Unit,
     onEditExistingTag: (String, String, String?, Boolean) -> Unit,
     onAddAttachment: (Uri, String, String?) -> Unit,
@@ -343,19 +308,21 @@ fun EditListScreen(
     var deleteForeverConfirmOpen by rememberSaveable { mutableStateOf(false) }
 
     var pendingHeroSession by remember { mutableStateOf<Pair<String, File?>?>(null) }
-    val launchHeroImagePick = rememberHeroImagePickThenCopy { uriString, copiedFile ->
-        pendingHeroSession = uriString to copiedFile
-    }
+    val launchHeroImagePick =
+        rememberHeroImagePickThenCopy { uriString, copiedFile ->
+            pendingHeroSession = uriString to copiedFile
+        }
     var pictureViewer by remember { mutableStateOf<Pair<String, Long>?>(null) }
 
     val titlePlaceholder = if (existing) stringResource(R.string.edit_list_title_new) else stringResource(R.string.edit_list_title_new)
     val blurStyle = rememberProgressiveBlurStyle(bottomExtra = 0.dp)
 
-    val shelfState = when {
-        trashed -> NoteShelfState.TRASHED
-        archived -> NoteShelfState.ARCHIVED
-        else -> NoteShelfState.ACTIVE
-    }
+    val shelfState =
+        when {
+            trashed -> NoteShelfState.TRASHED
+            archived -> NoteShelfState.ARCHIVED
+            else -> NoteShelfState.ACTIVE
+        }
     val readOnly = shelfState != NoteShelfState.ACTIVE
 
     var isEditMode by remember(existing, forceEdit) { mutableStateOf(!existing || forceEdit) }
@@ -373,7 +340,9 @@ fun EditListScreen(
         }
     }
 
-    val lazyListStateForVisibility = androidx.compose.foundation.lazy.rememberLazyListState()
+    val lazyListStateForVisibility =
+        androidx.compose.foundation.lazy
+            .rememberLazyListState()
     var bottomBarVisible by remember { mutableStateOf(true) }
 
     // Force-show the bar whenever the list is scrolled to the very top. derivedStateOf is
@@ -393,22 +362,23 @@ fun EditListScreen(
     // so the bar flashed back during the bounce. A NestedScrollConnection that filters the
     // SHOW direction on NestedScrollSource.UserInput means the spring-back phase never
     // re-reveals the bar, giving a clean M3E overscroll feel.
-    val barVisibilityNestedScroll = remember {
-        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-            override fun onPreScroll(
-                available: androidx.compose.ui.geometry.Offset,
-                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
-            ): androidx.compose.ui.geometry.Offset {
-                val dy = available.y
-                when {
-                    dy < -1f -> bottomBarVisible = false
-                    dy > 1f && source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput ->
-                        bottomBarVisible = true
+    val barVisibilityNestedScroll =
+        remember {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                override fun onPreScroll(
+                    available: androidx.compose.ui.geometry.Offset,
+                    source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+                ): androidx.compose.ui.geometry.Offset {
+                    val dy = available.y
+                    when {
+                        dy < -1f -> bottomBarVisible = false
+                        dy > 1f && source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput ->
+                            bottomBarVisible = true
+                    }
+                    return androidx.compose.ui.geometry.Offset.Zero
                 }
-                return androidx.compose.ui.geometry.Offset.Zero
             }
         }
-    }
 
     val density = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
@@ -428,9 +398,10 @@ fun EditListScreen(
     }
 
     Scaffold(
-        modifier = Modifier
-            .nestedScroll(barVisibilityNestedScroll)
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            Modifier
+                .nestedScroll(barVisibilityNestedScroll)
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
             LargeTopAppBar(
@@ -439,21 +410,28 @@ fun EditListScreen(
                     val collapseFraction = scrollBehavior.state.collapsedFraction
                     val expandedStyle = MaterialTheme.typography.headlineMedium
                     val collapsedStyle = MaterialTheme.typography.titleLarge
-                    val titleStyle = expandedStyle.copy(
-                        fontSize = androidx.compose.ui.unit.lerp(
-                            expandedStyle.fontSize,
-                            collapsedStyle.fontSize,
-                            collapseFraction,
-                        ),
-                        lineHeight = androidx.compose.ui.unit.lerp(
-                            expandedStyle.lineHeight,
-                            collapsedStyle.lineHeight,
-                            collapseFraction,
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    val iconSize = androidx.compose.ui.unit.lerp(28.dp, 22.dp, collapseFraction)
-                    val iconGap = androidx.compose.ui.unit.lerp(12.dp, 8.dp, collapseFraction)
+                    val titleStyle =
+                        expandedStyle.copy(
+                            fontSize =
+                                androidx.compose.ui.unit.lerp(
+                                    expandedStyle.fontSize,
+                                    collapsedStyle.fontSize,
+                                    collapseFraction,
+                                ),
+                            lineHeight =
+                                androidx.compose.ui.unit.lerp(
+                                    expandedStyle.lineHeight,
+                                    collapsedStyle.lineHeight,
+                                    collapseFraction,
+                                ),
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    val iconSize =
+                        androidx.compose.ui.unit
+                            .lerp(28.dp, 22.dp, collapseFraction)
+                    val iconGap =
+                        androidx.compose.ui.unit
+                            .lerp(12.dp, 8.dp, collapseFraction)
                     val headerSymbol = iconSymbolName(iconKey)
                     val headerBrandDrawable = iconDrawableRes(iconKey)
                     val headerEmoji = iconEmojiPayload(iconKey)
@@ -498,22 +476,25 @@ fun EditListScreen(
                                 onValueChange = { if (it.length <= 80) onTitleChange(it) },
                                 textStyle = titleStyle,
                                 enabled = !readOnly,
-                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
-                                    imeAction = androidx.compose.ui.text.input.ImeAction.Next
-                                ),
+                                keyboardOptions =
+                                    androidx.compose.foundation.text.KeyboardOptions(
+                                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                                        imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                                    ),
                                 singleLine = true,
                                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(newListTitleFocus),
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .focusRequester(newListTitleFocus),
                                 decorationBox = { inner ->
                                     if (title.isEmpty()) {
                                         Text(
                                             text = titlePlaceholder,
-                                            style = titleStyle.copy(
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                            ),
+                                            style =
+                                                titleStyle.copy(
+                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                                ),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
                                         )
@@ -610,65 +591,74 @@ fun EditListScreen(
         // checked child's real parent is still in the active section we synthesise a read-only
         // header row above that child's group so the context isn't lost.
         // ---------------------------------------------------------------------------------
-        val activeList = remember(items) {
-            items.filter { !it.checked }.sortedBy { it.sortOrder }
-        }
-        val completedItems = remember(items) {
-            items.filter { it.checked }.sortedBy { it.sortOrder }
-        }
-        val activeParentLookup = remember(activeList) {
-            activeList.filter { it.depth == 0 }.associateBy { it.localId }
-        }
-        val checkedParentLookup = remember(completedItems) {
-            completedItems.filter { it.depth == 0 }.associateBy { it.localId }
-        }
-        val completedEntries: List<CompletedEntry> = remember(completedItems, activeParentLookup, checkedParentLookup) {
-            buildCompletedEntries(
-                completedItems = completedItems,
-                activeParents = activeParentLookup,
-                checkedParents = checkedParentLookup,
-            )
-        }
+        val activeList =
+            remember(items) {
+                items.filter { !it.checked }.sortedBy { it.sortOrder }
+            }
+        val completedItems =
+            remember(items) {
+                items.filter { it.checked }.sortedBy { it.sortOrder }
+            }
+        val activeParentLookup =
+            remember(activeList) {
+                activeList.filter { it.depth == 0 }.associateBy { it.localId }
+            }
+        val checkedParentLookup =
+            remember(completedItems) {
+                completedItems.filter { it.depth == 0 }.associateBy { it.localId }
+            }
+        val completedEntries: List<CompletedEntry> =
+            remember(completedItems, activeParentLookup, checkedParentLookup) {
+                buildCompletedEntries(
+                    completedItems = completedItems,
+                    activeParents = activeParentLookup,
+                    checkedParents = checkedParentLookup,
+                )
+            }
         // Mirror of completedEntries for the active half: synthesises a ghost parent header when a
         // child is unchecked but its real parent is still in the completed section. This keeps the
         // parent context visible when the user unchecks a single child out of a cascade-checked
         // group (the user's bug report: "tap B2 to uncheck it, only B2 moves back to unchecked
         // section, without a parent above it").
-        val activeEntries: List<ActiveEntry> = remember(activeList, activeParentLookup, checkedParentLookup) {
-            buildActiveEntries(
-                activeItems = activeList,
-                activeParents = activeParentLookup,
-                checkedParents = checkedParentLookup,
-            )
-        }
+        val activeEntries: List<ActiveEntry> =
+            remember(activeList, activeParentLookup, checkedParentLookup) {
+                buildActiveEntries(
+                    activeItems = activeList,
+                    activeParents = activeParentLookup,
+                    checkedParents = checkedParentLookup,
+                )
+            }
         val activeIds = remember(activeList) { activeList.map { it.localId } }
         val completedRowIds = remember(completedItems) { completedItems.map { it.localId } }
 
         var showChecked by rememberSaveable { mutableStateOf(true) }
 
         val lazyListState = lazyListStateForVisibility
-        val reorderState = sh.calvin.reorderable.rememberReorderableLazyListState(lazyListState) { from, to ->
-            // Keys are the EditableItem.localId for both active rows and completed rows. Ghost
-            // headers are keyed with a synthetic "ghost-<parentId>" string so their drags are
-            // ignored here. We only reorder within the matching sublist (no cross-section drags).
-            val fromId = from.key as? Long ?: return@rememberReorderableLazyListState
-            val toId = to.key as? Long ?: return@rememberReorderableLazyListState
-            val (list, fromIdx, toIdx) = when {
-                fromId in activeIds && toId in activeIds ->
-                    Triple(activeIds, activeIds.indexOf(fromId), activeIds.indexOf(toId))
-                fromId in completedRowIds && toId in completedRowIds ->
-                    Triple(completedRowIds, completedRowIds.indexOf(fromId), completedRowIds.indexOf(toId))
-                else -> return@rememberReorderableLazyListState
+        val reorderState =
+            sh.calvin.reorderable.rememberReorderableLazyListState(lazyListState) { from, to ->
+                // Keys are the EditableItem.localId for both active rows and completed rows. Ghost
+                // headers are keyed with a synthetic "ghost-<parentId>" string so their drags are
+                // ignored here. We only reorder within the matching sublist (no cross-section drags).
+                val fromId = from.key as? Long ?: return@rememberReorderableLazyListState
+                val toId = to.key as? Long ?: return@rememberReorderableLazyListState
+                val (list, fromIdx, toIdx) =
+                    when {
+                        fromId in activeIds && toId in activeIds ->
+                            Triple(activeIds, activeIds.indexOf(fromId), activeIds.indexOf(toId))
+                        fromId in completedRowIds && toId in completedRowIds ->
+                            Triple(completedRowIds, completedRowIds.indexOf(fromId), completedRowIds.indexOf(toId))
+                        else -> return@rememberReorderableLazyListState
+                    }
+                if (fromIdx >= 0 && toIdx >= 0) onReorderWithin(list, fromIdx, toIdx)
             }
-            if (fromIdx >= 0 && toIdx >= 0) onReorderWithin(list, fromIdx, toIdx)
-        }
 
         androidx.compose.foundation.lazy.LazyColumn(
             state = lazyListState,
-            modifier = Modifier
-                .fillMaxSize()
-                .then(blurMod)
-                .padding(horizontal = 20.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .then(blurMod)
+                    .padding(horizontal = 20.dp),
         ) {
             item(key = "top_padding") {
                 Spacer(Modifier.height(padding.calculateTopPadding()))
@@ -695,11 +685,12 @@ fun EditListScreen(
                 item(key = "archived_banner") {
                     Spacer(Modifier.height(16.dp))
                     ArchivedBanner(
-                        state = if (shelfState == NoteShelfState.TRASHED) {
-                            ArchivedBannerState.TRASHED
-                        } else {
-                            ArchivedBannerState.ARCHIVED
-                        },
+                        state =
+                            if (shelfState == NoteShelfState.TRASHED) {
+                                ArchivedBannerState.TRASHED
+                            } else {
+                                ArchivedBannerState.ARCHIVED
+                            },
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -707,7 +698,33 @@ fun EditListScreen(
             item(key = "items_spacing") {
                 Spacer(Modifier.height(12.dp))
             }
-            
+
+            if (existing && !isEditMode && activeEntries.isEmpty() && completedEntries.isEmpty()) {
+                item(key = "empty_list_view_placeholder") {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(140.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        Text(
+                            text = stringResource(R.string.edit_list_empty_view_title),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(
+                            text = stringResource(R.string.edit_list_empty_view_hint),
+                            style =
+                                MaterialTheme.typography.bodyMedium.copy(
+                                    fontStyle = FontStyle.Italic,
+                                ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        )
+                    }
+                }
+            }
+
             items(
                 items = activeEntries,
                 key = { entry ->
@@ -715,29 +732,36 @@ fun EditListScreen(
                         is ActiveEntry.Ghost -> "ghost-active-${entry.header.realParentLocalId}"
                         is ActiveEntry.Row -> entry.item.localId
                     }
-                }
+                },
             ) { entry ->
                 when (entry) {
-                    is ActiveEntry.Ghost -> GhostParentHeaderRow(
-                        header = entry.header,
-                        isParentChecked = entry.header.parentChecked,
-                        // Active rows draw a drag-handle gutter while in edit mode; the ghost
-                        // has to mirror that so its checkbox lines up with the rows below.
-                        showDragHandleGutter = isEditMode,
-                        modifier = Modifier.animateItem(
-                            placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                        ),
-                    )
+                    is ActiveEntry.Ghost ->
+                        GhostParentHeaderRow(
+                            header = entry.header,
+                            isParentChecked = entry.header.parentChecked,
+                            // Active rows draw a drag-handle gutter while in edit mode; the ghost
+                            // has to mirror that so its checkbox lines up with the rows below.
+                            showDragHandleGutter = isEditMode,
+                            modifier =
+                                Modifier.animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ),
+                        )
                     is ActiveEntry.Row -> {
                         val item = entry.item
                         ReorderableItem(
                             state = reorderState,
                             key = item.localId,
-                            modifier = Modifier.animateItem(
-                                placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                            )
+                            modifier =
+                                Modifier.animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ),
                         ) { isDragging ->
-                            val fr = focusRequesters.getOrPut(item.localId) { androidx.compose.ui.focus.FocusRequester() }
+                            val fr =
+                                focusRequesters.getOrPut(item.localId) {
+                                    androidx.compose.ui.focus
+                                        .FocusRequester()
+                                }
                             ChecklistRow(
                                 item = item,
                                 isEditMode = isEditMode && !readOnly,
@@ -747,22 +771,39 @@ fun EditListScreen(
                                 onTextChange = if (readOnly) ({ _ -> }) else ({ onItemTextChange(item.localId, it) }),
                                 onToggle = if (readOnly) ({}) else ({ onItemToggle(item.localId) }),
                                 onRemove = if (readOnly) ({}) else ({ onItemRemove(item.localId) }),
-                                onNext = if (readOnly) ({}) else ({
-                                    expectingNewItem = true
-                                    onAddItem()
-                                }),
-                                onIndentChange = if (readOnly) null else ({ deltaDepth ->
-                                    // deltaDepth = +1 means user dragged right (indent); -1 means
-                                    // user dragged left (outdent). We delegate both to the
-                                    // ViewModel so the anchor lookup runs on the freshest
-                                    // in-memory list. Doing the lookup here was buggy: the
-                                    // gesture lives inside a pointerInput(item.localId, depth)
-                                    // block whose captured `activeList` does NOT refresh when
-                                    // siblings are reordered, so swiping right after a drag
-                                    // picked the wrong prior top-level row as the anchor.
-                                    if (deltaDepth > 0) onIndent(item.localId)
-                                    else if (deltaDepth < 0) onOutdent(item.localId)
-                                }),
+                                onNext =
+                                    if (readOnly) {
+                                        ({})
+                                    } else {
+                                        (
+                                            {
+                                                expectingNewItem = true
+                                                onAddItem()
+                                            }
+                                        )
+                                    },
+                                onIndentChange =
+                                    if (readOnly) {
+                                        null
+                                    } else {
+                                        (
+                                            { deltaDepth ->
+                                                // deltaDepth = +1 means user dragged right (indent); -1 means
+                                                // user dragged left (outdent). We delegate both to the
+                                                // ViewModel so the anchor lookup runs on the freshest
+                                                // in-memory list. Doing the lookup here was buggy: the
+                                                // gesture lives inside a pointerInput(item.localId, depth)
+                                                // block whose captured `activeList` does NOT refresh when
+                                                // siblings are reordered, so swiping right after a drag
+                                                // picked the wrong prior top-level row as the anchor.
+                                                if (deltaDepth > 0) {
+                                                    onIndent(item.localId)
+                                                } else if (deltaDepth < 0) {
+                                                    onOutdent(item.localId)
+                                                }
+                                            }
+                                        )
+                                    },
                             )
                         }
                     }
@@ -773,16 +814,15 @@ fun EditListScreen(
                 item(key = "add_item_btn") {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateItem(
-                                placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                            )
-                            .tapSoundClickable {
-                                expectingNewItem = true
-                                onAddItem()
-                            }
-                            .padding(vertical = 14.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ).tapSoundClickable {
+                                    expectingNewItem = true
+                                    onAddItem()
+                                }.padding(vertical = 14.dp),
                     ) {
                         RememberMaterialRoundedSymbol(
                             name = "add",
@@ -805,13 +845,13 @@ fun EditListScreen(
                     Spacer(Modifier.height(16.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .animateItem(
-                                placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                            )
-                            .tapSoundClickable { showChecked = !showChecked }
-                            .padding(vertical = 8.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ).tapSoundClickable { showChecked = !showChecked }
+                                .padding(vertical = 8.dp),
                     ) {
                         RememberMaterialRoundedSymbol(
                             name = if (showChecked) "expand_more" else "chevron_right",
@@ -836,26 +876,32 @@ fun EditListScreen(
                                 is CompletedEntry.Ghost -> "ghost-${entry.header.realParentLocalId}"
                                 is CompletedEntry.Row -> entry.item.localId
                             }
-                        }
+                        },
                     ) { entry ->
                         when (entry) {
-                            is CompletedEntry.Ghost -> GhostParentHeaderRow(
-                                header = entry.header,
-                                isParentChecked = entry.header.parentChecked,
-                                // Completed rows never render a drag handle, so the ghost in
-                                // the checked section never reserves a gutter either.
-                                showDragHandleGutter = false,
-                                modifier = Modifier.animateItem(
-                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                                ),
-                            )
+                            is CompletedEntry.Ghost ->
+                                GhostParentHeaderRow(
+                                    header = entry.header,
+                                    isParentChecked = entry.header.parentChecked,
+                                    // Completed rows never render a drag handle, so the ghost in
+                                    // the checked section never reserves a gutter either.
+                                    showDragHandleGutter = false,
+                                    modifier =
+                                        Modifier.animateItem(
+                                            placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                        ),
+                                )
                             is CompletedEntry.Row -> {
                                 // Checked rows are NOT wrapped in ReorderableItem: Google Keep
                                 // freezes the order of checked items and we mirror that. The
                                 // item sort order in completed is implicit (most-recently
                                 // checked last, siblings grouped under their ghost parent).
                                 val item = entry.item
-                                val fr = focusRequesters.getOrPut(item.localId) { androidx.compose.ui.focus.FocusRequester() }
+                                val fr =
+                                    focusRequesters.getOrPut(item.localId) {
+                                        androidx.compose.ui.focus
+                                            .FocusRequester()
+                                    }
                                 ChecklistRow(
                                     item = item,
                                     isEditMode = isEditMode && !readOnly,
@@ -866,21 +912,29 @@ fun EditListScreen(
                                     onTextChange = if (readOnly) ({ _ -> }) else ({ onItemTextChange(item.localId, it) }),
                                     onToggle = if (readOnly) ({}) else ({ onItemToggle(item.localId) }),
                                     onRemove = if (readOnly) ({}) else ({ onItemRemove(item.localId) }),
-                                    onNext = if (readOnly) ({}) else ({
-                                        expectingNewItem = true
-                                        onAddItem()
-                                    }),
+                                    onNext =
+                                        if (readOnly) {
+                                            ({})
+                                        } else {
+                                            (
+                                                {
+                                                    expectingNewItem = true
+                                                    onAddItem()
+                                                }
+                                            )
+                                        },
                                     onIndentChange = null,
-                                    modifier = Modifier.animateItem(
-                                        placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                                    ),
+                                    modifier =
+                                        Modifier.animateItem(
+                                            placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                        ),
                                 )
                             }
                         }
                     }
                 }
             }
-            
+
             item(key = "options_panel") {
                 Spacer(Modifier.height(20.dp))
                 OptionsPanel(
@@ -892,7 +946,7 @@ fun EditListScreen(
                     isChecklist = true,
                     actions = actions,
                     tags = tags,
-                    attachmentCount = attachments.size,
+                    attachments = attachments,
                     onOpenReminder = if (readOnly) ({}) else ({ reminderPickerOpen = true }),
                     onSetImportance = if (readOnly) ({ _ -> }) else onImportanceChange,
                     onOpenPicture = if (readOnly) ({}) else launchHeroImagePick,
@@ -920,7 +974,10 @@ fun EditListScreen(
         if (iconPickerOpen) {
             IconPicker(
                 current = iconKey,
-                onPick = { onIconKeyChange(it); iconPickerOpen = false },
+                onPick = {
+                    onIconKeyChange(it)
+                    iconPickerOpen = false
+                },
                 onDismiss = { iconPickerOpen = false },
                 isChecklist = true,
             )
@@ -928,7 +985,10 @@ fun EditListScreen(
         if (actionsPickerOpen) {
             ActionPicker(
                 current = actions,
-                onConfirm = { onActionsChange(it); actionsPickerOpen = false },
+                onConfirm = {
+                    onActionsChange(it)
+                    actionsPickerOpen = false
+                },
                 onDismiss = { actionsPickerOpen = false },
             )
         }
@@ -958,7 +1018,7 @@ fun EditListScreen(
             imageUri = viewerForOverlay?.first,
             imageCacheRevision = viewerForOverlay?.second ?: 0L,
             imageContentDescription = stringResource(R.string.viewer_cover_image_cd),
-        sharedElementKey = viewerForOverlay?.first?.let { uri -> "hero-image-$uri" },
+            sharedElementKey = viewerForOverlay?.first?.let { uri -> "hero-image-$uri" },
             onDismiss = { pictureViewer = null },
             // Delete is only reachable on the active shelf - archived/trashed lists are
             // read-only, so there's no delete affordance there.
@@ -1024,35 +1084,38 @@ private fun PictureHero(
     // Outer Box keeps the layout slot at a constant height; only the inline content
     // toggles, so the surrounding lazy column never reflows mid-transition.
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(220.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(220.dp),
     ) {
         AnimatedVisibility(
             visible = !viewerOpen,
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            val sharedModifier = if (sharedScope != null) {
-                with(sharedScope) {
-                    Modifier.sharedBounds(
-                        sharedContentState = rememberSharedContentState(key = "hero-image-$uri"),
-                        animatedVisibilityScope = this@AnimatedVisibility,
-                    )
+            val sharedModifier =
+                if (sharedScope != null) {
+                    with(sharedScope) {
+                        Modifier.sharedBounds(
+                            sharedContentState = rememberSharedContentState(key = "hero-image-$uri"),
+                            animatedVisibilityScope = this@AnimatedVisibility,
+                        )
+                    }
+                } else {
+                    Modifier
                 }
-            } else {
-                Modifier
-            }
             // No delete overlay on the inline hero: it competes visually with the
             // hero image and invites accidental taps. Delete lives in the full-screen
             // viewer.
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(sharedModifier)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .tapSoundClickable(onClick = onOpenFull),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(sharedModifier)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .tapSoundClickable(onClick = onOpenFull),
             ) {
                 HeroFramedImage(
                     imageUri = uri,

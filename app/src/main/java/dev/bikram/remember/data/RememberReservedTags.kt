@@ -7,6 +7,5 @@ package dev.bikram.remember.data
 object RememberReservedTags {
     const val FAVORITE: String = "__remember_favorite__"
 
-    fun userVisibleTags(tags: List<String>): List<String> =
-        tags.filterNot { it == FAVORITE }
+    fun userVisibleTags(tags: List<String>): List<String> = tags.filterNot { it == FAVORITE }
 }

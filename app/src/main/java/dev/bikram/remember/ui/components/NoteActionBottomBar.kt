@@ -143,10 +143,11 @@ fun NoteActionBottomBarContent(
         tonalElevation = 3.dp,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 8.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -223,11 +224,12 @@ private fun ActionItem(
     iconScale: Float = 1f,
 ) {
     Column(
-        modifier = Modifier
-            .width(72.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+        modifier =
+            Modifier
+                .width(72.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(onClick = onClick)
+                .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -261,16 +263,16 @@ private fun EditActionItem(
     val hapticEnabled = LocalHapticEnabled.current
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     Column(
-        modifier = Modifier
-            .width(72.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(
-                onClick = {
-                    if (isEditMode && hapticEnabled) hostView.performSaveHaptic()
-                    onClick()
-                },
-            )
-            .padding(vertical = 8.dp),
+        modifier =
+            Modifier
+                .width(72.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(
+                    onClick = {
+                        if (isEditMode && hapticEnabled) hostView.performSaveHaptic()
+                        onClick()
+                    },
+                ).padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -299,9 +301,10 @@ private fun EditActionItem(
             },
         ) { editing ->
             Text(
-                text = stringResource(
-                    if (editing) R.string.edit_bottom_bar_done else R.string.edit_bottom_bar_edit
-                ),
+                text =
+                    stringResource(
+                        if (editing) R.string.edit_bottom_bar_done else R.string.edit_bottom_bar_edit,
+                    ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
@@ -341,19 +344,19 @@ private fun DoneActionItem(
         label = "bottomBarDoneColor",
     )
     Column(
-        modifier = Modifier
-            .width(72.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(
-                onClick = {
-                    if (!completed) {
-                        pulsing = true
-                        if (hapticEnabled) hostView.performSaveHaptic()
-                    }
-                    onClick()
-                },
-            )
-            .padding(vertical = 8.dp),
+        modifier =
+            Modifier
+                .width(72.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(
+                    onClick = {
+                        if (!completed) {
+                            pulsing = true
+                            if (hapticEnabled) hostView.performSaveHaptic()
+                        }
+                        onClick()
+                    },
+                ).padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -367,10 +370,14 @@ private fun DoneActionItem(
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = stringResource(
-                if (completed) R.string.edit_bottom_bar_mark_not_done
-                else R.string.edit_bottom_bar_mark_done
-            ),
+            text =
+                stringResource(
+                    if (completed) {
+                        R.string.edit_bottom_bar_mark_not_done
+                    } else {
+                        R.string.edit_bottom_bar_mark_done
+                    },
+                ),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
@@ -403,19 +410,19 @@ private fun FavoriteActionItem(
         label = "bottomBarFavColor",
     )
     Column(
-        modifier = Modifier
-            .width(72.dp)
-            .clip(RoundedCornerShape(16.dp))
-            .clickable(
-                onClick = {
-                    if (!favorite) {
-                        favPulsing = true
-                        if (hapticEnabled) hostView.performSaveHaptic()
-                    }
-                    onClick()
-                },
-            )
-            .padding(vertical = 8.dp),
+        modifier =
+            Modifier
+                .width(72.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .clickable(
+                    onClick = {
+                        if (!favorite) {
+                            favPulsing = true
+                            if (hapticEnabled) hostView.performSaveHaptic()
+                        }
+                        onClick()
+                    },
+                ).padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {

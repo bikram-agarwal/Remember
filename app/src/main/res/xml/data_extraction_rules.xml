@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude
+            domain="file"
+            path="note_heroes/" />
+        <exclude
+            domain="file"
+            path="note_attachments/" />
+        <exclude
+            domain="file"
+            path="remember_backup/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude
+            domain="file"
+            path="note_heroes/" />
+        <exclude
+            domain="file"
+            path="note_attachments/" />
+        <exclude
+            domain="file"
+            path="remember_backup/" />
+    </device-transfer>
+</data-extraction-rules>

@@ -21,7 +21,6 @@ data class ChecklistEditResult(
 )
 
 object ChecklistEditor {
-
     /**
      * Parent-context toggle:
      *
@@ -29,49 +28,57 @@ object ChecklistEditor {
      * * Checking the last unchecked child also checks the parent.
      * * Unchecking a child of a checked parent brings the parent back to active with it.
      */
-    fun toggleChecked(items: List<EditableItem>, localId: Long): ChecklistEditResult {
-        val target = items.firstOrNull { item -> item.localId == localId }
-            ?: return ChecklistEditResult(items = items, changed = false)
+    fun toggleChecked(
+        items: List<EditableItem>,
+        localId: Long,
+    ): ChecklistEditResult {
+        val target =
+            items.firstOrNull { item -> item.localId == localId }
+                ?: return ChecklistEditResult(items = items, changed = false)
         val newChecked = !target.checked
-        val affectedIds: Set<Long> = if (target.depth == 0) {
-            buildSet {
-                add(target.localId)
-                items.forEach { item ->
-                    if (item.parentLocalId == target.localId) {
-                        add(item.localId)
+        val affectedIds: Set<Long> =
+            if (target.depth == 0) {
+                buildSet {
+                    add(target.localId)
+                    items.forEach { item ->
+                        if (item.parentLocalId == target.localId) {
+                            add(item.localId)
+                        }
                     }
                 }
-            }
-        } else {
-            buildSet {
-                add(target.localId)
-                val parentId = target.parentLocalId
-                val parent = parentId?.let { requestedParentId ->
-                    items.firstOrNull { item -> item.localId == requestedParentId }
-                }
-                if (parent != null) {
-                    if (newChecked) {
-                        val siblings = items.filter { item -> item.parentLocalId == parentId }
-                        val allWillBeChecked = siblings.all { sibling ->
-                            sibling.localId == target.localId || sibling.checked
+            } else {
+                buildSet {
+                    add(target.localId)
+                    val parentId = target.parentLocalId
+                    val parent =
+                        parentId?.let { requestedParentId ->
+                            items.firstOrNull { item -> item.localId == requestedParentId }
                         }
-                        if (allWillBeChecked && !parent.checked) {
+                    if (parent != null) {
+                        if (newChecked) {
+                            val siblings = items.filter { item -> item.parentLocalId == parentId }
+                            val allWillBeChecked =
+                                siblings.all { sibling ->
+                                    sibling.localId == target.localId || sibling.checked
+                                }
+                            if (allWillBeChecked && !parent.checked) {
+                                add(parent.localId)
+                            }
+                        } else if (parent.checked) {
                             add(parent.localId)
                         }
-                    } else if (parent.checked) {
-                        add(parent.localId)
                     }
                 }
             }
-        }
         return ChecklistEditResult(
-            items = items.map { item ->
-                if (item.localId in affectedIds) {
-                    item.copy(checked = newChecked)
-                } else {
-                    item
-                }
-            },
+            items =
+                items.map { item ->
+                    if (item.localId in affectedIds) {
+                        item.copy(checked = newChecked)
+                    } else {
+                        item
+                    }
+                },
             changed = true,
         )
     }
@@ -92,36 +99,42 @@ object ChecklistEditor {
             return ChecklistEditResult(items = items, changed = false)
         }
         val movingId = visibleIds[fromIndex]
-        val movingItem = items.firstOrNull { item -> item.localId == movingId }
-            ?: return ChecklistEditResult(items = items, changed = false)
+        val movingItem =
+            items.firstOrNull { item -> item.localId == movingId }
+                ?: return ChecklistEditResult(items = items, changed = false)
 
-        val rearrangedIds = visibleIds.toMutableList().apply {
-            removeAt(fromIndex)
-            add(toIndex, movingId)
-        }
+        val rearrangedIds =
+            visibleIds.toMutableList().apply {
+                removeAt(fromIndex)
+                add(toIndex, movingId)
+            }
         val previousId = rearrangedIds.getOrNull(toIndex - 1)
         val nextId = rearrangedIds.getOrNull(toIndex + 1)
-        val previousOrder = previousId?.let { id ->
-            items.first { item -> item.localId == id }.sortOrder
-        }
-        val nextOrder = nextId?.let { id ->
-            items.first { item -> item.localId == id }.sortOrder
-        }
+        val previousOrder =
+            previousId?.let { id ->
+                items.first { item -> item.localId == id }.sortOrder
+            }
+        val nextOrder =
+            nextId?.let { id ->
+                items.first { item -> item.localId == id }.sortOrder
+            }
 
-        val newSortOrder = when {
-            previousOrder != null && nextOrder != null -> (previousOrder + nextOrder) / 2.0
-            previousOrder != null -> previousOrder + 1.0
-            nextOrder != null -> nextOrder - 1.0
-            else -> movingItem.sortOrder
-        }
+        val newSortOrder =
+            when {
+                previousOrder != null && nextOrder != null -> (previousOrder + nextOrder) / 2.0
+                previousOrder != null -> previousOrder + 1.0
+                nextOrder != null -> nextOrder - 1.0
+                else -> movingItem.sortOrder
+            }
         return ChecklistEditResult(
-            items = items.map { item ->
-                if (item.localId == movingId) {
-                    item.copy(sortOrder = newSortOrder)
-                } else {
-                    item
-                }
-            },
+            items =
+                items.map { item ->
+                    if (item.localId == movingId) {
+                        item.copy(sortOrder = newSortOrder)
+                    } else {
+                        item
+                    }
+                },
             changed = true,
         )
     }
@@ -134,31 +147,35 @@ object ChecklistEditor {
         localId: Long,
         newParentLocalId: Long?,
     ): ChecklistEditResult {
-        val target = items.firstOrNull { item -> item.localId == localId }
-            ?: return ChecklistEditResult(items = items, changed = false)
-        val resolvedParent = newParentLocalId?.let { requestedParentId ->
-            val candidate = items.firstOrNull { item -> item.localId == requestedParentId }
-                ?: return@let null
-            if (candidate.depth == 1) {
-                candidate.parentLocalId
-            } else {
-                candidate.localId
+        val target =
+            items.firstOrNull { item -> item.localId == localId }
+                ?: return ChecklistEditResult(items = items, changed = false)
+        val resolvedParent =
+            newParentLocalId?.let { requestedParentId ->
+                val candidate =
+                    items.firstOrNull { item -> item.localId == requestedParentId }
+                        ?: return@let null
+                if (candidate.depth == 1) {
+                    candidate.parentLocalId
+                } else {
+                    candidate.localId
+                }
             }
-        }
         if (target.parentLocalId == resolvedParent) {
             return ChecklistEditResult(items = items, changed = false)
         }
         return ChecklistEditResult(
-            items = items.map { item ->
-                if (item.localId == localId) {
-                    item.copy(
-                        parentLocalId = resolvedParent,
-                        depth = if (resolvedParent != null) 1 else 0,
-                    )
-                } else {
-                    item
-                }
-            },
+            items =
+                items.map { item ->
+                    if (item.localId == localId) {
+                        item.copy(
+                            parentLocalId = resolvedParent,
+                            depth = if (resolvedParent != null) 1 else 0,
+                        )
+                    } else {
+                        item
+                    }
+                },
             changed = true,
         )
     }
@@ -166,29 +183,39 @@ object ChecklistEditor {
     /**
      * Indents under the nearest prior top-level sibling in the current unchecked list.
      */
-    fun indent(items: List<EditableItem>, localId: Long): ChecklistEditResult {
-        val target = items.firstOrNull { item -> item.localId == localId }
-            ?: return ChecklistEditResult(items = items, changed = false)
+    fun indent(
+        items: List<EditableItem>,
+        localId: Long,
+    ): ChecklistEditResult {
+        val target =
+            items.firstOrNull { item -> item.localId == localId }
+                ?: return ChecklistEditResult(items = items, changed = false)
         if (target.depth != 0) {
             return ChecklistEditResult(items = items, changed = false)
         }
-        val orderedActive = items
-            .filter { item -> !item.checked }
-            .sortedBy { item -> item.sortOrder }
+        val orderedActive =
+            items
+                .filter { item -> !item.checked }
+                .sortedBy { item -> item.sortOrder }
         val targetIndex = orderedActive.indexOfFirst { item -> item.localId == localId }
         if (targetIndex <= 0) {
             return ChecklistEditResult(items = items, changed = false)
         }
-        val anchor = (targetIndex - 1 downTo 0)
-            .map { index -> orderedActive[index] }
-            .firstOrNull { item -> item.depth == 0 }
-            ?: return ChecklistEditResult(items = items, changed = false)
+        val anchor =
+            (targetIndex - 1 downTo 0)
+                .map { index -> orderedActive[index] }
+                .firstOrNull { item -> item.depth == 0 }
+                ?: return ChecklistEditResult(items = items, changed = false)
         return setParent(items, localId, anchor.localId)
     }
 
-    fun outdent(items: List<EditableItem>, localId: Long): ChecklistEditResult {
-        val target = items.firstOrNull { item -> item.localId == localId }
-            ?: return ChecklistEditResult(items = items, changed = false)
+    fun outdent(
+        items: List<EditableItem>,
+        localId: Long,
+    ): ChecklistEditResult {
+        val target =
+            items.firstOrNull { item -> item.localId == localId }
+                ?: return ChecklistEditResult(items = items, changed = false)
         if (target.depth != 1) {
             return ChecklistEditResult(items = items, changed = false)
         }

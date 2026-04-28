@@ -1,6 +1,4 @@
 package dev.bikram.remember.ui.common
-import androidx.compose.material3.TextButton
-
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -8,7 +6,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -16,7 +13,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -31,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size as ComposeSize
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -52,12 +47,12 @@ import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
 import coil3.size.Size
 import dev.bikram.remember.R
+import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberTextButton
 import java.io.File
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.roundToInt
-import dev.bikram.remember.ui.components.RememberTextButton
-import dev.bikram.remember.ui.components.RememberButton
+import androidx.compose.ui.geometry.Size as ComposeSize
 
 @Composable
 fun HeroFramingEditorDialog(
@@ -69,17 +64,21 @@ fun HeroFramingEditorDialog(
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    val model = remember(imageUri) {
-        ImageRequest.Builder(context)
-            .data(imageUri)
-            .size(Size.ORIGINAL)
-            .build()
-    }
+    val model =
+        remember(imageUri) {
+            ImageRequest
+                .Builder(context)
+                .data(imageUri)
+                .size(Size.ORIGINAL)
+                .build()
+        }
     val painter = rememberAsyncImagePainter(model)
     val loadState by painter.state.collectAsStateWithLifecycle()
     val intrinsic: ComposeSize = painter.intrinsicSize
-    val imageReady = intrinsic.width > 0f && intrinsic.height > 0f &&
-        loadState is AsyncImagePainter.State.Success
+    val imageReady =
+        intrinsic.width > 0f &&
+            intrinsic.height > 0f &&
+            loadState is AsyncImagePainter.State.Success
     var zoom by remember(imageUri) { mutableFloatStateOf(initialFraming?.zoom?.coerceIn(1f, 8f) ?: 1f) }
     var panXPx by remember(imageUri) { mutableFloatStateOf(0f) }
     var panYPx by remember(imageUri) { mutableFloatStateOf(0f) }
@@ -155,24 +154,25 @@ fun HeroFramingEditorDialog(
                             painter = painter,
                             contentDescription = null,
                             contentScale = ContentScale.FillBounds,
-                            modifier = Modifier
-                                .requiredSize(widthDp, heightDp)
-                                .offset { IntOffset(offsetXDp.roundToPx(), offsetYDp.roundToPx()) }
-                                .pointerInput(maskW, maskH, iw, ih, zoom) {
-                                    detectTransformGestures { _, pan, zoomChange, _ ->
-                                        zoom = (zoom * zoomChange).coerceIn(1f, 8f)
-                                        panXPx += pan.x
-                                        panYPx += pan.y
-                                        val coverNow = max(maskW / iw, maskH / ih)
-                                        val displayNow = coverNow * zoom.coerceIn(1f, 8f)
-                                        val sw = iw * displayNow
-                                        val sh = ih * displayNow
-                                        val rangeX = max(0f, (sw - maskW) / 2f)
-                                        val rangeY = max(0f, (sh - maskH) / 2f)
-                                        panXPx = panXPx.coerceIn(-rangeX, rangeX)
-                                        panYPx = panYPx.coerceIn(-rangeY, rangeY)
-                                    }
-                                },
+                            modifier =
+                                Modifier
+                                    .requiredSize(widthDp, heightDp)
+                                    .offset { IntOffset(offsetXDp.roundToPx(), offsetYDp.roundToPx()) }
+                                    .pointerInput(maskW, maskH, iw, ih, zoom) {
+                                        detectTransformGestures { _, pan, zoomChange, _ ->
+                                            zoom = (zoom * zoomChange).coerceIn(1f, 8f)
+                                            panXPx += pan.x
+                                            panYPx += pan.y
+                                            val coverNow = max(maskW / iw, maskH / ih)
+                                            val displayNow = coverNow * zoom.coerceIn(1f, 8f)
+                                            val sw = iw * displayNow
+                                            val sh = ih * displayNow
+                                            val rangeX = max(0f, (sw - maskW) / 2f)
+                                            val rangeY = max(0f, (sh - maskH) / 2f)
+                                            panXPx = panXPx.coerceIn(-rangeX, rangeX)
+                                            panYPx = panYPx.coerceIn(-rangeY, rangeY)
+                                        }
+                                    },
                         )
                         Canvas(
                             Modifier

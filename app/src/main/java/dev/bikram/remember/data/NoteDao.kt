@@ -18,7 +18,6 @@ data class NoteWithItems(
 
 @Dao
 interface NoteDao {
-
     /**
      * "Active" now means neither trashed nor archived -- archive is a hidden-but-kept state
      * that behaves like a separate shelf from Home.
@@ -116,10 +115,17 @@ interface NoteDao {
     suspend fun update(note: NoteEntity)
 
     @Query("UPDATE notes SET pinned = :favorite, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun setFavorite(id: Long, favorite: Boolean, updatedAt: Long)
+    suspend fun setFavorite(
+        id: Long,
+        favorite: Boolean,
+        updatedAt: Long,
+    )
 
     @Query("UPDATE notes SET tags = :tags WHERE id = :id")
-    suspend fun updateTagCache(id: Long, tags: List<String>)
+    suspend fun updateTagCache(
+        id: Long,
+        tags: List<String>,
+    )
 
     @Query(
         "UPDATE notes " +
@@ -130,7 +136,11 @@ interface NoteDao {
             "updatedAt = :updatedAt " +
             "WHERE id = :id",
     )
-    suspend fun setTrashed(id: Long, trashed: Boolean, updatedAt: Long)
+    suspend fun setTrashed(
+        id: Long,
+        trashed: Boolean,
+        updatedAt: Long,
+    )
 
     /**
      * Archiving clears pinned (parity with trash) and cannot coexist with trashed = 1;
@@ -145,13 +155,20 @@ interface NoteDao {
             "updatedAt = :updatedAt " +
             "WHERE id = :id",
     )
-    suspend fun setArchived(id: Long, archived: Boolean, updatedAt: Long)
+    suspend fun setArchived(
+        id: Long,
+        archived: Boolean,
+        updatedAt: Long,
+    )
 
     @Query("DELETE FROM notes WHERE id = :id")
     suspend fun deleteById(id: Long)
 
     @Query("SELECT id FROM notes")
     suspend fun allNoteIds(): List<Long>
+
+    @Query("SELECT COUNT(*) FROM notes WHERE pictureUri = :uri")
+    suspend fun countPictureUri(uri: String): Int
 
     @Query("SELECT id FROM notes WHERE trashed = 1")
     suspend fun trashedNoteIds(): List<Long>
@@ -174,7 +191,6 @@ interface NoteDao {
 
 @Dao
 interface ChecklistItemDao {
-
     @Query("SELECT * FROM checklist_items WHERE noteId = :noteId ORDER BY sortOrder ASC")
     suspend fun itemsFor(noteId: Long): List<ChecklistItemEntity>
 
@@ -196,7 +212,6 @@ interface ChecklistItemDao {
 
 @Dao
 interface AttachmentDao {
-
     @Query("SELECT * FROM attachments WHERE noteId = :noteId ORDER BY id ASC")
     suspend fun attachmentsFor(noteId: Long): List<NoteAttachmentEntity>
 
@@ -205,6 +220,12 @@ interface AttachmentDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(attachments: List<NoteAttachmentEntity>)
+
+    @Query("SELECT * FROM attachments WHERE id = :id LIMIT 1")
+    suspend fun getById(id: Long): NoteAttachmentEntity?
+
+    @Query("SELECT COUNT(*) FROM attachments WHERE uri = :uri")
+    suspend fun countByUri(uri: String): Int
 
     @Query("DELETE FROM attachments WHERE id = :id")
     suspend fun deleteById(id: Long)
@@ -215,7 +236,6 @@ interface AttachmentDao {
 
 @Dao
 interface TagDao {
-
     @Query("SELECT * FROM tags ORDER BY normalizedName ASC")
     fun observeAllTags(): Flow<List<TagEntity>>
 

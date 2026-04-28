@@ -72,16 +72,18 @@ fun AppBottomSheet(
                 }
                 Spacer(Modifier.size(8.dp))
             }
-            val bodyModifier = Modifier
-                .fillMaxWidth()
-                .padding(contentPadding)
-                .let { if (scrollable) it.verticalScroll(rememberScrollState()) else it }
+            val bodyModifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(contentPadding)
+                    .let { if (scrollable) it.verticalScroll(rememberScrollState()) else it }
             Column(modifier = bodyModifier, content = content)
             if (actions != null) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically,
                     content = actions,

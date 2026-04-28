@@ -28,12 +28,11 @@ class GoogleTasksApi(
         URL(url).openConnection() as HttpURLConnection
     },
 ) {
-
     /**
      * GET /users/@me/lists. Walks pagination internally and returns every list.
      */
     suspend fun listTaskLists(accessToken: String): GoogleTasksApiResult<List<GoogleTaskList>> =
-        paginate(accessToken, BASE_LISTS_URL) { token ->
+        paginate { token ->
             val url = if (token == null) BASE_LISTS_URL else "$BASE_LISTS_URL?pageToken=${url(token)}"
             request(url, accessToken)?.let { body ->
                 val page = json.decodeFromString(GoogleTaskListsResponse.serializer(), body)
@@ -45,9 +44,12 @@ class GoogleTasksApi(
      * GET /lists/{taskListId}/tasks. Includes hidden + completed tasks so the UI can offer them
      * (and dedupe against already-imported items). Walks pagination internally.
      */
-    suspend fun listTasks(accessToken: String, taskListId: String): GoogleTasksApiResult<List<GoogleTask>> {
+    suspend fun listTasks(
+        accessToken: String,
+        taskListId: String,
+    ): GoogleTasksApiResult<List<GoogleTask>> {
         val base = "$BASE_API_URL/lists/${url(taskListId)}/tasks?showCompleted=true&showHidden=true&maxResults=100"
-        return paginate(accessToken, base) { token ->
+        return paginate { token ->
             val url = if (token == null) base else "$base&pageToken=${url(token)}"
             request(url, accessToken)?.let { body ->
                 val page = json.decodeFromString(GoogleTasksResponse.serializer(), body)
@@ -57,47 +59,51 @@ class GoogleTasksApi(
     }
 
     private suspend fun <T> paginate(
-        accessToken: String,
-        firstUrl: String,
         fetch: suspend (pageToken: String?) -> Pair<List<T>, String?>?,
-    ): GoogleTasksApiResult<List<T>> = withContext(Dispatchers.IO) {
-        val accumulated = mutableListOf<T>()
-        var token: String? = null
-        var firstCall = true
-        while (true) {
-            val page = try {
-                fetch(if (firstCall) null else token)
-            } catch (unauth: UnauthorizedException) {
-                return@withContext GoogleTasksApiResult.Unauthorized
-            } catch (io: IOException) {
-                return@withContext GoogleTasksApiResult.NetworkError(io)
-            } catch (other: Throwable) {
-                return@withContext GoogleTasksApiResult.Failure(other)
-            } ?: return@withContext GoogleTasksApiResult.Failure(IllegalStateException("Empty response"))
-            accumulated.addAll(page.first)
-            token = page.second
-            if (token.isNullOrEmpty()) break
-            firstCall = false
-            // Defensive cap: tasks API will normally exhaust within a handful of pages.
-            if (accumulated.size > MAX_ITEMS_PER_LIST) break
+    ): GoogleTasksApiResult<List<T>> =
+        withContext(Dispatchers.IO) {
+            val accumulated = mutableListOf<T>()
+            var token: String? = null
+            var firstCall = true
+            while (true) {
+                val page =
+                    try {
+                        fetch(if (firstCall) null else token)
+                    } catch (unauth: UnauthorizedException) {
+                        return@withContext GoogleTasksApiResult.Unauthorized
+                    } catch (io: IOException) {
+                        return@withContext GoogleTasksApiResult.NetworkError(io)
+                    } catch (other: Throwable) {
+                        return@withContext GoogleTasksApiResult.Failure(other)
+                    } ?: return@withContext GoogleTasksApiResult.Failure(IllegalStateException("Empty response"))
+                accumulated.addAll(page.first)
+                token = page.second
+                if (token.isNullOrEmpty()) break
+                firstCall = false
+                // Defensive cap: tasks API will normally exhaust within a handful of pages.
+                if (accumulated.size > MAX_ITEMS_PER_LIST) break
+            }
+            GoogleTasksApiResult.Success(accumulated)
         }
-        GoogleTasksApiResult.Success(accumulated)
-    }
 
     /**
      * Performs the GET. Throws [UnauthorizedException] for 401/403 so [paginate] can fail fast,
      * [IOException] for transport problems, and returns the body on success.
      */
-    private fun request(url: String, accessToken: String): String? {
-        val conn = httpFactory(url).apply {
-            requestMethod = "GET"
-            setRequestProperty("Authorization", "Bearer $accessToken")
-            setRequestProperty("Accept", "application/json")
-            connectTimeout = CONNECT_TIMEOUT_MS
-            readTimeout = READ_TIMEOUT_MS
-            doInput = true
-            useCaches = false
-        }
+    private fun request(
+        url: String,
+        accessToken: String,
+    ): String? {
+        val conn =
+            httpFactory(url).apply {
+                requestMethod = "GET"
+                setRequestProperty("Authorization", "Bearer $accessToken")
+                setRequestProperty("Accept", "application/json")
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                doInput = true
+                useCaches = false
+            }
         try {
             val code = conn.responseCode
             if (code == HttpURLConnection.HTTP_UNAUTHORIZED || code == HttpURLConnection.HTTP_FORBIDDEN) {
@@ -120,7 +126,9 @@ class GoogleTasksApi(
 
     private fun url(s: String) = URLEncoder.encode(s, "UTF-8")
 
-    private class UnauthorizedException(val httpCode: Int) : IOException("HTTP $httpCode")
+    private class UnauthorizedException(
+        val httpCode: Int,
+    ) : IOException("HTTP $httpCode")
 
     companion object {
         private const val BASE_API_URL = "https://tasks.googleapis.com/tasks/v1"
@@ -129,23 +137,30 @@ class GoogleTasksApi(
         private const val READ_TIMEOUT_MS = 30_000
         private const val MAX_ITEMS_PER_LIST = 5_000
 
-        val DefaultJson: Json = Json {
-            ignoreUnknownKeys = true
-            isLenient = true
-            coerceInputValues = true
-        }
+        val DefaultJson: Json =
+            Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+                coerceInputValues = true
+            }
     }
 }
 
 sealed class GoogleTasksApiResult<out T> {
-    data class Success<T>(val value: T) : GoogleTasksApiResult<T>()
+    data class Success<T>(
+        val value: T,
+    ) : GoogleTasksApiResult<T>()
 
     /** 401/403. Caller should invalidate the token, mint a fresh one, and retry once. */
     data object Unauthorized : GoogleTasksApiResult<Nothing>()
 
     /** IOException - transient. Caller surfaces a "check connection" message with retry. */
-    data class NetworkError(val cause: IOException) : GoogleTasksApiResult<Nothing>()
+    data class NetworkError(
+        val cause: IOException,
+    ) : GoogleTasksApiResult<Nothing>()
 
     /** Anything else - typically a JSON parse failure or unexpected status code. */
-    data class Failure(val cause: Throwable) : GoogleTasksApiResult<Nothing>()
+    data class Failure(
+        val cause: Throwable,
+    ) : GoogleTasksApiResult<Nothing>()
 }

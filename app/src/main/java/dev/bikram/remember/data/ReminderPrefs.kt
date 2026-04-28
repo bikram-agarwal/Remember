@@ -15,19 +15,21 @@ data class ReminderPreferencesState(
 
 private val Context.reminderDataStore by preferencesDataStore(name = "reminder_prefs")
 
-class ReminderPrefs(private val context: Context) {
-
+class ReminderPrefs(
+    private val context: Context,
+) {
     private object Keys {
         val KEEP_UNTIL_DONE = booleanPreferencesKey("keep_reminder_notifications_until_done")
         val SUMMARY_NOTIFICATION = booleanPreferencesKey("reminder_summary_notification")
     }
 
-    val state: Flow<ReminderPreferencesState> = context.reminderDataStore.data.map { prefs ->
-        ReminderPreferencesState(
-            keepReminderNotificationsUntilDone = prefs[Keys.KEEP_UNTIL_DONE] ?: false,
-            reminderSummaryNotificationEnabled = prefs[Keys.SUMMARY_NOTIFICATION] ?: false,
-        )
-    }
+    val state: Flow<ReminderPreferencesState> =
+        context.reminderDataStore.data.map { prefs ->
+            ReminderPreferencesState(
+                keepReminderNotificationsUntilDone = prefs[Keys.KEEP_UNTIL_DONE] ?: false,
+                reminderSummaryNotificationEnabled = prefs[Keys.SUMMARY_NOTIFICATION] ?: false,
+            )
+        }
 
     suspend fun snapshot(): ReminderPreferencesState = state.first()
 

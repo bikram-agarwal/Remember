@@ -9,7 +9,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
 
-data class ContactPick(val displayName: String, val data: String)
+data class ContactPick(
+    val displayName: String,
+    val data: String,
+)
 
 @Composable
 fun rememberPhonePickLauncher(onPicked: (ContactPick) -> Unit): ActivityResultLauncher<Intent> {
@@ -19,20 +22,23 @@ fun rememberPhonePickLauncher(onPicked: (ContactPick) -> Unit): ActivityResultLa
     ) { result ->
         val uri: Uri = result.data?.data ?: return@rememberLauncherForActivityResult
         val resolver = context.contentResolver
-        resolver.query(
-            uri,
-            arrayOf(
-                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
-                ContactsContract.CommonDataKinds.Phone.NUMBER,
-            ),
-            null, null, null,
-        )?.use { cur ->
-            if (cur.moveToFirst()) {
-                val name = cur.getString(0) ?: ""
-                val number = cur.getString(1) ?: ""
-                onPicked(ContactPick(name, number))
+        resolver
+            .query(
+                uri,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER,
+                ),
+                null,
+                null,
+                null,
+            )?.use { cur ->
+                if (cur.moveToFirst()) {
+                    val name = cur.getString(0) ?: ""
+                    val number = cur.getString(1) ?: ""
+                    onPicked(ContactPick(name, number))
+                }
             }
-        }
     }
 }
 
@@ -57,11 +63,13 @@ fun rememberEmailPickLauncher(onPicked: (ContactPick) -> Unit): ActivityResultLa
                     val idx = cur.getColumnIndex(columnName)
                     return if (idx >= 0) cur.getString(idx) ?: "" else ""
                 }
-                name = col(ContactsContract.CommonDataKinds.Email.DISPLAY_NAME)
-                    .ifBlank { col("display_name") }
-                    .ifBlank { col("display_name_alt") }
-                email = col(ContactsContract.CommonDataKinds.Email.ADDRESS)
-                    .ifBlank { col("data1") }
+                name =
+                    col(ContactsContract.CommonDataKinds.Email.DISPLAY_NAME)
+                        .ifBlank { col("display_name") }
+                        .ifBlank { col("display_name_alt") }
+                email =
+                    col(ContactsContract.CommonDataKinds.Email.ADDRESS)
+                        .ifBlank { col("data1") }
                 val contactIdIdx = cur.getColumnIndex("contact_id")
                 if (contactIdIdx >= 0) {
                     contactId = cur.getLong(contactIdIdx)
@@ -71,17 +79,18 @@ fun rememberEmailPickLauncher(onPicked: (ContactPick) -> Unit): ActivityResultLa
         // Fallback for OEM Contacts apps that return an email row URI without joining
         // the parent contact's display name. Look the contact up explicitly.
         if (name.isBlank() && contactId > 0L) {
-            resolver.query(
-                ContactsContract.Contacts.CONTENT_URI,
-                arrayOf(ContactsContract.Contacts.DISPLAY_NAME),
-                "${ContactsContract.Contacts._ID} = ?",
-                arrayOf(contactId.toString()),
-                null,
-            )?.use { cur ->
-                if (cur.moveToFirst()) {
-                    name = cur.getString(0) ?: ""
+            resolver
+                .query(
+                    ContactsContract.Contacts.CONTENT_URI,
+                    arrayOf(ContactsContract.Contacts.DISPLAY_NAME),
+                    "${ContactsContract.Contacts._ID} = ?",
+                    arrayOf(contactId.toString()),
+                    null,
+                )?.use { cur ->
+                    if (cur.moveToFirst()) {
+                        name = cur.getString(0) ?: ""
+                    }
                 }
-            }
         }
         if (email.isNotBlank()) onPicked(ContactPick(name, email))
     }

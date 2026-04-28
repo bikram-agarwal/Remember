@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.layout.Measurable
@@ -22,14 +23,13 @@ import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.node.LayoutModifierNode
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Velocity
-import kotlin.math.abs
-import kotlin.math.sign
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlin.math.abs
+import kotlin.math.sign
 
 /**
  * Translation-based overscroll effect whose release uses the Material 3 Expressive
@@ -123,11 +123,12 @@ private class ExpressiveOverscrollEffect(
         // Settle any remaining stretch with the M3 Expressive spatial spring.
         if (offsetState.floatValue != 0f) {
             val releaseAnim = Animatable(offsetState.floatValue)
-            releaseJob = scope.launch {
-                releaseAnim.animateTo(0f, animationSpec = releaseSpec) {
-                    offsetState.floatValue = value
+            releaseJob =
+                scope.launch {
+                    releaseAnim.animateTo(0f, animationSpec = releaseSpec) {
+                        offsetState.floatValue = value
+                    }
                 }
-            }
             releaseJob?.join()
             releaseJob = null
         }
@@ -139,17 +140,18 @@ private class ExpressiveOverscrollEffect(
     // inside the layer block are snapshot-observed, so Compose invalidates the
     // layer (not the whole measure pass) when the offset changes - cheaper than
     // triggering a re-measure each frame.
-    override val node: DelegatableNode = object : Modifier.Node(), LayoutModifierNode {
-        override fun MeasureScope.measure(
-            measurable: Measurable,
-            constraints: Constraints,
-        ): MeasureResult {
-            val placeable = measurable.measure(constraints)
-            return layout(placeable.width, placeable.height) {
-                placeable.placeRelativeWithLayer(0, 0) {
-                    translationY = offsetState.floatValue
+    override val node: DelegatableNode =
+        object : Modifier.Node(), LayoutModifierNode {
+            override fun MeasureScope.measure(
+                measurable: Measurable,
+                constraints: Constraints,
+            ): MeasureResult {
+                val placeable = measurable.measure(constraints)
+                return layout(placeable.width, placeable.height) {
+                    placeable.placeRelativeWithLayer(0, 0) {
+                        translationY = offsetState.floatValue
+                    }
                 }
             }
         }
-    }
 }

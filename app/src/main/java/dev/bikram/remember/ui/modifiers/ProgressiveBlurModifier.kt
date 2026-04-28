@@ -22,7 +22,8 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.theme.LocalBlurBars
 import dev.bikram.remember.ui.theme.ProgressiveBlurStyle
 
-private val dualEdgeBlurAgsl = """
+private val dualEdgeBlurAgsl =
+    """
     uniform shader content;
     uniform float blurRadius;
     uniform float topHeight;
@@ -71,7 +72,7 @@ private val dualEdgeBlurAgsl = """
 
         return accum / weightSum;
     }
-""".trimIndent()
+    """.trimIndent()
 
 fun Modifier.progressiveBlur(
     blurRadius: Float,
@@ -80,65 +81,75 @@ fun Modifier.progressiveBlur(
     showGradientOverlay: Boolean = true,
     overlayAlpha: Float = 0.28f,
     overlayAlphaBottom: Float = overlayAlpha,
-): Modifier = composed {
-    val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
-    val overlayColorTop = remember(surfaceContainer, overlayAlpha) {
-        surfaceContainer.copy(alpha = overlayAlpha)
-    }
-    val overlayColorBottom = remember(surfaceContainer, overlayAlphaBottom) {
-        surfaceContainer.copy(alpha = overlayAlphaBottom)
-    }
-    val topBrushColors = remember(overlayColorTop) { listOf(overlayColorTop, Color.Transparent) }
-    val bottomBrushColors = remember(overlayColorBottom) { listOf(Color.Transparent, overlayColorBottom) }
-    val topBrush = remember(topBrushColors, topHeight) {
-        if (topHeight > 0f) {
-            Brush.verticalGradient(colors = topBrushColors, endY = topHeight)
-        } else {
-            null
-        }
-    }
-
-    val blurModifier = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && blurRadius > 0f) {
-        // Cache the RuntimeShader for the lifetime of this modifier; the graphicsLayer block
-        // ran on every property invalidation and was allocating a fresh native shader each time.
-        val shader = remember { RuntimeShader(dualEdgeBlurAgsl) }
-        Modifier.graphicsLayer {
-            shader.setFloatUniform("blurRadius", blurRadius)
-            shader.setFloatUniform("topHeight", topHeight)
-            shader.setFloatUniform("bottomHeight", bottomHeight)
-            shader.setFloatUniform("contentHeight", size.height)
-            renderEffect = RenderEffect.createRuntimeShaderEffect(shader, "content")
-                .asComposeRenderEffect()
-        }
-    } else {
-        Modifier
-    }
-
-    val gradientModifier = if (showGradientOverlay) {
-        Modifier.drawWithContent {
-            drawContent()
-            if (topBrush != null) {
-                drawRect(brush = topBrush)
+): Modifier =
+    composed {
+        val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
+        val overlayColorTop =
+            remember(surfaceContainer, overlayAlpha) {
+                surfaceContainer.copy(alpha = overlayAlpha)
             }
-            if (bottomHeight > 0f) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        colors = bottomBrushColors,
-                        startY = size.height - bottomHeight,
-                    ),
-                )
+        val overlayColorBottom =
+            remember(surfaceContainer, overlayAlphaBottom) {
+                surfaceContainer.copy(alpha = overlayAlphaBottom)
             }
-        }
-    } else {
-        Modifier
-    }
+        val topBrushColors = remember(overlayColorTop) { listOf(overlayColorTop, Color.Transparent) }
+        val bottomBrushColors = remember(overlayColorBottom) { listOf(Color.Transparent, overlayColorBottom) }
+        val topBrush =
+            remember(topBrushColors, topHeight) {
+                if (topHeight > 0f) {
+                    Brush.verticalGradient(colors = topBrushColors, endY = topHeight)
+                } else {
+                    null
+                }
+            }
 
-    this.then(blurModifier).then(gradientModifier)
-}
+        val blurModifier =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && blurRadius > 0f) {
+                // Cache the RuntimeShader for the lifetime of this modifier; the graphicsLayer block
+                // ran on every property invalidation and was allocating a fresh native shader each time.
+                val shader = remember { RuntimeShader(dualEdgeBlurAgsl) }
+                Modifier.graphicsLayer {
+                    shader.setFloatUniform("blurRadius", blurRadius)
+                    shader.setFloatUniform("topHeight", topHeight)
+                    shader.setFloatUniform("bottomHeight", bottomHeight)
+                    shader.setFloatUniform("contentHeight", size.height)
+                    renderEffect =
+                        RenderEffect
+                            .createRuntimeShaderEffect(shader, "content")
+                            .asComposeRenderEffect()
+                }
+            } else {
+                Modifier
+            }
+
+        val gradientModifier =
+            if (showGradientOverlay) {
+                Modifier.drawWithContent {
+                    drawContent()
+                    if (topBrush != null) {
+                        drawRect(brush = topBrush)
+                    }
+                    if (bottomHeight > 0f) {
+                        drawRect(
+                            brush =
+                                Brush.verticalGradient(
+                                    colors = bottomBrushColors,
+                                    startY = size.height - bottomHeight,
+                                ),
+                        )
+                    }
+                }
+            } else {
+                Modifier
+            }
+
+        this.then(blurModifier).then(gradientModifier)
+    }
 
 /** Default pill height (matches HorizontalFloatingToolbar + its bottom padding in MainTabScaffold). */
 val PillBottomBarHeight = 64.dp
 val PillBottomScrimExtra = 24.dp
+
 /** Blur band above the fold. Extended to cover LargeTopAppBar's expanded area when the title is in-frame. */
 val TopAppBarHeight = 56.dp
 
@@ -174,20 +185,22 @@ fun rememberProgressiveBlurStyle(
     }
 }
 
-fun ProgressiveBlurStyle.applyToScrollableList(): Modifier = Modifier.progressiveBlur(
-    blurRadius = blurRadius,
-    topHeight = topHeightPx,
-    bottomHeight = bottomHeightPx,
-    showGradientOverlay = true,
-    overlayAlpha = overlayAlpha,
-    overlayAlphaBottom = overlayAlphaBottom,
-)
+fun ProgressiveBlurStyle.applyToScrollableList(): Modifier =
+    Modifier.progressiveBlur(
+        blurRadius = blurRadius,
+        topHeight = topHeightPx,
+        bottomHeight = bottomHeightPx,
+        showGradientOverlay = true,
+        overlayAlpha = overlayAlpha,
+        overlayAlphaBottom = overlayAlphaBottom,
+    )
 
-fun ProgressiveBlurStyle.applyToFullBleedLayer(): Modifier = Modifier.progressiveBlur(
-    blurRadius = blurRadius,
-    topHeight = topHeightPx,
-    bottomHeight = bottomHeightPx,
-    showGradientOverlay = true,
-    overlayAlpha = overlayAlpha,
-    overlayAlphaBottom = overlayAlphaBottom,
-)
+fun ProgressiveBlurStyle.applyToFullBleedLayer(): Modifier =
+    Modifier.progressiveBlur(
+        blurRadius = blurRadius,
+        topHeight = topHeightPx,
+        bottomHeight = bottomHeightPx,
+        showGradientOverlay = true,
+        overlayAlpha = overlayAlpha,
+        overlayAlphaBottom = overlayAlphaBottom,
+    )

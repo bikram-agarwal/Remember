@@ -16,14 +16,19 @@ enum class RecurrenceEndKind { NEVER, ON_DATE, AFTER_COUNT }
 /** Monthly recurrence sub-rule. Either by fixed day-of-month, or by Nth weekday. */
 sealed class MonthlyMode {
     /** Fire on the N-th day of the month (1..31). If the month is shorter the closest valid day is used. */
-    data class ByDayOfMonth(val day: Int) : MonthlyMode()
+    data class ByDayOfMonth(
+        val day: Int,
+    ) : MonthlyMode()
 
     /**
      * Fire on the [ordinal]-th [weekday] of the month.
      * ordinal: 1=first, 2=second, 3=third, 4=fourth, 5=last (uses LAST).
      * weekday: Calendar.SUNDAY (1) … Calendar.SATURDAY (7).
      */
-    data class ByNthWeekday(val ordinal: Int, val weekday: Int) : MonthlyMode()
+    data class ByNthWeekday(
+        val ordinal: Int,
+        val weekday: Int,
+    ) : MonthlyMode()
 }
 
 data class RecurrenceRule(
@@ -51,11 +56,12 @@ data class RecurrenceRule(
                 if (daysOfWeek.isEmpty()) {
                     cal.add(Calendar.WEEK_OF_YEAR, interval)
                 } else {
-                    val nextWeekly = nextWeeklyWithDaysAfter(
-                        afterMillis = afterMillis,
-                        interval = interval,
-                        daysOfWeek = daysOfWeek,
-                    )
+                    val nextWeekly =
+                        nextWeeklyWithDaysAfter(
+                            afterMillis = afterMillis,
+                            interval = interval,
+                            daysOfWeek = daysOfWeek,
+                        )
                     if (nextWeekly == null) return null
                     cal.timeInMillis = nextWeekly
                 }
@@ -94,13 +100,15 @@ data class RecurrenceRule(
         }
 
     /** Returned rule after consuming one fire — decrements count if applicable. */
-    fun afterFire(): RecurrenceRule = when (endKind) {
-        RecurrenceEndKind.AFTER_COUNT -> when (endCount) {
-            null -> this
-            else -> copy(endCount = (endCount - 1).coerceAtLeast(0))
+    fun afterFire(): RecurrenceRule =
+        when (endKind) {
+            RecurrenceEndKind.AFTER_COUNT ->
+                when (endCount) {
+                    null -> this
+                    else -> copy(endCount = (endCount - 1).coerceAtLeast(0))
+                }
+            else -> this
         }
-        else -> this
-    }
 
     companion object {
         fun toJson(rule: RecurrenceRule?): String? {
@@ -131,16 +139,22 @@ data class RecurrenceRule(
             if (value.isNullOrBlank()) return null
             return runCatching {
                 val o = JSONObject(value)
-                val mode = when {
-                    o.has("md") -> MonthlyMode.ByDayOfMonth(o.getInt("md"))
-                    o.has("mo") -> MonthlyMode.ByNthWeekday(o.getInt("mo"), o.getInt("mw"))
-                    else -> null
-                }
+                val mode =
+                    when {
+                        o.has("md") -> MonthlyMode.ByDayOfMonth(o.getInt("md"))
+                        o.has("mo") -> MonthlyMode.ByNthWeekday(o.getInt("mo"), o.getInt("mw"))
+                        else -> null
+                    }
                 RecurrenceRule(
                     unit = RecurrenceUnit.valueOf(o.getString("u")),
                     interval = o.optInt("i", 1),
-                    daysOfWeek = o.optString("dw", "").takeIf { it.isNotBlank() }
-                        ?.split(",")?.mapNotNull { it.toIntOrNull() }?.toSet() ?: emptySet(),
+                    daysOfWeek =
+                        o
+                            .optString("dw", "")
+                            .takeIf { it.isNotBlank() }
+                            ?.split(",")
+                            ?.mapNotNull { it.toIntOrNull() }
+                            ?.toSet() ?: emptySet(),
                     monthlyMode = mode,
                     endKind = RecurrenceEndKind.valueOf(o.optString("ek", RecurrenceEndKind.NEVER.name)),
                     endDate = if (o.has("ed")) o.getLong("ed") else null,
@@ -151,18 +165,18 @@ data class RecurrenceRule(
     }
 }
 
-private fun calendarDayOfWeek(day: DayOfWeek): Int = when (day) {
-    DayOfWeek.SUNDAY -> Calendar.SUNDAY
-    DayOfWeek.MONDAY -> Calendar.MONDAY
-    DayOfWeek.TUESDAY -> Calendar.TUESDAY
-    DayOfWeek.WEDNESDAY -> Calendar.WEDNESDAY
-    DayOfWeek.THURSDAY -> Calendar.THURSDAY
-    DayOfWeek.FRIDAY -> Calendar.FRIDAY
-    DayOfWeek.SATURDAY -> Calendar.SATURDAY
-}
+private fun calendarDayOfWeek(day: DayOfWeek): Int =
+    when (day) {
+        DayOfWeek.SUNDAY -> Calendar.SUNDAY
+        DayOfWeek.MONDAY -> Calendar.MONDAY
+        DayOfWeek.TUESDAY -> Calendar.TUESDAY
+        DayOfWeek.WEDNESDAY -> Calendar.WEDNESDAY
+        DayOfWeek.THURSDAY -> Calendar.THURSDAY
+        DayOfWeek.FRIDAY -> Calendar.FRIDAY
+        DayOfWeek.SATURDAY -> Calendar.SATURDAY
+    }
 
-private fun startOfIsoWeekMonday(date: java.time.LocalDate): java.time.LocalDate =
-    date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+private fun startOfIsoWeekMonday(date: java.time.LocalDate): java.time.LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
 /**
  * Next fire strictly after [afterMillis] for WEEKLY rules with explicit [daysOfWeek].
@@ -178,8 +192,9 @@ private fun nextWeeklyWithDaysAfter(
     daysOfWeek: Set<Int>,
 ): Long? {
     if (daysOfWeek.any { day ->
-        day < Calendar.SUNDAY || day > Calendar.SATURDAY
-    }) {
+            day < Calendar.SUNDAY || day > Calendar.SATURDAY
+        }
+    ) {
         return null
     }
     val safeInterval = interval.coerceAtLeast(1)
@@ -207,7 +222,11 @@ private fun nextWeeklyWithDaysAfter(
     return null
 }
 
-private fun advanceToNthWeekday(cal: Calendar, ordinal: Int, weekday: Int) {
+private fun advanceToNthWeekday(
+    cal: Calendar,
+    ordinal: Int,
+    weekday: Int,
+) {
     // cal is at the 1st of the target month. Find first matching weekday.
     while (cal.get(Calendar.DAY_OF_WEEK) != weekday) {
         cal.add(Calendar.DAY_OF_MONTH, 1)

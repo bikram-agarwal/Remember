@@ -3,22 +3,23 @@ package dev.bikram.remember.data
 import androidx.annotation.StringRes
 import androidx.room.ColumnInfo
 import androidx.room.Entity
-import androidx.room.Fts4
-import dev.bikram.remember.R
 import androidx.room.ForeignKey
+import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import dev.bikram.remember.R
 
 enum class NoteKind { NOTE, LIST }
 
 enum class Importance { LOW, DEFAULT, HIGH }
 
 @StringRes
-fun Importance.labelRes(): Int = when (this) {
-    Importance.LOW -> R.string.importance_low
-    Importance.DEFAULT -> R.string.importance_default
-    Importance.HIGH -> R.string.importance_high
-}
+fun Importance.labelRes(): Int =
+    when (this) {
+        Importance.LOW -> R.string.importance_low
+        Importance.DEFAULT -> R.string.importance_default
+        Importance.HIGH -> R.string.importance_high
+    }
 
 enum class Visibility { SECRET, PRIVATE, PUBLIC }
 
@@ -37,35 +38,37 @@ enum class ActionType {
 }
 
 @StringRes
-fun ActionType.labelRes(): Int = when (this) {
-    ActionType.CALL_NUMBER -> R.string.action_type_call_number
-    ActionType.SEND_MESSAGE -> R.string.action_type_send_message
-    ActionType.SEND_EMAIL -> R.string.action_type_send_email
-    ActionType.GET_DIRECTIONS -> R.string.action_type_get_directions
-    ActionType.OPEN_LINK -> R.string.action_type_open_link
-    ActionType.OPEN_APP -> R.string.action_type_open_app
-    ActionType.OPEN_SHORTCUT -> R.string.action_type_open_shortcut
-    ActionType.COPY_TO_CLIPBOARD -> R.string.action_type_copy_to_clipboard
-    ActionType.SHARE_CONTENT -> R.string.action_type_share_content
-    ActionType.MARK_AS_DONE -> R.string.action_type_mark_as_done
-    ActionType.SNOOZE -> R.string.action_type_snooze
-}
+fun ActionType.labelRes(): Int =
+    when (this) {
+        ActionType.CALL_NUMBER -> R.string.action_type_call_number
+        ActionType.SEND_MESSAGE -> R.string.action_type_send_message
+        ActionType.SEND_EMAIL -> R.string.action_type_send_email
+        ActionType.GET_DIRECTIONS -> R.string.action_type_get_directions
+        ActionType.OPEN_LINK -> R.string.action_type_open_link
+        ActionType.OPEN_APP -> R.string.action_type_open_app
+        ActionType.OPEN_SHORTCUT -> R.string.action_type_open_shortcut
+        ActionType.COPY_TO_CLIPBOARD -> R.string.action_type_copy_to_clipboard
+        ActionType.SHARE_CONTENT -> R.string.action_type_share_content
+        ActionType.MARK_AS_DONE -> R.string.action_type_mark_as_done
+        ActionType.SNOOZE -> R.string.action_type_snooze
+    }
 
 @StringRes
-fun ActionType.dataLabelRes(): Int = when (this) {
-    ActionType.CALL_NUMBER,
-    ActionType.SEND_MESSAGE,
-    -> R.string.action_field_phone_number
-    ActionType.SEND_EMAIL -> R.string.action_field_email_address
-    ActionType.GET_DIRECTIONS -> R.string.action_field_address
-    ActionType.OPEN_LINK -> R.string.action_field_url
-    ActionType.OPEN_APP -> R.string.action_field_package
-    ActionType.OPEN_SHORTCUT -> R.string.action_field_shortcut
-    ActionType.COPY_TO_CLIPBOARD -> R.string.action_field_text_copy
-    ActionType.SHARE_CONTENT -> R.string.action_field_text_share
-    ActionType.MARK_AS_DONE -> R.string.action_field_mark_done_blank
-    ActionType.SNOOZE -> R.string.action_field_snooze_blank
-}
+fun ActionType.dataLabelRes(): Int =
+    when (this) {
+        ActionType.CALL_NUMBER,
+        ActionType.SEND_MESSAGE,
+        -> R.string.action_field_phone_number
+        ActionType.SEND_EMAIL -> R.string.action_field_email_address
+        ActionType.GET_DIRECTIONS -> R.string.action_field_address
+        ActionType.OPEN_LINK -> R.string.action_field_url
+        ActionType.OPEN_APP -> R.string.action_field_package
+        ActionType.OPEN_SHORTCUT -> R.string.action_field_shortcut
+        ActionType.COPY_TO_CLIPBOARD -> R.string.action_field_text_copy
+        ActionType.SHARE_CONTENT -> R.string.action_field_text_share
+        ActionType.MARK_AS_DONE -> R.string.action_field_mark_done_blank
+        ActionType.SNOOZE -> R.string.action_field_snooze_blank
+    }
 
 data class NoteAction(
     val type: ActionType,
@@ -179,12 +182,14 @@ data class NoteTagCrossRef(
 
 @Entity(
     tableName = "checklist_items",
-    foreignKeys = [ForeignKey(
-        entity = NoteEntity::class,
-        parentColumns = ["id"],
-        childColumns = ["noteId"],
-        onDelete = ForeignKey.CASCADE,
-    )],
+    foreignKeys = [
+        ForeignKey(
+            entity = NoteEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["noteId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
     indices = [Index("noteId"), Index("parentId")],
 )
 data class ChecklistItemEntity(
@@ -210,12 +215,14 @@ data class ChecklistItemEntity(
 
 @Entity(
     tableName = "attachments",
-    foreignKeys = [ForeignKey(
-        entity = NoteEntity::class,
-        parentColumns = ["id"],
-        childColumns = ["noteId"],
-        onDelete = ForeignKey.CASCADE,
-    )],
+    foreignKeys = [
+        ForeignKey(
+            entity = NoteEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["noteId"],
+            onDelete = ForeignKey.CASCADE,
+        ),
+    ],
     indices = [Index("noteId")],
 )
 data class NoteAttachmentEntity(

@@ -7,37 +7,52 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.core.app.NotificationCompat
+import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.MainActivity
 import dev.bikram.remember.R
-import dev.bikram.remember.RememberApp
 import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
-import dev.bikram.remember.ui.edit.iconEmojiPayload
+import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.labelRes
+import dev.bikram.remember.di.ApplicationScope
+import dev.bikram.remember.ui.edit.iconEmojiPayload
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class ReminderReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
+    @Inject lateinit var noteRepository: NoteRepository
+
+    @Inject lateinit var reminderPrefs: ReminderPrefs
+
+    @ApplicationScope @Inject
+    lateinit var applicationScope: CoroutineScope
+
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         val noteId = intent.getLongExtra(ReminderScheduler.EXTRA_NOTE_ID, -1L)
         if (noteId <= 0L) return
-        
-        val pendingResult = goAsync()
-        val app = context.applicationContext as RememberApp
-        val repo = app.container.noteRepository
 
-        app.container.applicationScope.launch {
+        val pendingResult = goAsync()
+
+        applicationScope.launch {
             try {
-                val noteWithItems = repo.get(noteId) ?: return@launch
+                val noteWithItems = noteRepository.get(noteId) ?: return@launch
                 val note = noteWithItems.note
                 if (note.trashed) return@launch
 
-                val keepUntilDone = app.container.reminderPrefs
-                    .snapshot()
-                    .keepReminderNotificationsUntilDone
+                val keepUntilDone =
+                    reminderPrefs
+                        .snapshot()
+                        .keepReminderNotificationsUntilDone
                 showNotification(
                     context = context,
                     note = note,
@@ -60,30 +75,33 @@ class ReminderReceiver : BroadcastReceiver() {
             if (note.trashed) return
 
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            val channelId = when (note.importance) {
-                Importance.LOW -> ReminderScheduler.CHANNEL_ID_LOW
-                Importance.HIGH -> ReminderScheduler.CHANNEL_ID_HIGH
-                Importance.DEFAULT -> ReminderScheduler.CHANNEL_ID_DEFAULT
-            }
-            
-            val builder = NotificationCompat.Builder(context, channelId)
-                .setSmallIcon(R.drawable.ic_stat_remember)
-                .setContentTitle(
-                    notificationTitle(context, note),
-                )
-                .setContentText(summary(context, note, items))
-                .setPriority(priorityFor(note.importance))
-                .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                .setContentIntent(openNotePendingIntent(context, note.id))
-                .setDeleteIntent(dismissPendingIntent(context, note.id).takeIf { keepUntilDone })
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setOnlyAlertOnce(true)
+            val channelId =
+                when (note.importance) {
+                    Importance.LOW -> ReminderScheduler.CHANNEL_ID_LOW
+                    Importance.HIGH -> ReminderScheduler.CHANNEL_ID_HIGH
+                    Importance.DEFAULT -> ReminderScheduler.CHANNEL_ID_DEFAULT
+                }
+
+            val builder =
+                NotificationCompat
+                    .Builder(context, channelId)
+                    .setSmallIcon(R.drawable.ic_stat_remember)
+                    .setContentTitle(
+                        notificationTitle(context, note),
+                    ).setContentText(summary(context, note, items))
+                    .setPriority(priorityFor(note.importance))
+                    .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setContentIntent(openNotePendingIntent(context, note.id))
+                    .setDeleteIntent(dismissPendingIntent(context, note.id).takeIf { keepUntilDone })
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setOnlyAlertOnce(true)
 
             if (note.kind == NoteKind.LIST) {
                 builder.setStyle(
-                    NotificationCompat.BigTextStyle()
+                    NotificationCompat
+                        .BigTextStyle()
                         .bigText(summary(context, note, items, expanded = true)),
                 )
             }
@@ -118,7 +136,10 @@ class ReminderReceiver : BroadcastReceiver() {
             nm.notify(ReminderScheduler.pendingRequestCodeForNote(note.id), builder.build())
         }
 
-        private fun notificationTitle(context: Context, note: NoteEntity): String {
+        private fun notificationTitle(
+            context: Context,
+            note: NoteEntity,
+        ): String {
             val title = note.title.ifBlank { context.getString(R.string.options_reminder) }
             val emoji = iconEmojiPayload(note.iconKey) ?: return title
             return "$emoji $title"
@@ -131,16 +152,16 @@ class ReminderReceiver : BroadcastReceiver() {
             expanded: Boolean = false,
         ): String {
             if (note.kind == NoteKind.LIST) {
-                val uncheckedItems = items
-                    .asSequence()
-                    .filterNot { it.checked }
-                    .sortedBy { it.sortOrder }
-                    .map { item ->
-                        val text = item.text.trim()
-                        if (item.depth > 0 && text.isNotBlank()) "  $text" else text
-                    }
-                    .filter { it.isNotBlank() }
-                    .toList()
+                val uncheckedItems =
+                    items
+                        .asSequence()
+                        .filterNot { it.checked }
+                        .sortedBy { it.sortOrder }
+                        .map { item ->
+                            val text = item.text.trim()
+                            if (item.depth > 0 && text.isNotBlank()) "  $text" else text
+                        }.filter { it.isNotBlank() }
+                        .toList()
 
                 if (uncheckedItems.isEmpty()) {
                     return context.getString(R.string.reminder_notification_all_items_checked)
@@ -166,7 +187,10 @@ class ReminderReceiver : BroadcastReceiver() {
          * (formerly receiver-side) [ActionReceiver] logic so checklist items still get
          * the [x] / [ ] prefix.
          */
-        private fun computeShareText(note: NoteEntity, items: List<ChecklistItemEntity>): String =
+        private fun computeShareText(
+            note: NoteEntity,
+            items: List<ChecklistItemEntity>,
+        ): String =
             if (note.kind == NoteKind.NOTE) {
                 note.body
             } else {
@@ -175,17 +199,22 @@ class ReminderReceiver : BroadcastReceiver() {
                 }
             }
 
-        private fun priorityFor(importance: Importance): Int = when (importance) {
-            Importance.LOW -> NotificationCompat.PRIORITY_LOW
-            Importance.DEFAULT -> NotificationCompat.PRIORITY_DEFAULT
-            Importance.HIGH -> NotificationCompat.PRIORITY_HIGH
-        }
-
-        private fun openNotePendingIntent(context: Context, noteId: Long): PendingIntent {
-            val open = Intent(context, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                putExtra("open_note_id", noteId)
+        private fun priorityFor(importance: Importance): Int =
+            when (importance) {
+                Importance.LOW -> NotificationCompat.PRIORITY_LOW
+                Importance.DEFAULT -> NotificationCompat.PRIORITY_DEFAULT
+                Importance.HIGH -> NotificationCompat.PRIORITY_HIGH
             }
+
+        private fun openNotePendingIntent(
+            context: Context,
+            noteId: Long,
+        ): PendingIntent {
+            val open =
+                Intent(context, MainActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    putExtra("open_note_id", noteId)
+                }
             return PendingIntent.getActivity(
                 context,
                 ReminderScheduler.pendingRequestCodeForNote(noteId),
@@ -194,11 +223,15 @@ class ReminderReceiver : BroadcastReceiver() {
             )
         }
 
-        private fun dismissPendingIntent(context: Context, noteId: Long): PendingIntent {
-            val dismiss = Intent(context, ReminderDismissReceiver::class.java).apply {
-                action = ReminderDismissReceiver.ACTION_DISMISSED
-                putExtra(ReminderDismissReceiver.EXTRA_NOTE_ID, noteId)
-            }
+        private fun dismissPendingIntent(
+            context: Context,
+            noteId: Long,
+        ): PendingIntent {
+            val dismiss =
+                Intent(context, ReminderDismissReceiver::class.java).apply {
+                    action = ReminderDismissReceiver.ACTION_DISMISSED
+                    putExtra(ReminderDismissReceiver.EXTRA_NOTE_ID, noteId)
+                }
             return PendingIntent.getBroadcast(
                 context,
                 ReminderScheduler.pendingRequestCodeForDismiss(noteId),
@@ -223,32 +256,36 @@ class ReminderReceiver : BroadcastReceiver() {
             val requestCode = ReminderScheduler.pendingRequestCodeForNoteAction(noteId, index)
             val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             val launchIntent = buildActivityLaunchIntent(context, noteId, action, shareText)
-            val pi = if (launchIntent != null) {
-                PendingIntent.getActivity(context, requestCode, launchIntent, flags)
-            } else {
-                // Non-activity actions (MARK_AS_DONE, COPY_TO_CLIPBOARD) and any
-                // activity action whose data is unusable at notification-creation time
-                // (e.g. OPEN_APP for an uninstalled package) fall back to the receiver,
-                // which can surface a Toast for the failure case.
-                val i = Intent(context, ActionReceiver::class.java).apply {
-                    this.action = ActionReceiver.ACTION_FIRE
-                    putExtra(ActionReceiver.EXTRA_NOTE_ID, noteId)
-                    putExtra(ActionReceiver.EXTRA_ACTION_INDEX, index)
-                }
-                PendingIntent.getBroadcast(context, requestCode, i, flags)
-            }
-            val actionLabel = action.title.trim().ifBlank {
-                if (action.type == ActionType.MARK_AS_DONE) {
-                    context.getString(R.string.action_type_mark_as_done)
+            val pi =
+                if (launchIntent != null) {
+                    PendingIntent.getActivity(context, requestCode, launchIntent, flags)
                 } else {
-                    context.getString(action.type.labelRes())
+                    // Non-activity actions (MARK_AS_DONE, COPY_TO_CLIPBOARD) and any
+                    // activity action whose data is unusable at notification-creation time
+                    // (e.g. OPEN_APP for an uninstalled package) fall back to the receiver,
+                    // which can surface a Toast for the failure case.
+                    val i =
+                        Intent(context, ActionReceiver::class.java).apply {
+                            this.action = ActionReceiver.ACTION_FIRE
+                            putExtra(ActionReceiver.EXTRA_NOTE_ID, noteId)
+                            putExtra(ActionReceiver.EXTRA_ACTION_INDEX, index)
+                        }
+                    PendingIntent.getBroadcast(context, requestCode, i, flags)
                 }
-            }
-            return NotificationCompat.Action.Builder(
-                R.drawable.ic_stat_remember,
-                actionLabel,
-                pi,
-            ).build()
+            val actionLabel =
+                action.title.trim().ifBlank {
+                    if (action.type == ActionType.MARK_AS_DONE) {
+                        context.getString(R.string.action_type_mark_as_done)
+                    } else {
+                        context.getString(action.type.labelRes())
+                    }
+                }
+            return NotificationCompat.Action
+                .Builder(
+                    R.drawable.ic_stat_remember,
+                    actionLabel,
+                    pi,
+                ).build()
         }
 
         /**
@@ -265,49 +302,50 @@ class ReminderReceiver : BroadcastReceiver() {
             action: NoteAction,
             shareText: String,
         ): Intent? {
-            val intent: Intent = when (action.type) {
-                ActionType.SNOOZE -> Intent(context, SnoozeActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    putExtra(SnoozeActivity.EXTRA_NOTE_ID, noteId)
+            val intent: Intent =
+                when (action.type) {
+                    ActionType.SNOOZE ->
+                        Intent(context, SnoozeActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                            putExtra(SnoozeActivity.EXTRA_NOTE_ID, noteId)
+                        }
+                    // Always ACTION_DIAL even when CALL_PHONE is granted. ACTION_CALL from a
+                    // PendingIntent is fragile (some OEMs deny it without an active activity)
+                    // and dropping the user into the dialer with the number pre-filled is the
+                    // more predictable behavior anyway.
+                    ActionType.CALL_NUMBER -> Intent(Intent.ACTION_DIAL, Uri.parse("tel:${action.details}"))
+                    ActionType.SEND_MESSAGE -> Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${action.details}"))
+                    ActionType.SEND_EMAIL -> Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${action.details}"))
+                    ActionType.GET_DIRECTIONS -> Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(action.details)}"))
+                    ActionType.OPEN_LINK -> Intent(Intent.ACTION_VIEW, Uri.parse(normalizeUrl(action.details)))
+                    ActionType.OPEN_APP -> {
+                        // Resolve at notification time. If the app is uninstalled return null
+                        // so the receiver can Toast a useful error instead of silently no-oping.
+                        context.packageManager.getLaunchIntentForPackage(action.details) ?: return null
+                    }
+                    ActionType.OPEN_SHORTCUT -> {
+                        runCatching { Intent.parseUri(action.details, Intent.URI_INTENT_SCHEME) }
+                            .getOrNull() ?: return null
+                    }
+                    ActionType.SHARE_CONTENT -> {
+                        if (shareText.isBlank()) return null
+                        Intent.createChooser(
+                            Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_TEXT, shareText)
+                            },
+                            action.title.trim().ifBlank { context.getString(R.string.share_chooser_generic) },
+                        )
+                    }
+                    // Non-activity types - handled by ActionReceiver.
+                    ActionType.MARK_AS_DONE,
+                    ActionType.COPY_TO_CLIPBOARD,
+                    -> return null
                 }
-                // Always ACTION_DIAL even when CALL_PHONE is granted. ACTION_CALL from a
-                // PendingIntent is fragile (some OEMs deny it without an active activity)
-                // and dropping the user into the dialer with the number pre-filled is the
-                // more predictable behavior anyway.
-                ActionType.CALL_NUMBER -> Intent(Intent.ACTION_DIAL, Uri.parse("tel:${action.details}"))
-                ActionType.SEND_MESSAGE -> Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${action.details}"))
-                ActionType.SEND_EMAIL -> Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${action.details}"))
-                ActionType.GET_DIRECTIONS -> Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(action.details)}"))
-                ActionType.OPEN_LINK -> Intent(Intent.ACTION_VIEW, Uri.parse(normalizeUrl(action.details)))
-                ActionType.OPEN_APP -> {
-                    // Resolve at notification time. If the app is uninstalled return null
-                    // so the receiver can Toast a useful error instead of silently no-oping.
-                    context.packageManager.getLaunchIntentForPackage(action.details) ?: return null
-                }
-                ActionType.OPEN_SHORTCUT -> {
-                    runCatching { Intent.parseUri(action.details, Intent.URI_INTENT_SCHEME) }
-                        .getOrNull() ?: return null
-                }
-                ActionType.SHARE_CONTENT -> {
-                    if (shareText.isBlank()) return null
-                    Intent.createChooser(
-                        Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_TEXT, shareText)
-                        },
-                        action.title.trim().ifBlank { context.getString(R.string.share_chooser_generic) },
-                    )
-                }
-                // Non-activity types - handled by ActionReceiver.
-                ActionType.MARK_AS_DONE,
-                ActionType.COPY_TO_CLIPBOARD,
-                -> return null
-            }
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             return intent
         }
 
-        private fun normalizeUrl(s: String): String =
-            if (s.startsWith("http://") || s.startsWith("https://")) s else "https://$s"
+        private fun normalizeUrl(s: String): String = if (s.startsWith("http://") || s.startsWith("https://")) s else "https://$s"
     }
 }

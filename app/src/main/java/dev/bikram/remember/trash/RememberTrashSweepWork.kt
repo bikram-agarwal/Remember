@@ -19,13 +19,14 @@ object RememberTrashSweepWork {
 
     fun ensureScheduled(context: Context) {
         val workManager = WorkManager.getInstance(context)
-        val request = PeriodicWorkRequestBuilder<TrashSweepWorker>(1, TimeUnit.DAYS)
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiresBatteryNotLow(true)
-                    .build(),
-            )
-            .build()
+        val request =
+            PeriodicWorkRequestBuilder<TrashSweepWorker>(1, TimeUnit.DAYS)
+                .setConstraints(
+                    Constraints
+                        .Builder()
+                        .setRequiresBatteryNotLow(true)
+                        .build(),
+                ).build()
         workManager.enqueueUniquePeriodicWork(
             UNIQUE_NAME,
             ExistingPeriodicWorkPolicy.KEEP,

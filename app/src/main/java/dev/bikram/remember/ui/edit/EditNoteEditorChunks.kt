@@ -1,16 +1,17 @@
 package dev.bikram.remember.ui.edit
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,18 +21,14 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -44,18 +41,15 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
@@ -63,11 +57,11 @@ import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -82,41 +76,43 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import dev.bikram.remember.ui.common.HERO_MASK_ASPECT_RATIO
-import dev.bikram.remember.ui.common.HeroFramedImage
-import dev.bikram.remember.ui.common.HeroFraming
 import com.mohamedrejeb.richeditor.annotation.ExperimentalRichTextApi
 import com.mohamedrejeb.richeditor.model.RichTextState
 import com.mohamedrejeb.richeditor.ui.BasicRichTextEditor
 import com.mohamedrejeb.richeditor.ui.material3.RichText
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.ApplyRichEditorListIndent
+import dev.bikram.remember.ui.common.HERO_MASK_ASPECT_RATIO
+import dev.bikram.remember.ui.common.HeroFramedImage
+import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RichTextToolbar
 import dev.bikram.remember.ui.components.ArchivedBanner
 import dev.bikram.remember.ui.components.ArchivedBannerState
 import dev.bikram.remember.ui.components.NoteShelfState
+import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.TagAccentEditorStrip
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.rememberExpressiveOverscrollEffect
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
-import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
 
-private const val UndoMaxHistory = 50
+private const val UNDO_MAX_HISTORY = 50
 
 // snapshotFlow on the full annotated string forces a deep equals check (paragraph + span lists)
 // per emission, which compounds with toMarkdown work on every keystroke. Reading length+hashCode
 // of the plain text instead is O(text length) and avoids the per-emit allocation entirely.
-private data class BodyFingerprint(val length: Int, val textHash: Int)
+private data class BodyFingerprint(
+    val length: Int,
+    val textHash: Int,
+)
 
 /**
  * Bridges the editor's [RichTextState] with [EditNoteViewModel.body]. Owns the "last
@@ -177,13 +173,14 @@ internal fun rememberEditorBodyBridge(
 ): EditorBodyBridge {
     ApplyRichEditorListIndent(richTextState)
 
-    val bridge = remember(vm, richTextState, undoController) {
-        EditorBodyBridge(
-            richTextState = richTextState,
-            undoController = undoController,
-            onMarkdownChanged = vm::setBody,
-        )
-    }
+    val bridge =
+        remember(vm, richTextState, undoController) {
+            EditorBodyBridge(
+                richTextState = richTextState,
+                undoController = undoController,
+                onMarkdownChanged = vm::setBody,
+            )
+        }
     val isEditModeState = rememberUpdatedState(isEditMode)
 
     // Seed the editor and undo baseline once the VM finishes loading from disk. Resetting on
@@ -222,8 +219,7 @@ internal fun rememberEditorBodyBridge(
                 snapshotFlow {
                     val text = richTextState.annotatedString.text
                     BodyFingerprint(text.length, text.hashCode())
-                }
-                    .distinctUntilChanged()
+                }.distinctUntilChanged()
                     .debounce(250)
                     .collectLatest { bridge.flush() }
             } finally {
@@ -245,44 +241,49 @@ internal fun rememberEditorBodyBridge(
 
     val lifecycleOwner = LocalLifecycleOwner.current
     val snackbarHostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current
-    val changesSavedMsg = androidx.compose.ui.res.stringResource(dev.bikram.remember.R.string.changes_saved)
+    val changesSavedMsg =
+        androidx.compose.ui.res
+            .stringResource(dev.bikram.remember.R.string.changes_saved)
     val undoMsg = stringResource(R.string.common_undo)
-    
+
     val untitledName = stringResource(R.string.edit_note_title_new)
-    
+
     DisposableEffect(lifecycleOwner, bridge, vm, appScope) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_STOP) {
-                bridge.flush()
-                appScope.launch {
-                    val undoAction = vm.saveIfNeeded(untitledName)
-                    if (undoAction != null) {
-                        val result = snackbarHostState.showSnackbar(
-                            message = changesSavedMsg,
-                            actionLabel = undoMsg,
-                            withDismissAction = true,
-                            duration = androidx.compose.material3.SnackbarDuration.Short
-                        )
-                        if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                            undoAction()
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) {
+                    bridge.flush()
+                    appScope.launch {
+                        val undoAction = vm.saveIfNeeded(untitledName)
+                        if (undoAction != null) {
+                            val result =
+                                snackbarHostState.showSnackbar(
+                                    message = changesSavedMsg,
+                                    actionLabel = undoMsg,
+                                    withDismissAction = true,
+                                    duration = androidx.compose.material3.SnackbarDuration.Short,
+                                )
+                            if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                undoAction()
+                            }
                         }
                     }
                 }
             }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             bridge.flush()
-            appScope.launch { 
+            appScope.launch {
                 val undoAction = vm.saveIfNeeded(untitledName)
                 if (undoAction != null) {
-                    val result = snackbarHostState.showSnackbar(
-                        message = changesSavedMsg,
-                        actionLabel = undoMsg,
-                        withDismissAction = true,
-                        duration = androidx.compose.material3.SnackbarDuration.Short
-                    )
+                    val result =
+                        snackbarHostState.showSnackbar(
+                            message = changesSavedMsg,
+                            actionLabel = undoMsg,
+                            withDismissAction = true,
+                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                        )
                     if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
                         undoAction()
                     }
@@ -330,11 +331,12 @@ internal fun EditNoteTopBarSection(
             val collapseFraction = scrollBehavior.state.collapsedFraction
             val expandedStyle = MaterialTheme.typography.headlineMedium
             val collapsedStyle = MaterialTheme.typography.titleLarge
-            val titleStyle = expandedStyle.copy(
-                fontSize = lerp(expandedStyle.fontSize, collapsedStyle.fontSize, collapseFraction),
-                lineHeight = lerp(expandedStyle.lineHeight, collapsedStyle.lineHeight, collapseFraction),
-                color = MaterialTheme.colorScheme.onSurface,
-            )
+            val titleStyle =
+                expandedStyle.copy(
+                    fontSize = lerp(expandedStyle.fontSize, collapsedStyle.fontSize, collapseFraction),
+                    lineHeight = lerp(expandedStyle.lineHeight, collapsedStyle.lineHeight, collapseFraction),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
             val iconSize = lerp(28.dp, 22.dp, collapseFraction)
             val iconGap = lerp(12.dp, 8.dp, collapseFraction)
             val headerSymbol = iconSymbolName(iconKey)
@@ -381,22 +383,25 @@ internal fun EditNoteTopBarSection(
                         onValueChange = { if (it.length <= 80) vm.setTitle(it) },
                         textStyle = titleStyle,
                         enabled = !readOnly,
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
-                            imeAction = androidx.compose.ui.text.input.ImeAction.Next
-                        ),
+                        keyboardOptions =
+                            androidx.compose.foundation.text.KeyboardOptions(
+                                capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                                imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                            ),
                         singleLine = true,
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .focusRequester(newNoteTitleFocus),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .focusRequester(newNoteTitleFocus),
                         decorationBox = { inner ->
                             if (title.isEmpty()) {
                                 Text(
                                     text = titlePlaceholder,
-                                    style = titleStyle.copy(
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                    ),
+                                    style =
+                                        titleStyle.copy(
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                        ),
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                 )
@@ -460,24 +465,26 @@ internal fun EditNoteBottomBarSection(
     bridge: EditorBodyBridge,
     isEditMode: Boolean,
 ) {
-    val onUndo = remember(richTextState, undoController, bridge) {
-        {
-            undoController.undo(richTextState.toMarkdown())?.let { previous ->
-                richTextState.setMarkdown(previous)
-                bridge.reset(previous)
+    val onUndo =
+        remember(richTextState, undoController, bridge) {
+            {
+                undoController.undo(richTextState.toMarkdown())?.let { previous ->
+                    richTextState.setMarkdown(previous)
+                    bridge.reset(previous)
+                }
+                Unit
             }
-            Unit
         }
-    }
-    val onRedo = remember(richTextState, undoController, bridge) {
-        {
-            undoController.redo(richTextState.toMarkdown())?.let { next ->
-                richTextState.setMarkdown(next)
-                bridge.reset(next)
+    val onRedo =
+        remember(richTextState, undoController, bridge) {
+            {
+                undoController.redo(richTextState.toMarkdown())?.let { next ->
+                    richTextState.setMarkdown(next)
+                    bridge.reset(next)
+                }
+                Unit
             }
-            Unit
         }
-    }
     AnimatedVisibility(visible = isEditMode) {
         EditNoteFormatBarContent(
             richTextState = richTextState,
@@ -511,15 +518,17 @@ internal fun EditNoteFormatBarContent(
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
-        modifier = modifier
-            .fillMaxWidth()
-            .imePadding(),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .imePadding(),
     ) {
         RichTextToolbar(
             state = richTextState,
-            modifier = Modifier
-                .fillMaxWidth()
-                .navigationBarsPadding(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding(),
             canUndo = undoController.canUndo,
             canRedo = undoController.canRedo,
             onUndo = onUndo,
@@ -530,7 +539,7 @@ internal fun EditNoteFormatBarContent(
 
 /**
  * Undo / redo controller backed by Compose state lists so toolbar enabled-state recomposes
- * automatically. Capacity is capped at [UndoMaxHistory] entries so a long editing session
+ * automatically. Capacity is capped at [UNDO_MAX_HISTORY] entries so a long editing session
  * doesn't grow unbounded.
  */
 @Stable
@@ -558,7 +567,7 @@ internal class UndoRedoController {
         }
         if (markdown == lastPushed) return
         undoStack.add(lastPushed)
-        if (undoStack.size > UndoMaxHistory) undoStack.removeAt(0)
+        if (undoStack.size > UNDO_MAX_HISTORY) undoStack.removeAt(0)
         redoStack.clear()
         lastPushed = markdown
     }
@@ -566,7 +575,7 @@ internal class UndoRedoController {
     fun undo(current: String): String? {
         if (undoStack.isEmpty()) return null
         redoStack.add(current)
-        if (redoStack.size > UndoMaxHistory) redoStack.removeAt(0)
+        if (redoStack.size > UNDO_MAX_HISTORY) redoStack.removeAt(0)
         val prev = undoStack.removeAt(undoStack.lastIndex)
         lastPushed = prev
         suppressCapture = true
@@ -576,7 +585,7 @@ internal class UndoRedoController {
     fun redo(current: String): String? {
         if (redoStack.isEmpty()) return null
         undoStack.add(current)
-        if (undoStack.size > UndoMaxHistory) undoStack.removeAt(0)
+        if (undoStack.size > UNDO_MAX_HISTORY) undoStack.removeAt(0)
         val next = redoStack.removeAt(redoStack.lastIndex)
         lastPushed = next
         suppressCapture = true
@@ -645,7 +654,6 @@ internal fun EditNoteRichEditorSection(
     bodyPlaceholder: String,
     isEditMode: Boolean,
     existing: Boolean,
-    onRequestEditMode: () -> Unit,
 ) {
     val bodyEmpty = richTextState.annotatedString.isEmpty()
     // Only the "new note" flow may show the real editor while not in edit mode (empty draft).
@@ -653,15 +661,19 @@ internal fun EditNoteRichEditorSection(
     if (isEditMode || (!existing && bodyEmpty)) {
         BasicRichTextEditor(
             state = richTextState,
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-            ),
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
+            textStyle =
+                MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+            keyboardOptions =
+                androidx.compose.foundation.text
+                    .KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 140.dp)
-                .onPreviewKeyEvent { event -> handleRichEditorKey(event, richTextState) },
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 140.dp)
+                    .onPreviewKeyEvent { event -> handleRichEditorKey(event, richTextState) },
             decorationBox = { inner ->
                 if (richTextState.annotatedString.isEmpty()) {
                     Text(
@@ -674,28 +686,39 @@ internal fun EditNoteRichEditorSection(
             },
         )
     } else if (existing && bodyEmpty) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .heightIn(min = 140.dp)
-                .tapSoundClickable { onRequestEditMode() },
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 140.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
-                text = bodyPlaceholder,
+                text = stringResource(R.string.common_empty_note),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(
+                text = stringResource(R.string.edit_note_empty_view_hint),
+                style =
+                    MaterialTheme.typography.bodyMedium.copy(
+                        fontStyle = FontStyle.Italic,
+                    ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             )
         }
     } else {
         SelectionContainer {
             RichText(
                 state = richTextState,
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 140.dp),
+                style =
+                    MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 140.dp),
             )
         }
     }
@@ -721,7 +744,6 @@ internal fun EditNoteScrollableContent(
     existing: Boolean,
     shelfState: NoteShelfState,
     pictureViewerOpen: Boolean,
-    onRequestEditMode: () -> Unit,
     onOpenReminder: () -> Unit,
     onOpenPicture: () -> Unit,
     onViewPictureFull: (String, Long) -> Unit,
@@ -744,18 +766,19 @@ internal fun EditNoteScrollableContent(
     // the rest of the motion language in the app.
     val overscrollEffect = rememberExpressiveOverscrollEffect()
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .then(blurModifier)
-            // Clip BEFORE the overscroll translation so the translated content doesn't bleed
-            // into the top-app-bar / bottom-bar zones during the bounce. Foundation 1.8+
-            // deprecated `OverscrollEffect.effectModifier`; the replacement is the
-            // `Modifier.overscroll(effect)` extension, which attaches the effect's
-            // DelegatableNode to the chain.
-            .clipToBounds()
-            .overscroll(overscrollEffect)
-            .verticalScroll(state = scrollState, overscrollEffect = overscrollEffect)
-            .padding(horizontal = horizontalPadding),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .then(blurModifier)
+                // Clip BEFORE the overscroll translation so the translated content doesn't bleed
+                // into the top-app-bar / bottom-bar zones during the bounce. Foundation 1.8+
+                // deprecated `OverscrollEffect.effectModifier`; the replacement is the
+                // `Modifier.overscroll(effect)` extension, which attaches the effect's
+                // DelegatableNode to the chain.
+                .clipToBounds()
+                .overscroll(overscrollEffect)
+                .verticalScroll(state = scrollState, overscrollEffect = overscrollEffect)
+                .padding(horizontal = horizontalPadding),
     ) {
         Spacer(Modifier.height(padding.calculateTopPadding()))
         // Order: tag color strip -> hero image -> shelf banner -> body. The banner sits right
@@ -791,7 +814,6 @@ internal fun EditNoteScrollableContent(
             bodyPlaceholder = bodyPlaceholder,
             isEditMode = isEditMode && !readOnly,
             existing = existing,
-            onRequestEditMode = onRequestEditMode,
         )
         Spacer(Modifier.height(24.dp))
         OptionsPanelSection(
@@ -863,7 +885,7 @@ private fun OptionsPanelSection(
         isChecklist = false,
         actions = actions,
         tags = tags,
-        attachmentCount = attachments.size,
+        attachments = attachments,
         onOpenReminder = onOpenReminder,
         onSetImportance = if (readOnly) ({ _ -> }) else vm::setImportance,
         onOpenPicture = onOpenPicture,
@@ -897,36 +919,39 @@ private fun EditNotePictureHero(
     // Outer Box keeps the layout slot at a constant size; only the inline content
     // toggles, so the surrounding scrollable column never reflows mid-transition.
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(HERO_MASK_ASPECT_RATIO),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(HERO_MASK_ASPECT_RATIO),
     ) {
         AnimatedVisibility(
             visible = !viewerOpen,
             enter = fadeIn(),
             exit = fadeOut(),
         ) {
-            val sharedModifier = if (sharedScope != null) {
-                with(sharedScope) {
-                    Modifier.sharedBounds(
-                        sharedContentState = rememberSharedContentState(key = "hero-image-$uri"),
-                        animatedVisibilityScope = this@AnimatedVisibility,
-                    )
+            val sharedModifier =
+                if (sharedScope != null) {
+                    with(sharedScope) {
+                        Modifier.sharedBounds(
+                            sharedContentState = rememberSharedContentState(key = "hero-image-$uri"),
+                            animatedVisibilityScope = this@AnimatedVisibility,
+                        )
+                    }
+                } else {
+                    Modifier
                 }
-            } else {
-                Modifier
-            }
 
             // No delete overlay on the inline hero: it competes visually with the
             // hero image and invites accidental taps. Delete lives in the full-screen
             // viewer (see EditNoteScreen).
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(sharedModifier)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceContainer)
-                    .tapSoundClickable(onClick = onOpenFull),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(sharedModifier)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(MaterialTheme.colorScheme.surfaceContainer)
+                        .tapSoundClickable(onClick = onOpenFull),
             ) {
                 HeroFramedImage(
                     imageUri = uri,

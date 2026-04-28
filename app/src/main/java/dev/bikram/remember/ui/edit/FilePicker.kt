@@ -38,13 +38,14 @@ fun rememberHeroImagePickThenCopy(
     onImageReady: (uriString: String, copiedPrivateFile: File?) -> Unit,
 ): () -> Unit {
     val context = LocalContext.current
-    val pickLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.PickVisualMedia(),
-    ) { picked: Uri? ->
-        if (picked == null) return@rememberLauncherForActivityResult
-        persistReadPermission(context, picked)
-        finalizeHeroImageToPrivateStorage(context, picked, onImageReady)
-    }
+    val pickLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.PickVisualMedia(),
+        ) { picked: Uri? ->
+            if (picked == null) return@rememberLauncherForActivityResult
+            persistReadPermission(context, picked)
+            finalizeHeroImageToPrivateStorage(context, picked, onImageReady)
+        }
     return remember(pickLauncher) {
         {
             pickLauncher.launch(
@@ -67,18 +68,20 @@ fun finalizeHeroImageToPrivateStorage(
     persistReadPermission(context, sourceUri)
     val heroesDir = File(context.filesDir, "note_heroes").apply { mkdirs() }
     val destFile = File(heroesDir, "cover_${System.currentTimeMillis()}.jpg")
-    val copyResult = runCatching {
-        context.contentResolver.openInputStream(sourceUri)?.use { input ->
-            destFile.outputStream().use { output -> input.copyTo(output) }
-        } ?: throw IOException("openInputStream failed")
-    }
+    val copyResult =
+        runCatching {
+            context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                destFile.outputStream().use { output -> input.copyTo(output) }
+            } ?: throw IOException("openInputStream failed")
+        }
     if (copyResult.isSuccess) {
         onResult(
-            FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
-                destFile,
-            ).toString(),
+            FileProvider
+                .getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    destFile,
+                ).toString(),
             destFile,
         )
     } else {
@@ -95,7 +98,10 @@ fun rememberDocumentPicker(onPicked: (Uri) -> Unit): ActivityResultLauncher<Arra
         if (uri != null) onPicked(uri)
     }
 
-fun persistReadPermission(context: Context, uri: Uri) {
+fun persistReadPermission(
+    context: Context,
+    uri: Uri,
+) {
     runCatching {
         context.contentResolver.takePersistableUriPermission(
             uri,
@@ -104,7 +110,10 @@ fun persistReadPermission(context: Context, uri: Uri) {
     }
 }
 
-fun resolveDisplayName(context: Context, uri: Uri): String {
+fun resolveDisplayName(
+    context: Context,
+    uri: Uri,
+): String {
     val resolver = context.contentResolver
     resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
         if (cursor.moveToFirst()) {
@@ -115,17 +124,25 @@ fun resolveDisplayName(context: Context, uri: Uri): String {
     return uri.lastPathSegment.orEmpty().ifBlank { "attachment" }
 }
 
-fun resolveMimeType(context: Context, uri: Uri): String? {
+fun resolveMimeType(
+    context: Context,
+    uri: Uri,
+): String? {
     val resolver: ContentResolver = context.contentResolver
     return resolver.getType(uri)
 }
 
-fun openUriWithChooser(context: Context, uri: Uri, mimeType: String?) {
+fun openUriWithChooser(
+    context: Context,
+    uri: Uri,
+    mimeType: String?,
+) {
     val resolvedType = mimeType?.takeUnless { it.isBlank() } ?: "*/*"
-    val intent = Intent(Intent.ACTION_VIEW).apply {
-        setDataAndType(uri, resolvedType)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
+    val intent =
+        Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, resolvedType)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
     val chooser = Intent.createChooser(intent, null)
     chooser.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     runCatching {
@@ -143,37 +160,40 @@ suspend fun copyUriIntoDownloads(
 ) {
     val resolver = context.contentResolver
     val safeName = displayName.ifBlank { "attachment" }.replace('/', '_')
-    val values = ContentValues().apply {
-        put(MediaStore.Downloads.DISPLAY_NAME, safeName)
-        put(MediaStore.Downloads.MIME_TYPE, mimeType?.takeUnless { it.isBlank() } ?: "application/octet-stream")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            put(MediaStore.Downloads.IS_PENDING, 1)
+    val values =
+        ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, safeName)
+            put(MediaStore.Downloads.MIME_TYPE, mimeType?.takeUnless { it.isBlank() } ?: "application/octet-stream")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Downloads.IS_PENDING, 1)
+            }
         }
-    }
-    
+
     val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
-    
-    val itemUri = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        runCatching { resolver.insert(collection, values) }.getOrNull()
-    }
-    
+
+    val itemUri =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { resolver.insert(collection, values) }.getOrNull()
+        }
+
     if (itemUri == null) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
             Toast.makeText(context, context.getString(R.string.toast_save_download_failed), Toast.LENGTH_SHORT).show()
         }
         return
     }
-    
-    val writeResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-        runCatching {
-            resolver.openInputStream(sourceUri)?.use { input ->
-                resolver.openOutputStream(itemUri, "w")?.use { output ->
-                    input.copyTo(output)
-                } ?: throw IOException("openOutputStream failed")
-            } ?: throw IOException("openInputStream failed")
+
+    val writeResult =
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                resolver.openInputStream(sourceUri)?.use { input ->
+                    resolver.openOutputStream(itemUri, "w")?.use { output ->
+                        input.copyTo(output)
+                    } ?: throw IOException("openOutputStream failed")
+                } ?: throw IOException("openInputStream failed")
+            }
         }
-    }
-    
+
     if (writeResult.isFailure) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             runCatching { resolver.delete(itemUri, null, null) }
@@ -183,7 +203,7 @@ suspend fun copyUriIntoDownloads(
         }
         return
     }
-    
+
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             values.clear()
@@ -191,7 +211,7 @@ suspend fun copyUriIntoDownloads(
             resolver.update(itemUri, values, null, null)
         }
     }
-    
+
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
         Toast.makeText(context, context.getString(R.string.toast_saved_to_downloads), Toast.LENGTH_SHORT).show()
     }

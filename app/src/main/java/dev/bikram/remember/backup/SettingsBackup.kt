@@ -8,7 +8,6 @@ import dev.bikram.remember.data.ViewOptionsPrefs
 import org.json.JSONObject
 
 object SettingsBackup {
-
     const val KEY_THEME = "theme_prefs"
     const val KEY_VIEW_OPTIONS = "view_options_prefs"
     const val KEY_LOCK = "lock_prefs"
@@ -21,13 +20,14 @@ object SettingsBackup {
         lockPrefs: LockPrefs,
         interactionPrefs: InteractionPrefs,
         backupPrefs: BackupPrefs,
-    ): JSONObject = JSONObject().apply {
-        put(KEY_THEME, themePrefs.exportForBackup())
-        put(KEY_VIEW_OPTIONS, viewOptionsPrefs.exportForBackup())
-        put(KEY_LOCK, lockPrefs.exportForBackup())
-        put(KEY_INTERACTION, interactionPrefs.exportForBackup())
-        put(KEY_BACKUP, backupPrefs.exportForBackup())
-    }
+    ): JSONObject =
+        JSONObject().apply {
+            put(KEY_THEME, themePrefs.exportForBackup())
+            put(KEY_VIEW_OPTIONS, viewOptionsPrefs.exportForBackup())
+            put(KEY_LOCK, lockPrefs.exportForBackup())
+            put(KEY_INTERACTION, interactionPrefs.exportForBackup())
+            put(KEY_BACKUP, backupPrefs.exportForBackup())
+        }
 
     suspend fun importJson(
         root: JSONObject?,

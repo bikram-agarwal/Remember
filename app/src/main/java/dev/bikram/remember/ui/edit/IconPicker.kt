@@ -1,11 +1,6 @@
 package dev.bikram.remember.ui.edit
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.TextButton
-
 import android.content.res.Resources
 import androidx.annotation.StringRes
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,10 +46,10 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import java.util.Locale
-import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,10 +61,14 @@ fun IconPicker(
 ) {
     val resources = LocalContext.current.resources
     val defaultCatalogKey = remember(isChecklist) { defaultIconCatalogKey(isChecklist) }
-    val selectionKey = remember(current, isChecklist, defaultCatalogKey) {
-        if (current.isNullOrBlank()) defaultCatalogKey
-        else normalizeIconKey(current) ?: defaultCatalogKey
-    }
+    val selectionKey =
+        remember(current, isChecklist, defaultCatalogKey) {
+            if (current.isNullOrBlank()) {
+                defaultCatalogKey
+            } else {
+                normalizeIconKey(current) ?: defaultCatalogKey
+            }
+        }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
@@ -83,10 +82,14 @@ fun IconPicker(
     }
 
     val trimmedQuery = searchQuery.trim()
-    val filteredOrdered = remember(trimmedQuery, resources.configuration) {
-        if (trimmedQuery.isEmpty()) emptyList()
-        else iconChoicesRankedForSearch(resources, trimmedQuery)
-    }
+    val filteredOrdered =
+        remember(trimmedQuery, resources.configuration) {
+            if (trimmedQuery.isEmpty()) {
+                emptyList()
+            } else {
+                iconChoicesRankedForSearch(resources, trimmedQuery)
+            }
+        }
 
     AppBottomSheet(
         title = "",
@@ -114,9 +117,10 @@ fun IconPicker(
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 10.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (!searchExpanded) {
@@ -138,9 +142,10 @@ fun IconPicker(
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
-                        modifier = Modifier
-                            .weight(1f)
-                            .focusRequester(searchFocusRequester),
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .focusRequester(searchFocusRequester),
                         singleLine = true,
                         placeholder = { Text(stringResource(R.string.icon_picker_search_hint)) },
                         leadingIcon = {
@@ -172,48 +177,57 @@ fun IconPicker(
 
             Box(modifier = Modifier.heightIn(min = 240.dp, max = 520.dp)) {
                 when {
-                    trimmedQuery.isEmpty() -> IconPickerGrid {
-                        iconCatalog.forEach { category ->
-                            iconHeader(category.nameRes, topPadding = 8.dp)
-                            // Keys must be unique in the whole grid: the same [IconChoice.key] can repeat
-                            // across categories (e.g. airplane_ticket in Maps and Social).
+                    trimmedQuery.isEmpty() ->
+                        IconPickerGrid {
+                            iconCatalog.forEach { category ->
+                                iconHeader(category.nameRes, topPadding = 8.dp)
+                                // Keys must be unique in the whole grid: the same [IconChoice.key] can repeat
+                                // across categories (e.g. airplane_ticket in Maps and Social).
+                                itemsIndexed(
+                                    category.icons,
+                                    key = { index, _ -> "${category.nameRes}_$index" },
+                                ) { _, choice ->
+                                    IconTile(
+                                        choice = choice,
+                                        selected = choice.key == selectionKey,
+                                        onClick = {
+                                            if (choice.key == defaultCatalogKey) {
+                                                onPick(null)
+                                            } else {
+                                                onPick(choice.key)
+                                            }
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                    filteredOrdered.isEmpty() ->
+                        Text(
+                            text = stringResource(R.string.icon_picker_no_results),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 24.dp),
+                        )
+                    else ->
+                        IconPickerGrid {
+                            iconHeader(R.string.icon_picker_results_heading, topPadding = 4.dp)
                             itemsIndexed(
-                                category.icons,
-                                key = { index, _ -> "${category.nameRes}_$index" },
+                                filteredOrdered,
+                                key = { index, choice -> "icon_picker_search_${index}_${choice.key}" },
                             ) { _, choice ->
                                 IconTile(
                                     choice = choice,
                                     selected = choice.key == selectionKey,
                                     onClick = {
-                                        if (choice.key == defaultCatalogKey) onPick(null)
-                                        else onPick(choice.key)
+                                        if (choice.key == defaultCatalogKey) {
+                                            onPick(null)
+                                        } else {
+                                            onPick(choice.key)
+                                        }
                                     },
                                 )
                             }
                         }
-                    }
-                    filteredOrdered.isEmpty() -> Text(
-                        text = stringResource(R.string.icon_picker_no_results),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(vertical = 24.dp),
-                    )
-                    else -> IconPickerGrid {
-                        iconHeader(R.string.icon_picker_results_heading, topPadding = 4.dp)
-                        itemsIndexed(
-                            filteredOrdered,
-                            key = { index, choice -> "icon_picker_search_${index}_${choice.key}" },
-                        ) { _, choice ->
-                            IconTile(
-                                choice = choice,
-                                selected = choice.key == selectionKey,
-                                onClick = {
-                                    if (choice.key == defaultCatalogKey) onPick(null)
-                                    else onPick(choice.key)
-                                },
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -230,20 +244,22 @@ fun IconPicker(
                 OutlinedTextField(
                     value = emojiDraft,
                     onValueChange = { entered ->
-                        emojiDraft = when {
-                            entered.isEmpty() -> ""
-                            else -> {
-                                val boundary = java.text.BreakIterator.getCharacterInstance()
-                                boundary.setText(entered)
-                                val start = boundary.first()
-                                val end = boundary.next()
-                                entered.substring(start, end)
+                        emojiDraft =
+                            when {
+                                entered.isEmpty() -> ""
+                                else -> {
+                                    val boundary = java.text.BreakIterator.getCharacterInstance()
+                                    boundary.setText(entered)
+                                    val start = boundary.first()
+                                    val end = boundary.next()
+                                    entered.substring(start, end)
+                                }
                             }
-                        }
                     },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 52.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 52.dp),
                     singleLine = true,
                     maxLines = 1,
                     placeholder = { Text(stringResource(R.string.icon_picker_emoji_dialog_hint)) },
@@ -291,43 +307,47 @@ fun IconPicker(
  * Keys must be lowercase. Values are lowercase substrings that appear in real symbol names
  * or humanized labels in [BundledMaterialSymbolIcons].
  */
-private val searchConceptSynonyms: Map<String, List<String>> = mapOf(
-    "work" to listOf("business", "job", "office", "laptop", "desktop", "computer", "corporate", "domain", "engineering", "assignment", "workspace", "meeting", "schedule", "chart"),
-    "job" to listOf("business", "work", "laptop", "corporate", "engineering", "assignment"),
-    "office" to listOf("business", "work", "laptop", "desktop", "corporate", "domain", "building", "apartment", "meeting"),
-    "home" to listOf("house", "door", "family", "pets", "garden", "bed", "chair", "sofa", "kitchen", "home"),
-    "house" to listOf("home", "door", "apartment", "hotel", "cottage", "garage"),
-    "love" to listOf("favorite", "heart", "valentine", "romance", "partner"),
-    "money" to listOf("attach", "currency", "euro", "payment", "card", "wallet", "savings", "paid", "lira"),
-    "try" to listOf("lira", "currency"),
-    "travel" to listOf("flight", "train", "hotel", "map", "luggage", "beach", "car", "vacation", "airplane", "passport"),
-    "trip" to listOf("flight", "train", "hotel", "map", "luggage", "car", "airplane"),
-    "food" to listOf("restaurant", "cafe", "pizza", "cake", "coffee", "bar", "local", "dining", "fastfood", "bakery"),
-    "sport" to listOf("fitness", "pool", "gym", "sports", "football", "basketball", "tennis", "golf", "exercise"),
-    "music" to listOf("mic", "headphones", "album", "library", "audio", "volume", "radio"),
-    "photo" to listOf("camera", "image", "gallery", "picture", "photo", "lens"),
-    "time" to listOf("calendar", "clock", "alarm", "schedule", "hour", "today", "event"),
-    "security" to listOf("lock", "key", "shield", "visibility", "password", "fingerprint", "vpn"),
-    "delete" to listOf("trash", "delete", "remove", "sweep", "close", "clear"),
-    "mail" to listOf("email", "mail", "send", "drafts", "inbox", "reply"),
-    "email" to listOf("mail", "send", "drafts", "inbox", "reply"),
-    "phone" to listOf("call", "phone", "mobile", "contact", "sim", "voicemail"),
-    "people" to listOf("person", "group", "face", "family", "contacts", "public"),
-    "car" to listOf("directions", "traffic", "taxi", "parking", "electric", "suv", "sedan"),
-    "health" to listOf("medical", "medication", "local", "hospital", "fitness", "monitor", "spa"),
-    "game" to listOf("sports", "esports", "casino", "toys", "puzzle", "stadia"),
-    "school" to listOf("school", "book", "menu_book", "science", "calculate", "backpack"),
-    "shop" to listOf("shopping", "cart", "store", "basket", "payment", "sell"),
-    "wifi" to listOf("wifi", "network", "router", "signal", "bluetooth", "cell"),
-    "battery" to listOf("battery", "charging", "power", "bolt"),
-    "location" to listOf("location", "map", "place", "navigation", "gps", "pin", "near"),
-    "weather" to listOf("wb", "sunny", "rain", "snow", "cloud", "storm", "thermostat", "air"),
-    "idea" to listOf("lightbulb", "tips", "emoji", "psychology", "science"),
-    "write" to listOf("edit", "note", "pen", "draw", "post", "sticky"),
-    "todo" to listOf("check", "list", "task", "done", "rule", "assignment"),
-)
+private val searchConceptSynonyms: Map<String, List<String>> =
+    mapOf(
+        "work" to listOf("business", "job", "office", "laptop", "desktop", "computer", "corporate", "domain", "engineering", "assignment", "workspace", "meeting", "schedule", "chart"),
+        "job" to listOf("business", "work", "laptop", "corporate", "engineering", "assignment"),
+        "office" to listOf("business", "work", "laptop", "desktop", "corporate", "domain", "building", "apartment", "meeting"),
+        "home" to listOf("house", "door", "family", "pets", "garden", "bed", "chair", "sofa", "kitchen", "home"),
+        "house" to listOf("home", "door", "apartment", "hotel", "cottage", "garage"),
+        "love" to listOf("favorite", "heart", "valentine", "romance", "partner"),
+        "money" to listOf("attach", "currency", "euro", "payment", "card", "wallet", "savings", "paid", "lira"),
+        "try" to listOf("lira", "currency"),
+        "travel" to listOf("flight", "train", "hotel", "map", "luggage", "beach", "car", "vacation", "airplane", "passport"),
+        "trip" to listOf("flight", "train", "hotel", "map", "luggage", "car", "airplane"),
+        "food" to listOf("restaurant", "cafe", "pizza", "cake", "coffee", "bar", "local", "dining", "fastfood", "bakery"),
+        "sport" to listOf("fitness", "pool", "gym", "sports", "football", "basketball", "tennis", "golf", "exercise"),
+        "music" to listOf("mic", "headphones", "album", "library", "audio", "volume", "radio"),
+        "photo" to listOf("camera", "image", "gallery", "picture", "photo", "lens"),
+        "time" to listOf("calendar", "clock", "alarm", "schedule", "hour", "today", "event"),
+        "security" to listOf("lock", "key", "shield", "visibility", "password", "fingerprint", "vpn"),
+        "delete" to listOf("trash", "delete", "remove", "sweep", "close", "clear"),
+        "mail" to listOf("email", "mail", "send", "drafts", "inbox", "reply"),
+        "email" to listOf("mail", "send", "drafts", "inbox", "reply"),
+        "phone" to listOf("call", "phone", "mobile", "contact", "sim", "voicemail"),
+        "people" to listOf("person", "group", "face", "family", "contacts", "public"),
+        "car" to listOf("directions", "traffic", "taxi", "parking", "electric", "suv", "sedan"),
+        "health" to listOf("medical", "medication", "local", "hospital", "fitness", "monitor", "spa"),
+        "game" to listOf("sports", "esports", "casino", "toys", "puzzle", "stadia"),
+        "school" to listOf("school", "book", "menu_book", "science", "calculate", "backpack"),
+        "shop" to listOf("shopping", "cart", "store", "basket", "payment", "sell"),
+        "wifi" to listOf("wifi", "network", "router", "signal", "bluetooth", "cell"),
+        "battery" to listOf("battery", "charging", "power", "bolt"),
+        "location" to listOf("location", "map", "place", "navigation", "gps", "pin", "near"),
+        "weather" to listOf("wb", "sunny", "rain", "snow", "cloud", "storm", "thermostat", "air"),
+        "idea" to listOf("lightbulb", "tips", "emoji", "psychology", "science"),
+        "write" to listOf("edit", "note", "pen", "draw", "post", "sticky"),
+        "todo" to listOf("check", "list", "task", "done", "rule", "assignment"),
+    )
 
-private fun iconChoicesRankedForSearch(resources: Resources, rawQuery: String): List<IconChoice> {
+private fun iconChoicesRankedForSearch(
+    resources: Resources,
+    rawQuery: String,
+): List<IconChoice> {
     val query = rawQuery.lowercase(Locale.getDefault())
     val tokens = query.split(Regex("\\s+")).filter { it.isNotEmpty() }
     if (tokens.isEmpty()) return emptyList()
@@ -338,9 +358,10 @@ private fun iconChoicesRankedForSearch(resources: Resources, rawQuery: String): 
             val iconLabel = humanizeIconKey(choice.key).lowercase(Locale.getDefault())
             val keyWords = iconKeyToSearchWords(choice.key)
             val combined = "$iconLabel $keyWords $categoryLabel"
-            val lowestTokenScore = tokens.minOfOrNull { token ->
-                bestConceptualTokenScore(token, combined, iconLabel, keyWords, categoryLabel)
-            } ?: 0f
+            val lowestTokenScore =
+                tokens.minOfOrNull { token ->
+                    bestConceptualTokenScore(token, combined, iconLabel, keyWords, categoryLabel)
+                } ?: 0f
             if (lowestTokenScore > 0f) {
                 scored += choice to (lowestTokenScore + iconLabel.length * 0.001f)
             }
@@ -352,8 +373,7 @@ private fun iconChoicesRankedForSearch(resources: Resources, rawQuery: String): 
         .sortedWith(
             compareByDescending<Pair<IconChoice, Float>> { it.second }
                 .thenBy { entry -> humanizeIconKey(entry.first.key).lowercase(Locale.getDefault()) },
-        )
-        .distinctBy { scoredEntry -> scoredEntry.first.key }
+        ).distinctBy { scoredEntry -> scoredEntry.first.key }
         .map { scoredEntry -> scoredEntry.first }
 }
 
@@ -366,10 +386,11 @@ private fun bestConceptualTokenScore(
 ): Float {
     val tokenLower = token.lowercase(Locale.getDefault())
     val synonyms = searchConceptSynonyms[tokenLower].orEmpty()
-    val stems = buildList {
-        add(tokenLower)
-        addAll(synonyms)
-    }
+    val stems =
+        buildList {
+            add(tokenLower)
+            addAll(synonyms)
+        }
     return stems.maxOfOrNull { stem ->
         tokenMatchStrength(stem, combinedLower, labelLower, keyWordsLower, categoryLower)
     } ?: 0f
@@ -384,22 +405,29 @@ private fun tokenMatchStrength(
 ): Float {
     if (token.isEmpty()) return 1f
     if (combinedLower.contains(token)) return 1f + token.length * 0.04f
-    val bestField = maxOf(
-        subsequenceStrength(token, labelLower),
-        subsequenceStrength(token, keyWordsLower),
-        subsequenceStrength(token, categoryLower),
-    )
+    val bestField =
+        maxOf(
+            subsequenceStrength(token, labelLower),
+            subsequenceStrength(token, keyWordsLower),
+            subsequenceStrength(token, categoryLower),
+        )
     if (bestField > 0f) return bestField * 0.92f
     return 0f
 }
 
-private fun subsequenceStrength(token: String, field: String): Float {
+private fun subsequenceStrength(
+    token: String,
+    field: String,
+): Float {
     if (token.isEmpty() || field.isEmpty()) return 0f
     if (!isSubsequence(token, field)) return 0f
     return 0.55f + token.length.toFloat() / (field.length + 3).coerceAtLeast(1)
 }
 
-private fun isSubsequence(tokenLower: String, fieldLower: String): Boolean {
+private fun isSubsequence(
+    tokenLower: String,
+    fieldLower: String,
+): Boolean {
     var tokenIndex = 0
     fieldLower.forEach { ch ->
         if (tokenIndex < tokenLower.length && ch == tokenLower[tokenIndex]) {
@@ -410,11 +438,12 @@ private fun isSubsequence(tokenLower: String, fieldLower: String): Boolean {
 }
 
 private fun iconKeyToSearchWords(key: String): String {
-    val raw = when {
-        key.startsWith(ICON_SYMBOL_PREFIX) -> key.removePrefix(ICON_SYMBOL_PREFIX)
-        key.startsWith(ICON_DRAWABLE_PREFIX) -> key.removePrefix(ICON_DRAWABLE_PREFIX)
-        else -> key
-    }
+    val raw =
+        when {
+            key.startsWith(ICON_SYMBOL_PREFIX) -> key.removePrefix(ICON_SYMBOL_PREFIX)
+            key.startsWith(ICON_DRAWABLE_PREFIX) -> key.removePrefix(ICON_DRAWABLE_PREFIX)
+            else -> key
+        }
     return raw.replace('_', ' ').lowercase(Locale.getDefault())
 }
 
@@ -431,15 +460,19 @@ private fun IconPickerGrid(
     )
 }
 
-private fun LazyGridScope.iconHeader(@StringRes labelRes: Int, topPadding: Dp) {
+private fun LazyGridScope.iconHeader(
+    @StringRes labelRes: Int,
+    topPadding: Dp,
+) {
     item(span = { GridItemSpan(5) }) {
         Text(
             text = stringResource(labelRes),
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(top = topPadding, bottom = 2.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = topPadding, bottom = 2.dp),
         )
     }
 }
@@ -451,17 +484,26 @@ private fun IconTile(
     onClick: () -> Unit,
 ) {
     val label = humanizeIconKey(choice.key)
-    val bg = if (selected) MaterialTheme.colorScheme.primaryContainer
-    else MaterialTheme.colorScheme.surfaceContainerHigh
-    val fg = if (selected) MaterialTheme.colorScheme.onPrimaryContainer
-    else MaterialTheme.colorScheme.onSurface
+    val bg =
+        if (selected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        }
+    val fg =
+        if (selected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
     Surface(
         shape = CircleShape,
         color = bg,
-        modifier = Modifier
-            .size(44.dp)
-            .clip(CircleShape)
-            .tapSoundClickable(onClick = onClick),
+        modifier =
+            Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .tapSoundClickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val symbolName = choice.symbolName

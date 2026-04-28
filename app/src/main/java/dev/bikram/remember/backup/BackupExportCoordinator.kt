@@ -35,8 +35,7 @@ class BackupExportCoordinator(
                 noteRepository.observeTrashed(),
             ) { activeNotes, trashedNotes ->
                 activeNotes to trashedNotes
-            }
-                .distinctUntilChanged()
+            }.distinctUntilChanged()
                 .drop(1)
                 .collect {
                     noteBackupDirtyTracker.markNotesChangedSinceLastTreeExport()
@@ -52,16 +51,22 @@ class BackupExportCoordinator(
 
                 override fun onStop(owner: LifecycleOwner) {
                     exitExportJob?.cancel()
-                    exitExportJob = applicationScope.launch {
-                        delay(EXIT_DEBOUNCE_MS)
-                        val prefs = backupPrefs.snapshot()
-                        if (!prefs.autoExportOnChange || prefs.exportFolderUri.isBlank()) return@launch
-                        if (!noteBackupDirtyTracker.hasPendingChangeSinceLastTreeExport()) return@launch
-                        val exportOutcome = backupIo.exportToTreeFolder(prefs.exportFolderUri)
-                        if (exportOutcome.isSuccess) {
-                            noteBackupDirtyTracker.clearAfterSuccessfulTreeExport()
+                    exitExportJob =
+                        applicationScope.launch {
+                            delay(EXIT_DEBOUNCE_MS)
+                            val prefs = backupPrefs.snapshot()
+                            val backupDestinations =
+                                listOf(
+                                    prefs.exportFolderUri,
+                                    prefs.cloudExportFolderUri,
+                                ).filter { it.isNotBlank() }
+                            if (!prefs.autoExportOnChange || backupDestinations.isEmpty()) return@launch
+                            if (!noteBackupDirtyTracker.hasPendingChangeSinceLastTreeExport()) return@launch
+                            val exportOutcome = backupIo.exportToTreeFolders(backupDestinations)
+                            if (exportOutcome.isSuccess) {
+                                noteBackupDirtyTracker.clearAfterSuccessfulTreeExport()
+                            }
                         }
-                    }
                 }
             },
         )

@@ -32,8 +32,9 @@ val DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS: List<NoteSwipeAction?> =
 
 private val Context.interactionDataStore by preferencesDataStore(name = "interaction_prefs")
 
-class InteractionPrefs(private val context: Context) {
-
+class InteractionPrefs(
+    private val context: Context,
+) {
     private object Keys {
         val HAPTIC = booleanPreferencesKey("haptic_feedback_enabled")
         val SWIPE_GESTURE_MODE = stringPreferencesKey("swipe_gesture_mode")
@@ -47,36 +48,42 @@ class InteractionPrefs(private val context: Context) {
         val SWIPE_END_TO_START_REVEAL_3 = stringPreferencesKey("swipe_end_to_start_reveal_3")
     }
 
-    val state: Flow<InteractionState> = context.interactionDataStore.data.map { prefs ->
-        InteractionState(
-            hapticFeedbackEnabled = prefs[Keys.HAPTIC] ?: true,
-            swipeGestureMode = prefs[Keys.SWIPE_GESTURE_MODE]
-                ?.let { runCatching { SwipeGestureMode.valueOf(it) }.getOrNull() }
-                ?: SwipeGestureMode.REVEAL_ACTIONS,
-            swipeStartToEnd = prefs[Keys.SWIPE_START_TO_END]
-                ?.let { noteSwipeActionFromStoredName(it) }
-                ?: NoteSwipeAction.EDIT,
-            swipeEndToStart = prefs[Keys.SWIPE_END_TO_START]
-                ?.let { noteSwipeActionFromStoredName(it) }
-                ?: NoteSwipeAction.TRASH,
-            swipeStartToEndRevealActions = sanitizedRevealActions(
-                listOf(
-                    prefs[Keys.SWIPE_START_TO_END_REVEAL_1],
-                    prefs[Keys.SWIPE_START_TO_END_REVEAL_2],
-                    prefs[Keys.SWIPE_START_TO_END_REVEAL_3],
-                ),
-                DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS,
-            ),
-            swipeEndToStartRevealActions = sanitizedRevealActions(
-                listOf(
-                    prefs[Keys.SWIPE_END_TO_START_REVEAL_1],
-                    prefs[Keys.SWIPE_END_TO_START_REVEAL_2],
-                    prefs[Keys.SWIPE_END_TO_START_REVEAL_3],
-                ),
-                DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS,
-            ),
-        )
-    }
+    val state: Flow<InteractionState> =
+        context.interactionDataStore.data.map { prefs ->
+            InteractionState(
+                hapticFeedbackEnabled = prefs[Keys.HAPTIC] ?: true,
+                swipeGestureMode =
+                    prefs[Keys.SWIPE_GESTURE_MODE]
+                        ?.let { runCatching { SwipeGestureMode.valueOf(it) }.getOrNull() }
+                        ?: SwipeGestureMode.REVEAL_ACTIONS,
+                swipeStartToEnd =
+                    prefs[Keys.SWIPE_START_TO_END]
+                        ?.let { noteSwipeActionFromStoredName(it) }
+                        ?: NoteSwipeAction.EDIT,
+                swipeEndToStart =
+                    prefs[Keys.SWIPE_END_TO_START]
+                        ?.let { noteSwipeActionFromStoredName(it) }
+                        ?: NoteSwipeAction.TRASH,
+                swipeStartToEndRevealActions =
+                    sanitizedRevealActions(
+                        listOf(
+                            prefs[Keys.SWIPE_START_TO_END_REVEAL_1],
+                            prefs[Keys.SWIPE_START_TO_END_REVEAL_2],
+                            prefs[Keys.SWIPE_START_TO_END_REVEAL_3],
+                        ),
+                        DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS,
+                    ),
+                swipeEndToStartRevealActions =
+                    sanitizedRevealActions(
+                        listOf(
+                            prefs[Keys.SWIPE_END_TO_START_REVEAL_1],
+                            prefs[Keys.SWIPE_END_TO_START_REVEAL_2],
+                            prefs[Keys.SWIPE_END_TO_START_REVEAL_3],
+                        ),
+                        DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS,
+                    ),
+            )
+        }
 
     suspend fun setHapticFeedbackEnabled(enabled: Boolean) {
         context.interactionDataStore.edit { it[Keys.HAPTIC] = enabled }
@@ -169,11 +176,12 @@ class InteractionPrefs(private val context: Context) {
         defaults: List<NoteSwipeAction?>,
     ): List<NoteSwipeAction?> {
         val hasStoredValue = stored.any { value -> value != null }
-        val source = if (hasStoredValue) {
-            stored
-        } else {
-            defaults.map { action -> action?.name.orEmpty() }
-        }
+        val source =
+            if (hasStoredValue) {
+                stored
+            } else {
+                defaults.map { action -> action?.name.orEmpty() }
+            }
         return normalizedRevealSlots(
             source.map { value ->
                 if (value.isNullOrBlank()) {

@@ -33,14 +33,15 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.remember.MainActivity
 import dev.bikram.remember.R
-import dev.bikram.remember.RememberApp
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.di.NotesWidgetEntryPoint
 import dev.bikram.remember.ui.edit.iconEmojiPayload
-import java.util.Calendar
 import kotlinx.coroutines.flow.first
+import java.util.Calendar
 
 /**
  * Two-section Glance widget:
@@ -50,18 +51,28 @@ import kotlinx.coroutines.flow.first
  * Tapping a row opens that note; the header actions create a new note or list.
  */
 class NotesWidget : GlanceAppWidget() {
-
-    override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val app = context.applicationContext as RememberApp
-        val active = app.container.noteRepository.observeActive().first()
+    override suspend fun provideGlance(
+        context: Context,
+        id: GlanceId,
+    ) {
+        val entryPoint =
+            EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                NotesWidgetEntryPoint::class.java,
+            )
+        val noteRepository = entryPoint.noteRepository()
+        val active = noteRepository.observeActive().first()
         val now = System.currentTimeMillis()
-        val favorites = active
-            .asSequence()
-            .filter { it.note.favorite }
-            .take(MAX_FAVORITE_ROWS)
-            .toList()
-        val reminderSummary = app.container.noteRepository.reminderSummaryItems(now)
-            .take(MAX_REMINDER_SUMMARY_ROWS)
+        val favorites =
+            active
+                .asSequence()
+                .filter { it.note.favorite }
+                .take(MAX_FAVORITE_ROWS)
+                .toList()
+        val reminderSummary =
+            noteRepository
+                .reminderSummaryItems(now)
+                .take(MAX_REMINDER_SUMMARY_ROWS)
         provideContent {
             GlanceTheme { WidgetContent(favorites = favorites, reminderSummary = reminderSummary, now = now) }
         }
@@ -74,22 +85,25 @@ class NotesWidget : GlanceAppWidget() {
         now: Long,
     ) {
         val context = LocalContext.current
-        val newNoteIntent = Intent(context, MainActivity::class.java).apply {
-            action = MainActivity.ACTION_SHORTCUT_NEW_NOTE
-            data = Uri.parse("remember://widget/new-note")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        }
-        val newListIntent = Intent(context, MainActivity::class.java).apply {
-            action = MainActivity.ACTION_SHORTCUT_NEW_LIST
-            data = Uri.parse("remember://widget/new-list")
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        }
+        val newNoteIntent =
+            Intent(context, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_SHORTCUT_NEW_NOTE
+                data = Uri.parse("remember://widget/new-note")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
+        val newListIntent =
+            Intent(context, MainActivity::class.java).apply {
+                action = MainActivity.ACTION_SHORTCUT_NEW_LIST
+                data = Uri.parse("remember://widget/new-list")
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
         Column(
-            modifier = GlanceModifier
-                .fillMaxSize()
-                .background(GlanceTheme.colors.widgetBackground)
-                .cornerRadius(20.dp)
-                .padding(12.dp),
+            modifier =
+                GlanceModifier
+                    .fillMaxSize()
+                    .background(GlanceTheme.colors.widgetBackground)
+                    .cornerRadius(20.dp)
+                    .padding(12.dp),
         ) {
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
@@ -97,33 +111,36 @@ class NotesWidget : GlanceAppWidget() {
             ) {
                 Text(
                     text = context.getString(R.string.widget_header_title),
-                    style = TextStyle(
-                        color = GlanceTheme.colors.primary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
+                    style =
+                        TextStyle(
+                            color = GlanceTheme.colors.primary,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
                     modifier = GlanceModifier.defaultWeight(),
                 )
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_note_add),
                     contentDescription = context.getString(R.string.widget_create_new_note),
-                    modifier = GlanceModifier
-                        .size(28.dp)
-                        .background(GlanceTheme.colors.primaryContainer)
-                        .cornerRadius(14.dp)
-                        .padding(4.dp)
-                        .clickable(actionStartActivity(newNoteIntent)),
+                    modifier =
+                        GlanceModifier
+                            .size(28.dp)
+                            .background(GlanceTheme.colors.primaryContainer)
+                            .cornerRadius(14.dp)
+                            .padding(4.dp)
+                            .clickable(actionStartActivity(newNoteIntent)),
                 )
                 Spacer(GlanceModifier.width(8.dp))
                 Image(
                     provider = ImageProvider(R.drawable.ic_widget_list_add),
                     contentDescription = context.getString(R.string.widget_create_new_list),
-                    modifier = GlanceModifier
-                        .size(28.dp)
-                        .background(GlanceTheme.colors.primaryContainer)
-                        .cornerRadius(14.dp)
-                        .padding(4.dp)
-                        .clickable(actionStartActivity(newListIntent)),
+                    modifier =
+                        GlanceModifier
+                            .size(28.dp)
+                            .background(GlanceTheme.colors.primaryContainer)
+                            .cornerRadius(14.dp)
+                            .padding(4.dp)
+                            .clickable(actionStartActivity(newListIntent)),
                 )
             }
             Spacer(GlanceModifier.height(8.dp))
@@ -161,11 +178,12 @@ class NotesWidget : GlanceAppWidget() {
     private fun SectionHeader(label: String) {
         Text(
             text = label,
-            style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-            ),
+            style =
+                TextStyle(
+                    color = GlanceTheme.colors.onSurfaceVariant,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
             modifier = GlanceModifier.padding(vertical = 4.dp),
         )
     }
@@ -174,10 +192,11 @@ class NotesWidget : GlanceAppWidget() {
     private fun SectionEmpty(label: String) {
         Text(
             text = label,
-            style = TextStyle(
-                color = GlanceTheme.colors.onSurfaceVariant,
-                fontSize = 12.sp,
-            ),
+            style =
+                TextStyle(
+                    color = GlanceTheme.colors.onSurfaceVariant,
+                    fontSize = 12.sp,
+                ),
             modifier = GlanceModifier.padding(vertical = 4.dp),
         )
     }
@@ -189,76 +208,98 @@ class NotesWidget : GlanceAppWidget() {
         showReminder: Boolean,
         now: Long = System.currentTimeMillis(),
     ) {
-        val openIntent = Intent(context, MainActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            data = Uri.parse("remember://widget/open/${note.note.id}")
-            putExtra("open_note_id", note.note.id)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        }
+        val openIntent =
+            Intent(context, MainActivity::class.java).apply {
+                action = Intent.ACTION_VIEW
+                data = Uri.parse("remember://widget/open/${note.note.id}")
+                putExtra("open_note_id", note.note.id)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
         Row(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp)
-                .clickable(actionStartActivity(openIntent)),
+            modifier =
+                GlanceModifier
+                    .fillMaxWidth()
+                    .padding(vertical = 6.dp)
+                    .clickable(actionStartActivity(openIntent)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = GlanceModifier
-                    .size(6.dp)
-                    .cornerRadius(3.dp)
-                    .background(GlanceTheme.colors.primary),
+                modifier =
+                    GlanceModifier
+                        .size(6.dp)
+                        .cornerRadius(3.dp)
+                        .background(GlanceTheme.colors.primary),
                 contentAlignment = Alignment.Center,
             ) { }
             Spacer(GlanceModifier.width(10.dp))
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(
-                    text = note.note.title.ifBlank {
-                        if (note.note.kind == NoteKind.NOTE) {
-                            context.getString(R.string.edit_note_title_new)
-                        } else {
-                            context.getString(R.string.edit_list_title_new)
-                        }
-                    },
+                    text =
+                        note.note.title.ifBlank {
+                            if (note.note.kind == NoteKind.NOTE) {
+                                context.getString(R.string.edit_note_title_new)
+                            } else {
+                                context.getString(R.string.edit_list_title_new)
+                            }
+                        },
                     maxLines = 1,
-                    style = TextStyle(
-                        color = GlanceTheme.colors.onSurface,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
+                    style =
+                        TextStyle(
+                            color = GlanceTheme.colors.onSurface,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
                 )
-                val subline = when {
-                    showReminder && note.note.reminderAt != null ->
-                        summaryLine(context, note, now)
-                    else -> note.note.body.ifBlank { note.items.firstOrNull()?.text.orEmpty() }
-                }
+                val subline =
+                    when {
+                        showReminder && note.note.reminderAt != null ->
+                            summaryLine(context, note, now)
+                        else ->
+                            note.note.body.ifBlank {
+                                note.items
+                                    .firstOrNull()
+                                    ?.text
+                                    .orEmpty()
+                            }
+                    }
                 if (subline.isNotBlank()) {
                     Text(
                         text = subline,
                         maxLines = 1,
-                        style = TextStyle(
-                            color = GlanceTheme.colors.onSurfaceVariant,
-                            fontSize = 12.sp,
-                        ),
+                        style =
+                            TextStyle(
+                                color = GlanceTheme.colors.onSurfaceVariant,
+                                fontSize = 12.sp,
+                            ),
                     )
                 }
             }
         }
     }
 
-    private fun summaryLine(context: Context, note: NoteWithItems, now: Long): String {
+    private fun summaryLine(
+        context: Context,
+        note: NoteWithItems,
+        now: Long,
+    ): String {
         val reminderAt = note.note.reminderAt ?: now
-        val title = note.note.title.ifBlank {
-            if (note.note.kind == NoteKind.NOTE) {
-                context.getString(R.string.edit_note_title_new)
-            } else {
-                context.getString(R.string.edit_list_title_new)
+        val title =
+            note.note.title.ifBlank {
+                if (note.note.kind == NoteKind.NOTE) {
+                    context.getString(R.string.edit_note_title_new)
+                } else {
+                    context.getString(R.string.edit_list_title_new)
+                }
             }
-        }
         val emojiTitle = iconEmojiPayload(note.note.iconKey)?.let { emoji -> "$emoji $title" } ?: title
         return context.getString(R.string.reminder_summary_line, summaryTimingLabel(context, reminderAt, now), emojiTitle)
     }
 
-    private fun summaryTimingLabel(context: Context, reminderAt: Long, now: Long): String {
+    private fun summaryTimingLabel(
+        context: Context,
+        reminderAt: Long,
+        now: Long,
+    ): String {
         val todayStart = startOfDay(now)
         val tomorrowStart = startOfTomorrow(now)
         return when {
@@ -272,9 +313,10 @@ class NotesWidget : GlanceAppWidget() {
             }
             reminderAt < tomorrowStart -> context.getString(R.string.reminder_summary_due_today)
             reminderAt - now < HOUR_MILLIS * 24 -> {
-                val hoursUntil = ((reminderAt - now + HOUR_MILLIS - 1) / HOUR_MILLIS)
-                    .coerceAtLeast(1)
-                    .toInt()
+                val hoursUntil =
+                    ((reminderAt - now + HOUR_MILLIS - 1) / HOUR_MILLIS)
+                        .coerceAtLeast(1)
+                        .toInt()
                 context.resources.getQuantityString(
                     R.plurals.reminder_summary_in_hours,
                     hoursUntil,
@@ -293,27 +335,30 @@ class NotesWidget : GlanceAppWidget() {
     }
 
     private fun startOfDay(millis: Long): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = millis
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
+        val calendar =
+            Calendar.getInstance().apply {
+                timeInMillis = millis
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
         return calendar.timeInMillis
     }
 
     private fun startOfTomorrow(now: Long): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = startOfDay(now)
-            add(Calendar.DAY_OF_MONTH, 1)
-        }
+        val calendar =
+            Calendar.getInstance().apply {
+                timeInMillis = startOfDay(now)
+                add(Calendar.DAY_OF_MONTH, 1)
+            }
         return calendar.timeInMillis
     }
 
-    private fun daysBetween(startMillis: Long, endMillis: Long): Int {
-        return ((endMillis - startMillis) / DAY_MILLIS).toInt()
-    }
+    private fun daysBetween(
+        startMillis: Long,
+        endMillis: Long,
+    ): Int = ((endMillis - startMillis) / DAY_MILLIS).toInt()
 
     companion object {
         private const val MAX_FAVORITE_ROWS = 3

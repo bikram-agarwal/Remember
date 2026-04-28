@@ -3,27 +3,47 @@ package dev.bikram.remember.reminders
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import dev.bikram.remember.RememberApp
+import dagger.hilt.android.AndroidEntryPoint
+import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.QuickCapturePrefs
+import dev.bikram.remember.data.ReminderPrefs
+import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.quickcapture.QuickCaptureNotifier
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
+@AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
+    @Inject lateinit var reminderScheduler: ReminderScheduler
+
+    @Inject lateinit var reminderPrefs: ReminderPrefs
+
+    @Inject lateinit var noteRepository: NoteRepository
+
+    @Inject lateinit var quickCapturePrefs: QuickCapturePrefs
+
+    @ApplicationScope @Inject
+    lateinit var applicationScope: CoroutineScope
+
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         val pendingResult = goAsync()
-        val app = context.applicationContext as RememberApp
-        val scheduler = app.container.reminderScheduler
         val now = System.currentTimeMillis()
-        app.container.applicationScope.launch {
+        applicationScope.launch {
             try {
-                val keepUntilDone = app.container.reminderPrefs
-                    .snapshot()
-                    .keepReminderNotificationsUntilDone
-                val all = app.container.noteRepository.observeActive().first()
+                val keepUntilDone =
+                    reminderPrefs
+                        .snapshot()
+                        .keepReminderNotificationsUntilDone
+                val all = noteRepository.observeActive().first()
                 all.forEach { item ->
                     val at = item.note.reminderAt ?: return@forEach
                     if (at > now) {
-                        scheduler.schedule(item.note.id, at)
+                        reminderScheduler.schedule(item.note.id, at)
                     } else if (item.note.completedAt == null) {
                         ReminderReceiver.showNotification(
                             context = context,
@@ -33,12 +53,12 @@ class BootReceiver : BroadcastReceiver() {
                         )
                     }
                 }
-                app.container.noteRepository.refreshReminderSummaryNotification()
+                noteRepository.refreshReminderSummaryNotification()
                 // Re-post the quick-capture notification if the user has it enabled. The
                 // notification is cleared by the OS on reboot, and the flow-based observer
                 // may not fire quickly enough before the broadcast's pending-result window
                 // closes, so we read the snapshot and post synchronously here.
-                if (app.container.quickCapturePrefs.snapshot().enabled) {
+                if (quickCapturePrefs.snapshot().enabled) {
                     QuickCaptureNotifier.show(context)
                 }
             } finally {

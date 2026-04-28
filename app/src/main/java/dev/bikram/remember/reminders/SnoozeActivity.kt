@@ -1,7 +1,6 @@
 package dev.bikram.remember.reminders
 
 import android.content.Context
-import android.graphics.Color as AndroidColor
 import android.graphics.drawable.ColorDrawable
 import android.os.Build
 import android.os.Bundle
@@ -33,7 +32,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,10 +41,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.R
-import dev.bikram.remember.RememberApp
+import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
+import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.TagRepository
+import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberTextButton
@@ -63,8 +66,18 @@ import java.time.ZoneOffset
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import javax.inject.Inject
+import android.graphics.Color as AndroidColor
 
+@AndroidEntryPoint
 class SnoozeActivity : ComponentActivity() {
+    @Inject lateinit var noteRepository: NoteRepository
+
+    @Inject lateinit var tagRepository: TagRepository
+
+    @Inject lateinit var themePrefs: ThemePrefs
+
+    @Inject lateinit var interactionPrefs: InteractionPrefs
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,16 +108,15 @@ class SnoozeActivity : ComponentActivity() {
         // Pull the user's selected color theme + interaction prefs, same pattern
         // as MainActivity, so the snooze sheet honors their seed color, dark / black
         // mode, palette style, etc. instead of falling back to the M3 defaults.
-        val container = (application as RememberApp).container
 
         setContent {
-            val themeState by container.themePrefs.state.collectAsStateWithLifecycle(
+            val themeState by themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
             )
-            val tagColors by container.tagRepository.observeTagColorMap().collectAsStateWithLifecycle(
+            val tagColors by tagRepository.observeTagColorMap().collectAsStateWithLifecycle(
                 initialValue = emptyMap(),
             )
-            val interactionState by container.interactionPrefs.state.collectAsStateWithLifecycle(
+            val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
                 initialValue = InteractionState(),
             )
             RememberTheme(
@@ -113,12 +125,13 @@ class SnoozeActivity : ComponentActivity() {
                 paintBackground = false,
             ) {
                 Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        // Scrim so the home / caller activity behind the snooze dialog
-                        // is dimmed and the user's focus lands on the floating window.
-                        .background(Color.Black.copy(alpha = 0.55f))
-                        .clickable { finish() },
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            // Scrim so the home / caller activity behind the snooze dialog
+                            // is dimmed and the user's focus lands on the floating window.
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .clickable { finish() },
                     contentAlignment = Alignment.Center,
                 ) {
                     SnoozeDialogContent(
@@ -130,53 +143,56 @@ class SnoozeActivity : ComponentActivity() {
         }
     }
 
-    private fun snoozeAndFinish(noteId: Long, timeMillis: Long) {
-        val app = applicationContext as RememberApp
-        val repo = app.container.noteRepository
-
+    private fun snoozeAndFinish(
+        noteId: Long,
+        timeMillis: Long,
+    ) {
         // Show the confirmation toast before launching the DB write so the user gets
         // immediate feedback even if the activity is finishing. Toast posts to the
         // system service and survives the activity destruction.
-        Toast.makeText(
-            applicationContext,
-            formatSnoozeConfirmation(applicationContext, timeMillis),
-            Toast.LENGTH_LONG,
-        ).show()
+        Toast
+            .makeText(
+                applicationContext,
+                formatSnoozeConfirmation(applicationContext, timeMillis),
+                Toast.LENGTH_LONG,
+            ).show()
 
         lifecycleScope.launch {
-            val noteWithItems = repo.get(noteId)
+            val noteWithItems = noteRepository.get(noteId)
             if (noteWithItems != null) {
                 val note = noteWithItems.note
-                val opts = dev.bikram.remember.data.NoteOptions(
-                    reminderAt = timeMillis,
-                    importance = note.importance,
-                    visibility = note.visibility,
-                    pictureUri = note.pictureUri,
-                    pictureHeroFraming = note.pictureHeroFraming,
-                    locked = note.locked,
-                    iconKey = note.iconKey,
-                    actions = note.actions,
-                    tags = note.tags,
-                    recurrence = note.recurrence,
-                )
+                val opts =
+                    dev.bikram.remember.data.NoteOptions(
+                        reminderAt = timeMillis,
+                        importance = note.importance,
+                        visibility = note.visibility,
+                        pictureUri = note.pictureUri,
+                        pictureHeroFraming = note.pictureHeroFraming,
+                        locked = note.locked,
+                        iconKey = note.iconKey,
+                        actions = note.actions,
+                        tags = note.tags,
+                        recurrence = note.recurrence,
+                    )
                 if (note.kind == dev.bikram.remember.data.NoteKind.NOTE) {
-                    repo.updateNote(note.id, note.title, note.body, note.colorIndex, opts)
+                    noteRepository.updateNote(note.id, note.title, note.body, note.colorIndex, opts)
                 } else {
-                    val persistable = noteWithItems.items.map {
-                        dev.bikram.remember.data.PersistableChecklistItem(
-                            localKey = it.id,
-                            text = it.text,
-                            checked = it.checked,
-                            sortOrder = it.sortOrder,
-                            parentLocalKey = it.parentId,
-                            depth = it.depth,
-                        )
-                    }
-                    repo.updateList(note.id, note.title, note.colorIndex, persistable, opts)
+                    val persistable =
+                        noteWithItems.items.map {
+                            dev.bikram.remember.data.PersistableChecklistItem(
+                                localKey = it.id,
+                                text = it.text,
+                                checked = it.checked,
+                                sortOrder = it.sortOrder,
+                                parentLocalKey = it.parentId,
+                                depth = it.depth,
+                            )
+                        }
+                    noteRepository.updateList(note.id, note.title, note.colorIndex, persistable, opts)
                 }
             }
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            nm.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notificationManager.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
 
             finish()
         }
@@ -196,7 +212,10 @@ class SnoozeActivity : ComponentActivity() {
  * existing date + time picker dialogs for the long-tail case.
  */
 @Composable
-fun SnoozeDialogContent(onSnooze: (Long) -> Unit, onDismiss: () -> Unit) {
+fun SnoozeDialogContent(
+    onSnooze: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
     val context = LocalContext.current
     // Capture once at composition. We never re-read the wall clock during the
     // session; if the user lingers in the sheet for hours the absolute targets
@@ -204,15 +223,17 @@ fun SnoozeDialogContent(onSnooze: (Long) -> Unit, onDismiss: () -> Unit) {
     // the visible labels mid-tap.
     val nowMillis = remember { System.currentTimeMillis() }
     val zone = remember { ZoneId.systemDefault() }
-    val now = remember(nowMillis, zone) {
-        ZonedDateTime.ofInstant(Instant.ofEpochMilli(nowMillis), zone)
-    }
+    val now =
+        remember(nowMillis, zone) {
+            ZonedDateTime.ofInstant(Instant.ofEpochMilli(nowMillis), zone)
+        }
     val timeFormatter = remember(context) { timeFormatterFor(context) }
-    val nowLabel = remember(now, timeFormatter) {
-        val dayPart = now.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault())
-        val timePart = now.format(timeFormatter)
-        context.getString(R.string.snooze_activity_now_format, "$dayPart $timePart")
-    }
+    val nowLabel =
+        remember(now, timeFormatter) {
+            val dayPart = now.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault())
+            val timePart = now.format(timeFormatter)
+            context.getString(R.string.snooze_activity_now_format, "$dayPart $timePart")
+        }
     val presets = remember(now) { computeSnoozePresets(context, now, timeFormatter) }
 
     var customDateMillis by remember { mutableStateOf<Long?>(null) }
@@ -226,11 +247,12 @@ fun SnoozeDialogContent(onSnooze: (Long) -> Unit, onDismiss: () -> Unit) {
         // Tonal alone does not paint a shadow at all in dark mode.
         tonalElevation = 6.dp,
         shadowElevation = 24.dp,
-        modifier = Modifier
-            .padding(horizontal = 16.dp, vertical = 24.dp)
-            .widthIn(max = 360.dp)
-            // Swallow scrim taps so tapping inside the dialog does not dismiss it.
-            .clickable(enabled = false) {},
+        modifier =
+            Modifier
+                .padding(horizontal = 16.dp, vertical = 24.dp)
+                .widthIn(max = 360.dp)
+                // Swallow scrim taps so tapping inside the dialog does not dismiss it.
+                .clickable(enabled = false) {},
     ) {
         Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 12.dp)) {
             Row(
@@ -357,18 +379,20 @@ private fun SnoozePresetRow(
     val accentBg = MaterialTheme.colorScheme.surfaceContainerHighest
     val accentFg = MaterialTheme.colorScheme.onSurfaceVariant
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .tapSoundClickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 10.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .tapSoundClickable(onClick = onClick)
+                .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(CircleShape)
-                .background(accentBg),
+            modifier =
+                Modifier
+                    .size(36.dp)
+                    .clip(CircleShape)
+                    .background(accentBg),
             contentAlignment = Alignment.Center,
         ) {
             RememberMaterialRoundedSymbol(
@@ -434,20 +458,24 @@ private fun computeSnoozePresets(
     val zone = now.zone
 
     // Soon: round up to next :15, with a +10 min floor.
-    val soonTarget = run {
-        val rounded = roundUpToNextQuarterHour(now)
-        if (rounded.toInstant().toEpochMilli() - now.toInstant().toEpochMilli() < 10 * 60_000L) {
-            rounded.plusMinutes(15)
-        } else rounded
-    }
+    val soonTarget =
+        run {
+            val rounded = roundUpToNextQuarterHour(now)
+            if (rounded.toInstant().toEpochMilli() - now.toInstant().toEpochMilli() < 10 * 60_000L) {
+                rounded.plusMinutes(15)
+            } else {
+                rounded
+            }
+        }
     val soonMins = ((soonTarget.toInstant().toEpochMilli() - now.toInstant().toEpochMilli()) / 60_000L).toInt()
-    presets += SnoozePreset(
-        title = context.getString(R.string.snooze_preset_soon),
-        subtitle = context.getString(R.string.snooze_subtitle_in_minutes, soonMins),
-        absoluteTime = soonTarget.format(timeFormatter),
-        targetMillis = soonTarget.toInstant().toEpochMilli(),
-        symbolName = "schedule",
-    )
+    presets +=
+        SnoozePreset(
+            title = context.getString(R.string.snooze_preset_soon),
+            subtitle = context.getString(R.string.snooze_subtitle_in_minutes, soonMins),
+            absoluteTime = soonTarget.format(timeFormatter),
+            targetMillis = soonTarget.toInstant().toEpochMilli(),
+            symbolName = "schedule",
+        )
 
     // "Later today" - only emit if it gives the user meaningful separation from
     // the next-named-time-of-day preset below ("This evening" at 9 PM, or "Late
@@ -456,88 +484,109 @@ private fun computeSnoozePresets(
     // to the same time. Drop "Later today" when it lands within 60 minutes of
     // the next named slot.
     val laterToday = roundUpToNextHour(now.plusHours(3))
-    val nextNamedSlotMillis: Long? = when {
-        now.hour < 20 -> today.atTime(LocalTime.of(21, 0)).atZone(zone).toInstant().toEpochMilli()
-        now.hour in 20 until 22 -> today.atTime(LocalTime.of(23, 0)).atZone(zone).toInstant().toEpochMilli()
-        else -> null
-    }
+    val nextNamedSlotMillis: Long? =
+        when {
+            now.hour < 20 ->
+                today
+                    .atTime(LocalTime.of(21, 0))
+                    .atZone(zone)
+                    .toInstant()
+                    .toEpochMilli()
+            now.hour in 20 until 22 ->
+                today
+                    .atTime(LocalTime.of(23, 0))
+                    .atZone(zone)
+                    .toInstant()
+                    .toEpochMilli()
+            else -> null
+        }
     val laterTodayMillis = laterToday.toInstant().toEpochMilli()
-    val laterTodayWellSeparated = nextNamedSlotMillis == null ||
-        (nextNamedSlotMillis - laterTodayMillis) >= 60 * 60_000L
+    val laterTodayWellSeparated =
+        nextNamedSlotMillis == null ||
+            (nextNamedSlotMillis - laterTodayMillis) >= 60 * 60_000L
     if (laterToday.toLocalDate() == today && laterToday.hour < 22 && laterTodayWellSeparated) {
         val hours = ((laterTodayMillis - now.toInstant().toEpochMilli()) / 3_600_000L).toInt()
-        presets += SnoozePreset(
-            title = context.getString(R.string.snooze_preset_later_today),
-            subtitle = context.getString(R.string.snooze_subtitle_in_hours, hours),
-            absoluteTime = laterToday.format(timeFormatter),
-            targetMillis = laterTodayMillis,
-            symbolName = "wb_twilight",
-        )
+        presets +=
+            SnoozePreset(
+                title = context.getString(R.string.snooze_preset_later_today),
+                subtitle = context.getString(R.string.snooze_subtitle_in_hours, hours),
+                absoluteTime = laterToday.format(timeFormatter),
+                targetMillis = laterTodayMillis,
+                symbolName = "wb_twilight",
+            )
     }
 
     if (now.hour < 20) {
         val evening = today.atTime(LocalTime.of(21, 0)).atZone(zone)
-        presets += SnoozePreset(
-            title = context.getString(R.string.snooze_preset_this_evening),
-            subtitle = context.getString(R.string.snooze_subtitle_tonight),
-            absoluteTime = evening.format(timeFormatter),
-            targetMillis = evening.toInstant().toEpochMilli(),
-            symbolName = "bedtime",
-        )
+        presets +=
+            SnoozePreset(
+                title = context.getString(R.string.snooze_preset_this_evening),
+                subtitle = context.getString(R.string.snooze_subtitle_tonight),
+                absoluteTime = evening.format(timeFormatter),
+                targetMillis = evening.toInstant().toEpochMilli(),
+                symbolName = "bedtime",
+            )
     } else if (now.hour in 20 until 22) {
         // Past dinnertime but not yet bed: offer a late-tonight option at 11 PM.
         val lateTonight = today.atTime(LocalTime.of(23, 0)).atZone(zone)
-        presets += SnoozePreset(
-            title = context.getString(R.string.snooze_preset_late_tonight),
-            subtitle = context.getString(R.string.snooze_subtitle_tonight),
-            absoluteTime = lateTonight.format(timeFormatter),
-            targetMillis = lateTonight.toInstant().toEpochMilli(),
-            symbolName = "bedtime",
-        )
+        presets +=
+            SnoozePreset(
+                title = context.getString(R.string.snooze_preset_late_tonight),
+                subtitle = context.getString(R.string.snooze_subtitle_tonight),
+                absoluteTime = lateTonight.format(timeFormatter),
+                targetMillis = lateTonight.toInstant().toEpochMilli(),
+                symbolName = "bedtime",
+            )
     }
 
-    val tomorrowDayLabel = tomorrow.dayOfWeek.getDisplayName(
-        java.time.format.TextStyle.SHORT,
-        Locale.getDefault(),
-    )
-    val tomorrowMorning = tomorrow.atTime(LocalTime.of(9, 0)).atZone(zone)
-    presets += SnoozePreset(
-        title = context.getString(R.string.snooze_preset_tomorrow_morning),
-        subtitle = tomorrowDayLabel,
-        absoluteTime = tomorrowMorning.format(timeFormatter),
-        targetMillis = tomorrowMorning.toInstant().toEpochMilli(),
-        symbolName = "wb_sunny",
-        dividerBefore = true,
-    )
-
-    val tomorrowAfternoon = tomorrow.atTime(LocalTime.of(14, 0)).atZone(zone)
-    presets += SnoozePreset(
-        title = context.getString(R.string.snooze_preset_tomorrow_afternoon),
-        subtitle = tomorrowDayLabel,
-        absoluteTime = tomorrowAfternoon.format(timeFormatter),
-        targetMillis = tomorrowAfternoon.toInstant().toEpochMilli(),
-        // light_mode is Material's full-disc sun glyph, distinct from wb_sunny's
-        // ray-burst sun used for "Tomorrow morning". Keeping both rows sun-themed
-        // (no clock) so they read as time-of-day rather than generic snooze slots.
-        symbolName = "light_mode",
-    )
-
-    // Next week: roll forward to next Monday at 9 AM.
-    val daysToMonday = ((DayOfWeek.MONDAY.value - today.dayOfWeek.value + 7) % 7).let {
-        if (it == 0) 7 else it
-    }
-    val nextMonday = today.plusDays(daysToMonday.toLong())
-    val nextWeek = nextMonday.atTime(LocalTime.of(9, 0)).atZone(zone)
-    presets += SnoozePreset(
-        title = context.getString(R.string.snooze_preset_next_week),
-        subtitle = nextMonday.dayOfWeek.getDisplayName(
+    val tomorrowDayLabel =
+        tomorrow.dayOfWeek.getDisplayName(
             java.time.format.TextStyle.SHORT,
             Locale.getDefault(),
-        ),
-        absoluteTime = nextWeek.format(timeFormatter),
-        targetMillis = nextWeek.toInstant().toEpochMilli(),
-        symbolName = "event",
-    )
+        )
+    val tomorrowMorning = tomorrow.atTime(LocalTime.of(9, 0)).atZone(zone)
+    presets +=
+        SnoozePreset(
+            title = context.getString(R.string.snooze_preset_tomorrow_morning),
+            subtitle = tomorrowDayLabel,
+            absoluteTime = tomorrowMorning.format(timeFormatter),
+            targetMillis = tomorrowMorning.toInstant().toEpochMilli(),
+            symbolName = "wb_sunny",
+            dividerBefore = true,
+        )
+
+    val tomorrowAfternoon = tomorrow.atTime(LocalTime.of(14, 0)).atZone(zone)
+    presets +=
+        SnoozePreset(
+            title = context.getString(R.string.snooze_preset_tomorrow_afternoon),
+            subtitle = tomorrowDayLabel,
+            absoluteTime = tomorrowAfternoon.format(timeFormatter),
+            targetMillis = tomorrowAfternoon.toInstant().toEpochMilli(),
+            // light_mode is Material's full-disc sun glyph, distinct from wb_sunny's
+            // ray-burst sun used for "Tomorrow morning". Keeping both rows sun-themed
+            // (no clock) so they read as time-of-day rather than generic snooze slots.
+            symbolName = "light_mode",
+        )
+
+    // Next week: roll forward to next Monday at 9 AM.
+    val daysToMonday =
+        ((DayOfWeek.MONDAY.value - today.dayOfWeek.value + 7) % 7).let {
+            if (it == 0) 7 else it
+        }
+    val nextMonday = today.plusDays(daysToMonday.toLong())
+    val nextWeek = nextMonday.atTime(LocalTime.of(9, 0)).atZone(zone)
+    presets +=
+        SnoozePreset(
+            title = context.getString(R.string.snooze_preset_next_week),
+            subtitle =
+                nextMonday.dayOfWeek.getDisplayName(
+                    java.time.format.TextStyle.SHORT,
+                    Locale.getDefault(),
+                ),
+            absoluteTime = nextWeek.format(timeFormatter),
+            targetMillis = nextWeek.toInstant().toEpochMilli(),
+            symbolName = "event",
+        )
 
     return presets
 }
@@ -561,7 +610,11 @@ private fun roundUpToNextHour(t: ZonedDateTime): ZonedDateTime {
     return if (mins == 0 && t.second == 0 && t.nano == 0) {
         t
     } else {
-        t.withMinute(0).withSecond(0).withNano(0).plusHours(1)
+        t
+            .withMinute(0)
+            .withSecond(0)
+            .withNano(0)
+            .plusHours(1)
     }
 }
 
@@ -579,11 +632,22 @@ private fun combineDayAndLocalTime(
     zone: ZoneId,
 ): Long {
     val localDate = Instant.ofEpochMilli(pickerDayMillis).atZone(ZoneOffset.UTC).toLocalDate()
-    return localDate.atTime(LocalTime.of(hour, minute)).atZone(zone).toInstant().toEpochMilli()
+    return localDate
+        .atTime(LocalTime.of(hour, minute))
+        .atZone(zone)
+        .toInstant()
+        .toEpochMilli()
 }
 
 private fun timeFormatterFor(context: android.content.Context): DateTimeFormatter {
-    val pattern = if (android.text.format.DateFormat.is24HourFormat(context)) "HH:mm" else "h:mm a"
+    val pattern =
+        if (android.text.format.DateFormat
+                .is24HourFormat(context)
+        ) {
+            "HH:mm"
+        } else {
+            "h:mm a"
+        }
     return DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
 }
 
@@ -594,7 +658,10 @@ private fun timeFormatterFor(context: android.content.Context): DateTimeFormatte
  * "Reminder set for Mon, Apr 28 at 9:00 AM"). Built fresh per-call - this is
  * called from [snoozeAndFinish] which fires once per snooze.
  */
-private fun formatSnoozeConfirmation(context: android.content.Context, targetMillis: Long): String {
+private fun formatSnoozeConfirmation(
+    context: android.content.Context,
+    targetMillis: Long,
+): String {
     val zone = ZoneId.systemDefault()
     val target = ZonedDateTime.ofInstant(Instant.ofEpochMilli(targetMillis), zone)
     val now = ZonedDateTime.now(zone)

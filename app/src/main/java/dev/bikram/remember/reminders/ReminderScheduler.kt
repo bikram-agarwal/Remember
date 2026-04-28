@@ -22,8 +22,10 @@ class ReminderScheduler(
     private val context: Context,
     private val reminderPrefs: ReminderPrefs? = null,
 ) {
-
-    fun schedule(noteId: Long, whenMillis: Long) {
+    fun schedule(
+        noteId: Long,
+        whenMillis: Long,
+    ) {
         if (whenMillis <= System.currentTimeMillis()) return
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pi = pendingIntent(noteId)
@@ -47,12 +49,16 @@ class ReminderScheduler(
         notificationManager.cancel(pendingRequestCodeForNote(noteId))
     }
 
-    suspend fun refreshNotificationIfActive(note: NoteEntity, items: List<ChecklistItemEntity>) {
+    suspend fun refreshNotificationIfActive(
+        note: NoteEntity,
+        items: List<ChecklistItemEntity>,
+    ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notificationId = pendingRequestCodeForNote(note.id)
-        val active = notificationManager.activeNotifications.any { notification ->
-            notification.id == notificationId
-        }
+        val active =
+            notificationManager.activeNotifications.any { notification ->
+                notification.id == notificationId
+            }
         if (active) {
             ReminderReceiver.showNotification(
                 context = context,
@@ -63,7 +69,10 @@ class ReminderScheduler(
         }
     }
 
-    suspend fun refreshSummaryNotification(notes: List<NoteWithItems>, nowMillis: Long) {
+    suspend fun refreshSummaryNotification(
+        notes: List<NoteWithItems>,
+        nowMillis: Long,
+    ) {
         val summaryEnabled = reminderPrefs?.snapshot()?.reminderSummaryNotificationEnabled ?: false
         if (!summaryEnabled || notes.isEmpty()) {
             cancelSummaryNotification()
@@ -77,15 +86,17 @@ class ReminderScheduler(
         notificationManager.cancel(SUMMARY_NOTIFICATION_ID)
     }
 
-    suspend fun keepReminderNotificationsUntilDone(): Boolean {
-        return reminderPrefs?.snapshot()?.keepReminderNotificationsUntilDone ?: false
-    }
+    suspend fun keepReminderNotificationsUntilDone(): Boolean = reminderPrefs?.snapshot()?.keepReminderNotificationsUntilDone ?: false
 
-    private fun showSummaryNotification(notes: List<NoteWithItems>, nowMillis: Long) {
+    private fun showSummaryNotification(
+        notes: List<NoteWithItems>,
+        nowMillis: Long,
+    ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val sortedNotes = notes
-            .filter { noteWithItems -> noteWithItems.note.reminderAt != null }
-            .sortedBy { noteWithItems -> noteWithItems.note.reminderAt }
+        val sortedNotes =
+            notes
+                .filter { noteWithItems -> noteWithItems.note.reminderAt != null }
+                .sortedBy { noteWithItems -> noteWithItems.note.reminderAt }
         if (sortedNotes.isEmpty()) {
             cancelSummaryNotification()
             return
@@ -104,24 +115,29 @@ class ReminderScheduler(
             )
         }
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID_SUMMARY)
-            .setSmallIcon(R.drawable.ic_stat_remember)
-            .setContentTitle(context.getString(R.string.reminder_summary_title))
-            .setContentText(context.getString(R.string.reminder_summary_count, sortedNotes.size))
-            .setStyle(inboxStyle)
-            .setContentIntent(openAppPendingIntent())
-            .setCategory(NotificationCompat.CATEGORY_STATUS)
-            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .setAutoCancel(false)
-            .setSilent(true)
-            .setOnlyAlertOnce(true)
-            .build()
+        val notification =
+            NotificationCompat
+                .Builder(context, CHANNEL_ID_SUMMARY)
+                .setSmallIcon(R.drawable.ic_stat_remember)
+                .setContentTitle(context.getString(R.string.reminder_summary_title))
+                .setContentText(context.getString(R.string.reminder_summary_count, sortedNotes.size))
+                .setStyle(inboxStyle)
+                .setContentIntent(openAppPendingIntent())
+                .setCategory(NotificationCompat.CATEGORY_STATUS)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
+                .setOngoing(true)
+                .setAutoCancel(false)
+                .setSilent(true)
+                .setOnlyAlertOnce(true)
+                .build()
         notificationManager.notify(SUMMARY_NOTIFICATION_ID, notification)
     }
 
-    private fun summaryLine(note: NoteEntity, nowMillis: Long): String {
+    private fun summaryLine(
+        note: NoteEntity,
+        nowMillis: Long,
+    ): String {
         val reminderAt = note.reminderAt ?: nowMillis
         val title = summaryTitle(note)
         return context.getString(R.string.reminder_summary_line, summaryTimingLabel(reminderAt, nowMillis), title)
@@ -133,7 +149,10 @@ class ReminderScheduler(
         return "$emoji $title"
     }
 
-    private fun summaryTimingLabel(reminderAt: Long, nowMillis: Long): String {
+    private fun summaryTimingLabel(
+        reminderAt: Long,
+        nowMillis: Long,
+    ): String {
         val todayStart = startOfDay(nowMillis)
         val tomorrowStart = startOfTomorrow(nowMillis)
         return when {
@@ -147,9 +166,10 @@ class ReminderScheduler(
             }
             reminderAt < tomorrowStart -> context.getString(R.string.reminder_summary_due_today)
             reminderAt - nowMillis < HOUR_MILLIS * 24 -> {
-                val hoursUntil = ((reminderAt - nowMillis + HOUR_MILLIS - 1) / HOUR_MILLIS)
-                    .coerceAtLeast(1)
-                    .toInt()
+                val hoursUntil =
+                    ((reminderAt - nowMillis + HOUR_MILLIS - 1) / HOUR_MILLIS)
+                        .coerceAtLeast(1)
+                        .toInt()
                 context.resources.getQuantityString(
                     R.plurals.reminder_summary_in_hours,
                     hoursUntil,
@@ -168,9 +188,10 @@ class ReminderScheduler(
     }
 
     private fun openAppPendingIntent(): PendingIntent {
-        val intent = Intent(context, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        }
+        val intent =
+            Intent(context, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+            }
         return PendingIntent.getActivity(
             context,
             SUMMARY_NOTIFICATION_ID,
@@ -180,33 +201,37 @@ class ReminderScheduler(
     }
 
     private fun startOfDay(millis: Long): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = millis
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
+        val calendar =
+            Calendar.getInstance().apply {
+                timeInMillis = millis
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }
         return calendar.timeInMillis
     }
 
     private fun startOfTomorrow(nowMillis: Long): Long {
-        val calendar = Calendar.getInstance().apply {
-            timeInMillis = startOfDay(nowMillis)
-            add(Calendar.DAY_OF_MONTH, 1)
-        }
+        val calendar =
+            Calendar.getInstance().apply {
+                timeInMillis = startOfDay(nowMillis)
+                add(Calendar.DAY_OF_MONTH, 1)
+            }
         return calendar.timeInMillis
     }
 
-    private fun daysBetween(startMillis: Long, endMillis: Long): Int {
-        return ((endMillis - startMillis) / DAY_MILLIS).toInt()
-    }
+    private fun daysBetween(
+        startMillis: Long,
+        endMillis: Long,
+    ): Int = ((endMillis - startMillis) / DAY_MILLIS).toInt()
 
     private fun pendingIntent(noteId: Long): PendingIntent {
-        val intent = Intent(context, ReminderReceiver::class.java).apply {
-            action = ACTION_FIRE_REMINDER
-            putExtra(EXTRA_NOTE_ID, noteId)
-        }
+        val intent =
+            Intent(context, ReminderReceiver::class.java).apply {
+                action = ACTION_FIRE_REMINDER
+                putExtra(EXTRA_NOTE_ID, noteId)
+            }
         return PendingIntent.getBroadcast(
             context,
             pendingRequestCodeForNote(noteId),
@@ -221,6 +246,7 @@ class ReminderScheduler(
 
         const val ACTION_FIRE_REMINDER = "dev.bikram.remember.reminders.FIRE"
         const val EXTRA_NOTE_ID = "note_id"
+
         // Channel IDs are versioned (_v2 suffix) because Android freezes channel
         // settings - importance, sound, vibration - the moment a channel is first
         // registered, and re-calling createNotificationChannel with the same id can NOT
@@ -235,14 +261,16 @@ class ReminderScheduler(
         private const val SUMMARY_MAX_LINES = 7
         private const val HOUR_MILLIS = 60L * 60L * 1000L
         private const val DAY_MILLIS = 24L * HOUR_MILLIS
+
         // Legacy ids - we delete them on app start to clean up the user's notification
         // settings UI rather than leaving stale channel rows behind.
-        val LEGACY_CHANNEL_IDS: List<String> = listOf(
-            "reminder",
-            "reminder_low",
-            "reminder_default",
-            "reminder_high",
-        )
+        val LEGACY_CHANNEL_IDS: List<String> =
+            listOf(
+                "reminder",
+                "reminder_low",
+                "reminder_default",
+                "reminder_high",
+            )
 
         val inexactFallbackScheduleCount: Int
             get() = inexactFallbackScheduleCounter.get()
@@ -260,7 +288,10 @@ class ReminderScheduler(
          * multiplicative overflow from `31 * hash + index` and keep codes disjoint from
          * [pendingRequestCodeForNote] (which uses [Long.hashCode] of the raw id only).
          */
-        fun pendingRequestCodeForNoteAction(noteId: Long, actionIndex: Int): Int {
+        fun pendingRequestCodeForNoteAction(
+            noteId: Long,
+            actionIndex: Int,
+        ): Int {
             val salted = noteId xor ((actionIndex.toLong() + 1L) shl 48)
             return (salted xor (salted ushr 32)).toInt()
         }

@@ -57,8 +57,15 @@ internal data class GhostParentHeader(
 internal sealed interface CompletedEntry {
     val sortKey: Double
 
-    data class Ghost(val header: GhostParentHeader, override val sortKey: Double) : CompletedEntry
-    data class Row(val item: EditableItem, override val sortKey: Double) : CompletedEntry
+    data class Ghost(
+        val header: GhostParentHeader,
+        override val sortKey: Double,
+    ) : CompletedEntry
+
+    data class Row(
+        val item: EditableItem,
+        override val sortKey: Double,
+    ) : CompletedEntry
 }
 
 /**
@@ -69,8 +76,15 @@ internal sealed interface CompletedEntry {
 internal sealed interface ActiveEntry {
     val sortKey: Double
 
-    data class Ghost(val header: GhostParentHeader, override val sortKey: Double) : ActiveEntry
-    data class Row(val item: EditableItem, override val sortKey: Double) : ActiveEntry
+    data class Ghost(
+        val header: GhostParentHeader,
+        override val sortKey: Double,
+    ) : ActiveEntry
+
+    data class Row(
+        val item: EditableItem,
+        override val sortKey: Double,
+    ) : ActiveEntry
 }
 
 @Composable
@@ -99,13 +113,16 @@ internal fun ChecklistRow(
     onIndentChange: ((Int) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
-    val scale by androidx.compose.animation.core.animateFloatAsState(if (isDragging) 1.02f else 1f)
-    val alpha by androidx.compose.animation.core.animateFloatAsState(if (isDragging) 0.8f else 1f)
+    val scale by androidx.compose.animation.core
+        .animateFloatAsState(if (isDragging) 1.02f else 1f)
+    val alpha by androidx.compose.animation.core
+        .animateFloatAsState(if (isDragging) 0.8f else 1f)
     // Depth indent. 28.dp per level matches the thumb/toggle gutter so child toggles line up with
     // the parent's text, not their own toggle.
     val depthIndent = (item.depth.coerceIn(0, 1) * 28).dp
     // Animate the indent so reparenting slides visibly instead of snapping.
-    val animatedIndent by androidx.compose.animation.core.animateDpAsState(depthIndent, label = "checklistDepthIndent")
+    val animatedIndent by androidx.compose.animation.core
+        .animateDpAsState(depthIndent, label = "checklistDepthIndent")
 
     // Haptics + RTL awareness for the gesture surfaces below.
     val haptic = LocalHapticFeedback.current
@@ -129,55 +146,59 @@ internal fun ChecklistRow(
     // the accumulator in raw pointer deltas and flip the sign when comparing to the threshold so
     // the +1 / -1 contract with the caller stays identical regardless of layout direction.
     val indentThresholdPx = with(androidx.compose.ui.platform.LocalDensity.current) { 48.dp.toPx() }
-    val indentModifier = if (isEditMode && onIndentChange != null) {
-        Modifier.pointerInput(item.localId, item.depth, isRtl) {
-            var accumulated = 0f
-            var fired = false
-            detectHorizontalDragGestures(
-                onDragStart = {
-                    accumulated = 0f
-                    fired = false
-                },
-                onDragEnd = {
-                    accumulated = 0f
-                    fired = false
-                },
-                onDragCancel = {
-                    accumulated = 0f
-                    fired = false
-                },
-                onHorizontalDrag = { _, delta ->
-                    if (fired) return@detectHorizontalDragGestures
-                    accumulated += delta
-                    // Effective "toward-nest" drag distance. In LTR that means rightward (positive
-                    // delta); in RTL that means leftward (negative delta) -- flip the sign so the
-                    // same comparison works in both layouts.
-                    val effective = if (isRtl) -accumulated else accumulated
-                    when {
-                        effective > indentThresholdPx -> {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onIndentChange(+1)
-                            fired = true
+    val indentModifier =
+        if (isEditMode && onIndentChange != null) {
+            Modifier.pointerInput(item.localId, item.depth, isRtl) {
+                var accumulated = 0f
+                var fired = false
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        accumulated = 0f
+                        fired = false
+                    },
+                    onDragEnd = {
+                        accumulated = 0f
+                        fired = false
+                    },
+                    onDragCancel = {
+                        accumulated = 0f
+                        fired = false
+                    },
+                    onHorizontalDrag = { _, delta ->
+                        if (fired) return@detectHorizontalDragGestures
+                        accumulated += delta
+                        // Effective "toward-nest" drag distance. In LTR that means rightward (positive
+                        // delta); in RTL that means leftward (negative delta) -- flip the sign so the
+                        // same comparison works in both layouts.
+                        val effective = if (isRtl) -accumulated else accumulated
+                        when {
+                            effective > indentThresholdPx -> {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onIndentChange(+1)
+                                fired = true
+                            }
+                            effective < -indentThresholdPx -> {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                onIndentChange(-1)
+                                fired = true
+                            }
                         }
-                        effective < -indentThresholdPx -> {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onIndentChange(-1)
-                            fired = true
-                        }
-                    }
-                },
-            )
+                    },
+                )
+            }
+        } else {
+            Modifier
         }
-    } else Modifier
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(start = animatedIndent)
-            .then(indentModifier)
-            .scale(scale)
-            .alpha(alpha),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(start = animatedIndent)
+                .then(indentModifier)
+                .scale(scale)
+                .alpha(alpha),
     ) {
         if (isEditMode && showDragHandle) {
             // The drag handle is a vertical-only gesture surface: only `dragHandleModifier`
@@ -193,11 +214,12 @@ internal fun ChecklistRow(
             // so users can still swipe the text area left or right to change depth.
             val cdReorder = stringResource(R.string.cd_reorder_drag_handle)
             Box(
-                modifier = dragHandleModifier
-                    .padding(start = 4.dp, end = 4.dp)
-                    .size(32.dp)
-                    .semantics { contentDescription = cdReorder },
-                contentAlignment = Alignment.Center
+                modifier =
+                    dragHandleModifier
+                        .padding(start = 4.dp, end = 4.dp)
+                        .size(32.dp)
+                        .semantics { contentDescription = cdReorder },
+                contentAlignment = Alignment.Center,
             ) {
                 RememberMaterialRoundedSymbol(
                     name = "drag_indicator",
@@ -219,23 +241,31 @@ internal fun ChecklistRow(
             BasicTextField(
                 value = item.text,
                 onValueChange = onTextChange,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = if (item.checked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    else MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
-                ),
+                textStyle =
+                    MaterialTheme.typography.bodyLarge.copy(
+                        color =
+                            if (item.checked) {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
+                    ),
                 singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
-                    imeAction = androidx.compose.ui.text.input.ImeAction.Next
-                ),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                    onNext = { onNext() }
-                ),
+                keyboardOptions =
+                    androidx.compose.foundation.text.KeyboardOptions(
+                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                    ),
+                keyboardActions =
+                    androidx.compose.foundation.text.KeyboardActions(
+                        onNext = { onNext() },
+                    ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                modifier = Modifier
-                    .weight(1f)
-                    .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
                 decorationBox = { inner ->
                     if (item.text.isEmpty()) {
                         Text(
@@ -258,13 +288,19 @@ internal fun ChecklistRow(
         } else {
             Text(
                 text = item.text.ifEmpty { stringResource(R.string.edit_list_new_item_placeholder) },
-                style = MaterialTheme.typography.bodyLarge.copy(
-                    color = if (item.checked) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    else if (item.text.isEmpty()) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-                    else MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
-                ),
-                modifier = Modifier.weight(1f)
+                style =
+                    MaterialTheme.typography.bodyLarge.copy(
+                        color =
+                            if (item.checked) {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            } else if (item.text.isEmpty()) {
+                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                        textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
+                    ),
+                modifier = Modifier.weight(1f),
             )
         }
     }
@@ -293,9 +329,10 @@ internal fun GhostParentHeaderRow(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .fillMaxWidth()
-            .alpha(0.45f),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .alpha(0.45f),
     ) {
         if (showDragHandleGutter) {
             Spacer(Modifier.width(40.dp))
@@ -304,8 +341,9 @@ internal fun GhostParentHeaderRow(
         // minSize guarantees of RememberIconButton so the ghost can't steal taps meant for a
         // child below it.
         Box(
-            modifier = Modifier
-                .size(40.dp),
+            modifier =
+                Modifier
+                    .size(40.dp),
             contentAlignment = Alignment.Center,
         ) {
             RememberMaterialRoundedSymbol(
@@ -317,10 +355,11 @@ internal fun GhostParentHeaderRow(
         }
         Text(
             text = header.text.ifEmpty { stringResource(R.string.edit_list_new_item_placeholder) },
-            style = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-                textDecoration = if (isParentChecked) TextDecoration.LineThrough else TextDecoration.None,
-            ),
+            style =
+                MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textDecoration = if (isParentChecked) TextDecoration.LineThrough else TextDecoration.None,
+                ),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
@@ -344,20 +383,23 @@ internal fun buildCompletedEntries(
     var lastGhostParentId: Long? = null
     for (item in completedItems) {
         val parentId = item.parentLocalId
-        val needsGhost = parentId != null &&
-            parentId !in checkedParents &&
-            parentId in activeParents
+        val needsGhost =
+            parentId != null &&
+                parentId !in checkedParents &&
+                parentId in activeParents
         if (needsGhost && parentId != lastGhostParentId) {
             val parent = activeParents[parentId]
             if (parent != null) {
-                out += CompletedEntry.Ghost(
-                    header = GhostParentHeader(
-                        realParentLocalId = parent.localId,
-                        text = parent.text,
-                        parentChecked = false,
-                    ),
-                    sortKey = item.sortOrder,
-                )
+                out +=
+                    CompletedEntry.Ghost(
+                        header =
+                            GhostParentHeader(
+                                realParentLocalId = parent.localId,
+                                text = parent.text,
+                                parentChecked = false,
+                            ),
+                        sortKey = item.sortOrder,
+                    )
                 lastGhostParentId = parentId
             }
         } else if (!needsGhost) {
@@ -383,20 +425,23 @@ internal fun buildActiveEntries(
     var lastGhostParentId: Long? = null
     for (item in activeItems) {
         val parentId = item.parentLocalId
-        val needsGhost = parentId != null &&
-            parentId !in activeParents &&
-            parentId in checkedParents
+        val needsGhost =
+            parentId != null &&
+                parentId !in activeParents &&
+                parentId in checkedParents
         if (needsGhost && parentId != lastGhostParentId) {
             val parent = checkedParents[parentId]
             if (parent != null) {
-                out += ActiveEntry.Ghost(
-                    header = GhostParentHeader(
-                        realParentLocalId = parent.localId,
-                        text = parent.text,
-                        parentChecked = true,
-                    ),
-                    sortKey = item.sortOrder,
-                )
+                out +=
+                    ActiveEntry.Ghost(
+                        header =
+                            GhostParentHeader(
+                                realParentLocalId = parent.localId,
+                                text = parent.text,
+                                parentChecked = true,
+                            ),
+                        sortKey = item.sortOrder,
+                    )
                 lastGhostParentId = parentId
             }
         } else if (!needsGhost) {

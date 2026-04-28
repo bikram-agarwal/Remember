@@ -2,7 +2,6 @@ package dev.bikram.remember.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -25,21 +24,22 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.bikram.remember.R
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.theme.LocalTagColors
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import androidx.compose.ui.res.stringResource
-import dev.bikram.remember.R
+import dev.bikram.remember.ui.theme.LocalTagColors
 
 /** Parse "#RRGGBB" into a Compose Color. Returns null if invalid. */
-fun parseHexColor(hex: String): Color? = runCatching {
-    Color(android.graphics.Color.parseColor(hex))
-}.getOrNull()
+fun parseHexColor(hex: String): Color? =
+    runCatching {
+        Color(android.graphics.Color.parseColor(hex))
+    }.getOrNull()
 
 /** Lookup the stored color for [tag], or derive a stable default from its hash. */
 @Composable
@@ -60,22 +60,26 @@ fun TagAccentCardStrip(
 ) {
     if (tags.isEmpty()) return
     val tagColorMap = LocalTagColors.current
-    val brush = remember(tags, tagColorMap) {
-        val orderedColors = tags.map { tag ->
-            val key = tag.trim().lowercase()
-            tagColorMap[key]?.let { parseHexColor(it) } ?: TagPalette.defaultFor(key)
-        }.take(4)
-        when (orderedColors.size) {
-            1 -> SolidColor(orderedColors[0])
-            else -> Brush.verticalGradient(orderedColors)
+    val brush =
+        remember(tags, tagColorMap) {
+            val orderedColors =
+                tags
+                    .map { tag ->
+                        val key = tag.trim().lowercase()
+                        tagColorMap[key]?.let { parseHexColor(it) } ?: TagPalette.defaultFor(key)
+                    }.take(4)
+            when (orderedColors.size) {
+                1 -> SolidColor(orderedColors[0])
+                else -> Brush.verticalGradient(orderedColors)
+            }
         }
-    }
     Box(
-        modifier = modifier
-            .width(5.dp)
-            .fillMaxHeight()
-            .clip(TagAccentStripShape)
-            .background(brush),
+        modifier =
+            modifier
+                .width(5.dp)
+                .fillMaxHeight()
+                .clip(TagAccentStripShape)
+                .background(brush),
     )
 }
 
@@ -87,23 +91,27 @@ fun TagAccentEditorStrip(tags: List<String>) {
         return
     }
     val tagColorMap = LocalTagColors.current
-    val brush = remember(tags, tagColorMap) {
-        val orderedColors = tags.map { tag ->
-            val key = tag.trim().lowercase()
-            tagColorMap[key]?.let { parseHexColor(it) } ?: TagPalette.defaultFor(key)
-        }.take(4)
-        when (orderedColors.size) {
-            1 -> SolidColor(orderedColors[0])
-            else -> Brush.horizontalGradient(orderedColors)
+    val brush =
+        remember(tags, tagColorMap) {
+            val orderedColors =
+                tags
+                    .map { tag ->
+                        val key = tag.trim().lowercase()
+                        tagColorMap[key]?.let { parseHexColor(it) } ?: TagPalette.defaultFor(key)
+                    }.take(4)
+            when (orderedColors.size) {
+                1 -> SolidColor(orderedColors[0])
+                else -> Brush.horizontalGradient(orderedColors)
+            }
         }
-    }
     Box(
-        modifier = Modifier
-            .padding(top = 4.dp, bottom = 12.dp)
-            .height(4.dp)
-            .width(56.dp)
-            .clip(CircleShape)
-            .background(brush),
+        modifier =
+            Modifier
+                .padding(top = 4.dp, bottom = 12.dp)
+                .height(4.dp)
+                .width(56.dp)
+                .clip(CircleShape)
+                .background(brush),
     )
 }
 
@@ -131,21 +139,25 @@ fun TagChipFilled(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = modifier
-            .alpha(if (faded) 0.4f else 1f)
-            .background(color, shape)
-            .border(
-                width = if (highlighted) 2.dp else 0.dp,
-                color = if (highlighted) MaterialTheme.colorScheme.primary else Color.Transparent,
-                shape = shape,
-            )
-            .let { if (onClick != null) it.tapSoundClickable(onClick = onClick) else it }
-            .padding(horizontal = horizontal, vertical = vertical),
+        modifier =
+            modifier
+                .alpha(if (faded) 0.4f else 1f)
+                .background(color, shape)
+                .border(
+                    width = if (highlighted) 2.dp else 0.dp,
+                    color = if (highlighted) MaterialTheme.colorScheme.primary else Color.Transparent,
+                    shape = shape,
+                ).let { if (onClick != null) it.tapSoundClickable(onClick = onClick) else it }
+                .padding(horizontal = horizontal, vertical = vertical),
     ) {
         Text(
             text = tag,
-            style = if (compact) MaterialTheme.typography.labelSmall
-            else MaterialTheme.typography.labelMedium,
+            style =
+                if (compact) {
+                    MaterialTheme.typography.labelSmall
+                } else {
+                    MaterialTheme.typography.labelMedium
+                },
             color = contentColor,
             maxLines = 1,
         )
@@ -163,9 +175,10 @@ fun TagChipFilled(
                 size = 14.dp,
                 tint = contentColor,
                 weight = FontWeight.Medium,
-                modifier = Modifier
-                    .semantics { contentDescription = cdRemoveTag }
-                    .tapSoundClickable(onClick = onRemove),
+                modifier =
+                    Modifier
+                        .semantics { contentDescription = cdRemoveTag }
+                        .tapSoundClickable(onClick = onRemove),
             )
         }
     }

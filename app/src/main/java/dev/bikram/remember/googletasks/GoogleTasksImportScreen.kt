@@ -40,13 +40,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -59,10 +59,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.bikram.remember.R
-import dev.bikram.remember.RememberApp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberCheckbox
@@ -98,34 +97,28 @@ fun GoogleTasksImportRoute(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
-    val container = (context.applicationContext as RememberApp).container
-    val vm: GoogleTasksImportViewModel = viewModel(
-        factory = GoogleTasksImportViewModel.factory(
-            appContext = context.applicationContext,
-            repository = container.googleTasksRepository,
-            importer = container.googleTasksImporter,
-            prefs = container.googleTasksImportPrefs,
-        ),
-    )
+    val vm: GoogleTasksImportViewModel = hiltViewModel()
 
     val state by vm.state.collectAsStateWithLifecycle()
     val effect by vm.effects.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val uriHandler = LocalUriHandler.current
 
-    val consentLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartIntentSenderForResult(),
-    ) { result ->
-        vm.onConsentResult(
-            resultData = result.data,
-            approved = result.resultCode == Activity.RESULT_OK,
-        )
-    }
-    val takeoutLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocument(),
-    ) { uri ->
-        if (uri != null) vm.loadTakeoutJson(uri)
-    }
+    val consentLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.StartIntentSenderForResult(),
+        ) { result ->
+            vm.onConsentResult(
+                resultData = result.data,
+                approved = result.resultCode == Activity.RESULT_OK,
+            )
+        }
+    val takeoutLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri != null) vm.loadTakeoutJson(uri)
+        }
 
     LaunchedEffect(effect) {
         when (val current = effect) {
@@ -134,10 +127,11 @@ fun GoogleTasksImportRoute(
                 vm.consumeEffect()
             }
             is GoogleTasksImportEffect.ImportFinished -> {
-                val message = context.getString(
-                    R.string.google_tasks_import_done_snack,
-                    current.outcome.writtenCount,
-                )
+                val message =
+                    context.getString(
+                        R.string.google_tasks_import_done_snack,
+                        current.outcome.writtenCount,
+                    )
                 snackbarHostState.showSnackbar(message)
                 vm.consumeEffect()
             }
@@ -146,17 +140,21 @@ fun GoogleTasksImportRoute(
     }
 
     LaunchedEffect(state.error) {
-        val message = when (val err = state.error) {
-            ImportError.Network -> context.getString(R.string.google_tasks_import_error_network)
-            ImportError.ConsentDenied -> context.getString(R.string.google_tasks_import_error_consent)
-            is ImportError.TakeoutParseFailed -> err.message
-                ?: context.getString(R.string.google_tasks_import_error_takeout_parse)
-            is ImportError.AuthFailed -> err.message
-                ?: context.getString(R.string.google_tasks_import_error_auth_default)
-            is ImportError.Unknown -> err.message
-                ?: context.getString(R.string.google_tasks_import_error_unknown_default)
-            null -> return@LaunchedEffect
-        }
+        val message =
+            when (val err = state.error) {
+                ImportError.Network -> context.getString(R.string.google_tasks_import_error_network)
+                ImportError.ConsentDenied -> context.getString(R.string.google_tasks_import_error_consent)
+                is ImportError.TakeoutParseFailed ->
+                    err.message
+                        ?: context.getString(R.string.google_tasks_import_error_takeout_parse)
+                is ImportError.AuthFailed ->
+                    err.message
+                        ?: context.getString(R.string.google_tasks_import_error_auth_default)
+                is ImportError.Unknown ->
+                    err.message
+                        ?: context.getString(R.string.google_tasks_import_error_unknown_default)
+                null -> return@LaunchedEffect
+            }
         snackbarHostState.showSnackbar(message)
     }
 
@@ -172,11 +170,12 @@ fun GoogleTasksImportRoute(
                 colors = transparentLargeTopAppBarColors(),
                 navigationIcon = {
                     Box(
-                        modifier = Modifier
-                            .padding(start = 4.dp)
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(20.dp))
-                            .tapSoundClickable(onClick = onBack),
+                        modifier =
+                            Modifier
+                                .padding(start = 4.dp)
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .tapSoundClickable(onClick = onBack),
                         contentAlignment = Alignment.Center,
                     ) {
                         RememberMaterialRoundedSymbol(
@@ -199,9 +198,10 @@ fun GoogleTasksImportRoute(
         bottomBar = {
             if (state.isLoaded) {
                 ImportBottomBar(
-                    selectedCount = state.selectedTaskIds.count { id ->
-                        state.visibleTasks().any { it.task.id == id }
-                    },
+                    selectedCount =
+                        state.selectedTaskIds.count { id ->
+                            state.visibleTasks().any { it.task.id == id }
+                        },
                     visibleCount = state.visibleTasks().size,
                     importMode = state.importMode,
                     overwrite = state.overwriteAlreadyImported,
@@ -215,9 +215,10 @@ fun GoogleTasksImportRoute(
         },
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding()),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding()),
         ) {
             ImportMethodSelector(
                 selectedMethod = state.selectedMethod,
@@ -227,42 +228,47 @@ fun GoogleTasksImportRoute(
             Box(modifier = Modifier.weight(1f)) {
                 when {
                     state.selectedMethod == ImportMethod.ManualImport && state.isFetching -> LoadingPanel()
-                    state.selectedMethod == ImportMethod.ManualImport && state.isLoaded -> LoadedPanel(
-                        state = state,
-                        onSwitchAccount = vm::switchAccount,
-                        onListFilterChange = vm::toggleListFilter,
-                        onTaskToggle = vm::toggleSelection,
-                    )
-                    state.selectedMethod == ImportMethod.ManualImport -> TakeoutImportPanel(
-                        onOpenTakeout = { uriHandler.openUri(GOOGLE_TAKEOUT_URL) },
-                        onPickJson = {
-                            takeoutLauncher.launch(
-                                arrayOf(
-                                    "application/json",
-                                    "application/octet-stream",
-                                    "text/json",
-                                    "text/plain",
-                                    "*/*",
-                                ),
-                            )
-                        },
-                    )
-                    !state.connected && !state.isFetching -> SignedOutPanel(
-                        rememberedEmail = state.rememberedEmail,
-                        onConnect = vm::connect,
-                        onSwitchAccount = vm::switchAccount,
-                    )
+                    state.selectedMethod == ImportMethod.ManualImport && state.isLoaded ->
+                        LoadedPanel(
+                            state = state,
+                            onSwitchAccount = vm::switchAccount,
+                            onListFilterChange = vm::toggleListFilter,
+                            onTaskToggle = vm::toggleSelection,
+                        )
+                    state.selectedMethod == ImportMethod.ManualImport ->
+                        TakeoutImportPanel(
+                            onOpenTakeout = { uriHandler.openUri(GOOGLE_TAKEOUT_URL) },
+                            onPickJson = {
+                                takeoutLauncher.launch(
+                                    arrayOf(
+                                        "application/json",
+                                        "application/octet-stream",
+                                        "text/json",
+                                        "text/plain",
+                                        "*/*",
+                                    ),
+                                )
+                            },
+                        )
+                    !state.connected && !state.isFetching ->
+                        SignedOutPanel(
+                            rememberedEmail = state.rememberedEmail,
+                            onConnect = vm::connect,
+                            onSwitchAccount = vm::switchAccount,
+                        )
                     state.isFetching -> LoadingPanel()
-                    state.isEmpty -> EmptyPanel(
-                        accountEmail = state.accountEmail.orEmpty(),
-                        onSwitchAccount = vm::switchAccount,
-                    )
-                    state.isLoaded -> LoadedPanel(
-                        state = state,
-                        onSwitchAccount = vm::switchAccount,
-                        onListFilterChange = vm::toggleListFilter,
-                        onTaskToggle = vm::toggleSelection,
-                    )
+                    state.isEmpty ->
+                        EmptyPanel(
+                            accountEmail = state.accountEmail.orEmpty(),
+                            onSwitchAccount = vm::switchAccount,
+                        )
+                    state.isLoaded ->
+                        LoadedPanel(
+                            state = state,
+                            onSwitchAccount = vm::switchAccount,
+                            onListFilterChange = vm::toggleListFilter,
+                            onTaskToggle = vm::toggleSelection,
+                        )
                 }
             }
         }
@@ -296,12 +302,11 @@ private fun ImportMethodSelector(
     }
 }
 
-private fun importMethodLabelRes(method: ImportMethod): Int {
-    return when (method) {
+private fun importMethodLabelRes(method: ImportMethod): Int =
+    when (method) {
         ImportMethod.GrantPermission -> R.string.google_tasks_import_method_grant_permission
         ImportMethod.ManualImport -> R.string.google_tasks_import_method_manual_import
     }
-}
 
 @Composable
 private fun SignedOutPanel(
@@ -310,9 +315,10 @@ private fun SignedOutPanel(
     onSwitchAccount: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -364,9 +370,10 @@ private fun TakeoutImportPanel(
     onPickJson: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = 24.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -457,11 +464,12 @@ private fun EmptyPanel(
             weight = FontWeight.Medium,
         )
         Spacer(Modifier.height(12.dp))
-        val titleText = if (accountEmail.isBlank()) {
-            stringResource(R.string.google_tasks_import_empty_title_no_email)
-        } else {
-            stringResource(R.string.google_tasks_import_empty_title, accountEmail)
-        }
+        val titleText =
+            if (accountEmail.isBlank()) {
+                stringResource(R.string.google_tasks_import_empty_title_no_email)
+            } else {
+                stringResource(R.string.google_tasks_import_empty_title, accountEmail)
+            }
         Text(
             titleText,
             style = MaterialTheme.typography.titleMedium,
@@ -535,21 +543,24 @@ private fun LoadedPanel(
     }
 }
 
-private fun groupPositionFor(index: Int, totalCount: Int): GroupPosition {
-    return when {
+private fun groupPositionFor(
+    index: Int,
+    totalCount: Int,
+): GroupPosition =
+    when {
         totalCount <= 1 -> GroupPosition.ONLY
         index == 0 -> GroupPosition.FIRST
         index == totalCount - 1 -> GroupPosition.LAST
         else -> GroupPosition.MIDDLE
     }
-}
 
 @Composable
 private fun ManualImportHeader() {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
@@ -594,11 +605,12 @@ private fun TakeoutCollapseSummary(stats: GoogleTasksTakeoutStats) {
             )
             Spacer(Modifier.size(8.dp))
             Text(
-                text = stringResource(
-                    R.string.google_tasks_import_takeout_collapse_summary,
-                    stats.collapsedInstanceCount,
-                    stats.recurringSeriesCount,
-                ),
+                text =
+                    stringResource(
+                        R.string.google_tasks_import_takeout_collapse_summary,
+                        stats.collapsedInstanceCount,
+                        stats.recurringSeriesCount,
+                    ),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurface,
             )
@@ -612,9 +624,10 @@ private fun AccountHeader(
     onSwitchAccount: () -> Unit,
 ) {
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
         shape = RoundedCornerShape(16.dp),
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
@@ -687,9 +700,10 @@ private fun ListFilterRow(
     val label = selectedTitle ?: stringResource(R.string.google_tasks_import_filter_all_lists)
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
@@ -752,19 +766,30 @@ private fun TaskRow(
     alreadyImported: Boolean,
     onToggle: () -> Unit,
 ) {
-    val displayTitle = wrapper.task.title.orEmpty().ifBlank {
-        wrapper.task.notes.orEmpty().lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
-    }
+    val displayTitle =
+        wrapper.task.title.orEmpty().ifBlank {
+            wrapper.task.notes
+                .orEmpty()
+                .lineSequence()
+                .firstOrNull { it.isNotBlank() }
+                ?.trim()
+                .orEmpty()
+        }
     val due = wrapper.task.due
     val dueLabel = remember(due) { due?.let { formatDueDate(it) } }
-    val noteSnippet = wrapper.task.notes?.replace('\n', ' ')?.trim().orEmpty()
+    val noteSnippet =
+        wrapper.task.notes
+            ?.replace('\n', ' ')
+            ?.trim()
+            .orEmpty()
     val statusCompleted = wrapper.task.status.equals(GoogleTaskStatus.COMPLETED, ignoreCase = true)
     val cardColors = elevatedCardColors()
 
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .tapSoundClickable(onClick = onToggle),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .tapSoundClickable(onClick = onToggle),
         shape = groupedItemShape(position),
         color = cardColors.containerColor,
         contentColor = cardColors.contentColor,
@@ -811,10 +836,11 @@ private fun TaskRow(
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             },
-                            colors = AssistChipDefaults.assistChipColors(
-                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                            ),
+                            colors =
+                                AssistChipDefaults.assistChipColors(
+                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                    labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                                ),
                         )
                         if (dueLabel != null) {
                             Text(
@@ -862,9 +888,10 @@ private fun ImportBottomBar(
         color = MaterialTheme.colorScheme.surfaceContainer,
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             ImportModeRow(importMode, onImportModeChange)
@@ -879,10 +906,11 @@ private fun ImportBottomBar(
                 Text(
                     text = stringResource(R.string.google_tasks_import_overwrite),
                     style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier
-                        .weight(1f)
-                        .tapSoundClickable { onOverwriteChange(!overwrite) }
-                        .padding(start = 4.dp),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .tapSoundClickable { onOverwriteChange(!overwrite) }
+                            .padding(start = 4.dp),
                 )
             }
             Row(
@@ -892,11 +920,12 @@ private fun ImportBottomBar(
                 RememberTextButton(onClick = onSelectAllToggle) {
                     val allSelected = selectedCount >= visibleCount && visibleCount > 0
                     Text(
-                        text = if (allSelected) {
-                            stringResource(R.string.google_tasks_import_clear_selection)
-                        } else {
-                            stringResource(R.string.google_tasks_import_select_all)
-                        },
+                        text =
+                            if (allSelected) {
+                                stringResource(R.string.google_tasks_import_clear_selection)
+                            } else {
+                                stringResource(R.string.google_tasks_import_select_all)
+                            },
                     )
                 }
                 Spacer(Modifier.weight(1f))
@@ -952,17 +981,19 @@ private fun ImportModeRow(
     }
 }
 
-private fun modeLabelRes(mode: ImportMode): Int = when (mode) {
-    ImportMode.ONE_NOTE_PER_TASK -> R.string.google_tasks_import_mode_one_note_per_task
-    ImportMode.GROUP_BY_LIST -> R.string.google_tasks_import_mode_group_by_list
-    ImportMode.LIST_AS_CHECKLIST -> R.string.google_tasks_import_mode_list_as_checklist
-}
+private fun modeLabelRes(mode: ImportMode): Int =
+    when (mode) {
+        ImportMode.ONE_NOTE_PER_TASK -> R.string.google_tasks_import_mode_one_note_per_task
+        ImportMode.GROUP_BY_LIST -> R.string.google_tasks_import_mode_group_by_list
+        ImportMode.LIST_AS_CHECKLIST -> R.string.google_tasks_import_mode_list_as_checklist
+    }
 
 private val DUE_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("MMM d")
 
-private fun formatDueDate(rfc3339: String): String? = runCatching {
-    val instant = Instant.parse(rfc3339)
-    DUE_FORMATTER.format(instant.atZone(ZoneId.systemDefault()).toLocalDate())
-}.getOrNull()
+private fun formatDueDate(rfc3339: String): String? =
+    runCatching {
+        val instant = Instant.parse(rfc3339)
+        DUE_FORMATTER.format(instant.atZone(ZoneId.systemDefault()).toLocalDate())
+    }.getOrNull()
 
 private const val GOOGLE_TAKEOUT_URL = "https://takeout.google.com/settings/takeout/custom/tasks"

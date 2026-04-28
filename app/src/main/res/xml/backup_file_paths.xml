@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
     <files-path name="remember_backup" path="remember_backup/" />
+    <files-path name="remember_diagnostics" path="diagnostics/" />
     <files-path name="note_heroes" path="note_heroes/" />
+    <files-path name="note_attachments" path="note_attachments/" />
+    <cache-path name="remember_diagnostics_share" path="diagnostics/" />
+    <cache-path name="remember_update" path="." />
 </paths>

@@ -1,0 +1,93 @@
+package dev.bikram.remember.update
+
+import dev.bikram.remember.BuildConfig
+import dev.bikram.remember.di.ApplicationScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
+
+@Singleton
+class RememberUpdateState
+    @Inject
+    constructor(
+        @param:ApplicationScope private val applicationScope: CoroutineScope,
+    ) {
+        private val _updateInfo = MutableStateFlow<RememberUpdateInfo?>(null)
+        val updateInfo: StateFlow<RememberUpdateInfo?> = _updateInfo.asStateFlow()
+
+        private val _updatePromoBannerDismissedThisSession = MutableStateFlow(false)
+        val updatePromoBannerDismissedThisSession: StateFlow<Boolean> =
+            _updatePromoBannerDismissedThisSession.asStateFlow()
+
+        private val _devReleasePlayBannerMockUiState =
+            MutableStateFlow<PlayInAppUpdateBannerUiState>(PlayInAppUpdateBannerUiState.Hidden)
+        val devReleasePlayBannerMockUiState: StateFlow<PlayInAppUpdateBannerUiState> =
+            _devReleasePlayBannerMockUiState.asStateFlow()
+        private var devReleasePlayBannerMockSequenceJob: Job? = null
+        private var devReleaseUpdatePromoMockArmed = false
+
+        fun showUpdate(info: RememberUpdateInfo?) {
+            _updateInfo.value = info
+            devReleaseUpdatePromoMockArmed = false
+            if (info != null) {
+                _updatePromoBannerDismissedThisSession.value = false
+            }
+        }
+
+        fun dismissUpdatePromoBanner() {
+            _updatePromoBannerDismissedThisSession.value = true
+            if (devReleaseUpdatePromoMockArmed) {
+                _updateInfo.value = null
+                devReleaseUpdatePromoMockArmed = false
+            }
+        }
+
+        fun devReleaseMockArmUpdatePromoBanner() {
+            if (BuildConfig.BUILD_TYPE != "devRelease" || !BuildConfig.SHOW_UPDATES) return
+            _updateInfo.value =
+                RememberUpdateInfo(
+                    versionName = "9.9.9",
+                    downloadUrl = "",
+                    releaseNotes = "",
+                )
+            devReleaseUpdatePromoMockArmed = true
+            _updatePromoBannerDismissedThisSession.value = false
+        }
+
+        fun devReleaseMockStartPlayUpdateBannerSequence() {
+            if (BuildConfig.BUILD_TYPE != "devRelease") return
+            devReleasePlayBannerMockSequenceJob?.cancel()
+            devReleasePlayBannerMockSequenceJob =
+                applicationScope.launch {
+                    _devReleasePlayBannerMockUiState.value =
+                        PlayInAppUpdateBannerUiState.Downloading(
+                            bytesDownloaded = MOCK_PLAY_UPDATE_BYTES_DOWNLOADED,
+                            totalBytesToDownload = MOCK_PLAY_UPDATE_BYTES_TOTAL,
+                            indeterminateProgress = false,
+                        )
+                    delay(2_500L)
+                    if (!isActive) return@launch
+                    _devReleasePlayBannerMockUiState.value = PlayInAppUpdateBannerUiState.ReadyToInstall
+                }
+        }
+
+        fun devReleaseCompletePlayUpdateIfReady(): Boolean {
+            if (BuildConfig.BUILD_TYPE != "devRelease") return false
+            if (_devReleasePlayBannerMockUiState.value != PlayInAppUpdateBannerUiState.ReadyToInstall) return false
+            devReleasePlayBannerMockSequenceJob?.cancel()
+            _devReleasePlayBannerMockUiState.value = PlayInAppUpdateBannerUiState.Hidden
+            return true
+        }
+
+        companion object {
+            private const val MOCK_PLAY_UPDATE_BYTES_DOWNLOADED: Long = 3_000_000L
+            private const val MOCK_PLAY_UPDATE_BYTES_TOTAL: Long = 10_000_000L
+        }
+    }

@@ -37,8 +37,8 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SingleChoiceSegmentedButtonRowScope
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -62,7 +62,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
-private const val FloatingActionTooltipDismissMillis = 5_000L
+private const val FLOATING_ACTION_TOOLTIP_DISMISS_MILLIS = 5_000L
 
 @Composable
 private fun RememberLongPressLabelTooltip(
@@ -80,9 +80,10 @@ private fun RememberLongPressLabelTooltip(
     val view = LocalView.current
 
     TooltipBox(
-        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-            TooltipAnchorPosition.Above,
-        ),
+        positionProvider =
+            TooltipDefaults.rememberTooltipPositionProvider(
+                TooltipAnchorPosition.Above,
+            ),
         tooltip = {
             PlainTooltip {
                 Box(
@@ -94,12 +95,13 @@ private fun RememberLongPressLabelTooltip(
             }
         },
         state = tooltipState,
-        modifier = Modifier.showLabelTooltipOnLongPress(
-            enabled = enabled,
-            tooltipState = tooltipState,
-            hapticEnabled = hapticEnabled,
-            view = view,
-        ),
+        modifier =
+            Modifier.showLabelTooltipOnLongPress(
+                enabled = enabled,
+                tooltipState = tooltipState,
+                hapticEnabled = hapticEnabled,
+                view = view,
+            ),
         enableUserInput = false,
     ) {
         content()
@@ -118,9 +120,10 @@ private fun Modifier.showLabelTooltipOnLongPress(
         coroutineScope {
             awaitEachGesture {
                 val firstDown = awaitFirstDown(requireUnconsumed = false)
-                val releasedBeforeLongPress = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                    waitForUpOrCancellation(PointerEventPass.Initial)
-                }
+                val releasedBeforeLongPress =
+                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                        waitForUpOrCancellation(PointerEventPass.Initial)
+                    }
                 if (releasedBeforeLongPress == null) {
                     if (hapticEnabled) {
                         view.performLongPressHaptic()
@@ -130,15 +133,16 @@ private fun Modifier.showLabelTooltipOnLongPress(
                     var labelFingerReleased = false
                     while (!labelFingerReleased) {
                         val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
-                        val activePointerChange = pointerEvent.changes.firstOrNull { pointerChange ->
-                            pointerChange.id == firstDown.id
-                        }
+                        val activePointerChange =
+                            pointerEvent.changes.firstOrNull { pointerChange ->
+                                pointerChange.id == firstDown.id
+                            }
                         activePointerChange?.consume()
                         labelFingerReleased = activePointerChange?.pressed != true
                     }
 
                     launch {
-                        delay(FloatingActionTooltipDismissMillis)
+                        delay(FLOATING_ACTION_TOOLTIP_DISMISS_MILLIS)
                         tooltipState.dismiss()
                     }
                 }
@@ -153,23 +157,30 @@ fun RememberToggleButton(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shapes: androidx.compose.material3.ToggleButtonShapes = androidx.compose.material3.ButtonGroupDefaults.connectedLeadingButtonShapes(),
-    colors: androidx.compose.material3.ToggleButtonColors = androidx.compose.material3.ToggleButtonDefaults.toggleButtonColors(),
+    shapes: androidx.compose.material3.ToggleButtonShapes =
+        androidx.compose.material3.ButtonGroupDefaults
+            .connectedLeadingButtonShapes(),
+    colors: androidx.compose.material3.ToggleButtonColors =
+        androidx.compose.material3.ToggleButtonDefaults
+            .toggleButtonColors(),
     contentPadding: PaddingValues = androidx.compose.material3.ToggleButtonDefaults.ContentPadding,
     interactionSource: MutableInteractionSource? = null,
-    content: @Composable RowScope.() -> Unit
+    content: @Composable RowScope.() -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     androidx.compose.material3.ToggleButton(
         checked = checked,
-        onCheckedChange = { playTap(); onCheckedChange(it) },
+        onCheckedChange = {
+            playTap()
+            onCheckedChange(it)
+        },
         modifier = modifier,
         enabled = enabled,
         shapes = shapes,
         colors = colors,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-        content = content
+        content = content,
     )
 }
 
@@ -181,7 +192,7 @@ fun RememberIconButton(
     colors: IconButtonColors = IconButtonDefaults.iconButtonColors(),
     interactionSource: MutableInteractionSource? = null,
     tooltipLabel: String? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     RememberLongPressLabelTooltip(
@@ -189,12 +200,15 @@ fun RememberIconButton(
         enabled = enabled,
     ) {
         IconButton(
-            onClick = { playTap(); onClick() },
+            onClick = {
+                playTap()
+                onClick()
+            },
             modifier = modifier,
             enabled = enabled,
             colors = colors,
             interactionSource = interactionSource,
-            content = content
+            content = content,
         )
     }
 }
@@ -208,7 +222,7 @@ fun RememberFilledIconButton(
     colors: IconButtonColors = IconButtonDefaults.filledIconButtonColors(),
     interactionSource: MutableInteractionSource? = null,
     tooltipLabel: String? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     RememberLongPressLabelTooltip(
@@ -216,13 +230,16 @@ fun RememberFilledIconButton(
         enabled = enabled,
     ) {
         FilledIconButton(
-            onClick = { playTap(); onClick() },
+            onClick = {
+                playTap()
+                onClick()
+            },
             modifier = modifier,
             enabled = enabled,
             shape = shape,
             colors = colors,
             interactionSource = interactionSource,
-            content = content
+            content = content,
         )
     }
 }
@@ -236,7 +253,7 @@ fun RememberFilledTonalIconButton(
     colors: IconButtonColors = IconButtonDefaults.filledTonalIconButtonColors(),
     interactionSource: MutableInteractionSource? = null,
     tooltipLabel: String? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     RememberLongPressLabelTooltip(
@@ -244,13 +261,16 @@ fun RememberFilledTonalIconButton(
         enabled = enabled,
     ) {
         FilledTonalIconButton(
-            onClick = { playTap(); onClick() },
+            onClick = {
+                playTap()
+                onClick()
+            },
             modifier = modifier,
             enabled = enabled,
             shape = shape,
             colors = colors,
             interactionSource = interactionSource,
-            content = content
+            content = content,
         )
     }
 }
@@ -266,11 +286,14 @@ fun RememberButton(
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     interactionSource: MutableInteractionSource? = null,
-    content: @Composable RowScope.() -> Unit
+    content: @Composable RowScope.() -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     androidx.compose.material3.Button(
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -279,7 +302,7 @@ fun RememberButton(
         border = border,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-        content = content
+        content = content,
     )
 }
 
@@ -294,11 +317,14 @@ fun RememberTextButton(
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.TextButtonContentPadding,
     interactionSource: MutableInteractionSource? = null,
-    content: @Composable RowScope.() -> Unit
+    content: @Composable RowScope.() -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     TextButton(
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -307,7 +333,7 @@ fun RememberTextButton(
         border = border,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-        content = content
+        content = content,
     )
 }
 
@@ -322,11 +348,14 @@ fun RememberOutlinedButton(
     border: BorderStroke? = ButtonDefaults.outlinedButtonBorder(enabled),
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     interactionSource: MutableInteractionSource? = null,
-    content: @Composable RowScope.() -> Unit
+    content: @Composable RowScope.() -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     OutlinedButton(
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -335,7 +364,7 @@ fun RememberOutlinedButton(
         border = border,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-        content = content
+        content = content,
     )
 }
 
@@ -350,11 +379,14 @@ fun RememberFilledTonalButton(
     border: BorderStroke? = null,
     contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
     interactionSource: MutableInteractionSource? = null,
-    content: @Composable RowScope.() -> Unit
+    content: @Composable RowScope.() -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     FilledTonalButton(
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -363,7 +395,7 @@ fun RememberFilledTonalButton(
         border = border,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-        content = content
+        content = content,
     )
 }
 
@@ -378,12 +410,12 @@ fun RememberFloatingActionButton(
     elevation: FloatingActionButtonElevation = FloatingActionButtonDefaults.elevation(),
     interactionSource: MutableInteractionSource? = null,
     tooltipLabel: String? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     RememberLongPressLabelTooltip(
         label = tooltipLabel,
-        enabled = enabled,
+        enabled = true,
     ) {
         FloatingActionButton(
             onClick = {
@@ -398,7 +430,7 @@ fun RememberFloatingActionButton(
             contentColor = contentColor,
             elevation = elevation,
             interactionSource = interactionSource,
-            content = content
+            content = content,
         )
     }
 }
@@ -420,7 +452,10 @@ fun RememberExtendedFloatingActionButton(
     ExtendedFloatingActionButton(
         text = text,
         icon = icon,
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         expanded = expanded,
         shape = shape,
@@ -443,11 +478,14 @@ fun RememberSurface(
     shadowElevation: Dp = 0.dp,
     border: BorderStroke? = null,
     interactionSource: MutableInteractionSource? = null,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     Surface(
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -457,7 +495,7 @@ fun RememberSurface(
         shadowElevation = shadowElevation,
         border = border,
         interactionSource = interactionSource,
-        content = content
+        content = content,
     )
 }
 
@@ -470,18 +508,21 @@ fun RememberElevatedCard(
     colors: CardColors = CardDefaults.elevatedCardColors(),
     elevation: CardElevation = CardDefaults.elevatedCardElevation(),
     interactionSource: MutableInteractionSource? = null,
-    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     ElevatedCard(
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         enabled = enabled,
         shape = shape,
         colors = colors,
         elevation = elevation,
         interactionSource = interactionSource,
-        content = content
+        content = content,
     )
 }
 
@@ -495,11 +536,14 @@ fun RememberOutlinedCard(
     elevation: CardElevation = CardDefaults.outlinedCardElevation(),
     border: BorderStroke = CardDefaults.outlinedCardBorder(enabled),
     interactionSource: MutableInteractionSource? = null,
-    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     OutlinedCard(
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         enabled = enabled,
         shape = shape,
@@ -507,7 +551,7 @@ fun RememberOutlinedCard(
         elevation = elevation,
         border = border,
         interactionSource = interactionSource,
-        content = content
+        content = content,
     )
 }
 
@@ -521,15 +565,24 @@ fun RememberFilterChip(
     leadingIcon: @Composable (() -> Unit)? = null,
     trailingIcon: @Composable (() -> Unit)? = null,
     shape: Shape = androidx.compose.material3.FilterChipDefaults.shape,
-    colors: androidx.compose.material3.SelectableChipColors = androidx.compose.material3.FilterChipDefaults.filterChipColors(),
-    elevation: androidx.compose.material3.SelectableChipElevation? = androidx.compose.material3.FilterChipDefaults.filterChipElevation(),
-    border: androidx.compose.foundation.BorderStroke? = androidx.compose.material3.FilterChipDefaults.filterChipBorder(enabled, selected),
+    colors: androidx.compose.material3.SelectableChipColors =
+        androidx.compose.material3.FilterChipDefaults
+            .filterChipColors(),
+    elevation: androidx.compose.material3.SelectableChipElevation? =
+        androidx.compose.material3.FilterChipDefaults
+            .filterChipElevation(),
+    border: androidx.compose.foundation.BorderStroke? =
+        androidx.compose.material3.FilterChipDefaults
+            .filterChipBorder(enabled, selected),
     interactionSource: MutableInteractionSource? = null,
 ) {
     val playTap = rememberPlayTapSound()
     FilterChip(
         selected = selected,
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         label = label,
         modifier = modifier,
         enabled = enabled,
@@ -554,15 +607,24 @@ fun RememberInputChip(
     avatar: @Composable (() -> Unit)? = null,
     trailingIcon: @Composable (() -> Unit)? = null,
     shape: Shape = androidx.compose.material3.InputChipDefaults.shape,
-    colors: androidx.compose.material3.SelectableChipColors = androidx.compose.material3.InputChipDefaults.inputChipColors(),
-    elevation: androidx.compose.material3.SelectableChipElevation? = androidx.compose.material3.InputChipDefaults.inputChipElevation(),
-    border: androidx.compose.foundation.BorderStroke? = androidx.compose.material3.InputChipDefaults.inputChipBorder(enabled, selected),
+    colors: androidx.compose.material3.SelectableChipColors =
+        androidx.compose.material3.InputChipDefaults
+            .inputChipColors(),
+    elevation: androidx.compose.material3.SelectableChipElevation? =
+        androidx.compose.material3.InputChipDefaults
+            .inputChipElevation(),
+    border: androidx.compose.foundation.BorderStroke? =
+        androidx.compose.material3.InputChipDefaults
+            .inputChipBorder(enabled, selected),
     interactionSource: MutableInteractionSource? = null,
 ) {
     val playTap = rememberPlayTapSound()
     androidx.compose.material3.InputChip(
         selected = selected,
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         label = label,
         modifier = modifier,
         enabled = enabled,
@@ -584,15 +646,23 @@ fun RememberSwitch(
     modifier: Modifier = Modifier,
     thumbContent: @Composable (() -> Unit)? = null,
     enabled: Boolean = true,
-    colors: androidx.compose.material3.SwitchColors = androidx.compose.material3.SwitchDefaults.colors(),
+    colors: androidx.compose.material3.SwitchColors =
+        androidx.compose.material3.SwitchDefaults
+            .colors(),
     interactionSource: MutableInteractionSource? = null,
 ) {
     val playTap = rememberPlayTapSound()
     androidx.compose.material3.Switch(
         checked = checked,
-        onCheckedChange = if (onCheckedChange != null) {
-            { playTap(); onCheckedChange(it) }
-        } else null,
+        onCheckedChange =
+            if (onCheckedChange != null) {
+                {
+                    playTap()
+                    onCheckedChange(it)
+                }
+            } else {
+                null
+            },
         modifier = modifier,
         thumbContent = thumbContent,
         enabled = enabled,
@@ -607,21 +677,30 @@ fun RememberCheckbox(
     onCheckedChange: ((Boolean) -> Unit)?,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: androidx.compose.material3.CheckboxColors = androidx.compose.material3.CheckboxDefaults.colors(),
+    colors: androidx.compose.material3.CheckboxColors =
+        androidx.compose.material3.CheckboxDefaults
+            .colors(),
     interactionSource: MutableInteractionSource? = null,
 ) {
     val playTap = rememberPlayTapSound()
     androidx.compose.material3.Checkbox(
         checked = checked,
-        onCheckedChange = if (onCheckedChange != null) {
-            { playTap(); onCheckedChange(it) }
-        } else null,
+        onCheckedChange =
+            if (onCheckedChange != null) {
+                {
+                    playTap()
+                    onCheckedChange(it)
+                }
+            } else {
+                null
+            },
         modifier = modifier,
         enabled = enabled,
         colors = colors,
         interactionSource = interactionSource,
     )
 }
+
 @Composable
 fun RememberDropdownMenuItem(
     text: @Composable () -> Unit,
@@ -630,14 +709,19 @@ fun RememberDropdownMenuItem(
     leadingIcon: @Composable (() -> Unit)? = null,
     trailingIcon: @Composable (() -> Unit)? = null,
     enabled: Boolean = true,
-    colors: MenuItemColors = androidx.compose.material3.MenuDefaults.itemColors(),
+    colors: MenuItemColors =
+        androidx.compose.material3.MenuDefaults
+            .itemColors(),
     contentPadding: PaddingValues = androidx.compose.material3.MenuDefaults.DropdownMenuItemContentPadding,
     interactionSource: MutableInteractionSource? = null,
 ) {
     val playTap = rememberPlayTapSound()
     DropdownMenuItem(
         text = text,
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         leadingIcon = leadingIcon,
         trailingIcon = trailingIcon,
@@ -656,16 +740,26 @@ fun androidx.compose.material3.SingleChoiceSegmentedButtonRowScope.RememberSegme
     shape: Shape,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    colors: androidx.compose.material3.SegmentedButtonColors = androidx.compose.material3.SegmentedButtonDefaults.colors(),
-    border: BorderStroke = androidx.compose.material3.SegmentedButtonDefaults.borderStroke(colors.activeBorderColor),
+    colors: androidx.compose.material3.SegmentedButtonColors =
+        androidx.compose.material3.SegmentedButtonDefaults
+            .colors(),
+    border: BorderStroke =
+        androidx.compose.material3.SegmentedButtonDefaults
+            .borderStroke(colors.activeBorderColor),
     interactionSource: MutableInteractionSource? = null,
-    icon: @Composable () -> Unit = { androidx.compose.material3.SegmentedButtonDefaults.Icon(selected) },
-    label: @Composable () -> Unit
+    icon: @Composable () -> Unit = {
+        androidx.compose.material3.SegmentedButtonDefaults
+            .Icon(selected)
+    },
+    label: @Composable () -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
     this.SegmentedButton(
         selected = selected,
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         shape = shape,
         modifier = modifier,
         enabled = enabled,
@@ -673,13 +767,12 @@ fun androidx.compose.material3.SingleChoiceSegmentedButtonRowScope.RememberSegme
         border = border,
         interactionSource = interactionSource,
         icon = icon,
-        label = label
+        label = label,
     )
 }
 
 @Composable
 fun RememberTab(
-
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -688,18 +781,21 @@ fun RememberTab(
     icon: @Composable (() -> Unit)? = null,
     selectedContentColor: Color = androidx.compose.material3.LocalContentColor.current,
     unselectedContentColor: Color = selectedContentColor,
-    interactionSource: MutableInteractionSource? = null
+    interactionSource: MutableInteractionSource? = null,
 ) {
     val playTap = rememberPlayTapSound()
     Tab(
         selected = selected,
-        onClick = { playTap(); onClick() },
+        onClick = {
+            playTap()
+            onClick()
+        },
         modifier = modifier,
         enabled = enabled,
         text = text,
         icon = icon,
         selectedContentColor = selectedContentColor,
         unselectedContentColor = unselectedContentColor,
-        interactionSource = interactionSource
+        interactionSource = interactionSource,
     )
 }

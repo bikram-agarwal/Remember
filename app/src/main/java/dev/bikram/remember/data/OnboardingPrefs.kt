@@ -13,16 +13,19 @@ data class OnboardingState(
     val hasSeenIntro: Boolean = false,
 )
 
-class OnboardingPrefs(private val context: Context) {
+class OnboardingPrefs(
+    private val context: Context,
+) {
     private object Keys {
         val HAS_SEEN_INTRO = booleanPreferencesKey("has_seen_intro")
     }
 
-    val state: Flow<OnboardingState> = context.onboardingDataStore.data.map { preferences ->
-        OnboardingState(
-            hasSeenIntro = preferences[Keys.HAS_SEEN_INTRO] ?: false,
-        )
-    }
+    val state: Flow<OnboardingState> =
+        context.onboardingDataStore.data.map { preferences ->
+            OnboardingState(
+                hasSeenIntro = preferences[Keys.HAS_SEEN_INTRO] ?: false,
+            )
+        }
 
     suspend fun markIntroSeen() {
         context.onboardingDataStore.edit { preferences ->

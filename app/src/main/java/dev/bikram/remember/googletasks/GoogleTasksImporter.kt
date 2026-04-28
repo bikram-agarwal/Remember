@@ -35,7 +35,6 @@ class GoogleTasksImporter(
     private val repository: NoteRepository,
     private val zone: ZoneId = ZoneId.systemDefault(),
 ) {
-
     /**
      * Import the selected [tasks] into Remember.
      *
@@ -72,23 +71,36 @@ class GoogleTasksImporter(
                     val anchor = group.first()
                     val taskListTitle = anchor.taskListTitle
                     // Subtasks become indented children under their parent.
-                    val parents = group.filter { it.task.parent.isNullOrBlank() }
-                        .sortedBy { it.task.position.orEmpty() }
+                    val parents =
+                        group
+                            .filter { it.task.parent.isNullOrBlank() }
+                            .sortedBy { it.task.position.orEmpty() }
                     val itemTexts = mutableListOf<String>()
                     parents.forEach { parent ->
-                        itemTexts.add(parent.task.title.orEmpty().ifBlank { firstLineOfNotes(parent.task) })
-                        group.filter { it.task.parent == parent.task.id }
+                        itemTexts.add(
+                            parent.task.title
+                                .orEmpty()
+                                .ifBlank { firstLineOfNotes(parent.task) },
+                        )
+                        group
+                            .filter { it.task.parent == parent.task.id }
                             .sortedBy { it.task.position.orEmpty() }
                             .forEach { child ->
-                                itemTexts.add("- " + child.task.title.orEmpty().ifBlank { firstLineOfNotes(child.task) })
+                                itemTexts.add(
+                                    "- " +
+                                        child.task.title
+                                            .orEmpty()
+                                            .ifBlank { firstLineOfNotes(child.task) },
+                                )
                             }
                     }
-                    val newId = repository.createList(
-                        title = taskListTitle,
-                        colorIndex = 0,
-                        items = itemTexts.filter { it.isNotBlank() },
-                        options = NoteOptions(tags = listOf(taskListTitle)),
-                    )
+                    val newId =
+                        repository.createList(
+                            title = taskListTitle,
+                            colorIndex = 0,
+                            items = itemTexts.filter { it.isNotBlank() },
+                            options = NoteOptions(tags = listOf(taskListTitle)),
+                        )
                     group.forEach { createdPairs[it.task.id] = newId }
                     written += group.size
                 }
@@ -97,26 +109,40 @@ class GoogleTasksImporter(
                 tasks.groupBy { it.taskListId }.forEach { (_, group) ->
                     val anchor = group.first()
                     val title = anchor.taskListTitle
-                    val body = buildString {
-                        group.sortedWith(compareBy({ it.task.parent ?: "" }, { it.task.position.orEmpty() }))
-                            .forEach { wrapper ->
-                                val indent = if (wrapper.task.parent.isNullOrBlank()) "" else "  "
-                                val mark = if (isCompleted(wrapper.task)) "[x]" else "[ ]"
-                                val displayTitle = wrapper.task.title.orEmpty().ifBlank { firstLineOfNotes(wrapper.task) }
-                                if (displayTitle.isNotBlank()) {
-                                    append(indent).append(mark).append(' ').append(displayTitle).append('\n')
+                    val body =
+                        buildString {
+                            group
+                                .sortedWith(compareBy({ it.task.parent ?: "" }, { it.task.position.orEmpty() }))
+                                .forEach { wrapper ->
+                                    val indent = if (wrapper.task.parent.isNullOrBlank()) "" else "  "
+                                    val mark = if (isCompleted(wrapper.task)) "[x]" else "[ ]"
+                                    val displayTitle =
+                                        wrapper.task.title
+                                            .orEmpty()
+                                            .ifBlank { firstLineOfNotes(wrapper.task) }
+                                    if (displayTitle.isNotBlank()) {
+                                        append(indent)
+                                            .append(mark)
+                                            .append(' ')
+                                            .append(displayTitle)
+                                            .append('\n')
+                                    }
+                                    if (!wrapper.task.notes.isNullOrBlank() &&
+                                        wrapper.task.title
+                                            .orEmpty()
+                                            .isNotBlank()
+                                    ) {
+                                        append(indent).append("    ").append(wrapper.task.notes.replace("\n", "\n    ")).append('\n')
+                                    }
                                 }
-                                if (!wrapper.task.notes.isNullOrBlank() && wrapper.task.title.orEmpty().isNotBlank()) {
-                                    append(indent).append("    ").append(wrapper.task.notes.replace("\n", "\n    ")).append('\n')
-                                }
-                            }
-                    }.trimEnd()
-                    val newId = repository.createNote(
-                        title = title,
-                        body = body,
-                        colorIndex = 0,
-                        options = NoteOptions(tags = listOf(title)),
-                    )
+                        }.trimEnd()
+                    val newId =
+                        repository.createNote(
+                            title = title,
+                            body = body,
+                            colorIndex = 0,
+                            options = NoteOptions(tags = listOf(title)),
+                        )
                     group.forEach { createdPairs[it.task.id] = newId }
                     written += group.size
                 }
@@ -134,8 +160,15 @@ class GoogleTasksImporter(
      * Either creates a new note for [task] or rewrites the existing [existingNoteId] in place.
      * Returns the resulting note id, or null when the row was skipped (eg. blank title and notes).
      */
-    private suspend fun upsertOneTask(task: TaskToImport, existingNoteId: Long?): Long? {
-        val title = task.task.title.orEmpty().trim().ifBlank { firstLineOfNotes(task.task) }
+    private suspend fun upsertOneTask(
+        task: TaskToImport,
+        existingNoteId: Long?,
+    ): Long? {
+        val title =
+            task.task.title
+                .orEmpty()
+                .trim()
+                .ifBlank { firstLineOfNotes(task.task) }
         val body = task.task.notes.orEmpty()
         if (title.isBlank() && body.isBlank()) return null
 
@@ -155,16 +188,20 @@ class GoogleTasksImporter(
                 options = options,
             )
             // markCompleted / markIncomplete write completedAt + handle scheduler cancellation.
-            if (isDone) repository.markCompleted(existingNoteId)
-            else repository.markIncomplete(existingNoteId)
+            if (isDone) {
+                repository.markCompleted(existingNoteId)
+            } else {
+                repository.markIncomplete(existingNoteId)
+            }
             existingNoteId
         } else {
-            val newId = repository.createNote(
-                title = title,
-                body = body,
-                colorIndex = 0,
-                options = options,
-            )
+            val newId =
+                repository.createNote(
+                    title = title,
+                    body = body,
+                    colorIndex = 0,
+                    options = options,
+                )
             if (isDone) repository.markCompleted(newId)
             newId
         }
@@ -178,7 +215,8 @@ class GoogleTasksImporter(
         val raw = task.due?.takeIf { it.isNotBlank() } ?: return null
         // Tasks API always returns "YYYY-MM-DDT00:00:00.000Z" but we accept date-only just in case.
         val date = parseDate(raw) ?: return null
-        return LocalDateTime.of(date, NINE_AM)
+        return LocalDateTime
+            .of(date, NINE_AM)
             .atZone(zone)
             .toInstant()
             .toEpochMilli()
@@ -192,10 +230,14 @@ class GoogleTasksImporter(
     }
 
     private fun firstLineOfNotes(task: GoogleTask): String =
-        task.notes.orEmpty().lineSequence().firstOrNull { it.isNotBlank() }?.trim().orEmpty()
+        task.notes
+            .orEmpty()
+            .lineSequence()
+            .firstOrNull { it.isNotBlank() }
+            ?.trim()
+            .orEmpty()
 
-    private fun isCompleted(task: GoogleTask): Boolean =
-        task.status.equals(GoogleTaskStatus.COMPLETED, ignoreCase = true)
+    private fun isCompleted(task: GoogleTask): Boolean = task.status.equals(GoogleTaskStatus.COMPLETED, ignoreCase = true)
 
     companion object {
         private val NINE_AM: LocalTime = LocalTime.of(9, 0)

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -39,6 +40,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
@@ -59,54 +61,59 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
-import androidx.lifecycle.viewmodel.compose.viewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dev.bikram.remember.R
 import dev.bikram.remember.data.GroupBy
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteRepository
-import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.NotesFilter
+import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.SortDir
 import dev.bikram.remember.data.SortKey
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.data.ViewOptionsPrefs
 import dev.bikram.remember.data.matches
-import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.EmptyFilterIllustration
 import dev.bikram.remember.ui.components.EmptyNotesIllustration
+import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
+import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
+import dev.bikram.remember.ui.feedback.rememberPlayTapSound
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
-import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
+import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,11 +126,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import dev.bikram.remember.ui.components.RememberOutlinedButton
-import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
-import dev.bikram.remember.ui.components.RememberButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
+import javax.inject.Inject
 
 sealed class HomeListItem {
     /**
@@ -140,17 +143,21 @@ sealed class HomeListItem {
         val collapsible: Boolean = true,
         @param:StringRes val labelRes: Int? = null,
     ) : HomeListItem()
+
     /**
      * [groupKey] disambiguates keys when the same note appears under multiple groups
      * (e.g. a note with tags ["work", "personal"] in GroupBy.TAG view), and is reused
      * by collapsible sections to gate visibility (e.g. groupKey="DONE" rows hide when
      * the Done section is collapsed).
      */
-    data class NoteRow(val note: NoteWithItems, val groupKey: String = "") : HomeListItem()
+    data class NoteRow(
+        val note: NoteWithItems,
+        val groupKey: String = "",
+    ) : HomeListItem()
 }
 
 /** Drives the M3 Expressive AnimatedContent that swaps the top-bar title. */
-private enum class TopBarTitleTarget { Selection, Search, AppName }
+private enum class TopBarTitleTarget { Search, AppName }
 
 data class HomeState(
     val loading: Boolean = true,
@@ -175,230 +182,256 @@ data class HomeState(
 )
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
-class HomeViewModel(
-    private val repository: NoteRepository,
-    private val themePrefs: ThemePrefs,
-    private val viewOptionsPrefs: ViewOptionsPrefs,
-) : ViewModel() {
-    private val filter = MutableStateFlow(NotesFilter())
-    private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
-    private val viewOptionsFlow = viewOptionsPrefs.state
-        .distinctUntilChanged()
+@HiltViewModel
+class HomeViewModel
+    @Inject
+    constructor(
+        private val repository: NoteRepository,
+        private val themePrefs: ThemePrefs,
+        private val viewOptionsPrefs: ViewOptionsPrefs,
+    ) : ViewModel() {
+        private val filter = MutableStateFlow(NotesFilter())
+        private val selectedIds = MutableStateFlow<Set<Long>>(emptySet())
+        private val viewOptionsFlow =
+            viewOptionsPrefs.state
+                .distinctUntilChanged()
 
-    /**
-     * When the search text is non-blank we push the query down to SQLite via Room FTS4
-     * rather than filtering in-memory. This keeps the main list responsive on large vaults
-     * and gives diacritic-insensitive, prefix-matched results. Facet filters (tags,
-     * reminder, etc.) still apply on top of the FTS result set.
-     */
-    private val notesSource: Flow<List<NoteWithItems>> = filter
-        .map { it.text.trim() }
-        .distinctUntilChanged()
-        .flatMapLatest { text ->
-            if (text.isBlank()) repository.observeActive()
-            else repository.searchNotes(text)
-        }
+        /**
+         * When the search text is non-blank we push the query down to SQLite via Room FTS4
+         * rather than filtering in-memory. This keeps the main list responsive on large vaults
+         * and gives diacritic-insensitive, prefix-matched results. Facet filters (tags,
+         * reminder, etc.) still apply on top of the FTS result set.
+         */
+        private val notesSource: Flow<List<NoteWithItems>> =
+            filter
+                .map { it.text.trim() }
+                .distinctUntilChanged()
+                .flatMapLatest { text ->
+                    if (text.isBlank()) {
+                        repository.observeActive()
+                    } else {
+                        repository.searchNotes(text)
+                    }
+                }
 
-    /**
-     * Archived notes matching the current query. Empty when search text is blank so the
-     * "Archive (N)" section only appears while the user is actively searching.
-     */
-    private val archivedSearchSource: Flow<List<NoteWithItems>> = filter
-        .map { it.text.trim() }
-        .distinctUntilChanged()
-        .flatMapLatest { text ->
-            if (text.isBlank()) flowOf(emptyList())
-            else repository.searchArchivedNotes(text)
-        }
+        /**
+         * Archived notes matching the current query. Empty when search text is blank so the
+         * "Archive (N)" section only appears while the user is actively searching.
+         */
+        private val archivedSearchSource: Flow<List<NoteWithItems>> =
+            filter
+                .map { it.text.trim() }
+                .distinctUntilChanged()
+                .flatMapLatest { text ->
+                    if (text.isBlank()) {
+                        flowOf(emptyList())
+                    } else {
+                        repository.searchArchivedNotes(text)
+                    }
+                }
 
-    /**
-     * Trashed notes matching the current query. Same "only while searching" gate as
-     * [archivedSearchSource]; drives the "Trash (N)" collapsed section on Home.
-     */
-    private val trashedSearchSource: Flow<List<NoteWithItems>> = filter
-        .map { it.text.trim() }
-        .distinctUntilChanged()
-        .flatMapLatest { text ->
-            if (text.isBlank()) flowOf(emptyList())
-            else repository.searchTrashedNotes(text)
-        }
+        /**
+         * Trashed notes matching the current query. Same "only while searching" gate as
+         * [archivedSearchSource]; drives the "Trash (N)" collapsed section on Home.
+         */
+        private val trashedSearchSource: Flow<List<NoteWithItems>> =
+            filter
+                .map { it.text.trim() }
+                .distinctUntilChanged()
+                .flatMapLatest { text ->
+                    if (text.isBlank()) {
+                        flowOf(emptyList())
+                    } else {
+                        repository.searchTrashedNotes(text)
+                    }
+                }
 
-    /**
-     * Tag suggestions always come from the full active set even while searching, so the
-     * filter sheet's tag chips don't collapse to only the currently-matched notes.
-     */
-    private val allActiveNotes: Flow<List<NoteWithItems>> = repository.observeActive()
+        /**
+         * Tag suggestions always come from the full active set even while searching, so the
+         * filter sheet's tag chips don't collapse to only the currently-matched notes.
+         */
+        private val allActiveNotes: Flow<List<NoteWithItems>> = repository.observeActive()
 
-    val state: StateFlow<HomeState> = combine(
-        listOf(
-            filter,
-            notesSource,
-            allActiveNotes,
-            viewOptionsFlow,
-            selectedIds,
-            archivedSearchSource,
-            trashedSearchSource,
-        ),
-    ) { arr ->
-        @Suppress("UNCHECKED_CAST")
-        val f = arr[0] as NotesFilter
-        @Suppress("UNCHECKED_CAST")
-        val searchResults = arr[1] as List<NoteWithItems>
-        @Suppress("UNCHECKED_CAST")
-        val allActive = arr[2] as List<NoteWithItems>
-        val opts = arr[3] as ViewOptions
-        @Suppress("UNCHECKED_CAST")
-        val selected = arr[4] as Set<Long>
-        @Suppress("UNCHECKED_CAST")
-        val archivedSearch = arr[5] as List<NoteWithItems>
-        @Suppress("UNCHECKED_CAST")
-        val trashedSearch = arr[6] as List<NoteWithItems>
-        // When FTS is active, skip the in-memory text check (SQL already did it) but keep
-        // facet filters; when not searching, the normal full predicate runs.
-        val filtered = if (f.text.isBlank()) {
-            searchResults.filter { f.matches(it) }
-        } else {
-            val facetOnly = f.copy(text = "")
-            searchResults.filter { facetOnly.matches(it) }
-        }
-        // Archive and trash results always get facet-only filtering - the FTS query has
-        // already matched text, and running the full matcher would double-check text
-        // against in-memory fields that may differ in edge cases.
-        val facetOnly = f.copy(text = "")
-        val filteredArchived =
-            if (f.text.isBlank()) emptyList()
-            else archivedSearch.filter { facetOnly.matches(it) }
-        val filteredTrashed =
-            if (f.text.isBlank()) emptyList()
-            else trashedSearch.filter { facetOnly.matches(it) }
-        val tags = allActive
-            .flatMap { RememberReservedTags.userVisibleTags(it.note.tags) }
-            .distinct()
-            .sorted()
-        val arranged = arrangeItems(filtered, opts)
-        // Prune selections whose underlying note no longer appears (trashed, archived, etc.).
-        val visibleIds = arranged.mapNotNull { (it as? HomeListItem.NoteRow)?.note?.note?.id }.toSet()
-        val prunedSelection = selected.intersect(visibleIds)
-        HomeState(
-            loading = false,
-            filter = f,
-            items = arranged,
-            totalActive = allActive.size,
-            availableTags = tags,
-            viewOptions = opts,
-            selectedIds = prunedSelection,
-            inSelectionMode = prunedSelection.isNotEmpty(),
-            archivedMatches = filteredArchived,
-            trashedMatches = filteredTrashed,
-        )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
-
-    fun setFilter(v: NotesFilter) { filter.value = v }
-    fun setQuery(v: String) { filter.value = filter.value.copy(text = v) }
-
-    fun setViewOptions(v: ViewOptions) {
-        viewModelScope.launch { viewOptionsPrefs.setViewOptions(v) }
-    }
-
-    fun toggleSelection(noteId: Long) {
-        selectedIds.value = selectedIds.value.toMutableSet().also {
-            if (!it.add(noteId)) it.remove(noteId)
-        }
-    }
-
-    fun selectNotes(noteIds: Set<Long>) {
-        selectedIds.value = noteIds
-    }
-
-    fun clearSelection() { selectedIds.value = emptySet() }
-
-    fun markSelectedDone() {
-        val ids = selectedIds.value.toList()
-        if (ids.isEmpty()) return
-        viewModelScope.launch {
-            ids.forEach { noteId ->
-                val existing = repository.get(noteId)?.note ?: return@forEach
-                if (existing.completedAt == null) repository.markCompleted(noteId)
-            }
-            selectedIds.value = emptySet()
-        }
-    }
-
-    fun archiveSelected() {
-        val ids = selectedIds.value.toList()
-        if (ids.isEmpty()) return
-        viewModelScope.launch {
-            ids.forEach { repository.archiveNote(it) }
-            selectedIds.value = emptySet()
-        }
-    }
-
-    fun trashSelected() {
-        val ids = selectedIds.value.toList()
-        if (ids.isEmpty()) return
-        viewModelScope.launch {
-            ids.forEach { repository.moveToTrash(it) }
-            selectedIds.value = emptySet()
-        }
-    }
-
-    /**
-     * Apply [addTags] to every selected note (union) and remove [removeTags] from every
-     * selected note (difference). Passing a tag in both sets is resolved in favour of removal.
-     */
-    fun applyTagsToSelection(
-        addTags: Set<String>,
-        removeTags: Set<String>,
-        newTagColors: Map<String, String> = emptyMap(),
-    ) {
-        val ids = selectedIds.value.toList()
-        if (ids.isEmpty()) return
-        val additions = addTags - removeTags
-        viewModelScope.launch {
-            newTagColors.forEach { (tagKey, hex) ->
-                repository.tagRepository?.setTagColor(tagKey, hex) ?: themePrefs.setTagColor(tagKey, hex)
-            }
-            ids.forEach { noteId ->
-                val existing = repository.get(noteId) ?: return@forEach
-                val note = existing.note
-                val updated = (note.tags.toSet() + additions - removeTags).toList()
-                if (updated.toSet() == note.tags.toSet()) return@forEach
-                repository.updateNote(
-                    id = noteId,
-                    title = note.title,
-                    body = note.body,
-                    colorIndex = note.colorIndex,
-                    options = dev.bikram.remember.data.NoteOptions(
-                        reminderAt = note.reminderAt,
-                        importance = note.importance,
-                        visibility = note.visibility,
-                        pictureUri = note.pictureUri,
-                        pictureHeroFraming = note.pictureHeroFraming,
-                        locked = note.locked,
-                        iconKey = note.iconKey,
-                        actions = note.actions,
-                        tags = updated,
-                        recurrence = note.recurrence,
-                    ),
-                )
-            }
-            selectedIds.value = emptySet()
-        }
-    }
-
-    companion object {
-        fun factory(
-            repository: NoteRepository,
-            themePrefs: ThemePrefs,
-            viewOptionsPrefs: ViewOptionsPrefs,
-        ) =
-            object : ViewModelProvider.Factory {
+        val state: StateFlow<HomeState> =
+            combine(
+                listOf(
+                    filter,
+                    notesSource,
+                    allActiveNotes,
+                    viewOptionsFlow,
+                    selectedIds,
+                    archivedSearchSource,
+                    trashedSearchSource,
+                ),
+            ) { arr ->
                 @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                    HomeViewModel(repository, themePrefs, viewOptionsPrefs) as T
+                val f = arr[0] as NotesFilter
+
+                @Suppress("UNCHECKED_CAST")
+                val searchResults = arr[1] as List<NoteWithItems>
+
+                @Suppress("UNCHECKED_CAST")
+                val allActive = arr[2] as List<NoteWithItems>
+                val opts = arr[3] as ViewOptions
+
+                @Suppress("UNCHECKED_CAST")
+                val selected = arr[4] as Set<Long>
+
+                @Suppress("UNCHECKED_CAST")
+                val archivedSearch = arr[5] as List<NoteWithItems>
+
+                @Suppress("UNCHECKED_CAST")
+                val trashedSearch = arr[6] as List<NoteWithItems>
+                // When FTS is active, skip the in-memory text check (SQL already did it) but keep
+                // facet filters; when not searching, the normal full predicate runs.
+                val filtered =
+                    if (f.text.isBlank()) {
+                        searchResults.filter { f.matches(it) }
+                    } else {
+                        val facetOnly = f.copy(text = "")
+                        searchResults.filter { facetOnly.matches(it) }
+                    }
+                // Archive and trash results always get facet-only filtering - the FTS query has
+                // already matched text, and running the full matcher would double-check text
+                // against in-memory fields that may differ in edge cases.
+                val facetOnly = f.copy(text = "")
+                val filteredArchived =
+                    if (f.text.isBlank()) {
+                        emptyList()
+                    } else {
+                        archivedSearch.filter { facetOnly.matches(it) }
+                    }
+                val filteredTrashed =
+                    if (f.text.isBlank()) {
+                        emptyList()
+                    } else {
+                        trashedSearch.filter { facetOnly.matches(it) }
+                    }
+                val tags =
+                    allActive
+                        .flatMap { RememberReservedTags.userVisibleTags(it.note.tags) }
+                        .distinct()
+                        .sorted()
+                val arranged = arrangeItems(filtered, opts)
+                // Prune selections whose underlying note no longer appears (trashed, archived, etc.).
+                val visibleIds = arranged.mapNotNull { (it as? HomeListItem.NoteRow)?.note?.note?.id }.toSet()
+                val prunedSelection = selected.intersect(visibleIds)
+                HomeState(
+                    loading = false,
+                    filter = f,
+                    items = arranged,
+                    totalActive = allActive.size,
+                    availableTags = tags,
+                    viewOptions = opts,
+                    selectedIds = prunedSelection,
+                    inSelectionMode = prunedSelection.isNotEmpty(),
+                    archivedMatches = filteredArchived,
+                    trashedMatches = filteredTrashed,
+                )
+            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
+
+        fun setFilter(v: NotesFilter) {
+            filter.value = v
+        }
+
+        fun setQuery(v: String) {
+            filter.value = filter.value.copy(text = v)
+        }
+
+        fun setViewOptions(v: ViewOptions) {
+            viewModelScope.launch { viewOptionsPrefs.setViewOptions(v) }
+        }
+
+        fun toggleSelection(noteId: Long) {
+            selectedIds.value =
+                selectedIds.value.toMutableSet().also {
+                    if (!it.add(noteId)) it.remove(noteId)
+                }
+        }
+
+        fun selectNotes(noteIds: Set<Long>) {
+            selectedIds.value = noteIds
+        }
+
+        fun clearSelection() {
+            selectedIds.value = emptySet()
+        }
+
+        fun markSelectedDone() {
+            val ids = selectedIds.value.toList()
+            if (ids.isEmpty()) return
+            viewModelScope.launch {
+                ids.forEach { noteId ->
+                    val existing = repository.get(noteId)?.note ?: return@forEach
+                    if (existing.completedAt == null) repository.markCompleted(noteId)
+                }
+                selectedIds.value = emptySet()
             }
+        }
+
+        fun archiveSelected() {
+            val ids = selectedIds.value.toList()
+            if (ids.isEmpty()) return
+            viewModelScope.launch {
+                ids.forEach { repository.archiveNote(it) }
+                selectedIds.value = emptySet()
+            }
+        }
+
+        fun trashSelected() {
+            val ids = selectedIds.value.toList()
+            if (ids.isEmpty()) return
+            viewModelScope.launch {
+                ids.forEach { repository.moveToTrash(it) }
+                selectedIds.value = emptySet()
+            }
+        }
+
+        /**
+         * Apply [addTags] to every selected note (union) and remove [removeTags] from every
+         * selected note (difference). Passing a tag in both sets is resolved in favour of removal.
+         */
+        fun applyTagsToSelection(
+            addTags: Set<String>,
+            removeTags: Set<String>,
+            newTagColors: Map<String, String> = emptyMap(),
+        ) {
+            val ids = selectedIds.value.toList()
+            if (ids.isEmpty()) return
+            val additions = addTags - removeTags
+            viewModelScope.launch {
+                newTagColors.forEach { (tagKey, hex) ->
+                    repository.tagRepository?.setTagColor(tagKey, hex) ?: themePrefs.setTagColor(tagKey, hex)
+                }
+                ids.forEach { noteId ->
+                    val existing = repository.get(noteId) ?: return@forEach
+                    val note = existing.note
+                    val updated = (note.tags.toSet() + additions - removeTags).toList()
+                    if (updated.toSet() == note.tags.toSet()) return@forEach
+                    repository.updateNote(
+                        id = noteId,
+                        title = note.title,
+                        body = note.body,
+                        colorIndex = note.colorIndex,
+                        options =
+                            dev.bikram.remember.data.NoteOptions(
+                                reminderAt = note.reminderAt,
+                                importance = note.importance,
+                                visibility = note.visibility,
+                                pictureUri = note.pictureUri,
+                                pictureHeroFraming = note.pictureHeroFraming,
+                                locked = note.locked,
+                                iconKey = note.iconKey,
+                                actions = note.actions,
+                                tags = updated,
+                                recurrence = note.recurrence,
+                            ),
+                    )
+                }
+                selectedIds.value = emptySet()
+            }
+        }
     }
-}
 
 /**
  * Lay out the home list with the task-first section model:
@@ -419,7 +452,10 @@ class HomeViewModel(
  * Note kinds (NoteKind.NOTE vs NoteKind.LIST) are still differentiated by the existing
  * GroupBy.TYPE pathway in the middle - that is orthogonal to the task model.
  */
-private fun arrangeItems(notes: List<NoteWithItems>, opts: ViewOptions): List<HomeListItem> {
+private fun arrangeItems(
+    notes: List<NoteWithItems>,
+    opts: ViewOptions,
+): List<HomeListItem> {
     // Capture once per emission so all section bucketing uses a consistent "now".
     // Today's cutoff drifts at midnight; we accept that the section won't roll until
     // the next StateFlow emit, which is acceptable for a notes/tasks app.
@@ -427,29 +463,34 @@ private fun arrangeItems(notes: List<NoteWithItems>, opts: ViewOptions): List<Ho
     val sorted = sortNotes(notes, opts)
 
     val (done, active) = sorted.partition { it.note.completedAt != null }
-    val (overdue, activeRest) = active.partition {
-        val r = it.note.reminderAt
-        r != null && r < now
-    }
+    val (overdue, activeRest) =
+        active.partition {
+            val r = it.note.reminderAt
+            r != null && r < now
+        }
 
     return buildList {
         if (overdue.isNotEmpty()) {
-            add(HomeListItem.Header(
-                label = "",
-                count = overdue.size,
-                stableKey = "OVERDUE",
-                labelRes = R.string.home_section_overdue,
-            ))
+            add(
+                HomeListItem.Header(
+                    label = "",
+                    count = overdue.size,
+                    stableKey = "OVERDUE",
+                    labelRes = R.string.home_section_overdue,
+                ),
+            )
             overdue.forEach { add(HomeListItem.NoteRow(it, groupKey = "OVERDUE")) }
         }
         addAll(arrangeMiddle(activeRest, opts, now))
         if (done.isNotEmpty()) {
-            add(HomeListItem.Header(
-                label = "",
-                count = done.size,
-                stableKey = "DONE",
-                labelRes = R.string.home_section_done,
-            ))
+            add(
+                HomeListItem.Header(
+                    label = "",
+                    count = done.size,
+                    stableKey = "DONE",
+                    labelRes = R.string.home_section_done,
+                ),
+            )
             done.forEach { add(HomeListItem.NoteRow(it, groupKey = "DONE")) }
         }
     }
@@ -473,12 +514,14 @@ private fun arrangeMiddle(
         val grouped = arrangeByGroupBy(active, opts)
         return if (opts.groupBy == GroupBy.NONE && grouped.isNotEmpty()) {
             buildList {
-                add(HomeListItem.Header(
-                    label = "",
-                    count = active.size,
-                    stableKey = "ACTIVE",
-                    labelRes = R.string.home_section_active,
-                ))
+                add(
+                    HomeListItem.Header(
+                        label = "",
+                        count = active.size,
+                        stableKey = "ACTIVE",
+                        labelRes = R.string.home_section_active,
+                    ),
+                )
                 addAll(grouped)
             }
         } else {
@@ -495,12 +538,14 @@ private fun arrangeMiddle(
     // Within each section the items are already ordered by [sortNotes] using the
     // chosen sort direction.
     val zone = java.time.ZoneId.systemDefault()
-    val tomorrowMidnightMillis = java.time.ZonedDateTime.now(zone)
-        .toLocalDate()
-        .plusDays(1)
-        .atStartOfDay(zone)
-        .toInstant()
-        .toEpochMilli()
+    val tomorrowMidnightMillis =
+        java.time.ZonedDateTime
+            .now(zone)
+            .toLocalDate()
+            .plusDays(1)
+            .atStartOfDay(zone)
+            .toInstant()
+            .toEpochMilli()
 
     val today = mutableListOf<NoteWithItems>()
     val upcoming = mutableListOf<NoteWithItems>()
@@ -514,28 +559,36 @@ private fun arrangeMiddle(
         }
     }
 
-    data class SectionDef(val label: String, val key: String, val items: List<NoteWithItems>)
-    val ascendingSections = listOf(
-        SectionDef("", "TODAY", today),
-        SectionDef("", "UPCOMING", upcoming),
-        SectionDef("", "NO_DATE", noDate),
+    data class SectionDef(
+        val label: String,
+        val key: String,
+        val items: List<NoteWithItems>,
     )
-    val sectionLabelRes = mapOf(
-        "TODAY" to R.string.home_section_today,
-        "UPCOMING" to R.string.home_section_upcoming,
-        "NO_DATE" to R.string.home_section_no_date,
-    )
+    val ascendingSections =
+        listOf(
+            SectionDef("", "TODAY", today),
+            SectionDef("", "UPCOMING", upcoming),
+            SectionDef("", "NO_DATE", noDate),
+        )
+    val sectionLabelRes =
+        mapOf(
+            "TODAY" to R.string.home_section_today,
+            "UPCOMING" to R.string.home_section_upcoming,
+            "NO_DATE" to R.string.home_section_no_date,
+        )
     val orderedSections = if (opts.sortDir == SortDir.ASC) ascendingSections else ascendingSections.reversed()
 
     return buildList {
         orderedSections.forEach { section ->
             if (section.items.isNotEmpty()) {
-                add(HomeListItem.Header(
-                    label = section.label,
-                    count = section.items.size,
-                    stableKey = section.key,
-                    labelRes = sectionLabelRes[section.key],
-                ))
+                add(
+                    HomeListItem.Header(
+                        label = section.label,
+                        count = section.items.size,
+                        stableKey = section.key,
+                        labelRes = sectionLabelRes[section.key],
+                    ),
+                )
                 section.items.forEach {
                     add(HomeListItem.NoteRow(it, groupKey = section.key))
                 }
@@ -545,8 +598,11 @@ private fun arrangeMiddle(
 }
 
 /** Existing GroupBy logic, now scoped to the active middle (post Overdue / Done extraction). */
-private fun arrangeByGroupBy(active: List<NoteWithItems>, opts: ViewOptions): List<HomeListItem> {
-    return when (opts.groupBy) {
+private fun arrangeByGroupBy(
+    active: List<NoteWithItems>,
+    opts: ViewOptions,
+): List<HomeListItem> =
+    when (opts.groupBy) {
         GroupBy.DATE -> active.map { HomeListItem.NoteRow(it) }
         GroupBy.NONE -> active.map { HomeListItem.NoteRow(it, groupKey = "ACTIVE") }
         GroupBy.TYPE -> {
@@ -554,21 +610,25 @@ private fun arrangeByGroupBy(active: List<NoteWithItems>, opts: ViewOptions): Li
             val listsOnly = active.filter { it.note.kind == NoteKind.LIST }
             buildList {
                 if (notesOnly.isNotEmpty()) {
-                    add(HomeListItem.Header(
-                        label = "",
-                        count = notesOnly.size,
-                        stableKey = "TYPE_NOTE",
-                        labelRes = R.string.home_section_notes,
-                    ))
+                    add(
+                        HomeListItem.Header(
+                            label = "",
+                            count = notesOnly.size,
+                            stableKey = "TYPE_NOTE",
+                            labelRes = R.string.home_section_notes,
+                        ),
+                    )
                     notesOnly.forEach { add(HomeListItem.NoteRow(it, groupKey = "TYPE_NOTE")) }
                 }
                 if (listsOnly.isNotEmpty()) {
-                    add(HomeListItem.Header(
-                        label = "",
-                        count = listsOnly.size,
-                        stableKey = "TYPE_LIST",
-                        labelRes = R.string.home_section_lists,
-                    ))
+                    add(
+                        HomeListItem.Header(
+                            label = "",
+                            count = listsOnly.size,
+                            stableKey = "TYPE_LIST",
+                            labelRes = R.string.home_section_lists,
+                        ),
+                    )
                     listsOnly.forEach { add(HomeListItem.NoteRow(it, groupKey = "TYPE_LIST")) }
                 }
             }
@@ -576,16 +636,19 @@ private fun arrangeByGroupBy(active: List<NoteWithItems>, opts: ViewOptions): Li
         GroupBy.TAG -> {
             val tagged = active.filter { RememberReservedTags.userVisibleTags(it.note.tags).isNotEmpty() }
             val untagged = active.filter { RememberReservedTags.userVisibleTags(it.note.tags).isEmpty() }
-            val tags = tagged
-                .flatMap { RememberReservedTags.userVisibleTags(it.note.tags) }
-                .distinct()
-                .sorted()
+            val tags =
+                tagged
+                    .flatMap { RememberReservedTags.userVisibleTags(it.note.tags) }
+                    .distinct()
+                    .sorted()
             buildList {
                 tags.forEach { tag ->
-                    val inTag = tagged.filter {
-                        RememberReservedTags.userVisibleTags(it.note.tags)
-                            .any { tagName -> tagName.equals(tag, ignoreCase = true) }
-                    }
+                    val inTag =
+                        tagged.filter {
+                            RememberReservedTags
+                                .userVisibleTags(it.note.tags)
+                                .any { tagName -> tagName.equals(tag, ignoreCase = true) }
+                        }
                     if (inTag.isNotEmpty()) {
                         val sectionKey = "TAG_$tag"
                         add(HomeListItem.Header(label = tag, count = inTag.size, stableKey = sectionKey))
@@ -593,29 +656,32 @@ private fun arrangeByGroupBy(active: List<NoteWithItems>, opts: ViewOptions): Li
                     }
                 }
                 if (untagged.isNotEmpty()) {
-                    add(HomeListItem.Header(
-                        label = "",
-                        count = untagged.size,
-                        stableKey = "TAG_UNTAGGED",
-                        labelRes = R.string.home_section_untagged,
-                    ))
+                    add(
+                        HomeListItem.Header(
+                            label = "",
+                            count = untagged.size,
+                            stableKey = "TAG_UNTAGGED",
+                            labelRes = R.string.home_section_untagged,
+                        ),
+                    )
                     untagged.forEach { add(HomeListItem.NoteRow(it, groupKey = "TAG_UNTAGGED")) }
                 }
             }
         }
     }
-}
 
-private fun sortNotes(notes: List<NoteWithItems>, opts: ViewOptions): List<NoteWithItems> {
-    return notes.sortedWith(buildComparator(opts))
-}
+private fun sortNotes(
+    notes: List<NoteWithItems>,
+    opts: ViewOptions,
+): List<NoteWithItems> = notes.sortedWith(buildComparator(opts))
 
 private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
-    val ascBase: Comparator<NoteWithItems> = when (opts.sortKey) {
-        SortKey.LAST_MODIFIED -> compareBy { it.note.updatedAt }
-        SortKey.CREATED -> compareBy { it.note.createdAt }
-        SortKey.REMINDER -> compareBy { it.note.reminderAt ?: Long.MAX_VALUE }
-    }
+    val ascBase: Comparator<NoteWithItems> =
+        when (opts.sortKey) {
+            SortKey.LAST_MODIFIED -> compareBy { it.note.updatedAt }
+            SortKey.CREATED -> compareBy { it.note.createdAt }
+            SortKey.REMINDER -> compareBy { it.note.reminderAt ?: Long.MAX_VALUE }
+        }
     val directed = if (opts.sortDir == SortDir.DESC) ascBase.reversed() else ascBase
     return if (opts.sortKey == SortKey.REMINDER) {
         // Items without a reminder sink to the bottom regardless of direction.
@@ -637,16 +703,12 @@ private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
 @Composable
 fun HomeRoute(
     repository: NoteRepository,
-    themePrefs: ThemePrefs,
-    viewOptionsPrefs: ViewOptionsPrefs,
     interactionPrefs: InteractionPrefs,
     onOpenNote: (NoteWithItems, Boolean) -> Unit,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
 ) {
-    val vm: HomeViewModel = viewModel(
-        factory = HomeViewModel.factory(repository, themePrefs, viewOptionsPrefs),
-    )
+    val vm: HomeViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
     val interaction by interactionPrefs.state.collectAsStateWithLifecycle(
         initialValue = InteractionState(),
@@ -725,10 +787,11 @@ fun HomeScreen(
     // tasks are already finished; every other section starts expanded.
     var collapsedSectionKeys by rememberSaveable { mutableStateOf(setOf("DONE")) }
     val listState = rememberLazyListState()
-    val listScrollEnabled = rememberContentOverflowScrollEnabled(
-        listState = listState,
-        additionalScrollEnabled = topBarState.collapsedFraction > 0f,
-    )
+    val listScrollEnabled =
+        rememberContentOverflowScrollEnabled(
+            listState = listState,
+            additionalScrollEnabled = topBarState.collapsedFraction > 0f,
+        )
     val filterControlScrollState = rememberScrollState()
     val blurStyle = rememberProgressiveBlurStyle()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -738,16 +801,19 @@ fun HomeScreen(
     androidx.activity.compose.BackHandler(enabled = state.inSelectionMode) {
         onClearSelection()
     }
-    val displayedItems = remember(state.items, collapsedSectionKeys) {
-        state.items.filterNot { item ->
-            item is HomeListItem.NoteRow && item.groupKey in collapsedSectionKeys
+    val displayedItems =
+        remember(state.items, collapsedSectionKeys) {
+            state.items.filterNot { item ->
+                item is HomeListItem.NoteRow && item.groupKey in collapsedSectionKeys
+            }
         }
-    }
-    val selectableVisibleIds = remember(displayedItems) {
-        displayedItems.mapNotNull { item ->
-            (item as? HomeListItem.NoteRow)?.note?.note?.id
-        }.toSet()
-    }
+    val selectableVisibleIds =
+        remember(displayedItems) {
+            displayedItems
+                .mapNotNull { item ->
+                    (item as? HomeListItem.NoteRow)?.note?.note?.id
+                }.toSet()
+        }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -755,7 +821,7 @@ fun HomeScreen(
         bottomBar = {
             HomeSelectionActionBar(
                 visible = state.inSelectionMode,
-                selectedCount = state.selectedIds.size,
+                onClearSelection = onClearSelection,
                 onTagSelected = { tagSheetOpen = true },
                 onMarkDoneSelected = onMarkSelectedDone,
                 onArchiveSelected = onArchiveSelected,
@@ -773,73 +839,72 @@ fun HomeScreen(
                     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
                     val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
                     val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-                    val titleTarget = when {
-                        state.inSelectionMode -> TopBarTitleTarget.Selection
-                        searchOpen -> TopBarTitleTarget.Search
-                        else -> TopBarTitleTarget.AppName
-                    }
+                    val titleTarget =
+                        when {
+                            searchOpen && !state.inSelectionMode -> TopBarTitleTarget.Search
+                            else -> TopBarTitleTarget.AppName
+                        }
                     AnimatedContent(
                         targetState = titleTarget,
                         transitionSpec = {
                             val enteringSearch = targetState == TopBarTitleTarget.Search
                             val leavingSearch = initialState == TopBarTitleTarget.Search
-                            val enter = if (enteringSearch) {
-                                fadeIn(fadeInSpec) +
-                                    expandHorizontally(spatialSpec, expandFrom = Alignment.End)
-                            } else {
-                                fadeIn(fadeInSpec)
-                            }
-                            val exit = if (leavingSearch) {
-                                fadeOut(fadeOutSpec) +
-                                    shrinkHorizontally(spatialSpec, shrinkTowards = Alignment.End)
-                            } else {
-                                fadeOut(fadeOutSpec)
-                            }
+                            val enter =
+                                if (enteringSearch) {
+                                    fadeIn(fadeInSpec) +
+                                        expandHorizontally(spatialSpec, expandFrom = Alignment.End)
+                                } else {
+                                    fadeIn(fadeInSpec)
+                                }
+                            val exit =
+                                if (leavingSearch) {
+                                    fadeOut(fadeOutSpec) +
+                                        shrinkHorizontally(spatialSpec, shrinkTowards = Alignment.End)
+                                } else {
+                                    fadeOut(fadeOutSpec)
+                                }
                             (enter togetherWith exit).using(SizeTransform(clip = false))
                         },
                         label = "topBarTitle",
                     ) { target ->
                         when (target) {
-                            TopBarTitleTarget.Selection -> Text(
-                                text = stringResource(
-                                    R.string.home_select_count,
-                                    state.selectedIds.size,
-                                ),
-                                style = MaterialTheme.typography.headlineSmall,
-                            )
-                            TopBarTitleTarget.Search -> InlineSearchField(
-                                query = state.filter.text,
-                                onQueryChange = onQueryChange,
-                            )
+                            TopBarTitleTarget.Search ->
+                                InlineSearchField(
+                                    query = state.filter.text,
+                                    onQueryChange = onQueryChange,
+                                )
                             TopBarTitleTarget.AppName -> Text(stringResource(R.string.app_name))
                         }
-                    }
-                },
-                navigationIcon = {
-                    if (state.inSelectionMode) {
-                        val cdExit = stringResource(R.string.home_select_exit_cd)
-                        RememberFilledTonalIconButton(onClick = onClearSelection) {
-                            RememberMaterialRoundedSymbol(
-                                name = "close",
-                                weight = FontWeight.Medium,
-                                modifier = Modifier.semantics { contentDescription = cdExit },
-                            )
-                        }
-                        Spacer(Modifier.width(4.dp))
                     }
                 },
                 actions = {
                     if (state.inSelectionMode) {
                         val cdSelectAll = stringResource(R.string.home_select_all)
-                        RememberFilledTonalIconButton(
-                            onClick = { onSelectAllVisible(selectableVisibleIds) },
-                            enabled = selectableVisibleIds.isNotEmpty(),
-                        ) {
-                            RememberMaterialRoundedSymbol(
-                                name = "select_all",
-                                weight = FontWeight.Medium,
-                                modifier = Modifier.semantics { contentDescription = cdSelectAll },
-                            )
+                        Box(modifier = Modifier.size(48.dp)) {
+                            RememberFilledTonalIconButton(
+                                onClick = { onSelectAllVisible(selectableVisibleIds) },
+                                enabled = selectableVisibleIds.isNotEmpty(),
+                                modifier = Modifier.align(Alignment.Center),
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "select_all",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = cdSelectAll },
+                                )
+                            }
+                            Badge(
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomStart)
+                                        .offset(x = 2.dp, y = (-2).dp),
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                            ) {
+                                Text(
+                                    text = state.selectedIds.size.toString(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
                         }
                         Spacer(Modifier.width(6.dp))
                         val cdUnselectAll = stringResource(R.string.home_unselect_all)
@@ -874,10 +939,11 @@ fun HomeScreen(
                                 RememberMaterialRoundedSymbol(
                                     name = if (open) "close" else "search",
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.semantics {
-                                        contentDescription =
-                                            if (open) cdCloseSearch else cdSearch
-                                    },
+                                    modifier =
+                                        Modifier.semantics {
+                                            contentDescription =
+                                                if (open) cdCloseSearch else cdSearch
+                                        },
                                 )
                             }
                         }
@@ -891,14 +957,15 @@ fun HomeScreen(
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
         val topInset = padding.calculateTopPadding() + 4.dp
         val bottomPadding = bottomInset + 24.dp
-        val listContentPadding = remember(topInset, bottomPadding) {
-            PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = topInset,
-                bottom = bottomPadding,
-            )
-        }
+        val listContentPadding =
+            remember(topInset, bottomPadding) {
+                PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = topInset,
+                    bottom = bottomPadding,
+                )
+            }
         // If the active list is empty we may still have archive/trash matches when the user
         // is searching - only fall through to the empty-state screen if NOTHING matched.
         val hasExtendedMatches =
@@ -908,10 +975,11 @@ fun HomeScreen(
             state.totalActive > 0 || state.filter.active || state.viewOptions != ViewOptions()
         if (showEmptyState) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(blurMod)
-                    .padding(listContentPadding),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(blurMod)
+                        .padding(listContentPadding),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 if (showFilterControls) {
@@ -926,9 +994,10 @@ fun HomeScreen(
                     )
                 }
                 Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
                     contentAlignment = Alignment.Center,
                 ) {
                     NotesEmptyState(
@@ -936,18 +1005,20 @@ fun HomeScreen(
                         totalUnfilteredNotes = state.totalActive,
                         onCreateNote = onCreateNote,
                         onCreateList = onCreateList,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp, vertical = 24.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp, vertical = 24.dp),
                     )
                 }
             }
         } else {
             LazyColumn(
                 state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(blurMod),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(blurMod),
                 contentPadding = listContentPadding,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 userScrollEnabled = listScrollEnabled,
@@ -961,11 +1032,12 @@ fun HomeScreen(
                             onViewOptionsChange = onViewOptionsChange,
                             availableTags = state.availableTags,
                             scrollState = filterControlScrollState,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .animateItem(
-                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                                ),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .animateItem(
+                                        placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                    ),
                         )
                     }
                 }
@@ -985,28 +1057,34 @@ fun HomeScreen(
                     },
                 ) { item ->
                     when (item) {
-                        is HomeListItem.Header -> GroupHeader(
-                            label = item.labelRes?.let { stringResource(it) } ?: item.label,
-                            count = item.count,
-                            collapsible = item.collapsible,
-                            collapsed = item.stableKey in collapsedSectionKeys,
-                            onToggle = if (item.collapsible) {
-                                {
-                                    collapsedSectionKeys = if (item.stableKey in collapsedSectionKeys) {
-                                        collapsedSectionKeys - item.stableKey
+                        is HomeListItem.Header ->
+                            GroupHeader(
+                                label = item.labelRes?.let { stringResource(it) } ?: item.label,
+                                count = item.count,
+                                collapsible = item.collapsible,
+                                collapsed = item.stableKey in collapsedSectionKeys,
+                                onToggle =
+                                    if (item.collapsible) {
+                                        {
+                                            collapsedSectionKeys =
+                                                if (item.stableKey in collapsedSectionKeys) {
+                                                    collapsedSectionKeys - item.stableKey
+                                                } else {
+                                                    collapsedSectionKeys + item.stableKey
+                                                }
+                                        }
                                     } else {
-                                        collapsedSectionKeys + item.stableKey
-                                    }
-                                }
-                            } else null,
-                            // Bookend sections (Overdue at top, Done at bottom) stay
-                            // put when the user reverses sort. The pin icon advertises
-                            // that to avoid surprise.
-                            pinned = item.stableKey == "OVERDUE" || item.stableKey == "DONE",
-                            modifier = Modifier.animateItem(
-                                placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                            ),
-                        )
+                                        null
+                                    },
+                                // Bookend sections (Overdue at top, Done at bottom) stay
+                                // put when the user reverses sort. The pin icon advertises
+                                // that to avoid surprise.
+                                pinned = item.stableKey == "OVERDUE" || item.stableKey == "DONE",
+                                modifier =
+                                    Modifier.animateItem(
+                                        placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                    ),
+                            )
                         is HomeListItem.NoteRow -> {
                             val noteId = item.note.note.id
                             val isSelected = noteId in state.selectedIds
@@ -1014,13 +1092,17 @@ fun HomeScreen(
                                 note = item.note,
                                 interaction = interaction,
                                 onOpenNote = { n ->
-                                    if (state.inSelectionMode) onToggleSelection(n.note.id)
-                                    else onOpenNote(n)
+                                    if (state.inSelectionMode) {
+                                        onToggleSelection(n.note.id)
+                                    } else {
+                                        onOpenNote(n)
+                                    }
                                 },
                                 onSwipeAction = onSwipeAction,
-                                modifier = Modifier.animateItem(
-                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                                ),
+                                modifier =
+                                    Modifier.animateItem(
+                                        placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                    ),
                                 selected = isSelected,
                                 onLongClick = { onToggleSelection(noteId) },
                                 // Swipes are meaningless during bulk-select and would visually
@@ -1041,9 +1123,10 @@ fun HomeScreen(
                             expanded = archiveSectionExpanded,
                             onToggle = { archiveSectionExpanded = !archiveSectionExpanded },
                             muted = false,
-                            modifier = Modifier.animateItem(
-                                placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                            ),
+                            modifier =
+                                Modifier.animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ),
                         )
                     }
                     if (archiveSectionExpanded) {
@@ -1059,9 +1142,10 @@ fun HomeScreen(
                                 onSwipeAction = onSwipeAction,
                                 badgeText = stringResource(R.string.home_search_section_badge_archive),
                                 badgeStyle = SectionBadgeStyle.ARCHIVE,
-                                modifier = Modifier.animateItem(
-                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                                ),
+                                modifier =
+                                    Modifier.animateItem(
+                                        placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                    ),
                             )
                         }
                     }
@@ -1076,9 +1160,10 @@ fun HomeScreen(
                             expanded = trashSectionExpanded,
                             onToggle = { trashSectionExpanded = !trashSectionExpanded },
                             muted = true,
-                            modifier = Modifier.animateItem(
-                                placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                            ),
+                            modifier =
+                                Modifier.animateItem(
+                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                ),
                         )
                     }
                     if (trashSectionExpanded) {
@@ -1094,9 +1179,10 @@ fun HomeScreen(
                                 onSwipeAction = onSwipeAction,
                                 badgeText = stringResource(R.string.home_search_section_badge_trash),
                                 badgeStyle = SectionBadgeStyle.TRASH,
-                                modifier = Modifier.animateItem(
-                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
-                                ),
+                                modifier =
+                                    Modifier.animateItem(
+                                        placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                    ),
                             )
                         }
                     }
@@ -1117,7 +1203,7 @@ fun HomeScreen(
 @Composable
 private fun HomeSelectionActionBar(
     visible: Boolean,
-    selectedCount: Int,
+    onClearSelection: () -> Unit,
     onTagSelected: () -> Unit,
     onMarkDoneSelected: () -> Unit,
     onArchiveSelected: () -> Unit,
@@ -1125,9 +1211,10 @@ private fun HomeSelectionActionBar(
     bottomPadding: androidx.compose.ui.unit.Dp,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = bottomPadding),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(bottom = bottomPadding),
         contentAlignment = Alignment.Center,
     ) {
         AnimatedVisibility(
@@ -1137,21 +1224,26 @@ private fun HomeSelectionActionBar(
         ) {
             Surface(
                 shape = RoundedCornerShape(50),
-                color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                tonalElevation = 6.dp,
-                shadowElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                tonalElevation = 3.dp,
+                shadowElevation = 3.dp,
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Text(
-                        text = selectedCount.toString(),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 10.dp),
-                    )
+                    val exitLabel = stringResource(R.string.home_select_exit_cd)
+                    RememberFilledTonalIconButton(
+                        onClick = onClearSelection,
+                        tooltipLabel = exitLabel,
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "close",
+                            weight = FontWeight.Medium,
+                            modifier = Modifier.semantics { contentDescription = exitLabel },
+                        )
+                    }
                     val tagLabel = stringResource(R.string.home_bulk_tag)
                     val cdTag = stringResource(R.string.home_bulk_tag_cd)
                     RememberFilledTonalIconButton(
@@ -1193,10 +1285,11 @@ private fun HomeSelectionActionBar(
                     RememberFilledTonalIconButton(
                         onClick = onTrashSelected,
                         tooltipLabel = trashLabel,
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        ),
+                        colors =
+                            IconButtonDefaults.filledTonalIconButtonColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                            ),
                     ) {
                         RememberMaterialRoundedSymbol(
                             name = "delete",
@@ -1220,25 +1313,27 @@ private fun GroupHeader(
     pinned: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
-    val baseModifier = modifier
-        .fillMaxWidth()
-        // More vertical breathing room than before. titleMedium is denser than
-        // labelLarge, so the additional padding keeps the cards from butting against
-        // the header text.
-        .padding(top = 18.dp, bottom = 6.dp, start = 4.dp)
+    val baseModifier =
+        modifier
+            .fillMaxWidth()
+            // More vertical breathing room than before. titleMedium is denser than
+            // labelLarge, so the additional padding keeps the cards from butting against
+            // the header text.
+            .padding(top = 18.dp, bottom = 6.dp, start = 4.dp)
     val headerInteractionSource = remember { MutableInteractionSource() }
     val playTap = rememberPlayTapSound()
-    val rowModifier = if (collapsible && onToggle != null) {
-        baseModifier.clickable(
-            indication = null,
-            interactionSource = headerInteractionSource,
-        ) {
-            playTap()
-            onToggle()
+    val rowModifier =
+        if (collapsible && onToggle != null) {
+            baseModifier.clickable(
+                indication = null,
+                interactionSource = headerInteractionSource,
+            ) {
+                playTap()
+                onToggle()
+            }
+        } else {
+            baseModifier
         }
-    } else {
-        baseModifier
-    }
     Row(
         modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically,
@@ -1254,9 +1349,10 @@ private fun GroupHeader(
                 size = 14.dp,
                 tint = MaterialTheme.colorScheme.primary,
                 weight = FontWeight.Medium,
-                modifier = Modifier
-                    .padding(end = 6.dp)
-                    .graphicsLayer { rotationZ = 30f },
+                modifier =
+                    Modifier
+                        .padding(end = 6.dp)
+                        .graphicsLayer { rotationZ = 30f },
             )
         }
         Text(
@@ -1291,9 +1387,10 @@ private fun GroupHeader(
                 size = 18.dp,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 weight = FontWeight.Medium,
-                modifier = Modifier
-                    .padding(end = 8.dp)
-                    .graphicsLayer { rotationZ = rotation },
+                modifier =
+                    Modifier
+                        .padding(end = 8.dp)
+                        .graphicsLayer { rotationZ = rotation },
             )
         }
     }
@@ -1319,13 +1416,13 @@ private fun InlineSearchField(
         keyboardController?.show()
     }
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(
-                MaterialTheme.colorScheme.surfaceContainerHigh,
-                RoundedCornerShape(28.dp),
-            )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                    RoundedCornerShape(28.dp),
+                ).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RememberMaterialRoundedSymbol(
@@ -1344,12 +1441,14 @@ private fun InlineSearchField(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = MaterialTheme.colorScheme.onSurface,
-            ),
-            modifier = Modifier
-                .weight(1f)
-                .focusRequester(focusRequester),
+            textStyle =
+                MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester),
             decorationBox = { inner ->
                 if (searchFieldValue.text.isEmpty()) {
                     Text(
@@ -1395,33 +1494,52 @@ private fun SearchSectionPillDivider(
     )
     val cdExpand = stringResource(R.string.section_expand_cd, label)
     val cdCollapse = stringResource(R.string.section_collapse_cd, label)
-    val pillBackground = if (muted) MaterialTheme.colorScheme.surfaceContainerLow
-    else MaterialTheme.colorScheme.surfaceContainerHigh
-    val labelColor = if (muted) MaterialTheme.colorScheme.onSurfaceVariant
-    else MaterialTheme.colorScheme.onSurface
-    val countBg = if (muted) MaterialTheme.colorScheme.surfaceContainerHighest
-    else MaterialTheme.colorScheme.secondaryContainer
-    val countColor = if (muted) MaterialTheme.colorScheme.onSurfaceVariant
-    else MaterialTheme.colorScheme.onSecondaryContainer
+    val pillBackground =
+        if (muted) {
+            MaterialTheme.colorScheme.surfaceContainerLow
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        }
+    val labelColor =
+        if (muted) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
+    val countBg =
+        if (muted) {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        } else {
+            MaterialTheme.colorScheme.secondaryContainer
+        }
+    val countColor =
+        if (muted) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        }
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = 8.dp),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center,
     ) {
         // Divider line behind the pill - the pill's solid background occludes the center.
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(MaterialTheme.colorScheme.outlineVariant),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant),
         )
         Row(
-            modifier = Modifier
-                .background(pillBackground, RoundedCornerShape(999.dp))
-                .semantics { contentDescription = if (expanded) cdCollapse else cdExpand }
-                .tapSoundClickable(onClick = onToggle)
-                .padding(horizontal = 14.dp, vertical = 6.dp),
+            modifier =
+                Modifier
+                    .background(pillBackground, RoundedCornerShape(999.dp))
+                    .semantics { contentDescription = if (expanded) cdCollapse else cdExpand }
+                    .tapSoundClickable(onClick = onToggle)
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -1431,9 +1549,10 @@ private fun SearchSectionPillDivider(
                 color = labelColor,
             )
             Box(
-                modifier = Modifier
-                    .background(countBg, RoundedCornerShape(999.dp))
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                modifier =
+                    Modifier
+                        .background(countBg, RoundedCornerShape(999.dp))
+                        .padding(horizontal = 8.dp, vertical = 2.dp),
             ) {
                 Text(
                     text = count.toString(),
@@ -1470,14 +1589,16 @@ private fun StateBadgedNoteCard(
     badgeStyle: SectionBadgeStyle,
     modifier: Modifier = Modifier,
 ) {
-    val bgColor = when (badgeStyle) {
-        SectionBadgeStyle.ARCHIVE -> MaterialTheme.colorScheme.secondaryContainer
-        SectionBadgeStyle.TRASH -> MaterialTheme.colorScheme.errorContainer
-    }
-    val fgColor = when (badgeStyle) {
-        SectionBadgeStyle.ARCHIVE -> MaterialTheme.colorScheme.onSecondaryContainer
-        SectionBadgeStyle.TRASH -> MaterialTheme.colorScheme.onErrorContainer
-    }
+    val bgColor =
+        when (badgeStyle) {
+            SectionBadgeStyle.ARCHIVE -> MaterialTheme.colorScheme.secondaryContainer
+            SectionBadgeStyle.TRASH -> MaterialTheme.colorScheme.errorContainer
+        }
+    val fgColor =
+        when (badgeStyle) {
+            SectionBadgeStyle.ARCHIVE -> MaterialTheme.colorScheme.onSecondaryContainer
+            SectionBadgeStyle.TRASH -> MaterialTheme.colorScheme.onErrorContainer
+        }
     Box(modifier = modifier.fillMaxWidth()) {
         Box(modifier = Modifier.graphicsLayer { alpha = 0.88f }) {
             SwipeableRememberNoteCard(
@@ -1489,11 +1610,12 @@ private fun StateBadgedNoteCard(
             )
         }
         Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 10.dp, end = 14.dp)
-                .background(bgColor, RoundedCornerShape(6.dp))
-                .padding(horizontal = 7.dp, vertical = 2.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 10.dp, end = 14.dp)
+                    .background(bgColor, RoundedCornerShape(6.dp))
+                    .padding(horizontal = 7.dp, vertical = 2.dp),
         ) {
             Text(
                 text = badgeText,
@@ -1566,13 +1688,14 @@ private fun NotesEmptyState(
         } else {
             EmptyFilterIllustration()
             Spacer(Modifier.height(18.dp))
-            val titleText = when {
-                filter.text.isNotBlank() ->
-                    stringResource(R.string.home_no_results_for, filter.text)
-                filter.facetActive ->
-                    stringResource(R.string.home_no_results_filters_title)
-                else -> stringResource(R.string.home_nothing_here)
-            }
+            val titleText =
+                when {
+                    filter.text.isNotBlank() ->
+                        stringResource(R.string.home_no_results_for, filter.text)
+                    filter.facetActive ->
+                        stringResource(R.string.home_no_results_filters_title)
+                    else -> stringResource(R.string.home_nothing_here)
+                }
             Text(
                 text = titleText,
                 style = MaterialTheme.typography.headlineSmall,
@@ -1580,11 +1703,12 @@ private fun NotesEmptyState(
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(6.dp))
-            val hintText = if (filter.text.isNotBlank()) {
-                stringResource(R.string.home_no_results_hint)
-            } else {
-                stringResource(R.string.home_no_results_filters_hint)
-            }
+            val hintText =
+                if (filter.text.isNotBlank()) {
+                    stringResource(R.string.home_no_results_hint)
+                } else {
+                    stringResource(R.string.home_no_results_filters_hint)
+                }
             Text(
                 text = hintText,
                 style = MaterialTheme.typography.bodyMedium,

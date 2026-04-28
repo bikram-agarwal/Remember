@@ -1,17 +1,14 @@
 package dev.bikram.remember.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,42 +24,42 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import dev.bikram.remember.data.ChecklistItemEntity
-import dev.bikram.remember.data.NoteKind
-import dev.bikram.remember.data.NoteWithItems
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import com.mohamedrejeb.richeditor.ui.material3.RichText
 import dev.bikram.remember.R
+import dev.bikram.remember.data.ChecklistItemEntity
+import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RememberReservedTags
-import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.ApplyRichEditorListIndent
 import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.iconDrawableRes
 import dev.bikram.remember.ui.edit.iconEmojiPayload
 import dev.bikram.remember.ui.edit.iconSymbolName
-import dev.bikram.remember.ui.common.ApplyRichEditorListIndent
-import dev.bikram.remember.ui.theme.LocalHeroOnCards
-import dev.bikram.remember.ui.theme.elevatedCardColors
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.theme.LocalHeroOnCards
+import dev.bikram.remember.ui.theme.elevatedCardColors
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val CardShape = RoundedCornerShape(12.dp)
 
@@ -90,39 +87,46 @@ fun NoteCard(
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
-    val sharedModifier = if (sharedScope != null && navScope != null) {
-        with(sharedScope) {
-            Modifier.sharedBounds(
-                sharedContentState = rememberSharedContentState(key = "note-card-${note.note.id}"),
-                animatedVisibilityScope = navScope
-            )
+    val sharedModifier =
+        if (sharedScope != null && navScope != null) {
+            with(sharedScope) {
+                Modifier.sharedBounds(
+                    sharedContentState = rememberSharedContentState(key = "note-card-${note.note.id}"),
+                    animatedVisibilityScope = navScope,
+                )
+            }
+        } else {
+            Modifier
         }
-    } else Modifier
 
     val selectionBorderColor = MaterialTheme.colorScheme.primary
-    val selectionBorder = if (selected) {
-        Modifier.border(BorderStroke(2.dp, selectionBorderColor), CardShape)
-    } else {
-        Modifier
-    }
-    val favoriteBorder = if (note.note.favorite && !selected) {
-        Modifier.border(BorderStroke(1.dp, Color(0xFFFF9EBC).copy(alpha = 0.70f)), CardShape)
-    } else {
-        Modifier
-    }
-    val clickableModifier = if (onLongClick != null) {
-        Modifier.tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
-    } else {
-        Modifier.tapSoundClickable(onClick = onClick)
-    }
+    val selectionBorder =
+        if (selected) {
+            Modifier.border(BorderStroke(2.dp, selectionBorderColor), CardShape)
+        } else {
+            Modifier
+        }
+    val favoriteBorder =
+        if (note.note.favorite && !selected) {
+            Modifier.border(BorderStroke(1.dp, Color(0xFFFF9EBC).copy(alpha = 0.70f)), CardShape)
+        } else {
+            Modifier
+        }
+    val clickableModifier =
+        if (onLongClick != null) {
+            Modifier.tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
+        } else {
+            Modifier.tapSoundClickable(onClick = onClick)
+        }
     Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .then(sharedModifier)
-            .clip(CardShape)
-            .then(favoriteBorder)
-            .then(selectionBorder)
-            .then(clickableModifier),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .then(sharedModifier)
+                .clip(CardShape)
+                .then(favoriteBorder)
+                .then(selectionBorder)
+                .then(clickableModifier),
         shape = CardShape,
         color = cardColors.containerColor,
         contentColor = cardColors.contentColor,
@@ -133,20 +137,22 @@ fun NoteCard(
             if (showHero) {
                 HeroBackground(
                     uri = note.note.pictureUri!!,
-                    framing = remember(note.note.pictureHeroFraming) {
-                        HeroFraming.fromJsonString(note.note.pictureHeroFraming)
-                    },
+                    framing =
+                        remember(note.note.pictureHeroFraming) {
+                            HeroFraming.fromJsonString(note.note.pictureHeroFraming)
+                        },
                     cacheRevision = note.note.updatedAt,
                     scrimTop = surface.copy(alpha = 0.20f),
                     scrimBottom = surface.copy(alpha = 0.48f),
                 )
             }
             Row(
-                modifier = if (hasTagStrip && !showHero) {
-                    Modifier.height(intrinsicSize = androidx.compose.foundation.layout.IntrinsicSize.Min)
-                } else {
-                    Modifier
-                },
+                modifier =
+                    if (hasTagStrip && !showHero) {
+                        Modifier.height(intrinsicSize = androidx.compose.foundation.layout.IntrinsicSize.Min)
+                    } else {
+                        Modifier
+                    },
             ) {
                 if (hasTagStrip && !showHero) {
                     TagAccentCardStrip(tags = visibleTags)
@@ -203,10 +209,14 @@ fun NoteCard(
                             Spacer(Modifier.width(8.dp))
                         }
                         Text(
-                            text = note.note.title.ifBlank {
-                                if (note.note.kind == NoteKind.NOTE) stringResource(R.string.edit_note_title_new)
-                                else stringResource(R.string.edit_list_title_new)
-                            },
+                            text =
+                                note.note.title.ifBlank {
+                                    if (note.note.kind == NoteKind.NOTE) {
+                                        stringResource(R.string.edit_note_title_new)
+                                    } else {
+                                        stringResource(R.string.edit_list_title_new)
+                                    }
+                                },
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.weight(1f),
@@ -220,9 +230,10 @@ fun NoteCard(
                                 tint = Color(0xFFFF9EBC),
                                 weight = FontWeight.Medium,
                                 opticalCenterYOffset = 1.dp,
-                                modifier = Modifier
-                                    .semantics { contentDescription = favoriteIconDescription }
-                                    .alpha(0.90f),
+                                modifier =
+                                    Modifier
+                                        .semantics { contentDescription = favoriteIconDescription }
+                                        .alpha(0.90f),
                             )
                         }
                     }
@@ -252,11 +263,12 @@ fun NoteCard(
             }
             if (selected) {
                 Box(
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(10.dp)
-                        .size(24.dp)
-                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(10.dp)
+                            .size(24.dp)
+                            .background(MaterialTheme.colorScheme.primary, CircleShape),
                     contentAlignment = Alignment.Center,
                 ) {
                     RememberMaterialRoundedSymbol(
@@ -287,14 +299,18 @@ private fun BoxScope.HeroBackground(
         modifier = Modifier.matchParentSize(),
     )
     Box(
-        modifier = Modifier
-            .matchParentSize()
-            .background(Brush.verticalGradient(colors = listOf(scrimTop, scrimBottom))),
+        modifier =
+            Modifier
+                .matchParentSize()
+                .background(Brush.verticalGradient(colors = listOf(scrimTop, scrimBottom))),
     )
 }
 
 @Composable
-private fun MetadataRow(note: NoteWithItems, visibleTags: List<String>) {
+private fun MetadataRow(
+    note: NoteWithItems,
+    visibleTags: List<String>,
+) {
     val tags = visibleTags.take(3)
     val extraTags = (visibleTags.size - tags.size).coerceAtLeast(0)
     val reminderAt = note.note.reminderAt
@@ -334,9 +350,10 @@ private fun MetadataRow(note: NoteWithItems, visibleTags: List<String>) {
                     size = 14.dp,
                     tint = MaterialTheme.colorScheme.onSurface,
                     weight = FontWeight.Medium,
-                    modifier = Modifier
-                        .semantics { contentDescription = cdPicture }
-                        .alpha(0.6f),
+                    modifier =
+                        Modifier
+                            .semantics { contentDescription = cdPicture }
+                            .alpha(0.6f),
                 )
             }
             if (hasAttachment) {
@@ -346,9 +363,10 @@ private fun MetadataRow(note: NoteWithItems, visibleTags: List<String>) {
                     size = 14.dp,
                     tint = MaterialTheme.colorScheme.onSurface,
                     weight = FontWeight.Medium,
-                    modifier = Modifier
-                        .semantics { contentDescription = cdAttachment }
-                        .alpha(0.6f),
+                    modifier =
+                        Modifier
+                            .semantics { contentDescription = cdAttachment }
+                            .alpha(0.6f),
                 )
             }
             // Reminder slot - last in the row (rightmost). Replaces the old generic
@@ -371,9 +389,10 @@ private fun MetadataRow(note: NoteWithItems, visibleTags: List<String>) {
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .semantics { contentDescription = cdReminder }
-                        .alpha(0.85f),
+                    modifier =
+                        Modifier
+                            .semantics { contentDescription = cdReminder }
+                            .alpha(0.85f),
                 )
             }
         }
@@ -400,10 +419,13 @@ private fun TagMini(label: String) {
 }
 
 @Composable
-private fun ChecklistPreview(items: List<ChecklistItemEntity>, limit: Int = 2) {
+private fun ChecklistPreview(
+    items: List<ChecklistItemEntity>,
+    limit: Int = 2,
+) {
     if (items.isEmpty()) {
         Text(
-            text = stringResource(R.string.notecard_empty_list),
+            text = stringResource(R.string.common_empty_list),
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.alpha(0.5f),
         )

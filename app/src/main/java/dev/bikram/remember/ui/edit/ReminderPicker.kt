@@ -1,20 +1,21 @@
 package dev.bikram.remember.ui.edit
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.TextButton
-
 import android.Manifest
+import android.app.AlarmManager
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import android.text.format.DateFormat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.Spring
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -26,42 +27,38 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TooltipAnchorPosition
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
 import androidx.compose.material3.TimeInput
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDefaults
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -70,25 +67,25 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.res.stringResource
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.bikram.remember.R
 import dev.bikram.remember.data.MonthlyMode
 import dev.bikram.remember.data.RecurrenceEndKind
@@ -96,30 +93,19 @@ import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import java.util.Calendar
-import java.util.Locale
-import android.app.AlarmManager
-import android.content.Context
-import android.content.Intent
-import android.net.Uri
-import android.os.Build
-import android.provider.Settings
-import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.runtime.DisposableEffect
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import dev.bikram.remember.ui.components.RememberTextButton
-import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
+import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.util.Calendar
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
@@ -143,26 +129,28 @@ fun ReminderPickerSheet(
 
     val context = LocalContext.current
     val am = remember { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
-    var canScheduleExact by remember { 
-        mutableStateOf(Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()) 
+    var canScheduleExact by remember {
+        mutableStateOf(Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms())
     }
     var notificationsGranted by remember {
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) {
-        notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
-    }
-    
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) {
+            notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        }
+
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                canScheduleExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
-                notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    canScheduleExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
+                    notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+                }
             }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
@@ -258,18 +246,20 @@ fun ReminderPickerSheet(
 
         PillRow(
             materialSymbolName = "schedule",
-            label = if (reminderTimeExplicit) {
-                formatReminderTimePill(reminderHour, reminderMinute)
-            } else {
-                stringResource(R.string.reminder_pick_time)
-            },
+            label =
+                if (reminderTimeExplicit) {
+                    formatReminderTimePill(reminderHour, reminderMinute)
+                } else {
+                    stringResource(R.string.reminder_pick_time)
+                },
             hasValue = reminderTimeExplicit,
             onClick = { timePickerOpen = true },
-            onClear = if (reminderTimeExplicit) {
-                { reminderTimeExplicit = false }
-            } else {
-                null
-            },
+            onClear =
+                if (reminderTimeExplicit) {
+                    { reminderTimeExplicit = false }
+                } else {
+                    null
+                },
         )
 
         Spacer(Modifier.height(8.dp))
@@ -277,18 +267,23 @@ fun ReminderPickerSheet(
         // Repeat pill
         PillRow(
             materialSymbolName = "repeat",
-            label = if (repeatOn) repeatSummary(
-                unit = unit,
-                interval = intervalText.toIntOrNull() ?: 1,
-                daysOfWeek = daysOfWeek,
-                monthlyKind = monthlyKind,
-                dayOfMonth = dayOfMonth,
-                nthOrdinal = nthOrdinal,
-                nthWeekday = nthWeekday,
-                endKind = endKind,
-                endDate = endDate,
-                endCount = endCountText.toIntOrNull(),
-            ) else "Repeat",
+            label =
+                if (repeatOn) {
+                    repeatSummary(
+                        unit = unit,
+                        interval = intervalText.toIntOrNull() ?: 1,
+                        daysOfWeek = daysOfWeek,
+                        monthlyKind = monthlyKind,
+                        dayOfMonth = dayOfMonth,
+                        nthOrdinal = nthOrdinal,
+                        nthWeekday = nthWeekday,
+                        endKind = endKind,
+                        endDate = endDate,
+                        endCount = endCountText.toIntOrNull(),
+                    )
+                } else {
+                    "Repeat"
+                },
             hasValue = repeatOn,
             onClick = {
                 if (!repeatOn) {
@@ -298,7 +293,15 @@ fun ReminderPickerSheet(
                     repeatExpanded = !repeatExpanded
                 }
             },
-            onClear = if (repeatOn) { { repeatOn = false; repeatExpanded = false } } else null,
+            onClear =
+                if (repeatOn) {
+                    {
+                        repeatOn = false
+                        repeatExpanded = false
+                    }
+                } else {
+                    null
+                },
         )
 
         if (repeatOn && repeatExpanded) {
@@ -339,24 +342,25 @@ fun ReminderPickerSheet(
 
         if (!canScheduleExact) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.errorContainer)
-                    .tapSoundClickable {
-                        val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                            data = Uri.parse("package:${context.packageName}")
-                        }
-                        context.startActivity(intent)
-                    }
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .tapSoundClickable {
+                            val intent =
+                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                    data = Uri.parse("package:${context.packageName}")
+                                }
+                            context.startActivity(intent)
+                        }.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     stringResource(R.string.reminder_exact_alarm_permission_prompt),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onErrorContainer,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
             }
             Spacer(Modifier.height(12.dp))
@@ -371,52 +375,64 @@ fun ReminderPickerSheet(
                 RememberFilledTonalButton(onClick = { onConfirm(null, null) }) { Text(stringResource(R.string.common_clear)) }
             }
             RememberFilledTonalButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-            
-            val isDoneEnabled = run {
-                if (repeatOn) {
-                    if (unit == RecurrenceUnit.WEEK && daysOfWeek.isEmpty()) return@run false
-                    if (endKind == RecurrenceEndKind.ON_DATE && endDate == null) return@run false
-                    if (endKind == RecurrenceEndKind.AFTER_COUNT && (endCountText.toIntOrNull() == null || endCountText.toInt() < 1)) return@run false
-                    if (intervalText.toIntOrNull() == null || intervalText.toInt() < 1) return@run false
+
+            val isDoneEnabled =
+                run {
+                    if (repeatOn) {
+                        if (unit == RecurrenceUnit.WEEK && daysOfWeek.isEmpty()) return@run false
+                        if (endKind == RecurrenceEndKind.ON_DATE && endDate == null) return@run false
+                        if (endKind == RecurrenceEndKind.AFTER_COUNT && (endCountText.toIntOrNull() == null || endCountText.toInt() < 1)) return@run false
+                        if (intervalText.toIntOrNull() == null || intervalText.toInt() < 1) return@run false
+                    }
+                    true
                 }
-                true
-            }
-            
+
             RememberButton(
                 enabled = isDoneEnabled,
                 onClick = {
-                val hour24 = if (reminderTimeExplicit) reminderHour else 18
-                val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
-                val selectedDay =
-                    Instant.ofEpochMilli(selectedDate).atZone(ZoneOffset.UTC).toLocalDate()
-                val fireAt = selectedDay
-                    .atTime(LocalTime.of(hour24, minuteVal))
-                    .atZone(ZoneId.systemDefault())
-                    .toInstant()
-                    .toEpochMilli()
-                val rule = if (!repeatOn) null else {
-                    val interval = intervalText.toIntOrNull()?.coerceIn(1, 999) ?: 1
-                    val mode: MonthlyMode? = if (unit == RecurrenceUnit.MONTH) {
-                        if (monthlyKind == MonthlyKind.BY_DAY) MonthlyMode.ByDayOfMonth(dayOfMonth)
-                        else MonthlyMode.ByNthWeekday(nthOrdinal, nthWeekday)
-                    } else null
-                    val daysSet = if (unit == RecurrenceUnit.WEEK) daysOfWeek else emptySet()
-                    // Fall back to the same default the picker pre-populates (10) when the field is
-                    // empty or otherwise unparseable. [RecurrenceRule.sanitized] also maps invalid
-                    // AFTER_COUNT + null endCount to NEVER so reminders never stop after one fire.
-                    val count = endCountText.toIntOrNull()?.coerceIn(1, 9999) ?: DEFAULT_END_COUNT
-                    RecurrenceRule(
-                        unit = unit,
-                        interval = interval,
-                        daysOfWeek = daysSet,
-                        monthlyMode = mode,
-                        endKind = endKind,
-                        endDate = if (endKind == RecurrenceEndKind.ON_DATE) endDate else null,
-                        endCount = if (endKind == RecurrenceEndKind.AFTER_COUNT) count else null,
-                    )
-                }
-                onConfirm(fireAt, rule)
-            }) { Text(stringResource(R.string.common_done)) }
+                    val hour24 = if (reminderTimeExplicit) reminderHour else 18
+                    val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
+                    val selectedDay =
+                        Instant.ofEpochMilli(selectedDate).atZone(ZoneOffset.UTC).toLocalDate()
+                    val fireAt =
+                        selectedDay
+                            .atTime(LocalTime.of(hour24, minuteVal))
+                            .atZone(ZoneId.systemDefault())
+                            .toInstant()
+                            .toEpochMilli()
+                    val rule =
+                        if (!repeatOn) {
+                            null
+                        } else {
+                            val interval = intervalText.toIntOrNull()?.coerceIn(1, 999) ?: 1
+                            val mode: MonthlyMode? =
+                                if (unit == RecurrenceUnit.MONTH) {
+                                    if (monthlyKind == MonthlyKind.BY_DAY) {
+                                        MonthlyMode.ByDayOfMonth(dayOfMonth)
+                                    } else {
+                                        MonthlyMode.ByNthWeekday(nthOrdinal, nthWeekday)
+                                    }
+                                } else {
+                                    null
+                                }
+                            val daysSet = if (unit == RecurrenceUnit.WEEK) daysOfWeek else emptySet()
+                            // Fall back to the same default the picker pre-populates (10) when the field is
+                            // empty or otherwise unparseable. [RecurrenceRule.sanitized] also maps invalid
+                            // AFTER_COUNT + null endCount to NEVER so reminders never stop after one fire.
+                            val count = endCountText.toIntOrNull()?.coerceIn(1, 9999) ?: DEFAULT_END_COUNT
+                            RecurrenceRule(
+                                unit = unit,
+                                interval = interval,
+                                daysOfWeek = daysSet,
+                                monthlyMode = mode,
+                                endKind = endKind,
+                                endDate = if (endKind == RecurrenceEndKind.ON_DATE) endDate else null,
+                                endCount = if (endKind == RecurrenceEndKind.AFTER_COUNT) count else null,
+                            )
+                        }
+                    onConfirm(fireAt, rule)
+                },
+            ) { Text(stringResource(R.string.common_done)) }
         }
         Spacer(Modifier.height(8.dp))
     }
@@ -424,7 +440,10 @@ fun ReminderPickerSheet(
     if (dateDialogOpen) {
         CalendarPickerDialog(
             initial = selectedDate,
-            onConfirm = { selectedDate = it; dateDialogOpen = false },
+            onConfirm = {
+                selectedDate = it
+                dateDialogOpen = false
+            },
             onDismiss = { dateDialogOpen = false },
         )
     }
@@ -506,11 +525,10 @@ private fun NotificationPermissionRequiredCard(
     }
 }
 
-private fun notificationSettingsIntent(context: Context): Intent {
-    return Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+private fun notificationSettingsIntent(context: Context): Intent =
+    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
     }
-}
 
 private enum class MonthlyKind { BY_DAY, BY_WEEKDAY }
 
@@ -523,21 +541,27 @@ private enum class MonthlyKind { BY_DAY, BY_WEEKDAY }
 private const val DEFAULT_END_COUNT = 10
 
 @Composable
-private fun formatReminderTimePill(hour24: Int, minute: Int): String {
-    return if (DateFormat.is24HourFormat(LocalContext.current)) {
+private fun formatReminderTimePill(
+    hour24: Int,
+    minute: Int,
+): String =
+    if (DateFormat.is24HourFormat(LocalContext.current)) {
         "%02d:%02d".format(hour24, minute)
     } else {
         formatTime12h(hour24, minute)
     }
-}
 
-private fun formatTime12h(hour24: Int, minute: Int): String {
+private fun formatTime12h(
+    hour24: Int,
+    minute: Int,
+): String {
     val ampm = if (hour24 < 12) "AM" else "PM"
-    val hour12 = when {
-        hour24 == 0 -> 12
-        hour24 > 12 -> hour24 - 12
-        else -> hour24
-    }
+    val hour12 =
+        when {
+            hour24 == 0 -> 12
+            hour24 > 12 -> hour24 - 12
+            else -> hour24
+        }
     return "%d:%02d %s".format(hour12, minute, ampm)
 }
 
@@ -568,10 +592,11 @@ internal fun CalendarPickerDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        ),
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
     ) {
         // By wrapping the content in a full-screen box, we force the Android Dialog Window to
         // be full-screen. This means that when the DatePicker switches modes and changes its
@@ -579,59 +604,64 @@ internal fun CalendarPickerDialog(
         // If we didn't do this, the Android WindowManager would try to resize the dialog window
         // mid-animation, causing severe (2-3 seconds) stuttering on many devices.
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onDismiss
-                ),
-            contentAlignment = Alignment.Center
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onDismiss,
+                    ),
+            contentAlignment = Alignment.Center,
         ) {
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
                 color = datePickerContainerColor,
                 tonalElevation = 0.dp,
-                modifier = Modifier
-                    .widthIn(min = 328.dp, max = 400.dp)
-                    .wrapContentHeight()
-                    .animateContentSize(
-                        animationSpec = spring<androidx.compose.ui.unit.IntSize>(
-                            dampingRatio = Spring.DampingRatioNoBouncy,
-                            stiffness = Spring.StiffnessMediumLow
-                        )
-                    )
-                    .padding(horizontal = 16.dp)
-                    .clickable(
-                        // Catch clicks on the surface so they don't leak to the dismiss background
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = {}
-                    ),
+                modifier =
+                    Modifier
+                        .widthIn(min = 328.dp, max = 400.dp)
+                        .wrapContentHeight()
+                        .animateContentSize(
+                            animationSpec =
+                                spring<androidx.compose.ui.unit.IntSize>(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                        ).padding(horizontal = 16.dp)
+                        .clickable(
+                            // Catch clicks on the surface so they don't leak to the dismiss background
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                        ),
             ) {
                 MaterialTheme(
-                    typography = MaterialTheme.typography.copy(
-                        displayLarge = MaterialTheme.typography.headlineMedium,
-                        headlineLarge = MaterialTheme.typography.headlineMedium,
-                    )
+                    typography =
+                        MaterialTheme.typography.copy(
+                            displayLarge = MaterialTheme.typography.headlineMedium,
+                            headlineLarge = MaterialTheme.typography.headlineMedium,
+                        ),
                 ) {
                     Column(
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        modifier = Modifier.padding(bottom = 12.dp),
                     ) {
                         DatePicker(
                             state = state,
                             title = null,
                             showModeToggle = true,
                             modifier = Modifier.padding(top = 16.dp),
-                            colors = DatePickerDefaults.colors(
-                                containerColor = datePickerContainerColor,
-                                dividerColor = Color.Transparent,
-                            )
+                            colors =
+                                DatePickerDefaults.colors(
+                                    containerColor = datePickerContainerColor,
+                                    dividerColor = Color.Transparent,
+                                ),
                         )
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 8.dp),
                             horizontalArrangement = Arrangement.End,
                         ) {
                             RememberTextButton(onClick = onDismiss) {
@@ -668,17 +698,19 @@ internal fun ReminderTimePickerDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         key(initialHour, initialMinute) {
-            val timePickerState = rememberTimePickerState(
-                initialHour = initialHour,
-                initialMinute = initialMinute,
-                is24Hour = false,
-            )
+            val timePickerState =
+                rememberTimePickerState(
+                    initialHour = initialHour,
+                    initialMinute = initialMinute,
+                    is24Hour = false,
+                )
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                modifier = Modifier
-                    .widthIn(max = 400.dp)
-                    .padding(16.dp),
+                modifier =
+                    Modifier
+                        .widthIn(max = 400.dp)
+                        .padding(16.dp),
             ) {
                 Column(
                     modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
@@ -687,42 +719,47 @@ internal fun ReminderTimePickerDialog(
                     Text(
                         text = stringResource(R.string.reminder_time_picker_title),
                         style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 12.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
                     )
                     // Use surfaceContainerHigh for the dial so it sits visibly above the
                     // surfaceContainerLowest dialog surface, even when Material You's
                     // tonal-surface roles compress close together.
-                    val pickerColors = TimePickerDefaults.colors(
-                        clockDialColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    )
+                    val pickerColors =
+                        TimePickerDefaults.colors(
+                            clockDialColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        )
                     if (showDial) {
                         TimePicker(state = timePickerState, colors = pickerColors)
                     } else {
                         TimeInput(state = timePickerState, colors = pickerColors)
                     }
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .padding(top = 8.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                                .padding(top = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val timeInputModeLabel = stringResource(R.string.reminder_time_input_mode)
                         val timeDialModeLabel = stringResource(R.string.reminder_time_dial_mode)
                         TooltipBox(
-                            positionProvider = TooltipDefaults.rememberTooltipPositionProvider(
-                                TooltipAnchorPosition.Above,
-                            ),
+                            positionProvider =
+                                TooltipDefaults.rememberTooltipPositionProvider(
+                                    TooltipAnchorPosition.Above,
+                                ),
                             tooltip = {
                                 PlainTooltip {
                                     Text(
-                                        text = if (showDial) {
-                                            timeInputModeLabel
-                                        } else {
-                                            timeDialModeLabel
-                                        },
+                                        text =
+                                            if (showDial) {
+                                                timeInputModeLabel
+                                            } else {
+                                                timeDialModeLabel
+                                            },
                                     )
                                 }
                             },
@@ -734,9 +771,10 @@ internal fun ReminderTimePickerDialog(
                                 RememberMaterialRoundedSymbol(
                                     name = if (showDial) "keyboard" else "schedule",
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.semantics {
-                                        contentDescription = if (showDial) timeInputModeLabel else timeDialModeLabel
-                                    },
+                                    modifier =
+                                        Modifier.semantics {
+                                            contentDescription = if (showDial) timeInputModeLabel else timeDialModeLabel
+                                        },
                                 )
                             }
                         }
@@ -767,34 +805,45 @@ private fun PillRow(
     onClear: (() -> Unit)? = null,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(PillHeight)
-            .clip(RoundedCornerShape(16.dp))
-            .background(
-                // Use full-opacity primaryContainer for the activated state so the pill
-                // stays clearly distinct from the sheet background even in seed-based
-                // themes where the half-alpha version washes out against light surfaces.
-                if (hasValue) MaterialTheme.colorScheme.primaryContainer
-                else MaterialTheme.colorScheme.surfaceContainerHigh,
-            )
-            .tapSoundClickable(onClick = onClick)
-            .padding(start = 20.dp, end = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(PillHeight)
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    // Use full-opacity primaryContainer for the activated state so the pill
+                    // stays clearly distinct from the sheet background even in seed-based
+                    // themes where the half-alpha version washes out against light surfaces.
+                    if (hasValue) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHigh
+                    },
+                ).tapSoundClickable(onClick = onClick)
+                .padding(start = 20.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RememberMaterialRoundedSymbol(
             name = materialSymbolName,
             size = 20.dp,
-            tint = if (hasValue) MaterialTheme.colorScheme.onPrimaryContainer
-            else MaterialTheme.colorScheme.onSurfaceVariant,
+            tint =
+                if (hasValue) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
             weight = FontWeight.Medium,
         )
         Spacer(Modifier.width(16.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            color = if (hasValue) MaterialTheme.colorScheme.onPrimaryContainer
-            else MaterialTheme.colorScheme.onSurface,
+            color =
+                if (hasValue) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                },
             modifier = Modifier.weight(1f),
         )
         // Reserve the trailing slot so rows with and without Clear match height/width.
@@ -860,9 +909,10 @@ private fun RepeatConfig(
             // field all start at the same vertical line.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(RepeatRowHeight),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(RepeatRowHeight),
             ) {
                 Box(
                     modifier = Modifier.width(RepeatLeadingPad),
@@ -881,9 +931,10 @@ private fun RepeatConfig(
                 )
                 Spacer(Modifier.width(10.dp))
                 SheetDropdown(
-                    boxModifier = Modifier
-                        .weight(1f)
-                        .height(RepeatRowHeight),
+                    boxModifier =
+                        Modifier
+                            .weight(1f)
+                            .height(RepeatRowHeight),
                     value = unitLabel(unit),
                     expanded = unitMenuOpen,
                     onExpandedChange = onUnitMenuOpen,
@@ -891,7 +942,10 @@ private fun RepeatConfig(
                     RecurrenceUnit.entries.forEach { u ->
                         RememberDropdownMenuItem(
                             text = { Text(unitLabel(u)) },
-                            onClick = { onUnit(u); onUnitMenuOpen(false) },
+                            onClick = {
+                                onUnit(u)
+                                onUnitMenuOpen(false)
+                            },
                         )
                     }
                 }
@@ -899,34 +953,42 @@ private fun RepeatConfig(
 
             Spacer(Modifier.height(10.dp))
             when (unit) {
-                RecurrenceUnit.WEEK -> WeekdayRow(selected = daysOfWeek, onToggle = { day ->
-                    val next = if (day in daysOfWeek) {
-                        if (daysOfWeek.size == 1) daysOfWeek else daysOfWeek - day
-                    } else daysOfWeek + day
-                    onDaysOfWeek(next)
-                })
+                RecurrenceUnit.WEEK ->
+                    WeekdayRow(selected = daysOfWeek, onToggle = { day ->
+                        val next =
+                            if (day in daysOfWeek) {
+                                if (daysOfWeek.size == 1) daysOfWeek else daysOfWeek - day
+                            } else {
+                                daysOfWeek + day
+                            }
+                        onDaysOfWeek(next)
+                    })
                 RecurrenceUnit.MONTH -> {
                     RadioOption(
                         selected = monthlyKind == MonthlyKind.BY_DAY,
                         onSelect = { onMonthlyKind(MonthlyKind.BY_DAY) },
                     ) {
                         SheetDropdown(
-                            boxModifier = Modifier
-                                .fillMaxWidth()
-                                .height(RepeatRowHeight),
+                            boxModifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(RepeatRowHeight),
                             value = "On day $dayOfMonth",
                             expanded = dayOfMonthMenuOpen,
                             onExpandedChange = {
                                 if (monthlyKind == MonthlyKind.BY_DAY) onDayOfMonthMenuOpen(it)
                             },
                         ) {
-                                (1..31).forEach { d ->
-                                    RememberDropdownMenuItem(
-                                        text = { Text(stringResource(R.string.reminder_on_day, d)) },
-                                        onClick = { onDayOfMonth(d); onDayOfMonthMenuOpen(false) },
-                                    )
-                                }
+                            for (dayOfMonthOption in 1..31) {
+                                RememberDropdownMenuItem(
+                                    text = { Text(stringResource(R.string.reminder_on_day, dayOfMonthOption)) },
+                                    onClick = {
+                                        onDayOfMonth(dayOfMonthOption)
+                                        onDayOfMonthMenuOpen(false)
+                                    },
+                                )
                             }
+                        }
                     }
                     Spacer(Modifier.height(6.dp))
                     RadioOption(
@@ -935,42 +997,54 @@ private fun RepeatConfig(
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             SheetDropdown(
-                                boxModifier = Modifier
-                                    .weight(1f)
-                                    .height(RepeatRowHeight),
+                                boxModifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .height(RepeatRowHeight),
                                 value = ordinalLabel(nthOrdinal),
                                 expanded = nthOrdinalMenuOpen,
                                 onExpandedChange = {
                                     if (monthlyKind == MonthlyKind.BY_WEEKDAY) onNthOrdinalMenuOpen(it)
                                 },
                             ) {
-                                    listOf(1 to "First", 2 to "Second", 3 to "Third", 4 to "Fourth", 5 to "Last").forEach { (n, lbl) ->
-                                        RememberDropdownMenuItem(
-                                            text = { Text(lbl) },
-                                            onClick = { onNthOrdinal(n); onNthOrdinalMenuOpen(false) },
-                                        )
-                                    }
+                                listOf(1 to "First", 2 to "Second", 3 to "Third", 4 to "Fourth", 5 to "Last").forEach { (n, lbl) ->
+                                    RememberDropdownMenuItem(
+                                        text = { Text(lbl) },
+                                        onClick = {
+                                            onNthOrdinal(n)
+                                            onNthOrdinalMenuOpen(false)
+                                        },
+                                    )
+                                }
                             }
                             SheetDropdown(
-                                boxModifier = Modifier
-                                    .weight(1f)
-                                    .height(RepeatRowHeight),
+                                boxModifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .height(RepeatRowHeight),
                                 value = weekdayFullName(nthWeekday),
                                 expanded = nthWeekdayMenuOpen,
                                 onExpandedChange = {
                                     if (monthlyKind == MonthlyKind.BY_WEEKDAY) onNthWeekdayMenuOpen(it)
                                 },
                             ) {
-                                    listOf(
-                                        Calendar.SUNDAY, Calendar.MONDAY, Calendar.TUESDAY,
-                                        Calendar.WEDNESDAY, Calendar.THURSDAY, Calendar.FRIDAY,
-                                        Calendar.SATURDAY,
-                                    ).forEach { wd ->
-                                        RememberDropdownMenuItem(
-                                            text = { Text(weekdayFullName(wd)) },
-                                            onClick = { onNthWeekday(wd); onNthWeekdayMenuOpen(false) },
-                                        )
-                                    }
+                                listOf(
+                                    Calendar.SUNDAY,
+                                    Calendar.MONDAY,
+                                    Calendar.TUESDAY,
+                                    Calendar.WEDNESDAY,
+                                    Calendar.THURSDAY,
+                                    Calendar.FRIDAY,
+                                    Calendar.SATURDAY,
+                                ).forEach { wd ->
+                                    RememberDropdownMenuItem(
+                                        text = { Text(weekdayFullName(wd)) },
+                                        onClick = {
+                                            onNthWeekday(wd)
+                                            onNthWeekdayMenuOpen(false)
+                                        },
+                                    )
+                                }
                             }
                         }
                     }
@@ -1007,9 +1081,10 @@ private fun RepeatConfig(
                 onSelect = { onEndKind(RecurrenceEndKind.AFTER_COUNT) },
             ) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(RepeatRowHeight),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(RepeatRowHeight),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -1051,22 +1126,24 @@ private fun CompactDigitField(
     fieldWidth: Dp = 48.dp,
     enabled: Boolean = true,
 ) {
-    val textColor = if (enabled) {
-        MaterialTheme.colorScheme.onSurface
-    } else {
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-    }
+    val textColor =
+        if (enabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        }
     val outlineShape = RoundedCornerShape(12.dp)
     Box(
-        modifier = modifier
-            .width(fieldWidth)
-            .height(RepeatRowHeight)
-            .clip(outlineShape)
-            .border(
-                width = 1.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) 0.6f else 0.35f),
-                shape = outlineShape,
-            ),
+        modifier =
+            modifier
+                .width(fieldWidth)
+                .height(RepeatRowHeight)
+                .clip(outlineShape)
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.outline.copy(alpha = if (enabled) 0.6f else 0.35f),
+                    shape = outlineShape,
+                ),
         contentAlignment = Alignment.Center,
     ) {
         BasicTextField(
@@ -1077,13 +1154,15 @@ private fun CompactDigitField(
             enabled = enabled,
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                color = textColor,
-                textAlign = TextAlign.Center,
-            ),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp),
+            textStyle =
+                MaterialTheme.typography.bodyLarge.copy(
+                    color = textColor,
+                    textAlign = TextAlign.Center,
+                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
         )
     }
 }
@@ -1101,17 +1180,17 @@ private fun SheetDropdown(
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(RepeatRowHeight)
-                .clip(RoundedCornerShape(12.dp))
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                    shape = RoundedCornerShape(12.dp),
-                )
-                .tapSoundClickable { onExpandedChange(true) }
-                .padding(horizontal = 16.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(RepeatRowHeight)
+                    .clip(RoundedCornerShape(12.dp))
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
+                        shape = RoundedCornerShape(12.dp),
+                    ).tapSoundClickable { onExpandedChange(true) }
+                    .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -1142,10 +1221,11 @@ private fun RadioOption(
     content: @Composable () -> Unit,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .tapSoundClickable(onClick = onSelect)
-            .padding(vertical = 4.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .tapSoundClickable(onClick = onSelect)
+                .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RadioButton(selected = selected, onClick = onSelect)
@@ -1155,41 +1235,55 @@ private fun RadioOption(
 }
 
 @Composable
-private fun WeekdayRow(selected: Set<Int>, onToggle: (Int) -> Unit) {
-    val weekdays = listOf(
-        Calendar.SUNDAY to "S",
-        Calendar.MONDAY to "M",
-        Calendar.TUESDAY to "T",
-        Calendar.WEDNESDAY to "W",
-        Calendar.THURSDAY to "T",
-        Calendar.FRIDAY to "F",
-        Calendar.SATURDAY to "S",
-    )
+private fun WeekdayRow(
+    selected: Set<Int>,
+    onToggle: (Int) -> Unit,
+) {
+    val weekdays =
+        listOf(
+            Calendar.SUNDAY to "S",
+            Calendar.MONDAY to "M",
+            Calendar.TUESDAY to "T",
+            Calendar.WEDNESDAY to "W",
+            Calendar.THURSDAY to "T",
+            Calendar.FRIDAY to "F",
+            Calendar.SATURDAY to "S",
+        )
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         weekdays.forEach { (day, label) ->
             val isSel = day in selected
             Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(
-                        if (isSel) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = if (isSel) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.outlineVariant,
-                        shape = CircleShape,
-                    )
-                    .tapSoundClickable { onToggle(day) },
+                modifier =
+                    Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(
+                            if (isSel) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHighest
+                            },
+                        ).border(
+                            width = 1.dp,
+                            color =
+                                if (isSel) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant
+                                },
+                            shape = CircleShape,
+                        ).tapSoundClickable { onToggle(day) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     label,
                     style = MaterialTheme.typography.labelMedium,
-                    color = if (isSel) MaterialTheme.colorScheme.onPrimary
-                    else MaterialTheme.colorScheme.onSurface,
+                    color =
+                        if (isSel) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                     textAlign = TextAlign.Center,
                 )
             }
@@ -1197,44 +1291,57 @@ private fun WeekdayRow(selected: Set<Int>, onToggle: (Int) -> Unit) {
     }
 }
 
-private fun unitLabel(u: RecurrenceUnit): String = when (u) {
-    RecurrenceUnit.DAY -> "Day"
-    RecurrenceUnit.WEEK -> "Week"
-    RecurrenceUnit.MONTH -> "Month"
-    RecurrenceUnit.YEAR -> "Year"
-}
+private fun unitLabel(u: RecurrenceUnit): String =
+    when (u) {
+        RecurrenceUnit.DAY -> "Day"
+        RecurrenceUnit.WEEK -> "Week"
+        RecurrenceUnit.MONTH -> "Month"
+        RecurrenceUnit.YEAR -> "Year"
+    }
 
-private fun ordinalLabel(n: Int): String = when (n) {
-    1 -> "First"; 2 -> "Second"; 3 -> "Third"; 4 -> "Fourth"; 5 -> "Last"
-    else -> "First"
-}
+private fun ordinalLabel(n: Int): String =
+    when (n) {
+        1 -> "First"
+        2 -> "Second"
+        3 -> "Third"
+        4 -> "Fourth"
+        5 -> "Last"
+        else -> "First"
+    }
 
-private fun ordinalWord(n: Int): String = when (n) {
-    1 -> "first"; 2 -> "second"; 3 -> "third"; 4 -> "fourth"; 5 -> "last"
-    else -> "first"
-}
+private fun ordinalWord(n: Int): String =
+    when (n) {
+        1 -> "first"
+        2 -> "second"
+        3 -> "third"
+        4 -> "fourth"
+        5 -> "last"
+        else -> "first"
+    }
 
-private fun weekdayFullName(weekday: Int): String = when (weekday) {
-    Calendar.SUNDAY -> "Sunday"
-    Calendar.MONDAY -> "Monday"
-    Calendar.TUESDAY -> "Tuesday"
-    Calendar.WEDNESDAY -> "Wednesday"
-    Calendar.THURSDAY -> "Thursday"
-    Calendar.FRIDAY -> "Friday"
-    Calendar.SATURDAY -> "Saturday"
-    else -> ""
-}
+private fun weekdayFullName(weekday: Int): String =
+    when (weekday) {
+        Calendar.SUNDAY -> "Sunday"
+        Calendar.MONDAY -> "Monday"
+        Calendar.TUESDAY -> "Tuesday"
+        Calendar.WEDNESDAY -> "Wednesday"
+        Calendar.THURSDAY -> "Thursday"
+        Calendar.FRIDAY -> "Friday"
+        Calendar.SATURDAY -> "Saturday"
+        else -> ""
+    }
 
-private fun weekdayShort(weekday: Int): String = when (weekday) {
-    Calendar.SUNDAY -> "Sun"
-    Calendar.MONDAY -> "Mon"
-    Calendar.TUESDAY -> "Tue"
-    Calendar.WEDNESDAY -> "Wed"
-    Calendar.THURSDAY -> "Thu"
-    Calendar.FRIDAY -> "Fri"
-    Calendar.SATURDAY -> "Sat"
-    else -> ""
-}
+private fun weekdayShort(weekday: Int): String =
+    when (weekday) {
+        Calendar.SUNDAY -> "Sun"
+        Calendar.MONDAY -> "Mon"
+        Calendar.TUESDAY -> "Tue"
+        Calendar.WEDNESDAY -> "Wed"
+        Calendar.THURSDAY -> "Thu"
+        Calendar.FRIDAY -> "Fri"
+        Calendar.SATURDAY -> "Sat"
+        else -> ""
+    }
 
 /**
  * Material [DatePicker] reports and expects millis at **start of the selected day in UTC**
@@ -1282,26 +1389,37 @@ private fun repeatSummary(
     endDate: Long?,
     endCount: Int?,
 ): String {
-    val every = if (interval == 1) when (unit) {
-        RecurrenceUnit.DAY -> "Daily"
-        RecurrenceUnit.WEEK -> "Weekly"
-        RecurrenceUnit.MONTH -> "Monthly"
-        RecurrenceUnit.YEAR -> "Yearly"
-    } else "Every $interval ${unitLabel(unit).lowercase()}s"
-    val detail = when (unit) {
-        RecurrenceUnit.WEEK -> if (daysOfWeek.size in 1..6) {
-            " on " + daysOfWeek.sorted().joinToString(", ") { weekdayShort(it) }
-        } else ""
-        RecurrenceUnit.MONTH -> when (monthlyKind) {
-            MonthlyKind.BY_DAY -> " on day $dayOfMonth"
-            MonthlyKind.BY_WEEKDAY -> " on the ${ordinalWord(nthOrdinal)} ${weekdayShort(nthWeekday)}"
+    val every =
+        if (interval == 1) {
+            when (unit) {
+                RecurrenceUnit.DAY -> "Daily"
+                RecurrenceUnit.WEEK -> "Weekly"
+                RecurrenceUnit.MONTH -> "Monthly"
+                RecurrenceUnit.YEAR -> "Yearly"
+            }
+        } else {
+            "Every $interval ${unitLabel(unit).lowercase()}s"
         }
-        else -> ""
-    }
-    val ending = when (endKind) {
-        RecurrenceEndKind.NEVER -> ""
-        RecurrenceEndKind.ON_DATE -> endDate?.let { " until ${formatDate(it)}" }.orEmpty()
-        RecurrenceEndKind.AFTER_COUNT -> endCount?.let { " for $it times" }.orEmpty()
-    }
+    val detail =
+        when (unit) {
+            RecurrenceUnit.WEEK ->
+                if (daysOfWeek.size in 1..6) {
+                    " on " + daysOfWeek.sorted().joinToString(", ") { weekdayShort(it) }
+                } else {
+                    ""
+                }
+            RecurrenceUnit.MONTH ->
+                when (monthlyKind) {
+                    MonthlyKind.BY_DAY -> " on day $dayOfMonth"
+                    MonthlyKind.BY_WEEKDAY -> " on the ${ordinalWord(nthOrdinal)} ${weekdayShort(nthWeekday)}"
+                }
+            else -> ""
+        }
+    val ending =
+        when (endKind) {
+            RecurrenceEndKind.NEVER -> ""
+            RecurrenceEndKind.ON_DATE -> endDate?.let { " until ${formatDate(it)}" }.orEmpty()
+            RecurrenceEndKind.AFTER_COUNT -> endCount?.let { " for $it times" }.orEmpty()
+        }
     return every + detail + ending
 }

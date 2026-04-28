@@ -11,16 +11,25 @@ import java.util.concurrent.TimeUnit
 object RememberBackupWork {
     private const val UNIQUE_NAME = "remember_scheduled_notes_backup"
 
-    fun updateSchedule(context: Context, prefs: BackupPreferencesState) {
+    fun updateSchedule(
+        context: Context,
+        prefs: BackupPreferencesState,
+    ) {
         val workManager = WorkManager.getInstance(context)
-        if (prefs.scheduledExportEnabled && prefs.exportFolderUri.isNotBlank()) {
-            val request = PeriodicWorkRequestBuilder<ScheduledNotesBackupWorker>(1, TimeUnit.DAYS)
-                .setConstraints(
-                    Constraints.Builder()
-                        .setRequiresBatteryNotLow(true)
-                        .build(),
-                )
-                .build()
+        val backupDestinations =
+            listOf(
+                prefs.exportFolderUri,
+                prefs.cloudExportFolderUri,
+            ).filter { it.isNotBlank() }
+        if (prefs.scheduledExportEnabled && backupDestinations.isNotEmpty()) {
+            val request =
+                PeriodicWorkRequestBuilder<ScheduledNotesBackupWorker>(1, TimeUnit.DAYS)
+                    .setConstraints(
+                        Constraints
+                            .Builder()
+                            .setRequiresBatteryNotLow(true)
+                            .build(),
+                    ).build()
             workManager.enqueueUniquePeriodicWork(
                 UNIQUE_NAME,
                 ExistingPeriodicWorkPolicy.UPDATE,

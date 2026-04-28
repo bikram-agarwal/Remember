@@ -1,9 +1,6 @@
 package dev.bikram.remember.ui.edit
-import androidx.compose.material3.TextButton
-
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,24 +38,24 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.AppBottomSheet
-import dev.bikram.remember.ui.components.TagChipFilled
-import dev.bikram.remember.ui.components.parseHexColor
-import kotlinx.coroutines.flow.collect
-import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.TagChipFilled
+import dev.bikram.remember.ui.components.parseHexColor
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.LocalTagColors
+import kotlinx.coroutines.flow.collect
 
 private val SwatchCorner = RoundedCornerShape(10.dp)
 private val PillCorner = RoundedCornerShape(12.dp)
@@ -128,9 +124,11 @@ fun TagEditorSheet(
         val tagBeingEdited = editingTag
         if (editMode && tagBeingEdited != null && trimmed.isNotBlank()) {
             onEditExistingTag(tagBeingEdited, trimmed, chosenHex, false)
-            tags = tags.map { tag ->
-                if (tag.equals(tagBeingEdited, ignoreCase = true)) trimmed else tag
-            }.distinctBy { tag -> tag.lowercase() }
+            tags =
+                tags
+                    .map { tag ->
+                        if (tag.equals(tagBeingEdited, ignoreCase = true)) trimmed else tag
+                    }.distinctBy { tag -> tag.lowercase() }
             clearEditSelection()
             return
         }
@@ -146,27 +144,30 @@ fun TagEditorSheet(
         onConfirm(finalTags, finalColors)
     }
 
-    val suggestions: List<String> = run {
-        val seen = LinkedHashMap<String, String>()
-        (remoteTags + tags + newColors.keys).forEach { raw ->
-            val trim = raw.trim()
-            if (trim.isBlank()) return@forEach
-            val key = trim.lowercase()
-            if (!seen.containsKey(key)) seen[key] = trim
+    val suggestions: List<String> =
+        run {
+            val seen = LinkedHashMap<String, String>()
+            (remoteTags + tags + newColors.keys).forEach { raw ->
+                val trim = raw.trim()
+                if (trim.isBlank()) return@forEach
+                val key = trim.lowercase()
+                if (!seen.containsKey(key)) seen[key] = trim
+            }
+            seen.values.sortedBy { it.lowercase() }
         }
-        seen.values.sortedBy { it.lowercase() }
-    }
 
-    val draftIsDuplicate = trimmedDraft.isNotBlank() &&
-        suggestions.any { tag ->
-            tag.equals(trimmedDraft, ignoreCase = true) &&
-                !tag.equals(editingTag.orEmpty(), ignoreCase = true)
+    val draftIsDuplicate =
+        trimmedDraft.isNotBlank() &&
+            suggestions.any { tag ->
+                tag.equals(trimmedDraft, ignoreCase = true) &&
+                    !tag.equals(editingTag.orEmpty(), ignoreCase = true)
+            }
+    val canSave =
+        if (editMode) {
+            editingTag != null && trimmedDraft.isNotBlank() && !draftIsDuplicate
+        } else {
+            true
         }
-    val canSave = if (editMode) {
-        editingTag != null && trimmedDraft.isNotBlank() && !draftIsDuplicate
-    } else {
-        true
-    }
 
     AppBottomSheet(
         title = stringResource(R.string.options_tags),
@@ -193,18 +194,23 @@ fun TagEditorSheet(
     ) {
         if (suggestions.isNotEmpty()) {
             Text(
-                text = stringResource(
-                    if (editMode) R.string.tag_editor_edit_mode_hint
-                    else R.string.tag_editor_suggested_heading
-                ),
+                text =
+                    stringResource(
+                        if (editMode) {
+                            R.string.tag_editor_edit_mode_hint
+                        } else {
+                            R.string.tag_editor_suggested_heading
+                        },
+                    ),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 10.dp),
             )
             FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .wrapContentHeight(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -236,17 +242,19 @@ fun TagEditorSheet(
                 modifier = Modifier.weight(1f),
             )
             Box(
-                modifier = Modifier
-                    .height(FieldHeight)
-                    .clip(CircleShape)
-                    .background(chosenColor)
-                    .padding(horizontal = 16.dp),
+                modifier =
+                    Modifier
+                        .height(FieldHeight)
+                        .clip(CircleShape)
+                        .background(chosenColor)
+                        .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = trimmedDraft.ifBlank {
-                        stringResource(R.string.tag_editor_preview_placeholder)
-                    },
+                    text =
+                        trimmedDraft.ifBlank {
+                            stringResource(R.string.tag_editor_preview_placeholder)
+                        },
                     style = MaterialTheme.typography.labelLarge,
                     color = TagPalette.textOn(chosenColor),
                     maxLines = 1,
@@ -258,10 +266,14 @@ fun TagEditorSheet(
         if (draftIsDuplicate) {
             Spacer(Modifier.height(6.dp))
             Text(
-                text = stringResource(
-                    if (editMode) R.string.tag_editor_duplicate_existing
-                    else R.string.tag_editor_duplicate
-                ),
+                text =
+                    stringResource(
+                        if (editMode) {
+                            R.string.tag_editor_duplicate_existing
+                        } else {
+                            R.string.tag_editor_duplicate
+                        },
+                    ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
             )
@@ -295,15 +307,16 @@ fun TagEditorSheet(
                 modifier = Modifier.width(170.dp),
                 leading = {
                     Box(
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clip(HexSwatchCorner)
-                            .background(chosenColor)
-                            .border(
-                                width = 1.dp,
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
-                                shape = HexSwatchCorner,
-                            ),
+                        modifier =
+                            Modifier
+                                .size(20.dp)
+                                .clip(HexSwatchCorner)
+                                .background(chosenColor)
+                                .border(
+                                    width = 1.dp,
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
+                                    shape = HexSwatchCorner,
+                                ),
                     )
                 },
             )
@@ -318,9 +331,12 @@ fun TagEditorSheet(
             ) {
                 Text(
                     stringResource(
-                        if (editMode) R.string.tag_editor_update_tag
-                        else R.string.common_save
-                    )
+                        if (editMode) {
+                            R.string.tag_editor_update_tag
+                        } else {
+                            R.string.common_save
+                        },
+                    ),
                 )
             }
         }
@@ -338,11 +354,12 @@ internal fun CompactOutlinedField(
 ) {
     val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
     Row(
-        modifier = modifier
-            .height(FieldHeight)
-            .clip(PillCorner)
-            .border(width = 1.dp, color = borderColor, shape = PillCorner)
-            .padding(horizontal = 12.dp),
+        modifier =
+            modifier
+                .height(FieldHeight)
+                .clip(PillCorner)
+                .border(width = 1.dp, color = borderColor, shape = PillCorner)
+                .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leading != null) {
@@ -357,9 +374,10 @@ internal fun CompactOutlinedField(
                 value = value,
                 onValueChange = onValueChange,
                 singleLine = true,
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                ),
+                textStyle =
+                    MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                    ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(onDone = {}),
@@ -402,21 +420,22 @@ internal fun ColorGrid(
                     val hex = paletteHex(color)
                     val selected = selectedHex?.equals(hex, ignoreCase = true) == true
                     Box(
-                        modifier = Modifier
-                            .weight(1f, fill = true)
-                            .aspectRatio(1f)
-                            .clip(SwatchCorner)
-                            .background(color)
-                            .border(
-                                width = if (selected) 2.dp else 1.dp,
-                                color = if (selected) {
-                                    MaterialTheme.colorScheme.onSurface
-                                } else {
-                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
-                                },
-                                shape = SwatchCorner,
-                            )
-                            .tapSoundClickable { onSelect(hex) },
+                        modifier =
+                            Modifier
+                                .weight(1f, fill = true)
+                                .aspectRatio(1f)
+                                .clip(SwatchCorner)
+                                .background(color)
+                                .border(
+                                    width = if (selected) 2.dp else 1.dp,
+                                    color =
+                                        if (selected) {
+                                            MaterialTheme.colorScheme.onSurface
+                                        } else {
+                                            MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+                                        },
+                                    shape = SwatchCorner,
+                                ).tapSoundClickable { onSelect(hex) },
                         contentAlignment = Alignment.Center,
                     ) {
                         if (selected) {
@@ -435,11 +454,12 @@ internal fun ColorGrid(
 }
 
 internal fun paletteHex(color: Color): String {
-    val argb = android.graphics.Color.argb(
-        255,
-        (color.red * 255).toInt(),
-        (color.green * 255).toInt(),
-        (color.blue * 255).toInt(),
-    )
+    val argb =
+        android.graphics.Color.argb(
+            255,
+            (color.red * 255).toInt(),
+            (color.green * 255).toInt(),
+            (color.blue * 255).toInt(),
+        )
     return "#%06X".format(argb and 0xFFFFFF)
 }

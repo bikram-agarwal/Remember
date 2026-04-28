@@ -85,28 +85,31 @@ fun OnboardingPermissionsScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val powerManager = remember {
-        context.getSystemService(Context.POWER_SERVICE) as PowerManager
-    }
+    val powerManager =
+        remember {
+            context.getSystemService(Context.POWER_SERVICE) as PowerManager
+        }
     var notificationsGranted by rememberSaveable {
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
     var ignoringBatteryOptimizations by remember {
         mutableStateOf(powerManager.isIgnoringBatteryOptimizations(context.packageName))
     }
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission(),
-    ) {
-        notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
-    }
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) {
+            notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+        }
 
     DisposableEffect(lifecycleOwner, context, powerManager) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
-                ignoringBatteryOptimizations = powerManager.isIgnoringBatteryOptimizations(context.packageName)
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+                    ignoringBatteryOptimizations = powerManager.isIgnoringBatteryOptimizations(context.packageName)
+                }
             }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -115,26 +118,30 @@ fun OnboardingPermissionsScreen(
 
     val scheme = MaterialTheme.colorScheme
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .systemBarsPadding(),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 26.dp)
-                .padding(top = 12.dp, bottom = 8.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 26.dp)
+                    .padding(top = 12.dp, bottom = 8.dp),
         ) {
             Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState()),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
             ) {
                 PermissionsHeroIllustration(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(250.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(250.dp),
                 )
                 Spacer(Modifier.height(6.dp))
                 Text(
@@ -158,11 +165,12 @@ fun OnboardingPermissionsScreen(
                     body = stringResource(R.string.onboarding_permissions_notifications_body),
                     iconName = "notifications",
                     statusText = stringResource(R.string.onboarding_permissions_status_recommended),
-                    actionText = if (notificationsGranted) {
-                        stringResource(R.string.onboarding_permissions_enabled)
-                    } else {
-                        stringResource(R.string.onboarding_permissions_allow_notifications)
-                    },
+                    actionText =
+                        if (notificationsGranted) {
+                            stringResource(R.string.onboarding_permissions_enabled)
+                        } else {
+                            stringResource(R.string.onboarding_permissions_allow_notifications)
+                        },
                     actionEnabled = !notificationsGranted,
                     primaryAction = true,
                     onAction = {
@@ -187,16 +195,18 @@ fun OnboardingPermissionsScreen(
                     body = stringResource(R.string.onboarding_permissions_reliable_body),
                     iconName = "timer",
                     statusText = stringResource(R.string.onboarding_permissions_status_optional),
-                    actionText = if (ignoringBatteryOptimizations) {
-                        stringResource(R.string.onboarding_permissions_enabled)
-                    } else {
-                        stringResource(R.string.onboarding_permissions_improve_reliability)
-                    },
+                    actionText =
+                        if (ignoringBatteryOptimizations) {
+                            stringResource(R.string.onboarding_permissions_enabled)
+                        } else {
+                            stringResource(R.string.onboarding_permissions_improve_reliability)
+                        },
                     actionEnabled = !ignoringBatteryOptimizations,
                     primaryAction = false,
-                    modifier = Modifier
-                        .fillMaxWidth(0.98f)
-                        .align(Alignment.CenterHorizontally),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth(0.98f)
+                            .align(Alignment.CenterHorizontally),
                     onAction = {
                         runCatching {
                             context.startActivity(batteryOptimizationIntent(context))
@@ -207,9 +217,10 @@ fun OnboardingPermissionsScreen(
                 )
                 Spacer(Modifier.height(14.dp))
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
                 ) {
@@ -231,10 +242,11 @@ fun OnboardingPermissionsScreen(
 
         RememberButton(
             onClick = onContinue,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
             shape = RoundedCornerShape(50),
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
         ) {
@@ -243,19 +255,24 @@ fun OnboardingPermissionsScreen(
                 targetState = notificationsGranted,
                 modifier = Modifier.weight(1f),
                 transitionSpec = {
-                    (slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { it / 2 } +
-                        fadeIn(animationSpec = motionScheme.defaultEffectsSpec())) togetherWith
-                        (slideOutVertically(animationSpec = motionScheme.defaultSpatialSpec()) { -it / 2 } +
-                            fadeOut(animationSpec = motionScheme.defaultEffectsSpec()))
+                    (
+                        slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { it / 2 } +
+                            fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
+                    ) togetherWith
+                        (
+                            slideOutVertically(animationSpec = motionScheme.defaultSpatialSpec()) { -it / 2 } +
+                                fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
+                        )
                 },
                 label = "permissionBottomCtaText",
             ) { granted ->
                 Text(
-                    text = if (granted) {
-                        stringResource(R.string.onboarding_permissions_continue)
-                    } else {
-                        stringResource(R.string.onboarding_permissions_skip_for_now)
-                    },
+                    text =
+                        if (granted) {
+                            stringResource(R.string.onboarding_permissions_continue)
+                        } else {
+                            stringResource(R.string.onboarding_permissions_skip_for_now)
+                        },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -274,50 +291,56 @@ private fun PermissionsHeroIllustration(
 ) {
     val scheme = MaterialTheme.colorScheme
     Box(
-        modifier = modifier.drawBehind {
-            drawCircle(
-                color = scheme.primary.copy(alpha = 0.18f),
-                radius = size.minDimension * 0.33f,
-                center = Offset(size.width * 0.46f, size.height * 0.56f),
-                style = Stroke(width = 1.5.dp.toPx()),
-            )
-            drawCircle(
-                color = scheme.primary.copy(alpha = 0.10f),
-                radius = size.minDimension * 0.22f,
-                center = Offset(size.width * 0.62f, size.height * 0.48f),
-                style = Stroke(width = 1.dp.toPx()),
-            )
-        },
+        modifier =
+            modifier.drawBehind {
+                drawCircle(
+                    color = scheme.primary.copy(alpha = 0.18f),
+                    radius = size.minDimension * 0.33f,
+                    center = Offset(size.width * 0.46f, size.height * 0.56f),
+                    style = Stroke(width = 1.5.dp.toPx()),
+                )
+                drawCircle(
+                    color = scheme.primary.copy(alpha = 0.10f),
+                    radius = size.minDimension * 0.22f,
+                    center = Offset(size.width * 0.62f, size.height * 0.48f),
+                    style = Stroke(width = 1.dp.toPx()),
+                )
+            },
         contentAlignment = Alignment.Center,
     ) {
         DecorativeStar(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .offset(x = 64.dp, y = 48.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .offset(x = 64.dp, y = 48.dp),
         )
         DecorativeStar(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset(x = (-42).dp, y = 92.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-42).dp, y = 92.dp),
             size = 22.dp,
         )
         DecorativeDot(
-            modifier = Modifier
-                .align(Alignment.CenterStart)
-                .offset(x = 36.dp, y = 16.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = 36.dp, y = 16.dp),
             size = 6.dp,
         )
         DecorativeDot(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .offset(x = (-86).dp, y = (-52).dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .offset(x = (-86).dp, y = (-52).dp),
             size = 4.dp,
         )
 
         Surface(
-            modifier = Modifier
-                .size(92.dp)
-                .offset(y = (-62).dp),
+            modifier =
+                Modifier
+                    .size(92.dp)
+                    .offset(y = (-62).dp),
             shape = CircleShape,
             color = scheme.primaryContainer,
             tonalElevation = 6.dp,
@@ -333,9 +356,10 @@ private fun PermissionsHeroIllustration(
         }
 
         Surface(
-            modifier = Modifier
-                .size(58.dp)
-                .offset(x = (-72).dp, y = (-12).dp),
+            modifier =
+                Modifier
+                    .size(58.dp)
+                    .offset(x = (-72).dp, y = (-12).dp),
             shape = CircleShape,
             color = scheme.primary,
             tonalElevation = 6.dp,
@@ -352,18 +376,20 @@ private fun PermissionsHeroIllustration(
         }
 
         ChecklistIllustrationCard(
-            modifier = Modifier
-                .width(104.dp)
-                .height(128.dp)
-                .offset(x = 52.dp, y = (-12).dp)
-                .graphicsLayer { rotationZ = 10f },
+            modifier =
+                Modifier
+                    .width(104.dp)
+                    .height(128.dp)
+                    .offset(x = 52.dp, y = (-12).dp)
+                    .graphicsLayer { rotationZ = 10f },
         )
         NoteIllustrationCard(
-            modifier = Modifier
-                .width(146.dp)
-                .height(78.dp)
-                .offset(x = (-32).dp, y = 62.dp)
-                .graphicsLayer { rotationZ = 4f },
+            modifier =
+                Modifier
+                    .width(146.dp)
+                    .height(78.dp)
+                    .offset(x = (-32).dp, y = 62.dp)
+                    .graphicsLayer { rotationZ = 4f },
         )
     }
 }
@@ -395,9 +421,10 @@ private fun ChecklistIllustrationCard(
                         tint = scheme.onPrimaryContainer.copy(alpha = 0.78f),
                     )
                     IllustrationLine(
-                        modifier = Modifier
-                            .height(4.dp)
-                            .weight(1f),
+                        modifier =
+                            Modifier
+                                .height(4.dp)
+                                .weight(1f),
                         color = scheme.onPrimaryContainer.copy(alpha = 0.35f),
                     )
                 }
@@ -428,21 +455,24 @@ private fun NoteIllustrationCard(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .background(scheme.primary, CircleShape),
+                    modifier =
+                        Modifier
+                            .size(10.dp)
+                            .background(scheme.primary, CircleShape),
                 )
                 IllustrationLine(
-                    modifier = Modifier
-                        .height(4.dp)
-                        .fillMaxWidth(0.72f),
+                    modifier =
+                        Modifier
+                            .height(4.dp)
+                            .fillMaxWidth(0.72f),
                     color = scheme.onSurfaceVariant.copy(alpha = 0.55f),
                 )
             }
             IllustrationLine(
-                modifier = Modifier
-                    .height(4.dp)
-                    .fillMaxWidth(0.54f),
+                modifier =
+                    Modifier
+                        .height(4.dp)
+                        .fillMaxWidth(0.54f),
                 color = scheme.onSurfaceVariant.copy(alpha = 0.35f),
             )
         }
@@ -465,9 +495,10 @@ private fun DecorativeDot(
     size: Dp = 4.dp,
 ) {
     Box(
-        modifier = modifier
-            .size(size)
-            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.72f), CircleShape),
+        modifier =
+            modifier
+                .size(size)
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.72f), CircleShape),
     )
 }
 
@@ -478,26 +509,28 @@ private fun DecorativeStar(
 ) {
     val sparkleColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
     Box(
-        modifier = modifier
-            .size(size)
-            .drawBehind {
-                val centerX = this.size.width / 2f
-                val centerY = this.size.height / 2f
-                val radius = this.size.minDimension / 2f
-                val innerRadius = radius * 0.28f
-                val sparklePath = Path().apply {
-                    moveTo(centerX, centerY - radius)
-                    lineTo(centerX + innerRadius, centerY - innerRadius)
-                    lineTo(centerX + radius, centerY)
-                    lineTo(centerX + innerRadius, centerY + innerRadius)
-                    lineTo(centerX, centerY + radius)
-                    lineTo(centerX - innerRadius, centerY + innerRadius)
-                    lineTo(centerX - radius, centerY)
-                    lineTo(centerX - innerRadius, centerY - innerRadius)
-                    close()
-                }
-                drawPath(sparklePath, sparkleColor)
-            },
+        modifier =
+            modifier
+                .size(size)
+                .drawBehind {
+                    val centerX = this.size.width / 2f
+                    val centerY = this.size.height / 2f
+                    val radius = this.size.minDimension / 2f
+                    val innerRadius = radius * 0.28f
+                    val sparklePath =
+                        Path().apply {
+                            moveTo(centerX, centerY - radius)
+                            lineTo(centerX + innerRadius, centerY - innerRadius)
+                            lineTo(centerX + radius, centerY)
+                            lineTo(centerX + innerRadius, centerY + innerRadius)
+                            lineTo(centerX, centerY + radius)
+                            lineTo(centerX - innerRadius, centerY + innerRadius)
+                            lineTo(centerX - radius, centerY)
+                            lineTo(centerX - innerRadius, centerY - innerRadius)
+                            close()
+                        }
+                    drawPath(sparklePath, sparkleColor)
+                },
     )
 }
 
@@ -535,34 +568,38 @@ private fun PermissionStatusCard(
         label = "permissionIconPulse",
     )
     val borderColor by animateColorAsState(
-        targetValue = if (granted) {
-            scheme.primary.copy(alpha = 0.72f)
-        } else {
-            scheme.surfaceTint.copy(alpha = 0.24f)
-        },
+        targetValue =
+            if (granted) {
+                scheme.primary.copy(alpha = 0.72f)
+            } else {
+                scheme.surfaceTint.copy(alpha = 0.24f)
+            },
         animationSpec = motionScheme.defaultEffectsSpec(),
         label = "permissionCardBorder",
     )
-    val containerColor = if (granted) {
-        lerp(scheme.primaryContainer, scheme.surface, 0.38f)
-    } else {
-        scheme.surfaceContainerHigh.copy(alpha = 0.92f)
-    }
+    val containerColor =
+        if (granted) {
+            lerp(scheme.primaryContainer, scheme.surface, 0.38f)
+        } else {
+            scheme.surfaceContainerHigh.copy(alpha = 0.92f)
+        }
     val titleColor = if (granted) scheme.onPrimaryContainer else scheme.onSurface
     val bodyColor = if (granted) scheme.onPrimaryContainer.copy(alpha = 0.86f) else scheme.onSurfaceVariant
     Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .scale(scale),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .scale(scale),
         shape = RoundedCornerShape(cardShape),
         border = BorderStroke(if (granted) 1.4.dp else 1.dp, borderColor),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = if (granted) 3.dp else 1.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(cardPadding),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(cardPadding),
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -597,10 +634,14 @@ private fun PermissionStatusCard(
             AnimatedContent(
                 targetState = granted,
                 transitionSpec = {
-                    (slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { it / 2 } +
-                        fadeIn(animationSpec = motionScheme.defaultEffectsSpec())) togetherWith
-                        (slideOutVertically(animationSpec = motionScheme.defaultSpatialSpec()) { -it / 2 } +
-                            fadeOut(animationSpec = motionScheme.defaultEffectsSpec()))
+                    (
+                        slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { it / 2 } +
+                            fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
+                    ) togetherWith
+                        (
+                            slideOutVertically(animationSpec = motionScheme.defaultSpatialSpec()) { -it / 2 } +
+                                fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
+                        )
                 },
                 label = "permissionCardAction",
             ) { targetGranted ->
@@ -611,10 +652,11 @@ private fun PermissionStatusCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            disabledContainerColor = scheme.surfaceContainerHighest,
-                            disabledContentColor = scheme.primary,
-                        ),
+                        colors =
+                            ButtonDefaults.outlinedButtonColors(
+                                disabledContainerColor = scheme.surfaceContainerHighest,
+                                disabledContentColor = scheme.primary,
+                            ),
                         border = BorderStroke(1.25.dp, scheme.primary.copy(alpha = 0.75f)),
                     ) {
                         Row(
@@ -642,10 +684,11 @@ private fun PermissionStatusCard(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(50),
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = scheme.primaryContainer,
-                            contentColor = scheme.onPrimaryContainer,
-                        ),
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = scheme.primaryContainer,
+                                contentColor = scheme.onPrimaryContainer,
+                            ),
                     ) {
                         Text(
                             text = actionText,
@@ -684,9 +727,10 @@ private fun PermissionIconBadge(
 ) {
     val scheme = MaterialTheme.colorScheme
     Surface(
-        modifier = Modifier
-            .size(iconSize)
-            .scale(pulseScale),
+        modifier =
+            Modifier
+                .size(iconSize)
+                .scale(pulseScale),
         shape = CircleShape,
         color = if (granted) scheme.primary else scheme.surfaceContainerHighest,
     ) {
@@ -708,34 +752,34 @@ private fun StatusPill(
     val scheme = MaterialTheme.colorScheme
     Surface(
         shape = RoundedCornerShape(50),
-        color = if (emphasized) {
-            scheme.primaryContainer
-        } else {
-            scheme.surfaceContainerHighest
-        },
+        color =
+            if (emphasized) {
+                scheme.primaryContainer
+            } else {
+                scheme.surfaceContainerHighest
+            },
     ) {
         Text(
             text = text,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
-            color = if (emphasized) {
-                scheme.onPrimaryContainer
-            } else {
-                scheme.onSurfaceVariant
-            },
+            color =
+                if (emphasized) {
+                    scheme.onPrimaryContainer
+                } else {
+                    scheme.onSurfaceVariant
+                },
         )
     }
 }
 
-private fun notificationSettingsIntent(context: Context): Intent {
-    return Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+private fun notificationSettingsIntent(context: Context): Intent =
+    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
     }
-}
 
-private fun batteryOptimizationIntent(context: Context): Intent {
-    return Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+private fun batteryOptimizationIntent(context: Context): Intent =
+    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
         data = Uri.parse("package:${context.packageName}")
     }
-}

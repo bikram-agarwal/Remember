@@ -30,9 +30,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -67,11 +67,12 @@ import dev.bikram.remember.ui.feedback.tapSoundClickable
  */
 private enum class BulkTagIntent { NEUTRAL, ADD, REMOVE }
 
-private fun BulkTagIntent.next(): BulkTagIntent = when (this) {
-    BulkTagIntent.NEUTRAL -> BulkTagIntent.ADD
-    BulkTagIntent.ADD -> BulkTagIntent.REMOVE
-    BulkTagIntent.REMOVE -> BulkTagIntent.NEUTRAL
-}
+private fun BulkTagIntent.next(): BulkTagIntent =
+    when (this) {
+        BulkTagIntent.NEUTRAL -> BulkTagIntent.ADD
+        BulkTagIntent.ADD -> BulkTagIntent.REMOVE
+        BulkTagIntent.REMOVE -> BulkTagIntent.NEUTRAL
+    }
 
 private val BulkTagFieldHeight = 40.dp
 private val BulkTagHexSwatchCorner = RoundedCornerShape(6.dp)
@@ -114,8 +115,9 @@ fun BulkTagSheet(
 
     val trimmedDraft = draftName.trim()
     val normalizedLowerTags = mergedTags.map { it.lowercase() }.toSet()
-    val draftIsDuplicate = trimmedDraft.isNotBlank() &&
-        normalizedLowerTags.contains(trimmedDraft.lowercase())
+    val draftIsDuplicate =
+        trimmedDraft.isNotBlank() &&
+            normalizedLowerTags.contains(trimmedDraft.lowercase())
     val chosenColor: Color = parseHexColor(lastValidHex) ?: TagPalette.presets[0]
     val canStageNewTag = trimmedDraft.isNotBlank() && !draftIsDuplicate
 
@@ -139,17 +141,20 @@ fun BulkTagSheet(
             }
             RememberButton(
                 onClick = {
-                    val adds = tagIntents
-                        .filterValues { it == BulkTagIntent.ADD }
-                        .keys
-                        .toSet()
-                    val removes = tagIntents
-                        .filterValues { it == BulkTagIntent.REMOVE }
-                        .keys
-                        .toSet()
-                    val colors = newTagColorsState
-                        .filterKeys { key -> adds.any { it.lowercase() == key } }
-                        .toMap()
+                    val adds =
+                        tagIntents
+                            .filterValues { it == BulkTagIntent.ADD }
+                            .keys
+                            .toSet()
+                    val removes =
+                        tagIntents
+                            .filterValues { it == BulkTagIntent.REMOVE }
+                            .keys
+                            .toSet()
+                    val colors =
+                        newTagColorsState
+                            .filterKeys { key -> adds.any { it.lowercase() == key } }
+                            .toMap()
                     onApply(adds, removes, colors)
                     // Selection mode exits after apply (VM clears selectedIds) - the sheet must
                     // close with it, otherwise any follow-up Apply lands on an empty selection
@@ -172,9 +177,10 @@ fun BulkTagSheet(
             )
         } else {
             FlowRow(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -208,10 +214,11 @@ fun BulkTagSheet(
             exit = fadeOut() + shrinkVertically(),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 12.dp)
-                    .animateContentSize(),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp)
+                        .animateContentSize(),
             ) {
                 // Name field + live preview in one row
                 Row(
@@ -225,16 +232,18 @@ fun BulkTagSheet(
                         placeholder = stringResource(R.string.tag_editor_field_placeholder),
                         modifier = Modifier.weight(1f),
                     )
-                    val previewLabel = trimmedDraft.ifBlank {
-                        stringResource(R.string.tag_editor_field_placeholder)
-                    }
+                    val previewLabel =
+                        trimmedDraft.ifBlank {
+                            stringResource(R.string.tag_editor_field_placeholder)
+                        }
                     Box(
-                        modifier = Modifier
-                            .height(BulkTagFieldHeight)
-                            .widthIn(min = 80.dp)
-                            .clip(CircleShape)
-                            .background(chosenColor)
-                            .padding(horizontal = 16.dp),
+                        modifier =
+                            Modifier
+                                .height(BulkTagFieldHeight)
+                                .widthIn(min = 80.dp)
+                                .clip(CircleShape)
+                                .background(chosenColor)
+                                .padding(horizontal = 16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
@@ -275,16 +284,18 @@ fun BulkTagSheet(
                         modifier = Modifier.weight(1f),
                         leading = {
                             Box(
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(BulkTagHexSwatchCorner)
-                                    .background(chosenColor)
-                                    .border(
-                                        width = 1.dp,
-                                        color = MaterialTheme.colorScheme.outline
-                                            .copy(alpha = 0.45f),
-                                        shape = BulkTagHexSwatchCorner,
-                                    ),
+                                modifier =
+                                    Modifier
+                                        .size(20.dp)
+                                        .clip(BulkTagHexSwatchCorner)
+                                        .background(chosenColor)
+                                        .border(
+                                            width = 1.dp,
+                                            color =
+                                                MaterialTheme.colorScheme.outline
+                                                    .copy(alpha = 0.45f),
+                                            shape = BulkTagHexSwatchCorner,
+                                        ),
                             )
                         },
                     )
@@ -319,28 +330,31 @@ private fun CreateNewTagPullTab(
     // Match the sheet's actual container color so the pill appears to visually cut the line.
     val sheetSurface = MaterialTheme.colorScheme.surfaceContainerLow
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 14.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 14.dp),
     ) {
         // Divider line - spans full width, centered vertically behind the pill.
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .align(Alignment.Center)
-                .background(dividerColor),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .align(Alignment.Center)
+                    .background(dividerColor),
         )
         // The pull-tab pill itself, centered, with solid background to occlude the line.
         Row(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .clip(CircleShape)
-                .background(sheetSurface)
-                .border(width = 1.dp, color = borderColor, shape = CircleShape)
-                .semantics { contentDescription = cd }
-                .tapSoundClickable(onClick = onToggle)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.Center)
+                    .clip(CircleShape)
+                    .background(sheetSurface)
+                    .border(width = 1.dp, color = borderColor, shape = CircleShape)
+                    .semantics { contentDescription = cd }
+                    .tapSoundClickable(onClick = onToggle)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -422,22 +436,22 @@ private fun TriStateTagChip(
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = Modifier
-            .clip(CircleShape)
-            .background(containerColor)
-            .let { base ->
-                if (borderStroke != null) {
-                    base.border(
-                        width = borderStroke.width,
-                        brush = borderStroke.brush,
-                        shape = CircleShape,
-                    )
-                } else {
-                    base
-                }
-            }
-            .tapSoundClickable(onClick = onCycle)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .background(containerColor)
+                .let { base ->
+                    if (borderStroke != null) {
+                        base.border(
+                            width = borderStroke.width,
+                            brush = borderStroke.brush,
+                            shape = CircleShape,
+                        )
+                    } else {
+                        base
+                    }
+                }.tapSoundClickable(onClick = onCycle)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         if (leadingIcon != null) {
             RememberMaterialRoundedSymbol(
@@ -449,10 +463,11 @@ private fun TriStateTagChip(
         }
         Text(
             text = tag,
-            style = MaterialTheme.typography.labelMedium.copy(
-                fontWeight = textWeight,
-                textDecoration = textDecoration,
-            ),
+            style =
+                MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = textWeight,
+                    textDecoration = textDecoration,
+                ),
             color = textColor,
             maxLines = 1,
         )

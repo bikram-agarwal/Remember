@@ -14,19 +14,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import androidx.navigation.NavController
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.OnboardingPrefs
-import dev.bikram.remember.data.ThemePrefs
-import dev.bikram.remember.data.ViewOptionsPrefs
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.googletasks.GoogleTasksImportRoute
 import dev.bikram.remember.ui.edit.EditListRoute
@@ -49,12 +47,21 @@ object Routes {
     const val ARG_ID = "id"
     const val ARG_PREFILL = "prefill"
     const val ARG_FORCE_EDIT = "forceEdit"
-    fun editNote(id: Long?, prefill: String = "", forceEdit: Boolean = false): String {
+
+    fun editNote(
+        id: Long?,
+        prefill: String = "",
+        forceEdit: Boolean = false,
+    ): String {
         val p = if (prefill.isNotEmpty()) "&$ARG_PREFILL=${Uri.encode(prefill)}" else ""
         val f = if (forceEdit) "&$ARG_FORCE_EDIT=true" else ""
         return "$EDIT_NOTE?${ARG_ID}=${id ?: -1L}$p$f"
     }
-    fun editList(id: Long?, forceEdit: Boolean = false): String {
+
+    fun editList(
+        id: Long?,
+        forceEdit: Boolean = false,
+    ): String {
         val f = if (forceEdit) "&${ARG_FORCE_EDIT}=true" else ""
         return "$EDIT_LIST?${ARG_ID}=${id ?: -1L}$f"
     }
@@ -64,11 +71,11 @@ object Routes {
 fun RememberNavGraph(
     repository: NoteRepository,
     onboardingPrefs: OnboardingPrefs,
-    themePrefs: ThemePrefs,
-    viewOptionsPrefs: ViewOptionsPrefs,
     interactionPrefs: InteractionPrefs,
     appScope: CoroutineScope,
     launchFlow: MutableStateFlow<LaunchAction?>? = null,
+    openSettingsRequest: Int = 0,
+    openUpdateSheetRequest: Int = 0,
 ) {
     val navController = rememberNavController()
     val onboardingState by onboardingPrefs.state.collectAsStateWithLifecycle(initialValue = null)
@@ -80,13 +87,14 @@ fun RememberNavGraph(
         return
     }
 
-    val lockedStartDestination = remember(currentOnboardingState.hasSeenIntro) {
-        if (currentOnboardingState.hasSeenIntro) {
-            Routes.MAIN
-        } else {
-            Routes.ONBOARDING_TITLE
+    val lockedStartDestination =
+        remember(currentOnboardingState.hasSeenIntro) {
+            if (currentOnboardingState.hasSeenIntro) {
+                Routes.MAIN
+            } else {
+                Routes.ONBOARDING_TITLE
+            }
         }
-    }
 
     LaunchedEffect(launchFlow, currentOnboardingState.hasSeenIntro) {
         if (!currentOnboardingState.hasSeenIntro) return@LaunchedEffect
@@ -112,7 +120,6 @@ fun RememberNavGraph(
             navController = navController,
             startDestination = lockedStartDestination,
         ) {
-
             composable(
                 route = Routes.ONBOARDING_TITLE,
                 enterTransition = {
@@ -187,52 +194,50 @@ fun RememberNavGraph(
             composable(Routes.MAIN) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable
+                    LocalNavAnimatedVisibilityScope provides this@composable,
                 ) {
                     MainTabScaffold(
                         repository = repository,
-                        themePrefs = themePrefs,
-                        viewOptionsPrefs = viewOptionsPrefs,
                         interactionPrefs = interactionPrefs,
                         onCreateNote = { navController.navigate(Routes.editNote(null)) },
                         onCreateList = { navController.navigate(Routes.editList(null)) },
                         onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
                         onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
                         onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                        openSettingsRequest = openSettingsRequest,
+                        openUpdateSheetRequest = openUpdateSheetRequest,
                     )
                 }
             }
 
             composable(
                 route = "${Routes.EDIT_NOTE}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
-                arguments = listOf(
-                    navArgument(Routes.ARG_ID) {
-                        type = NavType.LongType
-                        defaultValue = -1L
-                    },
-                    navArgument(Routes.ARG_PREFILL) {
-                        type = NavType.StringType
-                        defaultValue = ""
-                    },
-                    navArgument(Routes.ARG_FORCE_EDIT) {
-                        type = NavType.BoolType
-                        defaultValue = false
-                    },
-                ),
+                arguments =
+                    listOf(
+                        navArgument(Routes.ARG_ID) {
+                            type = NavType.LongType
+                            defaultValue = -1L
+                        },
+                        navArgument(Routes.ARG_PREFILL) {
+                            type = NavType.StringType
+                            defaultValue = ""
+                        },
+                        navArgument(Routes.ARG_FORCE_EDIT) {
+                            type = NavType.BoolType
+                            defaultValue = false
+                        },
+                    ),
             ) { entry ->
                 val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
-                val prefill = entry.arguments?.getString(Routes.ARG_PREFILL).orEmpty()
                 val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable
+                    LocalNavAnimatedVisibilityScope provides this@composable,
                 ) {
                     EditNoteRoute(
                         repository = repository,
-                        themePrefs = themePrefs,
                         appScope = appScope,
                         noteId = id.takeIf { it > 0 },
-                        prefillBody = prefill,
                         forceEdit = forceEdit,
                         onBack = { navController.popBackStack() },
                     )
@@ -250,26 +255,26 @@ fun RememberNavGraph(
 
             composable(
                 route = "${Routes.EDIT_LIST}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
-                arguments = listOf(
-                    navArgument(Routes.ARG_ID) {
-                        type = NavType.LongType
-                        defaultValue = -1L
-                    },
-                    navArgument(Routes.ARG_FORCE_EDIT) {
-                        type = NavType.BoolType
-                        defaultValue = false
-                    },
-                ),
+                arguments =
+                    listOf(
+                        navArgument(Routes.ARG_ID) {
+                            type = NavType.LongType
+                            defaultValue = -1L
+                        },
+                        navArgument(Routes.ARG_FORCE_EDIT) {
+                            type = NavType.BoolType
+                            defaultValue = false
+                        },
+                    ),
             ) { entry ->
                 val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
                 val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable
+                    LocalNavAnimatedVisibilityScope provides this@composable,
                 ) {
                     EditListRoute(
                         repository = repository,
-                        themePrefs = themePrefs,
                         appScope = appScope,
                         noteId = id.takeIf { it > 0 },
                         forceEdit = forceEdit,
@@ -281,10 +286,14 @@ fun RememberNavGraph(
     }
 }
 
-private fun NavController.openEditRouteFor(note: NoteWithItems, forceEdit: Boolean = false) {
-    val route = when (note.note.kind) {
-        NoteKind.NOTE -> Routes.editNote(note.note.id, forceEdit = forceEdit)
-        NoteKind.LIST -> Routes.editList(note.note.id, forceEdit = forceEdit)
-    }
+private fun NavController.openEditRouteFor(
+    note: NoteWithItems,
+    forceEdit: Boolean = false,
+) {
+    val route =
+        when (note.note.kind) {
+            NoteKind.NOTE -> Routes.editNote(note.note.id, forceEdit = forceEdit)
+            NoteKind.LIST -> Routes.editList(note.note.id, forceEdit = forceEdit)
+        }
     navigate(route)
 }

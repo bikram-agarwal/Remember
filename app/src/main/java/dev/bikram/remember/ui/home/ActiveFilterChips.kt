@@ -1,7 +1,7 @@
 package dev.bikram.remember.ui.home
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -19,10 +19,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import dev.bikram.remember.R
 import dev.bikram.remember.data.FilterType
 import dev.bikram.remember.data.GroupBy
 import dev.bikram.remember.data.NotesFilter
@@ -33,8 +33,6 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberCheckbox
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberInputChip
-import androidx.compose.ui.res.stringResource
-import dev.bikram.remember.R
 
 private val ActiveChipHeight = 32.dp
 
@@ -52,9 +50,10 @@ fun ActiveFilterChips(
     val defaultViewOptions = ViewOptions()
     val canReset = filter != defaultFilter || viewOptions != defaultViewOptions
     Row(
-        modifier = modifier
-            .horizontalScroll(scrollState)
-            .padding(vertical = 4.dp),
+        modifier =
+            modifier
+                .horizontalScroll(scrollState)
+                .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -102,11 +101,12 @@ fun ActiveFilterChips(
                 )
             }
         }
-        val tagLabel = when (filter.tags.size) {
-            0 -> stringResource(R.string.filter_dropdown_tags)
-            1 -> stringResource(R.string.filter_dropdown_tags_one, filter.tags.first())
-            else -> stringResource(R.string.filter_dropdown_tags_count, filter.tags.size)
-        }
+        val tagLabel =
+            when (filter.tags.size) {
+                0 -> stringResource(R.string.filter_dropdown_tags)
+                1 -> stringResource(R.string.filter_dropdown_tags_one, filter.tags.first())
+                else -> stringResource(R.string.filter_dropdown_tags_count, filter.tags.size)
+            }
         FilterDropdownChip(
             label = tagLabel,
             selected = filter.tags.isNotEmpty(),
@@ -119,25 +119,30 @@ fun ActiveFilterChips(
                     checked = checked,
                     onClick = {
                         val nextTags = filter.tags.toMutableSet()
-                        if (checked) nextTags.removeIf { selectedTag -> selectedTag.equals(tag, ignoreCase = true) }
-                        else nextTags.add(tag)
+                        if (checked) {
+                            nextTags.removeIf { selectedTag -> selectedTag.equals(tag, ignoreCase = true) }
+                        } else {
+                            nextTags.add(tag)
+                        }
                         onChange(filter.copy(tags = nextTags))
                     },
                 )
             }
         }
-        val otherFilterCount = listOf(
-            filter.hasReminder,
-            filter.hasPicture,
-            filter.hasAttachment,
-            filter.favorite,
-        ).count { active -> active == true }
+        val otherFilterCount =
+            listOf(
+                filter.hasReminder,
+                filter.hasPicture,
+                filter.hasAttachment,
+                filter.favorite,
+            ).count { active -> active == true }
         FilterDropdownChip(
-            label = if (otherFilterCount == 0) {
-                stringResource(R.string.filter_dropdown_others)
-            } else {
-                stringResource(R.string.filter_dropdown_others_count, otherFilterCount)
-            },
+            label =
+                if (otherFilterCount == 0) {
+                    stringResource(R.string.filter_dropdown_others)
+                } else {
+                    stringResource(R.string.filter_dropdown_others_count, otherFilterCount)
+                },
             selected = otherFilterCount > 0,
         ) {
             CheckableMenuItem(
@@ -258,29 +263,34 @@ private data class SortOption(
 )
 
 @Composable
-private fun sortLabel(sortKey: SortKey, sortDir: SortDir): String {
-    return when (sortKey) {
-        SortKey.REMINDER -> if (sortDir == SortDir.ASC) {
-            stringResource(R.string.view_options_sort_reminder_soonest)
-        } else {
-            stringResource(R.string.view_options_sort_reminder_latest)
-        }
-        SortKey.LAST_MODIFIED -> if (sortDir == SortDir.ASC) {
-            stringResource(R.string.view_options_sort_modified_oldest)
-        } else {
-            stringResource(R.string.view_options_sort_modified_newest)
-        }
-        SortKey.CREATED -> if (sortDir == SortDir.ASC) {
-            stringResource(R.string.view_options_sort_created_oldest)
-        } else {
-            stringResource(R.string.view_options_sort_created_newest)
-        }
+private fun sortLabel(
+    sortKey: SortKey,
+    sortDir: SortDir,
+): String =
+    when (sortKey) {
+        SortKey.REMINDER ->
+            if (sortDir == SortDir.ASC) {
+                stringResource(R.string.view_options_sort_reminder_soonest)
+            } else {
+                stringResource(R.string.view_options_sort_reminder_latest)
+            }
+        SortKey.LAST_MODIFIED ->
+            if (sortDir == SortDir.ASC) {
+                stringResource(R.string.view_options_sort_modified_oldest)
+            } else {
+                stringResource(R.string.view_options_sort_modified_newest)
+            }
+        SortKey.CREATED ->
+            if (sortDir == SortDir.ASC) {
+                stringResource(R.string.view_options_sort_created_oldest)
+            } else {
+                stringResource(R.string.view_options_sort_created_newest)
+            }
     }
-}
 
 @Composable
-private fun sortOptions(): List<SortOption> {
-    return listOf(
+private fun sortOptions(): List<SortOption> =
+    listOf(
         SortOption(SortKey.REMINDER, SortDir.ASC, stringResource(R.string.view_options_sort_reminder_soonest)),
         SortOption(SortKey.REMINDER, SortDir.DESC, stringResource(R.string.view_options_sort_reminder_latest)),
         SortOption(SortKey.LAST_MODIFIED, SortDir.DESC, stringResource(R.string.view_options_sort_modified_newest)),
@@ -288,33 +298,29 @@ private fun sortOptions(): List<SortOption> {
         SortOption(SortKey.CREATED, SortDir.DESC, stringResource(R.string.view_options_sort_created_newest)),
         SortOption(SortKey.CREATED, SortDir.ASC, stringResource(R.string.view_options_sort_created_oldest)),
     )
-}
 
 @Composable
-private fun groupOptions(): List<Pair<GroupBy, String>> {
-    return listOf(
+private fun groupOptions(): List<Pair<GroupBy, String>> =
+    listOf(
         GroupBy.NONE to stringResource(R.string.view_options_group_none),
         GroupBy.DATE to stringResource(R.string.view_options_group_date),
         GroupBy.TAG to stringResource(R.string.view_options_group_tags),
         GroupBy.TYPE to stringResource(R.string.view_options_group_type),
     )
-}
 
 @Composable
-private fun typeLabel(filterType: FilterType): String {
-    return when (filterType) {
+private fun typeLabel(filterType: FilterType): String =
+    when (filterType) {
         FilterType.ALL -> stringResource(R.string.filter_type_all)
         FilterType.NOTE -> stringResource(R.string.filter_type_notes)
         FilterType.LIST -> stringResource(R.string.filter_type_lists)
     }
-}
 
 @Composable
-private fun groupLabel(groupBy: GroupBy): String {
-    return when (groupBy) {
+private fun groupLabel(groupBy: GroupBy): String =
+    when (groupBy) {
         GroupBy.DATE -> stringResource(R.string.view_options_group_date)
         GroupBy.NONE -> stringResource(R.string.view_options_group_none)
         GroupBy.TAG -> stringResource(R.string.view_options_group_tags)
         GroupBy.TYPE -> stringResource(R.string.view_options_group_type)
     }
-}

@@ -16,22 +16,25 @@ enum class GroupPosition { FIRST, MIDDLE, LAST, ONLY }
 private val outerRadius = 16.dp
 private val innerRadius = 4.dp
 
-fun groupedItemShape(position: GroupPosition): RoundedCornerShape = when (position) {
-    GroupPosition.FIRST -> RoundedCornerShape(
-        topStart = outerRadius,
-        topEnd = outerRadius,
-        bottomStart = innerRadius,
-        bottomEnd = innerRadius,
-    )
-    GroupPosition.MIDDLE -> RoundedCornerShape(innerRadius)
-    GroupPosition.LAST -> RoundedCornerShape(
-        topStart = innerRadius,
-        topEnd = innerRadius,
-        bottomStart = outerRadius,
-        bottomEnd = outerRadius,
-    )
-    GroupPosition.ONLY -> RoundedCornerShape(outerRadius)
-}
+fun groupedItemShape(position: GroupPosition): RoundedCornerShape =
+    when (position) {
+        GroupPosition.FIRST ->
+            RoundedCornerShape(
+                topStart = outerRadius,
+                topEnd = outerRadius,
+                bottomStart = innerRadius,
+                bottomEnd = innerRadius,
+            )
+        GroupPosition.MIDDLE -> RoundedCornerShape(innerRadius)
+        GroupPosition.LAST ->
+            RoundedCornerShape(
+                topStart = innerRadius,
+                topEnd = innerRadius,
+                bottomStart = outerRadius,
+                bottomEnd = outerRadius,
+            )
+        GroupPosition.ONLY -> RoundedCornerShape(outerRadius)
+    }
 
 @Composable
 fun GroupedListItem(

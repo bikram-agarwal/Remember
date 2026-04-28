@@ -16,15 +16,17 @@ data class QuickCaptureState(
 
 private val Context.quickCaptureDataStore by preferencesDataStore(name = "quick_capture_prefs")
 
-class QuickCapturePrefs(private val context: Context) {
-
+class QuickCapturePrefs(
+    private val context: Context,
+) {
     private object Keys {
         val ENABLED = booleanPreferencesKey("quick_capture_enabled")
     }
 
-    val state: Flow<QuickCaptureState> = context.quickCaptureDataStore.data.map { prefs ->
-        QuickCaptureState(enabled = prefs[Keys.ENABLED] ?: false)
-    }
+    val state: Flow<QuickCaptureState> =
+        context.quickCaptureDataStore.data.map { prefs ->
+            QuickCaptureState(enabled = prefs[Keys.ENABLED] ?: false)
+        }
 
     suspend fun snapshot(): QuickCaptureState = state.first()
 

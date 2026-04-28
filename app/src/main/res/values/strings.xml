@@ -10,17 +10,17 @@
 
     <!-- Onboarding permissions -->
     <string name="onboarding_permissions_title">Stay on top of everything</string>
-    <string name="onboarding_permissions_subtitle">Enable notifications so reminders appear \nright when you need them.</string>
+    <string name="onboarding_permissions_subtitle">Enable notifications so reminders appear \nright when you need them</string>
     <string name="onboarding_permissions_notifications_title">Notifications</string>
-    <string name="onboarding_permissions_notifications_body">Required for reminder alerts, snooze actions, and quick capture.</string>
+    <string name="onboarding_permissions_notifications_body">Required for reminder alerts, snooze actions, and quick capture</string>
     <string name="onboarding_permissions_reliable_title">Improve reliability</string>
-    <string name="onboarding_permissions_reliable_body">Let Remember ignore battery optimizations so scheduled reminders are less likely to be delayed.</string>
+    <string name="onboarding_permissions_reliable_body">Let Remember ignore battery optimizations so scheduled reminders are less likely to be delayed</string>
     <string name="onboarding_permissions_status_recommended">Recommended</string>
     <string name="onboarding_permissions_status_optional">Optional</string>
     <string name="onboarding_permissions_enabled">Enabled</string>
     <string name="onboarding_permissions_allow_notifications">Enable notifications</string>
     <string name="onboarding_permissions_improve_reliability">Improve reliability</string>
-    <string name="onboarding_permissions_change_anytime_footer">You can change these anytime in Settings.</string>
+    <string name="onboarding_permissions_change_anytime_footer">You can change these anytime in Settings</string>
     <string name="onboarding_permissions_continue">Continue</string>
     <string name="onboarding_permissions_skip_for_now">Skip for now</string>
 
@@ -47,8 +47,13 @@
     <string name="common_title">Title</string>
     <string name="edit_note_title_existing">Untitled</string>
     <string name="edit_note_body_placeholder">Type your note…</string>
+    <string name="edit_note_empty_view_title">No content yet</string>
+    <string name="edit_note_empty_view_hint">Tap Edit to start writing</string>
+    <string name="edit_list_empty_view_title">Empty list</string>
+    <string name="edit_list_empty_view_hint">Tap Edit to start writing</string>
     <string name="common_empty">Empty</string>
     <string name="common_empty_note">Empty note</string>
+    <string name="common_empty_list">Empty list</string>
     <string name="common_undo">Undo</string>
     <string name="edit_note_title_new">Untitled note</string>
     <string name="edit_list_title_new">Untitled list</string>
@@ -56,6 +61,10 @@
     <!-- Toasts and transient feedback -->
     <string name="toast_export_failed">Export failed</string>
     <string name="toast_exported_notes">Exported %1$d notes</string>
+    <plurals name="toast_exported_to_destinations">
+        <item quantity="one">Backup exported to %1$d folder</item>
+        <item quantity="other">Backup exported to %1$d folders</item>
+    </plurals>
     <string name="toast_imported_notes">Imported %1$d notes</string>
     <string name="toast_copied">Copied</string>
     <string name="changes_saved">Changes saved</string>
@@ -76,7 +85,7 @@
     <string name="lock_use_device_unlock">Use your device unlock method</string>
     <string name="lock_wrong_pin">Wrong PIN</string>
     <string name="pin_setup_title">Set up PIN</string>
-    <string name="pin_setup_subtitle">Choose a 4–6 digit PIN to unlock Remember.</string>
+    <string name="pin_setup_subtitle">Choose a 4-6 digit PIN to unlock Remember</string>
     <string name="pin_label">PIN</string>
     <string name="pin_confirm_label">Confirm</string>
 
@@ -94,12 +103,12 @@
     <string name="main_empty_trash_title">Empty trash?</string>
     <string name="main_empty_trash_subtitle">Permanently delete all trashed items. This cannot be undone.</string>
     <string name="main_move_archive_to_trash_title">Move all archived items to trash?</string>
-    <string name="main_move_archive_to_trash_subtitle">All items in trash are permanently deleted after 30 days.</string>
+    <string name="main_move_archive_to_trash_subtitle">All items in trash are permanently deleted after 30 days</string>
     <string name="main_speed_dial_checklist">Checklist</string>
     <string name="main_speed_dial_note">Note</string>
     <string name="main_speed_dial_import">Import</string>
     <string name="home_no_notes_title">No notes yet</string>
-    <string name="home_no_notes_subtitle">Create a note or a checklist to get started.</string>
+    <string name="home_no_notes_subtitle">Create a note or a checklist to get started</string>
     <string name="home_create_note">Create note</string>
     <string name="home_create_list">Create list</string>
 
@@ -137,7 +146,6 @@
     <string name="notecard_picture_cd">Has picture</string>
     <string name="notecard_attachment_cd">Has attachment</string>
     <string name="notecard_extra_tags">+%1$d</string>
-    <string name="notecard_empty_list">Empty list</string>
     <string name="notecard_extra_items">+ %1$d more</string>
     <string name="hero_framing_title">Position cover</string>
     <string name="viewer_cover_image_cd">Cover image</string>
@@ -193,7 +201,7 @@
     <string name="edit_bottom_bar_restore_cd">Restore from trash</string>
     <string name="edit_save_cd">Save changes</string>
     <string name="edit_delete_forever_dialog_title">Delete forever?</string>
-    <string name="edit_delete_forever_dialog_body">This note will be permanently deleted and cannot be recovered.</string>
+    <string name="edit_delete_forever_dialog_body">This note will be permanently deleted and cannot be recovered</string>
     <string name="edit_delete_forever_dialog_confirm">Delete</string>
 
     <!-- History -->
@@ -237,7 +245,7 @@
     <string name="home_bulk_trash">Move to trash</string>
     <string name="home_bulk_tag">Tag / untag</string>
     <string name="home_bulk_tag_sheet_title">Bulk edit tags</string>
-    <string name="home_bulk_tag_sheet_subtitle">Tap to cycle: (+) Add to all, (x) Remove from all, tap again to reset.</string>
+    <string name="home_bulk_tag_sheet_subtitle">Tap to cycle: (+) Add to all, (x) Remove from all, tap again to reset</string>
     <string name="home_bulk_tag_apply">Apply</string>
     <string name="home_bulk_tag_create_pill">+ Create new tag</string>
     <string name="home_bulk_tag_create_pill_cd">Create a new tag</string>
@@ -254,7 +262,7 @@
     <string name="quick_capture_notification_title">New note</string>
     <string name="quick_capture_notification_text">Tap to write a new note</string>
     <string name="settings_quick_capture_title">Quick capture notification</string>
-    <string name="settings_quick_capture_subtitle">Pin a persistent notification that opens a blank note when tapped</string>
+    <string name="settings_quick_capture_subtitle">Persistent shortcut to create a new note</string>
 
     <!-- Widget additions -->
     <string name="widget_section_pinned">Favorites</string>
@@ -276,6 +284,8 @@
     <string name="options_actions">Notification Action</string>
     <string name="options_importance">Importance</string>
     <string name="options_picture">Picture</string>
+    <string name="options_picture_none">No picture</string>
+    <string name="options_picture_attached">Attached</string>
     <string name="options_attachments">Attachments</string>
 
     <!-- Importance -->
@@ -286,9 +296,9 @@
     <!-- Reminders -->
     <string name="reminder_set_title">Set reminder</string>
     <string name="reminder_exact_alarm_permission_prompt">Exact reminders require permission. Tap to enable in Settings.</string>
-    <string name="reminder_notifications_required_title">Allow notifications first</string>
-    <string name="reminder_notifications_required_body">Remember needs notification permission before it can alert you when a reminder is due.</string>
-    <string name="reminder_notifications_required_action">Allow notifications</string>
+    <string name="reminder_notifications_required_title">Enable notifications first</string>
+    <string name="reminder_notifications_required_body">Remember needs notification permission before it can alert you when a reminder is due</string>
+    <string name="reminder_notifications_required_action">Enable notifications</string>
     <string name="reminder_every_label">Every</string>
     <string name="reminder_on_day">On day %1$d</string>
     <string name="reminder_never">Never</string>
@@ -323,7 +333,7 @@
     <string name="tag_editor_duplicate">Already added</string>
     <string name="tag_editor_duplicate_existing">A tag with this name already exists</string>
     <string name="tag_editor_edit_mode_cd">Edit tags</string>
-    <string name="tag_editor_edit_mode_hint">Edit mode: tap a tag to load its name and color below.</string>
+    <string name="tag_editor_edit_mode_hint">Edit mode: tap a tag to load its name and color below</string>
     <string name="tag_editor_update_tag">Update tag</string>
 
     <!-- Note actions (sheet and editor) -->
@@ -384,10 +394,23 @@
     <!-- Attachments and pickers -->
     <string name="attachments_subtitle">Attach any file — PDFs, docs, audio, video</string>
     <string name="attachments_add">Add attachment</string>
+    <string name="media_storage_stored_in_app">Stored in app</string>
+    <string name="media_storage_linked_original">Linked original</string>
+    <string name="media_storage_linked_original_hint">Linked media may stop working if the original file is moved, deleted, or permission is lost</string>
+    <string name="media_storage_status_cd">Media storage status</string>
+    <string name="options_attachments_storage_summary">%1$s • %2$s, %3$s</string>
+    <plurals name="media_storage_stored_count">
+        <item quantity="one">%1$d stored</item>
+        <item quantity="other">%1$d stored</item>
+    </plurals>
+    <plurals name="media_storage_linked_count">
+        <item quantity="one">%1$d linked</item>
+        <item quantity="other">%1$d linked</item>
+    </plurals>
     <string name="icon_picker_title">Pick an icon</string>
     <string name="icon_picker_search_hint">Search icons</string>
     <string name="icon_picker_results_heading">Matches</string>
-    <string name="icon_picker_no_results">No icons match that search.</string>
+    <string name="icon_picker_no_results">No icons match that search</string>
     <string name="icon_picker_choose_emoji">Emoji</string>
     <string name="icon_picker_emoji_dialog_title">Emoji icon</string>
     <string name="icon_picker_emoji_dialog_hint">Enter an emoji</string>
@@ -416,11 +439,11 @@
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>
     <string name="appearance_add_custom_color_cd">Add custom color</string>
     <string name="appearance_custom_accent_title">Custom accent color</string>
-    <string name="appearance_custom_accent_body">Pick any hex color - Material You will generate a harmonized palette from it.</string>
+    <string name="appearance_custom_accent_body">Pick any hex color - Material You will generate a harmonized palette from it</string>
     <string name="appearance_preview">Preview</string>
     <string name="appearance_invalid_hex">Invalid hex</string>
     <string name="appearance_hex_placeholder">#FF5733 or FF5733</string>
-    <string name="appearance_material_you_requires_s">Material You colors need Android 12 or newer.</string>
+    <string name="appearance_material_you_requires_s">Material You colors need Android 12 or newer</string>
 
     <!-- Palette style names (shared) -->
     <string name="palette_style_tonal_spot">Tonal spot</string>
@@ -435,8 +458,11 @@
 
     <!-- Settings: shell and section titles -->
     <string name="settings_title">Settings</string>
+    <string name="settings_expand_all_sections_cd">Expand all settings sections</string>
+    <string name="settings_collapse_all_sections_cd">Collapse all settings sections</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_security">Security</string>
+    <string name="settings_updates_section">Updates</string>
     <string name="settings_section_about">About</string>
 
     <!-- Settings: appearance summary row -->
@@ -448,16 +474,16 @@
     <string name="settings_haptic_feedback">Haptic feedback</string>
     <string name="settings_haptic_feedback_desc">Light vibration when passing a swipe threshold</string>
     <string name="settings_notifications">Notifications</string>
-    <string name="settings_notifications_desc">Reminder alerts and system notifications for Remember</string>
+    <string name="settings_notifications_desc">Reminders and system alerts</string>
     <string name="settings_keep_reminders_until_done">Keep reminder notifications until done</string>
-    <string name="settings_keep_reminders_until_done_desc">If a due reminder is swiped away, Remember posts it again until it is marked done, snoozed, archived, or deleted.</string>
+    <string name="settings_keep_reminders_until_done_desc">Persistent alerts. Re-posts reminders until marked done.</string>
     <string name="settings_reminder_summary_notification">Reminder summary notification</string>
-    <string name="settings_reminder_summary_notification_desc">Show one silent ongoing notification listing overdue reminders and reminders due in the next 7 days.</string>
+    <string name="settings_reminder_summary_notification_desc">Silent overview of overdue and upcoming tasks</string>
     <string name="settings_reliable_reminders">Reliable reminders</string>
-    <string name="settings_reliable_reminders_desc">Allows the app to ignore battery optimizations so reminders can fire on time.</string>
-    <string name="settings_reliable_reminders_exact_desc">Allows the app to trigger reminders at the exact scheduled time.</string>
+    <string name="settings_reliable_reminders_desc">Priority timing. Bypasses battery optimizations for accuracy.</string>
+    <string name="settings_reliable_reminders_exact_desc">Triggers reminders at exact scheduled time</string>
     <string name="settings_run_in_background">Run in background</string>
-    <string name="settings_run_in_background_desc">Prevents the system from putting the app to sleep and delaying your reminders.</string>
+    <string name="settings_run_in_background_desc">Prevents the system from putting the app to sleep and delaying your reminders</string>
     <string name="settings_swipe_section">Swipe gestures</string>
     <string name="settings_swipe_gesture">Swipe actions</string>
     <string name="settings_swipe_mode_execute_one">Swipe to execute one action</string>
@@ -483,13 +509,13 @@
     <string name="google_tasks_import_intro_body">Connect a Google account, choose the tasks you want, and add them to Remember. Read-only access, no changes are made to Google Tasks.</string>
     <string name="google_tasks_import_takeout_title">Import from a file</string>
     <string name="google_tasks_import_takeout_body">The most private way to move your data. No account sign-in required. Just select the takeout file you downloaded from Google.</string>
-    <string name="google_tasks_import_takeout_step_1">1. Open Google Takeout for Tasks, tap \"Next step\", then \"Create export.\"</string>
+    <string name="google_tasks_import_takeout_step_1">1. Open Google Takeout for Tasks, tap \"Next step\", then \"Create export\"</string>
     <string name="google_tasks_import_takeout_step_2">2. Check your email for the download link. Download and extract the archive.</string>
     <string name="google_tasks_import_takeout_step_3">3. Come back here and tap \"Choose Tasks.json\"</string>
     <string name="google_tasks_import_takeout_pick_json">Choose Tasks.json</string>
     <string name="google_tasks_import_takeout_open_takeout">Open Google Takeout</string>
     <string name="google_tasks_import_takeout_loaded">Loaded from Google Takeout Tasks.json</string>
-    <string name="google_tasks_import_takeout_collapse_summary">Collapsed %1$d recurring task instances into %2$d tasks.</string>
+    <string name="google_tasks_import_takeout_collapse_summary">Collapsed %1$d recurring task instances into %2$d tasks</string>
     <string name="google_tasks_import_pick_account">Choose Google account</string>
     <string name="google_tasks_import_pick_other_account">Use a different account</string>
     <string name="google_tasks_import_continue_as">Continue as %1$s</string>
@@ -499,14 +525,14 @@
     <string name="google_tasks_import_loading">Loading your Google Tasks…</string>
     <string name="google_tasks_import_empty_title">No tasks under %1$s</string>
     <string name="google_tasks_import_empty_title_no_email">No tasks in your Google account</string>
-    <string name="google_tasks_import_empty_body">When you add tasks in Google Tasks they will show up here.</string>
+    <string name="google_tasks_import_empty_body">When you add tasks in Google Tasks they will show up here</string>
     <string name="google_tasks_import_filter_all_lists">All lists</string>
     <string name="google_tasks_import_filter_label">List</string>
     <string name="google_tasks_import_due_label">Due %1$s</string>
     <string name="google_tasks_import_completed_chip">Completed</string>
     <string name="google_tasks_import_already_imported_chip">Already imported</string>
     <string name="google_tasks_import_untitled_task">Untitled task</string>
-    <string name="google_tasks_import_time_caveat">Google Tasks does not expose reminder times to apps; due dates land at 9:00 AM and can be edited after import.</string>
+    <string name="google_tasks_import_time_caveat">Google Tasks does not expose reminder times to apps; due dates land at 9:00 AM and can be edited after import</string>
     <string name="google_tasks_import_select_all">Select all</string>
     <string name="google_tasks_import_clear_selection">Clear selection</string>
     <string name="google_tasks_import_selection_count">%1$d / %2$d</string>
@@ -517,23 +543,30 @@
     <string name="google_tasks_import_mode_list_as_checklist">List as checklist</string>
     <string name="google_tasks_import_done_snack">Imported %1$d tasks</string>
     <string name="google_tasks_import_error_network">Could not reach Google Tasks. Check your connection and try again.</string>
-    <string name="google_tasks_import_error_consent">Consent is required to import Google Tasks.</string>
+    <string name="google_tasks_import_error_consent">Consent is required to import Google Tasks</string>
     <string name="google_tasks_import_error_takeout_parse">Could not read this file. Choose the Google Tasks Tasks.json file from Takeout.</string>
     <string name="google_tasks_import_error_auth_default">Could not sign in to Google. Try a different account.</string>
-    <string name="google_tasks_import_error_unknown_default">Something went wrong while talking to Google Tasks.</string>
+    <string name="google_tasks_import_error_unknown_default">Something went wrong while talking to Google Tasks</string>
 
     <!-- Settings: backup and restore -->
     <string name="settings_backup_section">Backup &amp; restore</string>
     <string name="filesystem_folder_picker_internal_storage">Internal storage</string>
     <string name="settings_choose_export_folder">Choose export folder</string>
-    <string name="settings_export_folder_hint">Folder for exporting backups (notes, lists, settings)</string>
-    <string name="settings_export_select_folder_first">Select an export folder first</string>
-    <string name="settings_include_media_in_backup">Include images &amp; attachments?</string>
-    <string name="settings_include_media_in_backup_hint">This significantly increases the backup file size.</string>
+    <string name="settings_choose_local_backup_folder">Choose local backup folder</string>
+    <string name="settings_choose_cloud_backup_file">Choose cloud backup file</string>
+    <string name="settings_local_backup_folder_hint">Folder for exporting backups (notes, lists, settings)</string>
+    <string name="settings_cloud_backup_folder_hint">File on cloud for exporting backups (notes, lists, settings)</string>
+    <string name="settings_local_backup_folder_cleared">Local backup folder reset</string>
+    <string name="settings_cloud_backup_file_cleared">Cloud backup file reset</string>
+    <string name="settings_export_select_folder_first">Select a local or cloud backup folder first</string>
+    <string name="settings_include_media_in_backup">Include images &amp; attachments</string>
+    <string name="settings_include_media_in_backup_hint">This significantly increases the backup file size</string>
+    <string name="settings_include_media_in_backup_tooltip">When off, backups keep only links to images and attachments. Those files may not restore on another device.</string>
+    <string name="settings_include_media_info_cd">Explain media backup</string>
     <string name="settings_auto_export_on_change">Auto-export on app exit</string>
-    <string name="settings_auto_export_on_change_hint">Saves a full backup when you exit the app after making changes.</string>
+    <string name="settings_auto_export_on_change_hint">Saves a full backup when you exit the app after making changes</string>
     <string name="settings_scheduled_export">Daily scheduled backup</string>
-    <string name="settings_scheduled_export_hint">Automatically backs up once a day when an export folder is set.</string>
+    <string name="settings_scheduled_export_hint">Automatically backs up once a day to configured backup folders</string>
     <string name="settings_import_rules">Import backup</string>
     <string name="settings_export_now">Export backup</string>
     <string name="settings_restore_backup">Restore backup</string>
@@ -542,7 +575,12 @@
     <string name="settings_backup_help_body">Import adds notes from a backup to your existing collection, which may cause duplicates. Restore completely wipes all current data before importing the backup to ensure a clean slate.</string>
     <string name="settings_restore_confirm_title">Replace all notes?</string>
     <string name="settings_restore_confirm_body">This will permanently delete all notes and lists in the app and replace them with the backup. This cannot be undone.</string>
+    <string name="settings_restore_media_missing_warning">This backup does not include all image and attachment files. Missing media will remain as links and may not open after restore.</string>
     <string name="settings_restore_go_ahead">Replace and import</string>
+    <string name="cloud_provider_google_drive">Google Drive</string>
+    <string name="cloud_provider_onedrive">OneDrive</string>
+    <string name="cloud_provider_dropbox">Dropbox</string>
+    <string name="cloud_provider_box">Box</string>
 
     <!-- Settings: security -->
     <string name="settings_app_lock_title">App lock</string>
@@ -554,6 +592,50 @@
     <string name="settings_biometric_need_lock">Enable app lock first</string>
     <string name="settings_biometric_enabled">Enabled</string>
     <string name="settings_biometric_disabled">Disabled</string>
+
+    <!-- Settings: updates -->
+    <string name="settings_check_for_updates">Check for updates</string>
+    <string name="settings_update_check_frequency">Automatically check for updates</string>
+    <string name="settings_update_schedule_app_start">At startup: when the app starts</string>
+    <string name="settings_update_schedule_daily_21">Daily: every day at 9 PM</string>
+    <string name="settings_update_schedule_monday_21">Weekly: every Monday at 9 PM</string>
+    <string name="settings_update_schedule_never">Never</string>
+    <string name="settings_save_update_apk_to_downloads">Save update APK to Download folder</string>
+    <string name="settings_notify_new_updates">Get notification for new updates</string>
+    <string name="settings_notify_updates_need_auto_check">Enable \"Automatically check for updates\" first</string>
+    <string name="settings_notify_updates_enable_notifications">Allow notifications for Remember</string>
+    <string name="settings_checking_for_updates">Checking for updates…</string>
+    <string name="settings_update_available_button">Update available - %1$s</string>
+    <string name="settings_update_available">v%1$s available</string>
+    <string name="settings_update_current_version">Current version: %1$s</string>
+    <string name="settings_up_to_date">You\'re up to date</string>
+    <string name="settings_download_install">Download update (v%1$s)</string>
+    <string name="settings_open_play_store">Open Play Store</string>
+    <string name="settings_downloading">Downloading…</string>
+    <string name="settings_downloading_percent">Downloading %1$d%%</string>
+    <string name="settings_installing">Installing…</string>
+    <string name="settings_update_check_failed">Could not check for updates</string>
+    <string name="settings_update_download_failed">Could not download update</string>
+    <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Download failed</string>
+    <string name="notification_channel_updates_name">App updates</string>
+    <string name="notification_channel_updates_description">Alerts when a new app version is available</string>
+    <string name="notification_update_available_title">Update available</string>
+    <string name="notification_update_available_text">Version %1$s is ready to install</string>
+    <string name="update_banner_available_title">Update available</string>
+    <string name="update_banner_available_message">A newer Remember version is ready</string>
+    <string name="update_banner_available_action">Open</string>
+    <string name="play_update_banner_downloading_title">Downloading update</string>
+    <string name="play_update_banner_downloading">Downloading from Play Store…</string>
+    <string name="play_update_banner_downloading_bytes">%1$s of %2$s</string>
+    <string name="play_update_banner_install_title">Update ready</string>
+    <string name="play_update_banner_install_subtitle">Restart Remember to finish installing</string>
+    <string name="play_update_banner_install_action">Restart</string>
+    <string name="settings_dev_release_mocks_section">Dev release mocks</string>
+    <string name="settings_dev_release_mock_update_banner">Arm update promo banner</string>
+    <string name="settings_dev_release_mock_play_banner">Play update banner (download then install)</string>
+    <string name="settings_share_diagnostics">Share diagnostic log</string>
+    <string name="settings_share_diagnostics_subtitle">Share app version, device info, app log, and last crash stack</string>
+    <string name="settings_share_diagnostics_chooser">Share diagnostic log</string>
 
     <!-- Settings: about -->
     <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>

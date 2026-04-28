@@ -41,7 +41,9 @@ fun EmptyNotesIllustration(modifier: Modifier = Modifier) {
     Canvas(modifier.size(width = 180.dp, height = 180.dp)) {
         val scaleX = size.width / ARTBOARD_W
         val scaleY = size.height / ARTBOARD_H
+
         fun x(value: Float) = value * scaleX
+
         fun y(value: Float) = value * scaleY
 
         val padW = x(PAD_W)
@@ -165,12 +167,13 @@ fun EmptyNotesIllustration(modifier: Modifier = Modifier) {
                 style = Fill,
             )
 
-            val nibPath = Path().apply {
-                moveTo(barrelLeftEdge, barrelTop + y(1f))
-                lineTo(nibTip.x, nibTip.y)
-                lineTo(barrelLeftEdge, barrelTop + barrelThick - y(1f))
-                close()
-            }
+            val nibPath =
+                Path().apply {
+                    moveTo(barrelLeftEdge, barrelTop + y(1f))
+                    lineTo(nibTip.x, nibTip.y)
+                    lineTo(barrelLeftEdge, barrelTop + barrelThick - y(1f))
+                    close()
+                }
             drawPath(nibPath, color = scheme.onSurface.copy(alpha = 0.92f), style = Fill)
 
             drawLine(
@@ -322,15 +325,16 @@ fun EmptyTrashIllustration(modifier: Modifier = Modifier) {
         // Bin body - wide and slightly squat, with a small inward taper toward the bottom.
         // Top opening 116 wide, base 100 wide, height 126 (about 0.92 width-to-height
         // ratio so it reads as a real trash can rather than a tall mailing tube).
-        val binPath = Path().apply {
-            moveTo(52f * scaleX, 66f * scaleY)
-            lineTo(168f * scaleX, 66f * scaleY)
-            lineTo(162f * scaleX, 184f * scaleY)
-            quadraticTo(160f * scaleX, 192f * scaleY, 154f * scaleX, 192f * scaleY)
-            lineTo(66f * scaleX, 192f * scaleY)
-            quadraticTo(60f * scaleX, 192f * scaleY, 58f * scaleX, 184f * scaleY)
-            close()
-        }
+        val binPath =
+            Path().apply {
+                moveTo(52f * scaleX, 66f * scaleY)
+                lineTo(168f * scaleX, 66f * scaleY)
+                lineTo(162f * scaleX, 184f * scaleY)
+                quadraticTo(160f * scaleX, 192f * scaleY, 154f * scaleX, 192f * scaleY)
+                lineTo(66f * scaleX, 192f * scaleY)
+                quadraticTo(60f * scaleX, 192f * scaleY, 58f * scaleX, 184f * scaleY)
+                close()
+            }
         translate(left = 4f * scaleX, top = 6f * scaleY) {
             drawPath(binPath, color = shadowColor, style = Fill)
         }
@@ -397,16 +401,21 @@ fun EmptyTrashIllustration(modifier: Modifier = Modifier) {
  * Draws a 4-pointed sparkle (concave-sided diamond) centred at [center] with arms of
  * length [radius]. Used by the trash empty state.
  */
-private fun DrawScope.drawSparkle(center: Offset, radius: Float, color: Color) {
+private fun DrawScope.drawSparkle(
+    center: Offset,
+    radius: Float,
+    color: Color,
+) {
     val waist = radius * 0.32f
-    val sparkle = Path().apply {
-        moveTo(center.x, center.y - radius)
-        quadraticTo(center.x + waist, center.y - waist, center.x + radius, center.y)
-        quadraticTo(center.x + waist, center.y + waist, center.x, center.y + radius)
-        quadraticTo(center.x - waist, center.y + waist, center.x - radius, center.y)
-        quadraticTo(center.x - waist, center.y - waist, center.x, center.y - radius)
-        close()
-    }
+    val sparkle =
+        Path().apply {
+            moveTo(center.x, center.y - radius)
+            quadraticTo(center.x + waist, center.y - waist, center.x + radius, center.y)
+            quadraticTo(center.x + waist, center.y + waist, center.x, center.y + radius)
+            quadraticTo(center.x - waist, center.y + waist, center.x - radius, center.y)
+            quadraticTo(center.x - waist, center.y - waist, center.x, center.y - radius)
+            close()
+        }
     drawPath(sparkle, color = color, style = Fill)
 }
 

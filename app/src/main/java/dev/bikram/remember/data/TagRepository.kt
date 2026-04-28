@@ -18,7 +18,6 @@ class TagRepository(
     private val database: RememberDatabase? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
-
     fun observeActiveTags(): Flow<List<TagEntity>> = tagDao.observeActiveTags()
 
     fun observeActiveTagSuggestions(): Flow<List<String>> =
@@ -28,13 +27,17 @@ class TagRepository(
 
     fun observeTagColorMap(): Flow<Map<String, String>> =
         tagDao.observeAllTags().map { tags ->
-            tags.mapNotNull { tag ->
-                val colorHex = tag.colorHex ?: return@mapNotNull null
-                tag.normalizedName to colorHex
-            }.toMap()
+            tags
+                .mapNotNull { tag ->
+                    val colorHex = tag.colorHex ?: return@mapNotNull null
+                    tag.normalizedName to colorHex
+                }.toMap()
         }
 
-    suspend fun replaceTagsForNote(noteId: Long, tagNames: List<String>) {
+    suspend fun replaceTagsForNote(
+        noteId: Long,
+        tagNames: List<String>,
+    ) {
         val cleanedNames = cleanUserVisibleTagNames(tagNames)
         if (database != null) {
             database.withTransaction {
@@ -45,7 +48,10 @@ class TagRepository(
         }
     }
 
-    suspend fun setTagColor(tagName: String, colorHex: String?) {
+    suspend fun setTagColor(
+        tagName: String,
+        colorHex: String?,
+    ) {
         val cleanedName = tagName.trim()
         if (cleanedName.isBlank() || cleanedName == RememberReservedTags.FAVORITE) return
         val normalizedColor = colorHex?.let { normalizeHex(it) }
@@ -80,22 +86,24 @@ class TagRepository(
         var result: TagEditResult? = null
         if (database != null) {
             database.withTransaction {
-                result = editTagInTransaction(
+                result =
+                    editTagInTransaction(
+                        oldNormalizedName = oldNormalizedName,
+                        newName = cleanedNewName,
+                        newNormalizedName = newNormalizedName,
+                        colorHex = normalizedColor,
+                        resetColor = resetColor,
+                    )
+            }
+        } else {
+            result =
+                editTagInTransaction(
                     oldNormalizedName = oldNormalizedName,
                     newName = cleanedNewName,
                     newNormalizedName = newNormalizedName,
                     colorHex = normalizedColor,
                     resetColor = resetColor,
                 )
-            }
-        } else {
-            result = editTagInTransaction(
-                oldNormalizedName = oldNormalizedName,
-                newName = cleanedNewName,
-                newNormalizedName = newNormalizedName,
-                colorHex = normalizedColor,
-                resetColor = resetColor,
-            )
         }
         return result
     }
@@ -125,12 +133,13 @@ class TagRepository(
         if (collision != null && collision.id != existingTag.id) return null
 
         val nextColor = if (resetColor) null else colorHex ?: existingTag.colorHex
-        val updatedTag = existingTag.copy(
-            name = newName,
-            normalizedName = newNormalizedName,
-            colorHex = nextColor,
-            updatedAt = clock(),
-        )
+        val updatedTag =
+            existingTag.copy(
+                name = newName,
+                normalizedName = newNormalizedName,
+                colorHex = nextColor,
+                updatedAt = clock(),
+            )
         tagDao.updateTag(updatedTag)
         if (oldNormalizedName != newNormalizedName || existingTag.name != newName) {
             tagDao.noteIdsForTag(existingTag.id).forEach { noteId ->
@@ -140,17 +149,24 @@ class TagRepository(
         return TagEditResult(oldName = existingTag.name, newName = newName)
     }
 
-    private suspend fun replaceTagsForNoteInTransaction(noteId: Long, tagNames: List<String>) {
+    private suspend fun replaceTagsForNoteInTransaction(
+        noteId: Long,
+        tagNames: List<String>,
+    ) {
         tagDao.deleteAssignmentsForNote(noteId)
-        val assignments = tagNames.mapIndexed { tagIndex, tagName ->
-            val tag = createOrGetTagInTransaction(tagName, colorHex = null)
-            NoteTagCrossRef(noteId = noteId, tagId = tag.id, sortOrder = tagIndex)
-        }
+        val assignments =
+            tagNames.mapIndexed { tagIndex, tagName ->
+                val tag = createOrGetTagInTransaction(tagName, colorHex = null)
+                NoteTagCrossRef(noteId = noteId, tagId = tag.id, sortOrder = tagIndex)
+            }
         if (assignments.isNotEmpty()) tagDao.insertAssignments(assignments)
         syncNoteTagCache(noteId)
     }
 
-    private suspend fun createOrGetTagInTransaction(tagName: String, colorHex: String?): TagEntity {
+    private suspend fun createOrGetTagInTransaction(
+        tagName: String,
+        colorHex: String?,
+    ): TagEntity {
         val cleanedName = tagName.trim()
         val normalizedName = normalizeTagName(cleanedName)
         tagDao.getByNormalizedName(normalizedName)?.let { existingTag ->
@@ -162,15 +178,16 @@ class TagRepository(
             return existingTag
         }
         val now = clock()
-        val insertedId = tagDao.insertTag(
-            TagEntity(
-                name = cleanedName,
-                normalizedName = normalizedName,
-                colorHex = colorHex,
-                createdAt = now,
-                updatedAt = now,
-            ),
-        )
+        val insertedId =
+            tagDao.insertTag(
+                TagEntity(
+                    name = cleanedName,
+                    normalizedName = normalizedName,
+                    colorHex = colorHex,
+                    createdAt = now,
+                    updatedAt = now,
+                ),
+            )
         if (insertedId > 0L) {
             return tagDao.getByNormalizedName(normalizedName)
                 ?: error("Inserted tag row was not readable")
@@ -185,12 +202,9 @@ class TagRepository(
         val reservedTags = note.tags.filter { tagName -> tagName == RememberReservedTags.FAVORITE }
         noteDao.updateTagCache(noteId, visibleTags + reservedTags)
     }
-
 }
 
-fun normalizeTagName(tagName: String): String {
-    return tagName.trim().lowercase(Locale.ROOT)
-}
+fun normalizeTagName(tagName: String): String = tagName.trim().lowercase(Locale.ROOT)
 
 internal fun cleanUserVisibleTagNames(tagNames: List<String>): List<String> {
     val seenNames = LinkedHashSet<String>()

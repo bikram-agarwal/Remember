@@ -12,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.systemBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,17 +36,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mohamedrejeb.richeditor.annotation.ExperimentalRichTextApi
 import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
-import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import dev.bikram.remember.ui.components.NoteActionBottomBarContent
@@ -71,29 +66,27 @@ private enum class EditorBottomSlot { Format, Action, None }
 @Composable
 fun EditNoteRoute(
     repository: NoteRepository,
-    themePrefs: ThemePrefs,
     appScope: CoroutineScope,
     noteId: Long?,
-    prefillBody: String = "",
     forceEdit: Boolean = false,
     onBack: () -> Unit,
 ) {
-    val vm: EditNoteViewModel = viewModel(
-        key = "editNote-${noteId ?: 0L}",
-        factory = EditNoteViewModel.factory(repository, themePrefs, noteId, prefillBody),
-    )
+    val vm: EditNoteViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
-    val sharedModifier = if (sharedScope != null && navScope != null && noteId != null) {
-        with(sharedScope) {
-            Modifier.sharedBounds(
-                sharedContentState = rememberSharedContentState(key = "note-card-${noteId}"),
-                animatedVisibilityScope = navScope
-            )
+    val sharedModifier =
+        if (sharedScope != null && navScope != null && noteId != null) {
+            with(sharedScope) {
+                Modifier.sharedBounds(
+                    sharedContentState = rememberSharedContentState(key = "note-card-$noteId"),
+                    animatedVisibilityScope = navScope,
+                )
+            }
+        } else {
+            Modifier
         }
-    } else Modifier
 
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
         EditNoteScreen(
@@ -136,16 +129,18 @@ fun EditNoteScreen(
     var deleteForeverConfirmOpen by rememberSaveable { mutableStateOf(false) }
 
     var pendingHeroSession by remember { mutableStateOf<Pair<String, File?>?>(null) }
-    val launchHeroImagePick = rememberHeroImagePickThenCopy { uriString, copiedFile ->
-        pendingHeroSession = uriString to copiedFile
-    }
+    val launchHeroImagePick =
+        rememberHeroImagePickThenCopy { uriString, copiedFile ->
+            pendingHeroSession = uriString to copiedFile
+        }
     var pictureViewer by remember { mutableStateOf<Pair<String, Long>?>(null) }
 
-    val titlePlaceholder = if (existing) {
-        stringResource(R.string.edit_note_title_existing)
-    } else {
-        stringResource(R.string.common_title)
-    }
+    val titlePlaceholder =
+        if (existing) {
+            stringResource(R.string.edit_note_title_existing)
+        } else {
+            stringResource(R.string.common_title)
+        }
     val bodyPlaceholder = stringResource(R.string.edit_note_body_placeholder)
 
     val blurStyle = rememberProgressiveBlurStyle(bottomExtra = PillBottomBarHeight * 0)
@@ -155,11 +150,12 @@ fun EditNoteScreen(
     val trashed by vm.trashed.collectAsStateWithLifecycle()
     val favorite by vm.favorite.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
-    val shelfState = when {
-        trashed -> NoteShelfState.TRASHED
-        archived -> NoteShelfState.ARCHIVED
-        else -> NoteShelfState.ACTIVE
-    }
+    val shelfState =
+        when {
+            trashed -> NoteShelfState.TRASHED
+            archived -> NoteShelfState.ARCHIVED
+            else -> NoteShelfState.ACTIVE
+        }
     val readOnly = shelfState != NoteShelfState.ACTIVE
 
     var isEditMode by remember(existing, forceEdit) { mutableStateOf(!existing || forceEdit) }
@@ -171,13 +167,14 @@ fun EditNoteScreen(
     val richTextState = rememberRichTextState()
     val undoController = remember(editorNoteKey) { UndoRedoController() }
 
-    val bridge = rememberEditorBodyBridge(
-        vm = vm,
-        richTextState = richTextState,
-        undoController = undoController,
-        isEditMode = isEditMode,
-        appScope = appScope,
-    )
+    val bridge =
+        rememberEditorBodyBridge(
+            vm = vm,
+            richTextState = richTextState,
+            undoController = undoController,
+            isEditMode = isEditMode,
+            appScope = appScope,
+        )
 
     val snackbarHostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current
     val changesSavedMsg = stringResource(R.string.changes_saved)
@@ -189,12 +186,13 @@ fun EditNoteScreen(
         appScope.launch {
             val undoAction = vm.saveIfNeeded(untitledName)
             if (undoAction != null) {
-                val result = snackbarHostState.showSnackbar(
-                    message = changesSavedMsg,
-                    actionLabel = undoMsg,
-                    withDismissAction = true,
-                    duration = androidx.compose.material3.SnackbarDuration.Short
-                )
+                val result =
+                    snackbarHostState.showSnackbar(
+                        message = changesSavedMsg,
+                        actionLabel = undoMsg,
+                        withDismissAction = true,
+                        duration = androidx.compose.material3.SnackbarDuration.Short,
+                    )
                 if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
                     undoAction()
                 }
@@ -223,29 +221,30 @@ fun EditNoteScreen(
     // that filters on NestedScrollSource.UserInput for the SHOW direction means the spring
     // phase (reported as SideEffect) never re-reveals the bar - the overscroll stretch and
     // release land cleanly without the bar flickering.
-    val barVisibilityNestedScroll = remember {
-        object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
-            override fun onPreScroll(
-                available: androidx.compose.ui.geometry.Offset,
-                source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
-            ): androidx.compose.ui.geometry.Offset {
-                val dy = available.y
-                when {
-                    // Content moves up -> user is scrolling DOWN -> hide the bar. Accept
-                    // this from any source so a fling that carries scroll-down still hides
-                    // the bar.
-                    dy < -1f -> bottomBarVisible = false
-                    // Content moves down -> user is scrolling UP -> show the bar. Only
-                    // honour this for direct user drags; the spring-back and fling
-                    // deceleration both come through as SideEffect and would otherwise
-                    // flip the bar on during the bounce the user is scrolling away from.
-                    dy > 1f && source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput ->
-                        bottomBarVisible = true
+    val barVisibilityNestedScroll =
+        remember {
+            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+                override fun onPreScroll(
+                    available: androidx.compose.ui.geometry.Offset,
+                    source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
+                ): androidx.compose.ui.geometry.Offset {
+                    val dy = available.y
+                    when {
+                        // Content moves up -> user is scrolling DOWN -> hide the bar. Accept
+                        // this from any source so a fling that carries scroll-down still hides
+                        // the bar.
+                        dy < -1f -> bottomBarVisible = false
+                        // Content moves down -> user is scrolling UP -> show the bar. Only
+                        // honour this for direct user drags; the spring-back and fling
+                        // deceleration both come through as SideEffect and would otherwise
+                        // flip the bar on during the bounce the user is scrolling away from.
+                        dy > 1f && source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput ->
+                            bottomBarVisible = true
+                    }
+                    return androidx.compose.ui.geometry.Offset.Zero
                 }
-                return androidx.compose.ui.geometry.Offset.Zero
             }
         }
-    }
 
     val density = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
@@ -264,11 +263,12 @@ fun EditNoteScreen(
         isEditMode = false
         appScope.launch {
             if (vm.saveIfNeeded(untitledName) != null) {
-                android.widget.Toast.makeText(
-                    context,
-                    changesSavedMsg,
-                    android.widget.Toast.LENGTH_SHORT,
-                ).show()
+                android.widget.Toast
+                    .makeText(
+                        context,
+                        changesSavedMsg,
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
             }
         }
     }
@@ -277,9 +277,10 @@ fun EditNoteScreen(
         // Chain two nestedScroll connections: scrollBehavior drives the TopAppBar collapse,
         // barVisibilityNestedScroll drives the bottom action bar hide/show with a source
         // filter so overscroll spring-back doesn't flash the bar back in.
-        modifier = Modifier
-            .nestedScroll(barVisibilityNestedScroll)
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            Modifier
+                .nestedScroll(barVisibilityNestedScroll)
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
             EditNoteTopBarSection(
@@ -309,34 +310,37 @@ fun EditNoteScreen(
             // against one another on the same surface, driven by the M3E default spatial
             // spring, so the swap is one smooth vertical cross-fade instead of two
             // overlapping vertical expand/collapse passes.
-            val bottomSlot: EditorBottomSlot = when {
-                isEditMode -> EditorBottomSlot.Format
-                actionBarVisible -> EditorBottomSlot.Action
-                else -> EditorBottomSlot.None
-            }
+            val bottomSlot: EditorBottomSlot =
+                when {
+                    isEditMode -> EditorBottomSlot.Format
+                    actionBarVisible -> EditorBottomSlot.Action
+                    else -> EditorBottomSlot.None
+                }
             val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
             val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
             // Stable callbacks - the RichTextToolbar / action item rows are lambda-heavy
             // and re-allocating on every recomposition defeats their skippable-composable
             // optimization.
-            val onUndo = remember(richTextState, undoController, bridge) {
-                {
-                    undoController.undo(richTextState.toMarkdown())?.let { previous ->
-                        richTextState.setMarkdown(previous)
-                        bridge.reset(previous)
+            val onUndo =
+                remember(richTextState, undoController, bridge) {
+                    {
+                        undoController.undo(richTextState.toMarkdown())?.let { previous ->
+                            richTextState.setMarkdown(previous)
+                            bridge.reset(previous)
+                        }
+                        Unit
                     }
-                    Unit
                 }
-            }
-            val onRedo = remember(richTextState, undoController, bridge) {
-                {
-                    undoController.redo(richTextState.toMarkdown())?.let { next ->
-                        richTextState.setMarkdown(next)
-                        bridge.reset(next)
+            val onRedo =
+                remember(richTextState, undoController, bridge) {
+                    {
+                        undoController.redo(richTextState.toMarkdown())?.let { next ->
+                            richTextState.setMarkdown(next)
+                            bridge.reset(next)
+                        }
+                        Unit
                     }
-                    Unit
                 }
-            }
             AnimatedContent(
                 targetState = bottomSlot,
                 label = "EditNoteBottomSlot",
@@ -351,47 +355,49 @@ fun EditNoteScreen(
                 },
             ) { currentSlot ->
                 when (currentSlot) {
-                    EditorBottomSlot.Format -> EditNoteFormatBarContent(
-                        richTextState = richTextState,
-                        undoController = undoController,
-                        onUndo = onUndo,
-                        onRedo = onRedo,
-                    )
-                    EditorBottomSlot.Action -> NoteActionBottomBarContent(
-                        shelfState = shelfState,
-                        existing = persistedForToolbar,
-                        isEditMode = isEditMode,
-                        favorite = favorite,
-                        completed = completed,
-                        onToggleEdit = {
-                            // Outside edit mode this turns edit mode ON. The SAVE path is
-                            // owned by the top-bar Save icon (edit mode) or by
-                            // back/lifecycle (view mode flush), so there's no save
-                            // side-effect to run here.
-                            if (!isEditMode) isEditMode = true else saveAndExitEditMode()
-                        },
-                        onToggleFavorite = { vm.toggleFavorite() },
-                        onToggleCompleted = {
-                            appScope.launch { vm.toggleCompleted() }
-                        },
-                        onArchive = {
-                            appScope.launch { vm.archiveCurrent(untitledName) }
-                        },
-                        onNotification = {
-                            appScope.launch { vm.fireNotification(context, untitledName) }
-                        },
-                        onUnarchive = {
-                            appScope.launch { vm.unarchiveCurrent() }
-                        },
-                        onTrash = {
-                            appScope.launch { vm.trashCurrent() }
-                            onBack()
-                        },
-                        onRestore = {
-                            appScope.launch { vm.restoreFromTrashCurrent() }
-                        },
-                        onDeleteForever = { deleteForeverConfirmOpen = true },
-                    )
+                    EditorBottomSlot.Format ->
+                        EditNoteFormatBarContent(
+                            richTextState = richTextState,
+                            undoController = undoController,
+                            onUndo = onUndo,
+                            onRedo = onRedo,
+                        )
+                    EditorBottomSlot.Action ->
+                        NoteActionBottomBarContent(
+                            shelfState = shelfState,
+                            existing = persistedForToolbar,
+                            isEditMode = isEditMode,
+                            favorite = favorite,
+                            completed = completed,
+                            onToggleEdit = {
+                                // Outside edit mode this turns edit mode ON. The SAVE path is
+                                // owned by the top-bar Save icon (edit mode) or by
+                                // back/lifecycle (view mode flush), so there's no save
+                                // side-effect to run here.
+                                if (!isEditMode) isEditMode = true else saveAndExitEditMode()
+                            },
+                            onToggleFavorite = { vm.toggleFavorite() },
+                            onToggleCompleted = {
+                                appScope.launch { vm.toggleCompleted() }
+                            },
+                            onArchive = {
+                                appScope.launch { vm.archiveCurrent(untitledName) }
+                            },
+                            onNotification = {
+                                appScope.launch { vm.fireNotification(context, untitledName) }
+                            },
+                            onUnarchive = {
+                                appScope.launch { vm.unarchiveCurrent() }
+                            },
+                            onTrash = {
+                                appScope.launch { vm.trashCurrent() }
+                                onBack()
+                            },
+                            onRestore = {
+                                appScope.launch { vm.restoreFromTrashCurrent() }
+                            },
+                            onDeleteForever = { deleteForeverConfirmOpen = true },
+                        )
                     // Empty slot keeps Scaffold's bottomBar measure stable during the
                     // exit animation of whichever bar was previously visible.
                     EditorBottomSlot.None -> Box(Modifier.fillMaxWidth())
@@ -410,7 +416,6 @@ fun EditNoteScreen(
             existing = existing,
             shelfState = shelfState,
             pictureViewerOpen = pictureViewer != null,
-            onRequestEditMode = { if (!readOnly) isEditMode = true },
             onOpenReminder = { reminderPickerOpen = true },
             onOpenPicture = launchHeroImagePick,
             onViewPictureFull = { uri, revision ->
@@ -531,9 +536,16 @@ fun EditNoteScreen(
         imageContentDescription = stringResource(R.string.cd_note_hero_image),
         sharedElementKey = viewerForOverlay?.first?.let { uri -> "hero-image-$uri" },
         onDismiss = { pictureViewer = null },
-        onDelete = if (readOnly) null else ({
-            vm.setPictureUri(null)
-            pictureViewer = null
-        }),
+        onDelete =
+            if (readOnly) {
+                null
+            } else {
+                (
+                    {
+                        vm.setPictureUri(null)
+                        pictureViewer = null
+                    }
+                )
+            },
     )
 }

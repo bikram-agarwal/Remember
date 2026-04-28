@@ -71,11 +71,12 @@ fun RememberMaterialRoundedSymbol(
     val density = LocalDensity.current
     val fontSize = remember(size, density) { with(density) { size.toSp() } }
     val brush = remember(tint) { SolidColor(tint) }
-    val fontFamily = if (filled) {
-        MaterialSymbolsRoundedFilledFontFamily
-    } else {
-        MaterialSymbolsRoundedOutlinedFontFamily
-    }
+    val fontFamily =
+        if (filled) {
+            MaterialSymbolsRoundedFilledFontFamily
+        } else {
+            MaterialSymbolsRoundedOutlinedFontFamily
+        }
     val layoutModifier =
         if (opticalCenterYOffset == 0.dp) {
             modifier
@@ -85,16 +86,17 @@ fun RememberMaterialRoundedSymbol(
     BasicText(
         text = name,
         modifier = layoutModifier,
-        style = TextStyle(
-            brush = brush,
-            fontSize = fontSize,
-            lineHeight = fontSize,
-            fontFamily = fontFamily,
-            // Material Symbols icons are driven by the `rlig` feature (required ligatures).
-            fontFeatureSettings = "\"rlig\" 1, \"liga\" 1",
-            textAlign = TextAlign.Center,
-            platformStyle = PlatformTextStyle(includeFontPadding = false),
-            lineHeightStyle = FlatLineHeightStyle,
-        ),
+        style =
+            TextStyle(
+                brush = brush,
+                fontSize = fontSize,
+                lineHeight = fontSize,
+                fontFamily = fontFamily,
+                // Material Symbols icons are driven by the `rlig` feature (required ligatures).
+                fontFeatureSettings = "\"rlig\" 1, \"liga\" 1",
+                textAlign = TextAlign.Center,
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+                lineHeightStyle = FlatLineHeightStyle,
+            ),
     )
 }

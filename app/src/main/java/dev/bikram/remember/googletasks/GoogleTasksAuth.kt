@@ -53,7 +53,6 @@ import kotlin.coroutines.resumeWithException
  * name + signing certificate SHA-1. See `localdocs/google-tasks-oauth-setup.md`.
  */
 object GoogleTasksAuth {
-
     private const val TASKS_READONLY_SCOPE = "https://www.googleapis.com/auth/tasks.readonly"
     private const val EMAIL_SCOPE = "https://www.googleapis.com/auth/userinfo.email"
     private const val USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
@@ -62,10 +61,13 @@ object GoogleTasksAuth {
     private val json = Json { ignoreUnknownKeys = true }
 
     @Serializable
-    private data class UserInfoResponse(val email: String? = null)
+    private data class UserInfoResponse(
+        val email: String? = null,
+    )
 
     private fun authorizationRequest(): AuthorizationRequest =
-        AuthorizationRequest.Builder()
+        AuthorizationRequest
+            .Builder()
             .setRequestedScopes(listOf(Scope(TASKS_READONLY_SCOPE), Scope(EMAIL_SCOPE)))
             .build()
 
@@ -83,8 +85,8 @@ object GoogleTasksAuth {
      * [androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult]
      * and feeds the returned [Intent] back through [parseConsentResult].
      */
-    suspend fun authorize(context: Context): GoogleTasksAuthorizationResult {
-        return try {
+    suspend fun authorize(context: Context): GoogleTasksAuthorizationResult =
+        try {
             val task = Identity.getAuthorizationClient(context).authorize(authorizationRequest())
             val result = task.await()
             result.toAuthorizationResult()
@@ -93,7 +95,6 @@ object GoogleTasksAuth {
         } catch (e: Throwable) {
             GoogleTasksAuthorizationResult.Failure(e)
         }
-    }
 
     /**
      * Read the result of the consent-screen activity. The [data] is the Intent delivered to
@@ -101,7 +102,10 @@ object GoogleTasksAuth {
      * [androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult]
      * launcher.
      */
-    suspend fun parseConsentResult(context: Context, data: Intent?): GoogleTasksAuthorizationResult {
+    suspend fun parseConsentResult(
+        context: Context,
+        data: Intent?,
+    ): GoogleTasksAuthorizationResult {
         if (data == null) return GoogleTasksAuthorizationResult.Failure(IllegalStateException("Empty consent result"))
         return try {
             val result = Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(data)
@@ -131,7 +135,10 @@ object GoogleTasksAuth {
      * call fully wipes the OAuth grant for our app, which is too aggressive - the new tokens
      * issued after re-consent are then rejected by the Tasks API in a loop.
      */
-    suspend fun forget(context: Context, accessToken: String? = null) {
+    suspend fun forget(
+        context: Context,
+        accessToken: String? = null,
+    ) {
         runCatching {
             CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest())
         }
@@ -147,10 +154,14 @@ object GoogleTasksAuth {
      * Invalidate a previously-issued token. Used after a 401 response so the next
      * [authorize] call mints a fresh one rather than handing back the stale one from cache.
      */
-    suspend fun invalidateToken(context: Context, token: String) {
+    suspend fun invalidateToken(
+        context: Context,
+        token: String,
+    ) {
         withContext(Dispatchers.IO) {
             runCatching {
-                com.google.android.gms.auth.GoogleAuthUtil.clearToken(context, token)
+                com.google.android.gms.auth.GoogleAuthUtil
+                    .clearToken(context, token)
             }
         }
     }
@@ -167,13 +178,14 @@ object GoogleTasksAuth {
     private suspend fun revokeToken(accessToken: String) {
         withContext(Dispatchers.IO) {
             runCatching {
-                val conn = (URL(REVOKE_URL).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
-                    doOutput = true
-                    connectTimeout = 10_000
-                    readTimeout = 10_000
-                }
+                val conn =
+                    (URL(REVOKE_URL).openConnection() as HttpURLConnection).apply {
+                        requestMethod = "POST"
+                        setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                        doOutput = true
+                        connectTimeout = 10_000
+                        readTimeout = 10_000
+                    }
                 try {
                     conn.outputStream.use { os ->
                         os.write("token=$accessToken".toByteArray(Charsets.UTF_8))
@@ -189,10 +201,11 @@ object GoogleTasksAuth {
 
     private suspend fun AuthorizationResult.toAuthorizationResult(): GoogleTasksAuthorizationResult {
         if (hasResolution()) {
-            val sender = pendingIntent?.intentSender
-                ?: return GoogleTasksAuthorizationResult.Failure(
-                    IllegalStateException("Authorization result has resolution flag but no pendingIntent"),
-                )
+            val sender =
+                pendingIntent?.intentSender
+                    ?: return GoogleTasksAuthorizationResult.Failure(
+                        IllegalStateException("Authorization result has resolution flag but no pendingIntent"),
+                    )
             return GoogleTasksAuthorizationResult.NeedsConsent(
                 IntentSenderRequest.Builder(sender).build(),
             )
@@ -216,82 +229,111 @@ object GoogleTasksAuth {
      * Requires the `userinfo.email` scope, which we always include on the authorization request.
      * Returns null on any network or parse error - callers must tolerate a missing email.
      */
-    private suspend fun fetchEmailFromUserInfo(accessToken: String): String? = withContext(Dispatchers.IO) {
-        val conn = (URL(USERINFO_URL).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            setRequestProperty("Authorization", "Bearer $accessToken")
-            setRequestProperty("Accept", "application/json")
-            connectTimeout = 10_000
-            readTimeout = 15_000
-            doInput = true
+    private suspend fun fetchEmailFromUserInfo(accessToken: String): String? =
+        withContext(Dispatchers.IO) {
+            val conn =
+                (URL(USERINFO_URL).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    setRequestProperty("Authorization", "Bearer $accessToken")
+                    setRequestProperty("Accept", "application/json")
+                    connectTimeout = 10_000
+                    readTimeout = 15_000
+                    doInput = true
+                }
+            try {
+                if (conn.responseCode !in 200..299) return@withContext null
+                val body = BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8)).use { it.readText() }
+                json.decodeFromString(UserInfoResponse.serializer(), body).email
+            } catch (_: Throwable) {
+                null
+            } finally {
+                conn.disconnect()
+            }
         }
-        try {
-            if (conn.responseCode !in 200..299) return@withContext null
-            val body = BufferedReader(InputStreamReader(conn.inputStream, Charsets.UTF_8)).use { it.readText() }
-            json.decodeFromString(UserInfoResponse.serializer(), body).email
-        } catch (_: Throwable) {
-            null
-        } finally {
-            conn.disconnect()
-        }
-    }
 }
 
 interface GoogleTasksAuthDelegate {
     suspend fun authorize(context: Context): GoogleTasksAuthorizationResult
-    suspend fun parseConsentResult(context: Context, data: Intent?): GoogleTasksAuthorizationResult
-    suspend fun forget(context: Context, accessToken: String? = null)
-    suspend fun invalidateToken(context: Context, token: String)
+
+    suspend fun parseConsentResult(
+        context: Context,
+        data: Intent?,
+    ): GoogleTasksAuthorizationResult
+
+    suspend fun forget(
+        context: Context,
+        accessToken: String? = null,
+    )
+
+    suspend fun invalidateToken(
+        context: Context,
+        token: String,
+    )
 }
 
 object DefaultGoogleTasksAuthDelegate : GoogleTasksAuthDelegate {
-    override suspend fun authorize(context: Context): GoogleTasksAuthorizationResult {
-        return GoogleTasksAuth.authorize(context)
-    }
+    override suspend fun authorize(context: Context): GoogleTasksAuthorizationResult = GoogleTasksAuth.authorize(context)
 
     override suspend fun parseConsentResult(
         context: Context,
         data: Intent?,
-    ): GoogleTasksAuthorizationResult {
-        return GoogleTasksAuth.parseConsentResult(context, data)
-    }
+    ): GoogleTasksAuthorizationResult = GoogleTasksAuth.parseConsentResult(context, data)
 
-    override suspend fun forget(context: Context, accessToken: String?) {
+    override suspend fun forget(
+        context: Context,
+        accessToken: String?,
+    ) {
         GoogleTasksAuth.forget(context, accessToken)
     }
 
-    override suspend fun invalidateToken(context: Context, token: String) {
+    override suspend fun invalidateToken(
+        context: Context,
+        token: String,
+    ) {
         GoogleTasksAuth.invalidateToken(context, token)
     }
 }
 
 /** Suspend-friendly wrapper around the Play Services [Task] so we don't pull in a play-services-coroutine artifact. */
-private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
-    if (isComplete) {
-        val ex = exception
-        if (ex != null) cont.resumeWithException(ex)
-        else if (isCanceled) cont.cancel()
-        else @Suppress("UNCHECKED_CAST") cont.resume(result as T)
-        return@suspendCancellableCoroutine
+private suspend fun <T> Task<T>.await(): T =
+    suspendCancellableCoroutine { cont ->
+        if (isComplete) {
+            val ex = exception
+            if (ex != null) {
+                cont.resumeWithException(ex)
+            } else if (isCanceled) {
+                cont.cancel()
+            } else {
+                @Suppress("UNCHECKED_CAST")
+                cont.resume(result as T)
+            }
+            return@suspendCancellableCoroutine
+        }
+        addOnSuccessListener { value -> cont.resume(value) }
+        addOnFailureListener { error -> cont.resumeWithException(error) }
+        addOnCanceledListener { cont.cancel() }
     }
-    addOnSuccessListener { value -> cont.resume(value) }
-    addOnFailureListener { error -> cont.resumeWithException(error) }
-    addOnCanceledListener { cont.cancel() }
-}
 
 sealed class GoogleTasksAuthorizationResult {
     /**
      * Already authorized. [accessToken] is live; [accountEmail] identifies the picked Google
      * account when available, otherwise the empty string. UI must tolerate a blank email.
      */
-    data class Success(val accessToken: String, val accountEmail: String) : GoogleTasksAuthorizationResult()
+    data class Success(
+        val accessToken: String,
+        val accountEmail: String,
+    ) : GoogleTasksAuthorizationResult()
 
     /**
      * Consent UI must be shown. Caller launches [request] via
      * [androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult]
      * and forwards the resulting [Intent] to [GoogleTasksAuth.parseConsentResult].
      */
-    data class NeedsConsent(val request: IntentSenderRequest) : GoogleTasksAuthorizationResult()
+    data class NeedsConsent(
+        val request: IntentSenderRequest,
+    ) : GoogleTasksAuthorizationResult()
 
-    data class Failure(val cause: Throwable) : GoogleTasksAuthorizationResult()
+    data class Failure(
+        val cause: Throwable,
+    ) : GoogleTasksAuthorizationResult()
 }

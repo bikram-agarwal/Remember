@@ -10,6 +10,7 @@ enum class NoteSwipeAction(
     DUPLICATE("content_copy"),
     TOGGLE_FAVORITE("favorite"),
     ARCHIVE("archive"),
+
     /** Mark task done. Recurrence-aware via [NoteRepository.markCompleted]. */
     MARK_DONE("check_circle"),
 }

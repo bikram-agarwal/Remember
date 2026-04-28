@@ -74,11 +74,12 @@ fun DeliberateSwipeRevealCard(
     BoxWithConstraints(modifier = modifier.clip(cardShape)) {
         val constraintWidthPx =
             if (constraints.hasBoundedWidth) constraints.maxWidth.toFloat().coerceAtLeast(1f) else 0f
-        val widthPx = when {
-            laidOutWidthPx > 0f -> laidOutWidthPx
-            constraintWidthPx > 0f -> constraintWidthPx
-            else -> 0f
-        }
+        val widthPx =
+            when {
+                laidOutWidthPx > 0f -> laidOutWidthPx
+                constraintWidthPx > 0f -> constraintWidthPx
+                else -> 0f
+            }
         val dragClampPx = if (widthPx > 0f) widthPx else 10_000f
         val thresholdPx =
             if (widthPx > 0f) widthPx * commitThresholdFraction else Float.POSITIVE_INFINITY
@@ -102,68 +103,71 @@ fun DeliberateSwipeRevealCard(
                     laidOutWidthPx = size.width.toFloat()
                 },
         ) { layoutConstraints ->
-            val foregroundMeasurable = subcompose("foreground") {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .offset { IntOffset(offsetX.roundToInt(), 0) }
-                        .pointerInput(
-                            dragClampPx,
-                            thresholdPx,
-                            allowSwipeStartToEnd,
-                            allowSwipeEndToStart,
-                        ) {
-                            val minOffset = if (allowSwipeEndToStart) -dragClampPx else 0f
-                            val maxOffset = if (allowSwipeStartToEnd) dragClampPx else 0f
-                            detectHorizontalDragGestures(
-                                onHorizontalDrag = { _, dragAmount ->
-                                    offsetX = (offsetX + dragAmount).coerceIn(minOffset, maxOffset)
-                                },
-                                onDragEnd = {
-                                    scope.launch {
-                                        when {
-                                            allowSwipeStartToEnd && offsetX >= thresholdPx -> {
-                                                onSwipeStartToEnd()
-                                                offsetX = 0f
-                                            }
-                                            allowSwipeEndToStart && offsetX <= -thresholdPx -> {
-                                                onSwipeEndToStart()
-                                                offsetX = 0f
-                                            }
-                                            else -> {
-                                                val start = offsetX
-                                                val anim = Animatable(start)
-                                                anim.animateTo(
-                                                    targetValue = 0f,
-                                                    animationSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioNoBouncy,
-                                                        stiffness = Spring.StiffnessMedium,
-                                                    ),
-                                                ) {
-                                                    offsetX = value
+            val foregroundMeasurable =
+                subcompose("foreground") {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .offset { IntOffset(offsetX.roundToInt(), 0) }
+                            .pointerInput(
+                                dragClampPx,
+                                thresholdPx,
+                                allowSwipeStartToEnd,
+                                allowSwipeEndToStart,
+                            ) {
+                                val minOffset = if (allowSwipeEndToStart) -dragClampPx else 0f
+                                val maxOffset = if (allowSwipeStartToEnd) dragClampPx else 0f
+                                detectHorizontalDragGestures(
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        offsetX = (offsetX + dragAmount).coerceIn(minOffset, maxOffset)
+                                    },
+                                    onDragEnd = {
+                                        scope.launch {
+                                            when {
+                                                allowSwipeStartToEnd && offsetX >= thresholdPx -> {
+                                                    onSwipeStartToEnd()
+                                                    offsetX = 0f
+                                                }
+                                                allowSwipeEndToStart && offsetX <= -thresholdPx -> {
+                                                    onSwipeEndToStart()
+                                                    offsetX = 0f
+                                                }
+                                                else -> {
+                                                    val start = offsetX
+                                                    val anim = Animatable(start)
+                                                    anim.animateTo(
+                                                        targetValue = 0f,
+                                                        animationSpec =
+                                                            spring(
+                                                                dampingRatio = Spring.DampingRatioNoBouncy,
+                                                                stiffness = Spring.StiffnessMedium,
+                                                            ),
+                                                    ) {
+                                                        offsetX = value
+                                                    }
                                                 }
                                             }
                                         }
-                                    }
-                                },
-                            )
-                        },
-                ) {
-                    content()
-                }
-            }.first()
+                                    },
+                                )
+                            },
+                    ) {
+                        content()
+                    }
+                }.first()
             val foregroundPlaceable = foregroundMeasurable.measure(layoutConstraints)
             val cardWidth = foregroundPlaceable.width
             val cardHeight = foregroundPlaceable.height
             val fixed = Constraints.fixed(cardWidth, cardHeight)
-            val backgroundMeasurable = subcompose("background") {
-                Box(Modifier.fillMaxSize()) {
-                    when {
-                        offsetX > 4f -> backgroundContent(true)
-                        offsetX < -4f -> backgroundContent(false)
+            val backgroundMeasurable =
+                subcompose("background") {
+                    Box(Modifier.fillMaxSize()) {
+                        when {
+                            offsetX > 4f -> backgroundContent(true)
+                            offsetX < -4f -> backgroundContent(false)
+                        }
                     }
-                }
-            }.first()
+                }.first()
             val backgroundPlaceable = backgroundMeasurable.measure(fixed)
             layout(cardWidth, cardHeight) {
                 backgroundPlaceable.place(0, 0)
@@ -201,28 +205,32 @@ fun MultiActionSwipeRevealCard(
     val scope = rememberCoroutineScope()
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
-    val maxRevealWidthPx = with(androidx.compose.ui.platform.LocalDensity.current) {
-        maxRevealWidth.toPx()
-    }
+    val maxRevealWidthPx =
+        with(androidx.compose.ui.platform.LocalDensity.current) {
+            maxRevealWidth.toPx()
+        }
 
     BoxWithConstraints(modifier = modifier.clip(cardShape)) {
         val constraintWidthPx =
             if (constraints.hasBoundedWidth) constraints.maxWidth.toFloat().coerceAtLeast(1f) else 0f
-        val widthPx = when {
-            laidOutWidthPx > 0f -> laidOutWidthPx
-            constraintWidthPx > 0f -> constraintWidthPx
-            else -> 0f
-        }
-        val startRevealPx = if (startActions.isEmpty()) {
-            0f
-        } else {
-            maxRevealWidthPx.coerceAtMost(widthPx)
-        }
-        val endRevealPx = if (endActions.isEmpty()) {
-            0f
-        } else {
-            maxRevealWidthPx.coerceAtMost(widthPx)
-        }
+        val widthPx =
+            when {
+                laidOutWidthPx > 0f -> laidOutWidthPx
+                constraintWidthPx > 0f -> constraintWidthPx
+                else -> 0f
+            }
+        val startRevealPx =
+            if (startActions.isEmpty()) {
+                0f
+            } else {
+                maxRevealWidthPx.coerceAtMost(widthPx)
+            }
+        val endRevealPx =
+            if (endActions.isEmpty()) {
+                0f
+            } else {
+                maxRevealWidthPx.coerceAtMost(widthPx)
+            }
         val openThresholdPx = (maxRevealWidthPx * 0.22f).coerceAtLeast(36f)
 
         LaunchedEffect(hapticEnabled, startRevealPx, endRevealPx) {
@@ -246,68 +254,72 @@ fun MultiActionSwipeRevealCard(
                     laidOutWidthPx = size.width.toFloat()
                 },
         ) { layoutConstraints ->
-            val foregroundMeasurable = subcompose("foreground") {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .offset { IntOffset(offsetX.roundToInt(), 0) }
-                        .pointerInput(startRevealPx, endRevealPx, openThresholdPx) {
-                            detectHorizontalDragGestures(
-                                onHorizontalDrag = { _, dragAmount ->
-                                    offsetX = (offsetX + dragAmount).coerceIn(-endRevealPx, startRevealPx)
-                                },
-                                onDragEnd = {
-                                    scope.launch {
-                                        val target = when {
-                                            offsetX >= openThresholdPx && startRevealPx > 0f -> startRevealPx
-                                            offsetX <= -openThresholdPx && endRevealPx > 0f -> -endRevealPx
-                                            else -> 0f
+            val foregroundMeasurable =
+                subcompose("foreground") {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .offset { IntOffset(offsetX.roundToInt(), 0) }
+                            .pointerInput(startRevealPx, endRevealPx, openThresholdPx) {
+                                detectHorizontalDragGestures(
+                                    onHorizontalDrag = { _, dragAmount ->
+                                        offsetX = (offsetX + dragAmount).coerceIn(-endRevealPx, startRevealPx)
+                                    },
+                                    onDragEnd = {
+                                        scope.launch {
+                                            val target =
+                                                when {
+                                                    offsetX >= openThresholdPx && startRevealPx > 0f -> startRevealPx
+                                                    offsetX <= -openThresholdPx && endRevealPx > 0f -> -endRevealPx
+                                                    else -> 0f
+                                                }
+                                            val anim = Animatable(offsetX)
+                                            anim.animateTo(
+                                                targetValue = target,
+                                                animationSpec =
+                                                    spring(
+                                                        dampingRatio = Spring.DampingRatioNoBouncy,
+                                                        stiffness = Spring.StiffnessMedium,
+                                                    ),
+                                            ) {
+                                                offsetX = value
+                                            }
                                         }
-                                        val anim = Animatable(offsetX)
-                                        anim.animateTo(
-                                            targetValue = target,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                                stiffness = Spring.StiffnessMedium,
-                                            ),
-                                        ) {
-                                            offsetX = value
-                                        }
-                                    }
-                                },
-                            )
-                        },
-                ) {
-                    content()
-                }
-            }.first()
+                                    },
+                                )
+                            },
+                    ) {
+                        content()
+                    }
+                }.first()
             val foregroundPlaceable = foregroundMeasurable.measure(layoutConstraints)
             val cardWidth = foregroundPlaceable.width
             val cardHeight = foregroundPlaceable.height
             val fixed = Constraints.fixed(cardWidth, cardHeight)
-            val backgroundMeasurable = subcompose("background") {
-                Box(Modifier.fillMaxSize()) {
-                    if (offsetX > 4f && startActions.isNotEmpty()) {
-                        SwipeActionRail(
-                            actions = startActions,
-                            revealWidth = maxRevealWidth,
-                            alignToStart = true,
-                            onActionClick = {
-                                scope.launch { offsetX = 0f }
-                            },
-                        )
-                    } else if (offsetX < -4f && endActions.isNotEmpty()) {
-                        SwipeActionRail(
-                            actions = endActions,
-                            revealWidth = maxRevealWidth,
-                            alignToStart = false,
-                            onActionClick = {
-                                scope.launch { offsetX = 0f }
-                            },
-                        )
+            val backgroundMeasurable =
+                subcompose("background") {
+                    Box(Modifier.fillMaxSize()) {
+                        if (offsetX > 4f && startActions.isNotEmpty()) {
+                            SwipeActionRail(
+                                actions = startActions,
+                                revealWidth = maxRevealWidth,
+                                alignToStart = true,
+                                onActionClick = {
+                                    scope.launch { offsetX = 0f }
+                                },
+                            )
+                        } else if (offsetX < -4f && endActions.isNotEmpty()) {
+                            SwipeActionRail(
+                                actions = endActions,
+                                revealWidth = maxRevealWidth,
+                                alignToStart = false,
+                                onActionClick = {
+                                    scope.launch { offsetX = 0f }
+                                },
+                            )
+                        }
                     }
-                }
-            }.first()
+                }.first()
             val backgroundPlaceable = backgroundMeasurable.measure(fixed)
             layout(cardWidth, cardHeight) {
                 backgroundPlaceable.place(0, 0)
@@ -324,37 +336,42 @@ private fun BoxScope.SwipeActionRail(
     alignToStart: Boolean,
     onActionClick: () -> Unit,
 ) {
-    val nearestCardColor = if (alignToStart) {
-        actions.last().backgroundColor
-    } else {
-        actions.first().backgroundColor
-    }
+    val nearestCardColor =
+        if (alignToStart) {
+            actions.last().backgroundColor
+        } else {
+            actions.first().backgroundColor
+        }
     Box(
-        modifier = Modifier
-            .fillMaxHeight()
-            .width(revealWidth + SwipeRailCornerOverdraw)
-            .align(if (alignToStart) Alignment.CenterStart else Alignment.CenterEnd),
+        modifier =
+            Modifier
+                .fillMaxHeight()
+                .width(revealWidth + SwipeRailCornerOverdraw)
+                .align(if (alignToStart) Alignment.CenterStart else Alignment.CenterEnd),
     ) {
         Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(SwipeRailCornerOverdraw)
-                .align(if (alignToStart) Alignment.CenterEnd else Alignment.CenterStart)
-                .background(nearestCardColor),
+            modifier =
+                Modifier
+                    .fillMaxHeight()
+                    .width(SwipeRailCornerOverdraw)
+                    .align(if (alignToStart) Alignment.CenterEnd else Alignment.CenterStart)
+                    .background(nearestCardColor),
         )
         Row(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(revealWidth)
-                .align(if (alignToStart) Alignment.CenterStart else Alignment.CenterEnd),
+            modifier =
+                Modifier
+                    .fillMaxHeight()
+                    .width(revealWidth)
+                    .align(if (alignToStart) Alignment.CenterStart else Alignment.CenterEnd),
             horizontalArrangement = Arrangement.Start,
         ) {
             actions.forEach { action ->
                 SwipeActionTile(
                     action = action,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
                     onActionClick = onActionClick,
                 )
             }
@@ -369,12 +386,13 @@ private fun SwipeActionTile(
     onActionClick: () -> Unit,
 ) {
     Box(
-        modifier = modifier
-            .background(action.backgroundColor)
-            .tapSoundClickable {
-                onActionClick()
-                action.onClick()
-            },
+        modifier =
+            modifier
+                .background(action.backgroundColor)
+                .tapSoundClickable {
+                    onActionClick()
+                    action.onClick()
+                },
         contentAlignment = Alignment.Center,
     ) {
         Column(

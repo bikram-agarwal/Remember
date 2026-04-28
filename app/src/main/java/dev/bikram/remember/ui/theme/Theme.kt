@@ -1,9 +1,9 @@
 @file:Suppress("DEPRECATION")
+
 package dev.bikram.remember.ui.theme
 
 import android.os.Build
 import android.os.SystemClock
-import kotlinx.coroutines.launch
 import android.view.SoundEffectConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -49,50 +49,58 @@ val LocalIsDark = staticCompositionLocalOf { false }
 private val DefaultSeed = Color(0xFF485CC7)
 
 /** Seed colors for the 9 preset swatches. */
-private val SeedColors = mapOf(
-    ColorSource.SAPPHIRE to Color(0xFF1E63D6),
-    ColorSource.EMERALD to Color(0xFF10B981),
-    ColorSource.AMBER to Color(0xFFF59E0B),
-    ColorSource.VIOLET to Color(0xFF8B5CF6),
-    ColorSource.CORAL to Color(0xFFEF4444),
-    ColorSource.TEAL to Color(0xFF14B8A6),
-    ColorSource.LIME to Color(0xFF84CC16),
-    ColorSource.ROSE to Color(0xFFF43F5E),
-    ColorSource.SLATE to Color(0xFF64748B),
-)
+private val SeedColors =
+    mapOf(
+        ColorSource.SAPPHIRE to Color(0xFF1E63D6),
+        ColorSource.EMERALD to Color(0xFF10B981),
+        ColorSource.AMBER to Color(0xFFF59E0B),
+        ColorSource.VIOLET to Color(0xFF8B5CF6),
+        ColorSource.CORAL to Color(0xFFEF4444),
+        ColorSource.TEAL to Color(0xFF14B8A6),
+        ColorSource.LIME to Color(0xFF84CC16),
+        ColorSource.ROSE to Color(0xFFF43F5E),
+        ColorSource.SLATE to Color(0xFF64748B),
+    )
 
 /** Public: pick the representative Color for a ColorSource (UI swatch rendering). */
-fun seedColorFor(source: ColorSource, activeCustomHex: String): Color = when (source) {
-    ColorSource.DEFAULT -> DefaultSeed
-    ColorSource.MATERIAL_YOU -> Color(0xFF9B9DA7) // neutral - wallpaper drives real scheme
-    ColorSource.CUSTOM -> runCatching { Color(android.graphics.Color.parseColor(activeCustomHex)) }
-        .getOrElse { DefaultSeed }
-    else -> SeedColors[source] ?: DefaultSeed
-}
+fun seedColorFor(
+    source: ColorSource,
+    activeCustomHex: String,
+): Color =
+    when (source) {
+        ColorSource.DEFAULT -> DefaultSeed
+        ColorSource.MATERIAL_YOU -> Color(0xFF9B9DA7) // neutral - wallpaper drives real scheme
+        ColorSource.CUSTOM ->
+            runCatching { Color(android.graphics.Color.parseColor(activeCustomHex)) }
+                .getOrElse { DefaultSeed }
+        else -> SeedColors[source] ?: DefaultSeed
+    }
 
-private fun PaletteStyleOpt.toLib(): PaletteStyle = when (this) {
-    PaletteStyleOpt.TONAL_SPOT -> PaletteStyle.TonalSpot
-    PaletteStyleOpt.NEUTRAL -> PaletteStyle.Neutral
-    PaletteStyleOpt.VIBRANT -> PaletteStyle.Vibrant
-    PaletteStyleOpt.EXPRESSIVE -> PaletteStyle.Expressive
-    PaletteStyleOpt.RAINBOW -> PaletteStyle.Rainbow
-    PaletteStyleOpt.FRUIT_SALAD -> PaletteStyle.FruitSalad
-    PaletteStyleOpt.MONOCHROME -> PaletteStyle.Monochrome
-    PaletteStyleOpt.FIDELITY -> PaletteStyle.Fidelity
-    PaletteStyleOpt.CONTENT -> PaletteStyle.Content
-}
+private fun PaletteStyleOpt.toLib(): PaletteStyle =
+    when (this) {
+        PaletteStyleOpt.TONAL_SPOT -> PaletteStyle.TonalSpot
+        PaletteStyleOpt.NEUTRAL -> PaletteStyle.Neutral
+        PaletteStyleOpt.VIBRANT -> PaletteStyle.Vibrant
+        PaletteStyleOpt.EXPRESSIVE -> PaletteStyle.Expressive
+        PaletteStyleOpt.RAINBOW -> PaletteStyle.Rainbow
+        PaletteStyleOpt.FRUIT_SALAD -> PaletteStyle.FruitSalad
+        PaletteStyleOpt.MONOCHROME -> PaletteStyle.Monochrome
+        PaletteStyleOpt.FIDELITY -> PaletteStyle.Fidelity
+        PaletteStyleOpt.CONTENT -> PaletteStyle.Content
+    }
 
 /** Flatten surfaces to pure black for BLACK (OLED) mode. */
-private fun ColorScheme.toOled(): ColorScheme = copy(
-    background = Color.Black,
-    surface = Color.Black,
-    surfaceDim = Color.Black,
-    surfaceContainerLowest = Color.Black,
-    surfaceContainerLow = Color(0xFF080808),
-    surfaceContainer = Color(0xFF0F0F0F),
-    surfaceContainerHigh = Color(0xFF181818),
-    surfaceContainerHighest = Color(0xFF222222),
-)
+private fun ColorScheme.toOled(): ColorScheme =
+    copy(
+        background = Color.Black,
+        surface = Color.Black,
+        surfaceDim = Color.Black,
+        surfaceContainerLowest = Color.Black,
+        surfaceContainerLow = Color(0xFF080808),
+        surfaceContainer = Color(0xFF0F0F0F),
+        surfaceContainerHigh = Color(0xFF181818),
+        surfaceContainerHighest = Color(0xFF222222),
+    )
 
 /**
  * Pass [paintBackground] = false when the host activity is translucent (e.g. the snooze
@@ -109,12 +117,13 @@ fun RememberTheme(
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
-    val darkTheme = when (themeState.themeMode) {
-        ThemeMode.SYSTEM -> systemDark
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-        ThemeMode.BLACK -> true
-    }
+    val darkTheme =
+        when (themeState.themeMode) {
+            ThemeMode.SYSTEM -> systemDark
+            ThemeMode.LIGHT -> false
+            ThemeMode.DARK -> true
+            ThemeMode.BLACK -> true
+        }
     val black = themeState.themeMode == ThemeMode.BLACK
 
     val context = LocalContext.current
@@ -128,41 +137,51 @@ fun RememberTheme(
     // On Android 12+ with Material You selected we still prefer the system's own
     // dynamicLightColorScheme/dynamicDarkColorScheme so the app inherits exactly the
     // wallpaper-tuned palette the OS already computed.
-    val base: ColorScheme = when {
-        materialYouAvailable -> {
-            if (darkTheme) dynamicDarkColorScheme(context)
-            else dynamicLightColorScheme(context)
-        }
-        else -> {
-            val seed = if (themeState.colorSource == ColorSource.MATERIAL_YOU) {
-                DefaultSeed
-            } else {
-                seedColorFor(themeState.colorSource, themeState.activeCustomSeed)
+    val base: ColorScheme =
+        when {
+            materialYouAvailable -> {
+                if (darkTheme) {
+                    dynamicDarkColorScheme(context)
+                } else {
+                    dynamicLightColorScheme(context)
+                }
             }
-            rememberDynamicColorScheme(
-                seedColor = seed,
-                isDark = darkTheme,
-                style = themeState.paletteStyle.toLib(),
-                isAmoled = black,
-            )
+            else -> {
+                val seed =
+                    if (themeState.colorSource == ColorSource.MATERIAL_YOU) {
+                        DefaultSeed
+                    } else {
+                        seedColorFor(themeState.colorSource, themeState.activeCustomSeed)
+                    }
+                rememberDynamicColorScheme(
+                    seedColor = seed,
+                    isDark = darkTheme,
+                    style = themeState.paletteStyle.toLib(),
+                    isAmoled = black,
+                )
+            }
         }
-    }
 
     val scheme = if (black) base.toOled() else base
-    val tinted = if (!themeState.fixedCardColors && !black) scheme.tintSurfacesTowardPrimary(darkTheme)
-    else scheme
+    val tinted =
+        if (!themeState.fixedCardColors && !black) {
+            scheme.tintSurfacesTowardPrimary(darkTheme)
+        } else {
+            scheme
+        }
     // Material You's wallpaper-tuned outlines and containers already have enough chroma
     // to read against our tinted surfaces. The default and seed-based schemes use M3's
     // stock muted outlines and fairly soft container roles, which fade into the same
     // tinted surfaces; boost both so OutlinedButton borders stay visible and so the
     // activated pill / FilledTonalButton fills (Cancel button, etc.) look distinct.
-    val themed = if (materialYouAvailable) {
-        tinted
-    } else {
-        tinted
-            .boostOutlineForVisibility(darkTheme)
-            .boostContainersForSeedThemes(darkTheme)
-    }
+    val themed =
+        if (materialYouAvailable) {
+            tinted
+        } else {
+            tinted
+                .boostOutlineForVisibility(darkTheme)
+                .boostContainersForSeedThemes(darkTheme)
+        }
 
     val view = LocalView.current
     SideEffect {
@@ -188,18 +207,19 @@ fun RememberTheme(
         }
     }
 
-    val realTapSound = remember(view) {
-        val lastTapTimeMs = longArrayOf(0L)
-        val minTapSoundSpacingMs = 85L
-        {
-            val now = SystemClock.uptimeMillis()
-            if (now - lastTapTimeMs[0] >= minTapSoundSpacingMs) {
-                lastTapTimeMs[0] = now
-                // view.isShown is sometimes false in dialogs/sheets
-                view.playSoundEffect(SoundEffectConstants.CLICK)
+    val realTapSound =
+        remember(view) {
+            val lastTapTimeMs = longArrayOf(0L)
+            val minTapSoundSpacingMs = 85L
+            {
+                val now = SystemClock.uptimeMillis()
+                if (now - lastTapTimeMs[0] >= minTapSoundSpacingMs) {
+                    lastTapTimeMs[0] = now
+                    // view.isShown is sometimes false in dialogs/sheets
+                    view.playSoundEffect(SoundEffectConstants.CLICK)
+                }
             }
         }
-    }
     val playTapSound = realTapSound
 
     CompositionLocalProvider(
@@ -243,14 +263,16 @@ private fun GradientBackground(
     gradientTop: Color,
 ) {
     if (useGradient) {
-        val gradientBrush = remember(gradientBase, gradientTop) {
-            Brush.verticalGradient(
-                colorStops = arrayOf(
-                    0f to gradientTop.copy(alpha = 0.45f),
-                    0.55f to gradientBase.copy(alpha = 0f),
-                ),
-            )
-        }
+        val gradientBrush =
+            remember(gradientBase, gradientTop) {
+                Brush.verticalGradient(
+                    colorStops =
+                        arrayOf(
+                            0f to gradientTop.copy(alpha = 0.45f),
+                            0.55f to gradientBase.copy(alpha = 0f),
+                        ),
+                )
+            }
         Box(
             Modifier
                 .fillMaxSize()
@@ -268,32 +290,36 @@ private fun GradientBackground(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun transparentTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
-    containerColor = Color.Transparent,
-    scrolledContainerColor = Color.Transparent,
-    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-    titleContentColor = MaterialTheme.colorScheme.onSurface,
-    actionIconContentColor = MaterialTheme.colorScheme.onSurface,
-)
+fun transparentTopAppBarColors() =
+    TopAppBarDefaults.topAppBarColors(
+        containerColor = Color.Transparent,
+        scrolledContainerColor = Color.Transparent,
+        navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        actionIconContentColor = MaterialTheme.colorScheme.onSurface,
+    )
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun transparentLargeTopAppBarColors() = TopAppBarDefaults.topAppBarColors(
-    containerColor = Color.Transparent,
-    scrolledContainerColor = Color.Transparent,
-    navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
-    titleContentColor = MaterialTheme.colorScheme.onSurface,
-    actionIconContentColor = MaterialTheme.colorScheme.onSurface,
-)
+fun transparentLargeTopAppBarColors() =
+    TopAppBarDefaults.topAppBarColors(
+        containerColor = Color.Transparent,
+        scrolledContainerColor = Color.Transparent,
+        navigationIconContentColor = MaterialTheme.colorScheme.onSurface,
+        titleContentColor = MaterialTheme.colorScheme.onSurface,
+        actionIconContentColor = MaterialTheme.colorScheme.onSurface,
+    )
 
 /** Blend every surface-container role toward the accent so cards pick up a visible theme hue. */
 private fun ColorScheme.tintSurfacesTowardPrimary(dark: Boolean): ColorScheme {
-    val accentArgb = ColorUtils.blendARGB(
-        primary.toArgb(),
-        primaryContainer.toArgb(),
-        if (dark) 0.4f else 0.3f,
-    )
+    val accentArgb =
+        ColorUtils.blendARGB(
+            primary.toArgb(),
+            primaryContainer.toArgb(),
+            if (dark) 0.4f else 0.3f,
+        )
     val amount = if (dark) 0.34f else 0.22f
+
     fun tint(c: Color) = Color(ColorUtils.blendARGB(c.toArgb(), accentArgb, amount))
     return copy(
         surface = tint(surface),
@@ -320,9 +346,10 @@ private fun ColorScheme.boostOutlineForVisibility(dark: Boolean): ColorScheme {
     val outlineVariantBlend = if (dark) 0.20f else 0.16f
     return copy(
         outline = Color(ColorUtils.blendARGB(outline.toArgb(), targetArgb, outlineBlend)),
-        outlineVariant = Color(
-            ColorUtils.blendARGB(outlineVariant.toArgb(), targetArgb, outlineVariantBlend),
-        ),
+        outlineVariant =
+            Color(
+                ColorUtils.blendARGB(outlineVariant.toArgb(), targetArgb, outlineVariantBlend),
+            ),
     )
 }
 
@@ -338,11 +365,13 @@ private fun ColorScheme.boostContainersForSeedThemes(dark: Boolean): ColorScheme
     val primaryBlend = if (dark) 0.30f else 0.24f
     val secondaryBlend = if (dark) 0.26f else 0.20f
     return copy(
-        primaryContainer = Color(
-            ColorUtils.blendARGB(primaryContainer.toArgb(), primary.toArgb(), primaryBlend),
-        ),
-        secondaryContainer = Color(
-            ColorUtils.blendARGB(secondaryContainer.toArgb(), secondary.toArgb(), secondaryBlend),
-        ),
+        primaryContainer =
+            Color(
+                ColorUtils.blendARGB(primaryContainer.toArgb(), primary.toArgb(), primaryBlend),
+            ),
+        secondaryContainer =
+            Color(
+                ColorUtils.blendARGB(secondaryContainer.toArgb(), secondary.toArgb(), secondaryBlend),
+            ),
     )
 }

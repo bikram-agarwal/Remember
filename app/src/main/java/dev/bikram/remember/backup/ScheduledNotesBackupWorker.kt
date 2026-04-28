@@ -1,28 +1,41 @@
 package dev.bikram.remember.backup
 
 import android.content.Context
+import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import dev.bikram.remember.RememberApp
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedInject
+import dev.bikram.remember.data.BackupIo
+import dev.bikram.remember.data.BackupPrefs
 
-class ScheduledNotesBackupWorker(
-    appContext: Context,
-    workerParams: WorkerParameters,
-) : CoroutineWorker(appContext, workerParams) {
-
-    override suspend fun doWork(): Result {
-        val app = applicationContext as RememberApp
-        val prefs = app.container.backupPrefs.snapshot()
-        if (!prefs.scheduledExportEnabled || prefs.exportFolderUri.isBlank()) {
-            return Result.success()
+@HiltWorker
+class ScheduledNotesBackupWorker
+    @AssistedInject
+    constructor(
+        @Assisted appContext: Context,
+        @Assisted workerParams: WorkerParameters,
+        private val backupPrefs: BackupPrefs,
+        private val backupIo: BackupIo,
+        private val noteBackupDirtyTracker: NoteBackupDirtyTracker,
+    ) : CoroutineWorker(appContext, workerParams) {
+        override suspend fun doWork(): Result {
+            val prefs = backupPrefs.snapshot()
+            val backupDestinations =
+                listOf(
+                    prefs.exportFolderUri,
+                    prefs.cloudExportFolderUri,
+                ).filter { it.isNotBlank() }
+            if (!prefs.scheduledExportEnabled || backupDestinations.isEmpty()) {
+                return Result.success()
+            }
+            val exportOutcome = backupIo.exportToTreeFolders(backupDestinations)
+            if (exportOutcome.isSuccess) {
+                noteBackupDirtyTracker.clearAfterSuccessfulTreeExport()
+            }
+            return exportOutcome.fold(
+                onSuccess = { Result.success() },
+                onFailure = { Result.retry() },
+            )
         }
-        val exportOutcome = app.container.backupIo.exportToTreeFolder(prefs.exportFolderUri)
-        if (exportOutcome.isSuccess) {
-            app.container.noteBackupDirtyTracker.clearAfterSuccessfulTreeExport()
-        }
-        return exportOutcome.fold(
-            onSuccess = { Result.success() },
-            onFailure = { Result.retry() },
-        )
     }
-}

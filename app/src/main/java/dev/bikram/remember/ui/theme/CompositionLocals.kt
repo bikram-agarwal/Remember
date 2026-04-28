@@ -1,8 +1,8 @@
 package dev.bikram.remember.ui.theme
 
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.material3.SnackbarHostState
 import dev.bikram.remember.data.ThemeState
 
 val LocalSnackbarHostState = staticCompositionLocalOf<SnackbarHostState> { error("No SnackbarHostState provided") }

@@ -12,6 +12,7 @@ import org.json.JSONObject
 
 data class BackupPreferencesState(
     val exportFolderUri: String = "",
+    val cloudExportFolderUri: String = "",
     val autoExportOnChange: Boolean = false,
     val scheduledExportEnabled: Boolean = false,
     val includeMediaInBackup: Boolean = false,
@@ -19,28 +20,36 @@ data class BackupPreferencesState(
 
 private val Context.backupDataStore by preferencesDataStore(name = "backup_prefs")
 
-class BackupPrefs(private val context: Context) {
-
+class BackupPrefs(
+    private val context: Context,
+) {
     private object Keys {
         val EXPORT_FOLDER_URI = stringPreferencesKey("export_folder_uri")
+        val CLOUD_EXPORT_FOLDER_URI = stringPreferencesKey("cloud_export_folder_uri")
         val AUTO_EXPORT_ON_CHANGE = booleanPreferencesKey("auto_export_on_change")
         val SCHEDULED_EXPORT = booleanPreferencesKey("scheduled_export_enabled")
         val INCLUDE_MEDIA = booleanPreferencesKey("include_media_in_backup")
     }
 
-    val state: Flow<BackupPreferencesState> = context.backupDataStore.data.map { prefs ->
-        BackupPreferencesState(
-            exportFolderUri = prefs[Keys.EXPORT_FOLDER_URI].orEmpty(),
-            autoExportOnChange = prefs[Keys.AUTO_EXPORT_ON_CHANGE] ?: false,
-            scheduledExportEnabled = prefs[Keys.SCHEDULED_EXPORT] ?: false,
-            includeMediaInBackup = prefs[Keys.INCLUDE_MEDIA] ?: false,
-        )
-    }
+    val state: Flow<BackupPreferencesState> =
+        context.backupDataStore.data.map { prefs ->
+            BackupPreferencesState(
+                exportFolderUri = prefs[Keys.EXPORT_FOLDER_URI].orEmpty(),
+                cloudExportFolderUri = prefs[Keys.CLOUD_EXPORT_FOLDER_URI].orEmpty(),
+                autoExportOnChange = prefs[Keys.AUTO_EXPORT_ON_CHANGE] ?: false,
+                scheduledExportEnabled = prefs[Keys.SCHEDULED_EXPORT] ?: false,
+                includeMediaInBackup = prefs[Keys.INCLUDE_MEDIA] ?: false,
+            )
+        }
 
     suspend fun snapshot(): BackupPreferencesState = state.first()
 
     suspend fun setExportFolderUri(uriString: String) {
         context.backupDataStore.edit { it[Keys.EXPORT_FOLDER_URI] = uriString }
+    }
+
+    suspend fun setCloudExportFolderUri(uriString: String) {
+        context.backupDataStore.edit { it[Keys.CLOUD_EXPORT_FOLDER_URI] = uriString }
     }
 
     suspend fun setAutoExportOnChange(enabled: Boolean) {
@@ -59,6 +68,7 @@ class BackupPrefs(private val context: Context) {
         val prefs = context.backupDataStore.data.first()
         return JSONObject().apply {
             put(Keys.EXPORT_FOLDER_URI.name, prefs[Keys.EXPORT_FOLDER_URI].orEmpty())
+            put(Keys.CLOUD_EXPORT_FOLDER_URI.name, prefs[Keys.CLOUD_EXPORT_FOLDER_URI].orEmpty())
             put(Keys.AUTO_EXPORT_ON_CHANGE.name, prefs[Keys.AUTO_EXPORT_ON_CHANGE] ?: false)
             put(Keys.SCHEDULED_EXPORT.name, prefs[Keys.SCHEDULED_EXPORT] ?: false)
             put(Keys.INCLUDE_MEDIA.name, prefs[Keys.INCLUDE_MEDIA] ?: false)
@@ -70,6 +80,9 @@ class BackupPrefs(private val context: Context) {
         context.backupDataStore.edit { mutable ->
             if (json.has(Keys.EXPORT_FOLDER_URI.name) && !json.isNull(Keys.EXPORT_FOLDER_URI.name)) {
                 mutable[Keys.EXPORT_FOLDER_URI] = json.getString(Keys.EXPORT_FOLDER_URI.name)
+            }
+            if (json.has(Keys.CLOUD_EXPORT_FOLDER_URI.name) && !json.isNull(Keys.CLOUD_EXPORT_FOLDER_URI.name)) {
+                mutable[Keys.CLOUD_EXPORT_FOLDER_URI] = json.getString(Keys.CLOUD_EXPORT_FOLDER_URI.name)
             }
             if (json.has(Keys.AUTO_EXPORT_ON_CHANGE.name) && !json.isNull(Keys.AUTO_EXPORT_ON_CHANGE.name)) {
                 mutable[Keys.AUTO_EXPORT_ON_CHANGE] = json.getBoolean(Keys.AUTO_EXPORT_ON_CHANGE.name)

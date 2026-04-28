@@ -66,23 +66,26 @@ fun OnboardingTitleScreen(
 
     val scheme = MaterialTheme.colorScheme
     val motionScheme = MaterialTheme.motionScheme
-    val iconEnter = remember(motionScheme) {
-        fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
-            slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { fullHeight ->
-                fullHeight / 3
-            }
-    }
-    val blockEnter = remember(motionScheme) {
-        fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
-            slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { fullHeight ->
-                fullHeight / 2
-            }
-    }
+    val iconEnter =
+        remember(motionScheme) {
+            fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
+                slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { fullHeight ->
+                    fullHeight / 3
+                }
+        }
+    val blockEnter =
+        remember(motionScheme) {
+            fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
+                slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { fullHeight ->
+                    fullHeight / 2
+                }
+        }
 
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .systemBarsPadding(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .systemBarsPadding(),
     ) {
         AnimatedVisibility(
             visible = iconVisible,
@@ -94,9 +97,10 @@ fun OnboardingTitleScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 AppIconImage(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(RoundedCornerShape(percent = 25)),
+                    modifier =
+                        Modifier
+                            .size(120.dp)
+                            .clip(RoundedCornerShape(percent = 25)),
                 )
                 Spacer(Modifier.height(24.dp))
                 AnimatedVisibility(
@@ -124,9 +128,10 @@ fun OnboardingTitleScreen(
 
         AnimatedVisibility(
             visible = bylineVisible,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 120.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 120.dp),
             enter = blockEnter,
         ) {
             Surface(
@@ -140,9 +145,10 @@ fun OnboardingTitleScreen(
                     Image(
                         painter = painterResource(R.drawable.me_600),
                         contentDescription = null,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .clip(CircleShape),
+                        modifier =
+                            Modifier
+                                .size(28.dp)
+                                .clip(CircleShape),
                         contentScale = ContentScale.Crop,
                     )
                     Spacer(Modifier.width(8.dp))
@@ -157,10 +163,11 @@ fun OnboardingTitleScreen(
 
         AnimatedVisibility(
             visible = buttonVisible,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
             enter = blockEnter,
         ) {
             RememberButton(

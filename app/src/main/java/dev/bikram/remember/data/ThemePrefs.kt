@@ -53,8 +53,9 @@ data class ThemeState(
     val tagColors: Map<String, String> = emptyMap(),
 )
 
-class ThemePrefs(private val context: Context) {
-
+class ThemePrefs(
+    private val context: Context,
+) {
     private object Keys {
         val THEME_MODE = stringPreferencesKey("theme_mode")
         val COLOR_SOURCE = stringPreferencesKey("color_source")
@@ -68,23 +69,27 @@ class ThemePrefs(private val context: Context) {
         val TAG_COLORS = stringPreferencesKey("tag_colors")
     }
 
-    val state: Flow<ThemeState> = context.settingsDataStore.data.map { p ->
-        ThemeState(
-            themeMode = runCatching { ThemeMode.valueOf(p[Keys.THEME_MODE] ?: "") }
-                .getOrDefault(ThemeMode.SYSTEM),
-            colorSource = runCatching { ColorSource.valueOf(p[Keys.COLOR_SOURCE] ?: "") }
-                .getOrDefault(ColorSource.MATERIAL_YOU),
-            paletteStyle = runCatching { PaletteStyleOpt.valueOf(p[Keys.PALETTE_STYLE] ?: "") }
-                .getOrDefault(PaletteStyleOpt.TONAL_SPOT),
-            customSeeds = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty()),
-            activeCustomSeed = p[Keys.ACTIVE_CUSTOM_SEED].orEmpty(),
-            useGradient = p[Keys.USE_GRADIENT] ?: true,
-            fixedCardColors = p[Keys.FIXED_CARD_COLORS] ?: false,
-            heroOnCards = p[Keys.HERO_ON_CARDS] ?: true,
-            blurBars = p[Keys.BLUR_BARS] ?: true,
-            tagColors = decodeTagColors(p[Keys.TAG_COLORS].orEmpty()),
-        )
-    }
+    val state: Flow<ThemeState> =
+        context.settingsDataStore.data.map { p ->
+            ThemeState(
+                themeMode =
+                    runCatching { ThemeMode.valueOf(p[Keys.THEME_MODE] ?: "") }
+                        .getOrDefault(ThemeMode.SYSTEM),
+                colorSource =
+                    runCatching { ColorSource.valueOf(p[Keys.COLOR_SOURCE] ?: "") }
+                        .getOrDefault(ColorSource.MATERIAL_YOU),
+                paletteStyle =
+                    runCatching { PaletteStyleOpt.valueOf(p[Keys.PALETTE_STYLE] ?: "") }
+                        .getOrDefault(PaletteStyleOpt.TONAL_SPOT),
+                customSeeds = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty()),
+                activeCustomSeed = p[Keys.ACTIVE_CUSTOM_SEED].orEmpty(),
+                useGradient = p[Keys.USE_GRADIENT] ?: true,
+                fixedCardColors = p[Keys.FIXED_CARD_COLORS] ?: false,
+                heroOnCards = p[Keys.HERO_ON_CARDS] ?: true,
+                blurBars = p[Keys.BLUR_BARS] ?: true,
+                tagColors = decodeTagColors(p[Keys.TAG_COLORS].orEmpty()),
+            )
+        }
 
     suspend fun setThemeMode(mode: ThemeMode) {
         context.settingsDataStore.edit { it[Keys.THEME_MODE] = mode.name }
@@ -148,7 +153,10 @@ class ThemePrefs(private val context: Context) {
         context.settingsDataStore.edit { it[Keys.BLUR_BARS] = value }
     }
 
-    suspend fun setTagColor(tag: String, hex: String) {
+    suspend fun setTagColor(
+        tag: String,
+        hex: String,
+    ) {
         val normalized = normalizeHex(hex) ?: return
         val key = tag.trim().lowercase()
         if (key.isBlank()) return
@@ -215,8 +223,7 @@ class ThemePrefs(private val context: Context) {
     suspend fun importFromBackup(json: JSONObject?) {
         if (json == null || json.length() == 0) return
         context.settingsDataStore.edit { mutable ->
-            fun stringOrNull(key: String): String? =
-                if (json.has(key) && !json.isNull(key)) json.getString(key) else null
+            fun stringOrNull(key: String): String? = if (json.has(key) && !json.isNull(key)) json.getString(key) else null
             stringOrNull(Keys.THEME_MODE.name)?.let { mutable[Keys.THEME_MODE] = it }
             stringOrNull(Keys.COLOR_SOURCE.name)?.let { mutable[Keys.COLOR_SOURCE] = it }
             stringOrNull(Keys.PALETTE_STYLE.name)?.let { mutable[Keys.PALETTE_STYLE] = it }
@@ -245,11 +252,12 @@ class ThemePrefs(private val context: Context) {
  */
 fun normalizeHex(raw: String): String? {
     val stripped = raw.trim().removePrefix("#")
-    val hex = when (stripped.length) {
-        3 -> stripped.map { "$it$it" }.joinToString("")
-        6 -> stripped
-        else -> return null
-    }
+    val hex =
+        when (stripped.length) {
+            3 -> stripped.map { "$it$it" }.joinToString("")
+            6 -> stripped
+            else -> return null
+        }
     if (!hex.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }) return null
     return "#" + hex.uppercase()
 }

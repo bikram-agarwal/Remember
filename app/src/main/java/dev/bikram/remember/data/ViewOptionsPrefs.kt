@@ -8,25 +8,30 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 
-class ViewOptionsPrefs(private val context: Context) {
-
+class ViewOptionsPrefs(
+    private val context: Context,
+) {
     private object Keys {
         val SORT_KEY = stringPreferencesKey("sort_key")
         val SORT_DIR = stringPreferencesKey("sort_dir")
         val GROUP_BY = stringPreferencesKey("group_by")
     }
 
-    val state: Flow<ViewOptions> = context.settingsDataStore.data.map { prefs ->
-        val defaultViewOptions = ViewOptions()
-        ViewOptions(
-            sortKey = runCatching { SortKey.valueOf(prefs[Keys.SORT_KEY] ?: "") }
-                .getOrDefault(defaultViewOptions.sortKey),
-            sortDir = runCatching { SortDir.valueOf(prefs[Keys.SORT_DIR] ?: "") }
-                .getOrDefault(defaultViewOptions.sortDir),
-            groupBy = runCatching { GroupBy.valueOf(prefs[Keys.GROUP_BY] ?: "") }
-                .getOrDefault(defaultViewOptions.groupBy),
-        )
-    }
+    val state: Flow<ViewOptions> =
+        context.settingsDataStore.data.map { prefs ->
+            val defaultViewOptions = ViewOptions()
+            ViewOptions(
+                sortKey =
+                    runCatching { SortKey.valueOf(prefs[Keys.SORT_KEY] ?: "") }
+                        .getOrDefault(defaultViewOptions.sortKey),
+                sortDir =
+                    runCatching { SortDir.valueOf(prefs[Keys.SORT_DIR] ?: "") }
+                        .getOrDefault(defaultViewOptions.sortDir),
+                groupBy =
+                    runCatching { GroupBy.valueOf(prefs[Keys.GROUP_BY] ?: "") }
+                        .getOrDefault(defaultViewOptions.groupBy),
+            )
+        }
 
     suspend fun setViewOptions(value: ViewOptions) {
         context.settingsDataStore.edit {
@@ -49,8 +54,7 @@ class ViewOptionsPrefs(private val context: Context) {
     suspend fun importFromBackup(json: JSONObject?) {
         if (json == null || json.length() == 0) return
         context.settingsDataStore.edit { mutable ->
-            fun stringOrNull(key: String): String? =
-                if (json.has(key) && !json.isNull(key)) json.getString(key) else null
+            fun stringOrNull(key: String): String? = if (json.has(key) && !json.isNull(key)) json.getString(key) else null
             stringOrNull(Keys.SORT_KEY.name)?.let { mutable[Keys.SORT_KEY] = it }
             stringOrNull(Keys.SORT_DIR.name)?.let { mutable[Keys.SORT_DIR] = it }
             stringOrNull(Keys.GROUP_BY.name)?.let { mutable[Keys.GROUP_BY] = it }
