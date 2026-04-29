@@ -46,24 +46,34 @@ class GoogleTasksImporter(
         mode: ImportMode,
         alreadyImported: Map<String, Long>,
         overwrite: Boolean,
+        onProgress: (completedCount: Int) -> Unit = {},
     ): ImportOutcome {
         val createdPairs = mutableMapOf<String, Long>()
         var skippedAlreadyImported = 0
         var written = 0
+        var completedCount = 0
 
         when (mode) {
             ImportMode.ONE_NOTE_PER_TASK -> {
                 tasks.forEach { task ->
                     val previousNoteId = alreadyImported[task.task.id]
-                    if (previousNoteId != null && !overwrite) {
+                    val existingNoteId =
+                        previousNoteId?.takeIf { noteId ->
+                            repository.get(noteId) != null
+                        }
+                    if (existingNoteId != null && !overwrite) {
                         skippedAlreadyImported++
+                        completedCount++
+                        onProgress(completedCount)
                         return@forEach
                     }
-                    val noteId = upsertOneTask(task, previousNoteId.takeIf { overwrite })
+                    val noteId = upsertOneTask(task, existingNoteId.takeIf { overwrite })
                     if (noteId != null) {
                         createdPairs[task.task.id] = noteId
                         written++
                     }
+                    completedCount++
+                    onProgress(completedCount)
                 }
             }
             ImportMode.LIST_AS_CHECKLIST -> {
@@ -103,6 +113,8 @@ class GoogleTasksImporter(
                         )
                     group.forEach { createdPairs[it.task.id] = newId }
                     written += group.size
+                    completedCount += group.size
+                    onProgress(completedCount)
                 }
             }
             ImportMode.GROUP_BY_LIST -> {
@@ -145,6 +157,8 @@ class GoogleTasksImporter(
                         )
                     group.forEach { createdPairs[it.task.id] = newId }
                     written += group.size
+                    completedCount += group.size
+                    onProgress(completedCount)
                 }
             }
         }

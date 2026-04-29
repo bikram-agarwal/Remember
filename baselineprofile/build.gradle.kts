@@ -2,7 +2,6 @@ import com.android.build.api.dsl.TestExtension
 
 plugins {
     alias(libs.plugins.android.test)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.androidx.baselineprofile)
 }
 

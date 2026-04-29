@@ -37,16 +37,14 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.mohamedrejeb.richeditor.model.rememberRichTextState
-import com.mohamedrejeb.richeditor.ui.material3.RichText
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RememberReservedTags
-import dev.bikram.remember.ui.common.ApplyRichEditorListIndent
 import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
@@ -75,14 +73,9 @@ fun NoteCard(
     val visibleTags = RememberReservedTags.userVisibleTags(note.note.tags)
     val hasTagStrip = visibleTags.isNotEmpty()
     val heroEnabled = LocalHeroOnCards.current
-    val showHero = heroEnabled && note.note.pictureUri != null
+    val heroPictureUri = note.note.pictureUri?.takeIf { heroEnabled }
+    val showHero = heroPictureUri != null
     val surface = MaterialTheme.colorScheme.surface
-
-    val richTextState = rememberRichTextState()
-    ApplyRichEditorListIndent(richTextState)
-    androidx.compose.runtime.LaunchedEffect(note.note.body) {
-        richTextState.setMarkdown(note.note.body)
-    }
     val favoriteIconDescription = stringResource(R.string.notecard_favorite_cd)
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
@@ -136,7 +129,7 @@ fun NoteCard(
         Box(modifier = Modifier.fillMaxWidth()) {
             if (showHero) {
                 HeroBackground(
-                    uri = note.note.pictureUri!!,
+                    uri = heroPictureUri,
                     framing =
                         remember(note.note.pictureHeroFraming) {
                             HeroFraming.fromJsonString(note.note.pictureHeroFraming)
@@ -241,8 +234,8 @@ fun NoteCard(
                     when (note.note.kind) {
                         NoteKind.NOTE -> {
                             if (note.note.body.isNotBlank()) {
-                                RichText(
-                                    state = richTextState,
+                                MarkdownText(
+                                    markdown = note.note.body,
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 3,
                                     overflow = TextOverflow.Ellipsis,

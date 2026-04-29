@@ -3,7 +3,6 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -168,7 +167,7 @@ ktlint {
 }
 
 dependencies {
-    implementation("sh.calvin.reorderable:reorderable:2.4.3")
+    implementation("sh.calvin.reorderable:reorderable:3.1.0")
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
@@ -208,8 +207,6 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.androidx.profileinstaller)
-    // WYSIWYG Editor
-    implementation("com.mohamedrejeb.richeditor:richeditor-compose:1.0.0-rc13")
     debugImplementation(libs.androidx.ui.tooling)
     baselineProfile(project(":baselineprofile"))
     testImplementation("junit:junit:4.13.2")

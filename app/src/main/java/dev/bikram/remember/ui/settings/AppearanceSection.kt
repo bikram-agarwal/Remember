@@ -21,7 +21,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -48,6 +48,7 @@ import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
@@ -236,7 +237,22 @@ private fun AppearanceSettingsToggleItem(
             )
         }
         Spacer(Modifier.width(16.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        RememberSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            thumbContent =
+                if (checked) {
+                    {
+                        RememberMaterialRoundedSymbol(
+                            name = "check",
+                            size = SwitchDefaults.IconSize,
+                            weight = FontWeight.Bold,
+                        )
+                    }
+                } else {
+                    null
+                },
+        )
     }
 }
 

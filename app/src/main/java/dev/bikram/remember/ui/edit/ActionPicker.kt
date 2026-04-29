@@ -486,7 +486,7 @@ private fun AppBackedEditor(
                 val defaultTitle = context.getString(type.labelRes())
                 val newTitle =
                     if (title.isBlank() || title == defaultTitle) {
-                        context.getString(R.string.actions_open_app_title, app.label.toString())
+                        context.getString(R.string.actions_open_app_title, app.label)
                     } else {
                         title
                     }

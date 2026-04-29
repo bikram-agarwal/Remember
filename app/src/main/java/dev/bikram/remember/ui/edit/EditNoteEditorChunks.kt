@@ -11,11 +11,14 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -50,43 +53,28 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.isShiftPressed
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mohamedrejeb.richeditor.annotation.ExperimentalRichTextApi
-import com.mohamedrejeb.richeditor.model.RichTextState
-import com.mohamedrejeb.richeditor.ui.BasicRichTextEditor
-import com.mohamedrejeb.richeditor.ui.material3.RichText
 import dev.bikram.remember.R
-import dev.bikram.remember.ui.common.ApplyRichEditorListIndent
 import dev.bikram.remember.ui.common.HERO_MASK_ASPECT_RATIO
 import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.common.RichTextToolbar
 import dev.bikram.remember.ui.components.ArchivedBanner
 import dev.bikram.remember.ui.components.ArchivedBannerState
 import dev.bikram.remember.ui.components.NoteShelfState
@@ -106,16 +94,15 @@ import kotlinx.coroutines.launch
 
 private const val UNDO_MAX_HISTORY = 50
 
-// snapshotFlow on the full annotated string forces a deep equals check (paragraph + span lists)
-// per emission, which compounds with toMarkdown work on every keystroke. Reading length+hashCode
-// of the plain text instead is O(text length) and avoids the per-emit allocation entirely.
+// Snapshotting length+hash avoids collecting the whole TextFieldValue on every keystroke while
+// still detecting body edits for the debounced persistence pipeline.
 private data class BodyFingerprint(
     val length: Int,
     val textHash: Int,
 )
 
 /**
- * Bridges the editor's [RichTextState] with [EditNoteViewModel.body]. Owns the "last
+ * Bridges the editor's [MarkdownEditorState] with [EditNoteViewModel.body]. Owns the "last
  * synced markdown" book-keeping so flushes from the debounced typing pipeline, lifecycle
  * ON_STOP, and onDispose all share state.
  *
@@ -123,7 +110,7 @@ private data class BodyFingerprint(
  */
 @Stable
 internal class EditorBodyBridge(
-    private val richTextState: RichTextState,
+    private val currentMarkdown: () -> String,
     private val undoController: UndoRedoController?,
     private val onMarkdownChanged: (String) -> Unit,
 ) {
@@ -132,6 +119,11 @@ internal class EditorBodyBridge(
 
     fun reset(initial: String) {
         lastSyncedBody = initial
+    }
+
+    fun replaceFromHistory(markdown: String) {
+        lastSyncedBody = markdown
+        onMarkdownChanged(markdown)
     }
 
     fun pushIfChanged(markdown: String) {
@@ -143,12 +135,12 @@ internal class EditorBodyBridge(
 
     /** Snapshot the editor and immediately flush the markdown to the VM, bypassing the debounce. */
     fun flush() {
-        pushIfChanged(richTextState.toMarkdown())
+        pushIfChanged(currentMarkdown())
     }
 }
 
 /**
- * Wires the [richTextState] to the [vm] body flow and persists changes through [appScope]
+ * Wires [markdownEditorState] to the [vm] body flow and persists changes through [appScope]
  * on lifecycle ON_STOP and onDispose. Returns an [EditorBodyBridge] that callers can use
  * to trigger explicit flushes (e.g. before navigating).
  *
@@ -162,21 +154,19 @@ internal class EditorBodyBridge(
  *   [appScope] so backgrounded notes survive process death.
  * - onDispose: same as ON_STOP, for the navigate-away case.
  */
-@OptIn(ExperimentalRichTextApi::class, FlowPreview::class)
+@OptIn(FlowPreview::class)
 @Composable
 internal fun rememberEditorBodyBridge(
     vm: EditNoteViewModel,
-    richTextState: RichTextState,
+    markdownEditorState: MarkdownEditorState,
     undoController: UndoRedoController,
     isEditMode: Boolean,
     appScope: CoroutineScope,
 ): EditorBodyBridge {
-    ApplyRichEditorListIndent(richTextState)
-
     val bridge =
-        remember(vm, richTextState, undoController) {
+        remember(vm, markdownEditorState, undoController) {
             EditorBodyBridge(
-                richTextState = richTextState,
+                currentMarkdown = { markdownEditorState.markdown },
                 undoController = undoController,
                 onMarkdownChanged = vm::setBody,
             )
@@ -186,12 +176,10 @@ internal fun rememberEditorBodyBridge(
     // Seed the editor and undo baseline once the VM finishes loading from disk. Resetting on
     // (loaded -> true) instead of immediately at remember{} time fixes the historical bug where
     // an existing note's first edit went into an empty undo stack (so undoing erased it).
-    LaunchedEffect(vm, richTextState, bridge) {
+    LaunchedEffect(vm, markdownEditorState, bridge) {
         vm.loaded.first { it }
         val initialBody = vm.body.value
-        if (initialBody.isNotEmpty() && richTextState.annotatedString.text.isEmpty()) {
-            richTextState.setMarkdown(initialBody)
-        }
+        markdownEditorState.setMarkdown(initialBody)
         bridge.reset(initialBody)
         undoController.reset(initialBody)
     }
@@ -199,10 +187,10 @@ internal fun rememberEditorBodyBridge(
     // In view mode: mirror VM body changes back into the editor so external edits (e.g. the
     // share-text prefill) show up. In edit mode: do nothing here; the snapshotFlow loop below
     // is the source of truth.
-    LaunchedEffect(vm, richTextState, bridge) {
+    LaunchedEffect(vm, markdownEditorState, bridge) {
         vm.body.collect { latestBody ->
             if (!isEditModeState.value && latestBody != bridge.lastSyncedBody) {
-                richTextState.setMarkdown(latestBody)
+                markdownEditorState.setMarkdown(latestBody)
                 bridge.reset(latestBody)
             }
         }
@@ -210,32 +198,23 @@ internal fun rememberEditorBodyBridge(
 
     // Flush pending edits whenever we leave edit mode so view-mode rendering uses fresh markdown.
     LaunchedEffect(isEditMode, bridge) {
-        if (!isEditMode) bridge.flush()
+        if (!isEditMode) {
+            bridge.flush()
+        }
     }
 
     if (isEditMode) {
-        LaunchedEffect(richTextState, bridge) {
+        LaunchedEffect(markdownEditorState, bridge) {
             try {
                 snapshotFlow {
-                    val text = richTextState.annotatedString.text
-                    BodyFingerprint(text.length, text.hashCode())
+                    val markdown = markdownEditorState.markdown
+                    BodyFingerprint(markdown.length, markdown.hashCode())
                 }.distinctUntilChanged()
                     .debounce(250)
                     .collectLatest { bridge.flush() }
             } finally {
                 bridge.flush()
             }
-        }
-
-        // When the buffer empties out (user deleted everything), the library keeps the last span
-        // style as the "pending" style for new characters. That makes formatting sticky across a
-        // full erase-and-retype. Reset any active styles so fresh typing is unformatted.
-        LaunchedEffect(richTextState) {
-            snapshotFlow { richTextState.annotatedString.text.isEmpty() }
-                .distinctUntilChanged()
-                .collectLatest { isEmpty ->
-                    if (isEmpty) clearPendingSpanStyles(richTextState)
-                }
         }
     }
 
@@ -309,7 +288,9 @@ internal fun EditNoteTopBarSection(
     existing: Boolean,
     isEditMode: Boolean,
     readOnly: Boolean,
+    markdownDisplayMode: MarkdownEditorDisplayMode,
     onBack: () -> Unit,
+    onToggleMarkdownDisplayMode: () -> Unit,
     onSave: (() -> Unit)? = null,
 ) {
     val title by vm.title.collectAsStateWithLifecycle()
@@ -435,6 +416,30 @@ internal fun EditNoteTopBarSection(
             // bottom slot), so we surface Save here instead. Outside edit mode this slot is
             // empty - the action bar handles Edit / Favorite / Archive / Trash.
             if (isEditMode && !readOnly && onSave != null) {
+                val toggleCd =
+                    stringResource(
+                        if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
+                            R.string.cd_switch_to_live_preview
+                        } else {
+                            R.string.cd_switch_to_markdown_code
+                        },
+                    )
+                RememberIconButton(
+                    onClick = onToggleMarkdownDisplayMode,
+                    modifier = Modifier.semantics { contentDescription = toggleCd },
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name =
+                            if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
+                                "visibility"
+                            } else {
+                                "code"
+                            },
+                        size = 24.dp,
+                        tint = MaterialTheme.colorScheme.primary,
+                        weight = FontWeight.Medium,
+                    )
+                }
                 val saveCd = stringResource(R.string.edit_save_cd)
                 RememberIconButton(
                     onClick = onSave,
@@ -454,49 +459,50 @@ internal fun EditNoteTopBarSection(
 }
 
 /**
- * Bottom toolbar wrapping [RichTextToolbar]. Stable lambdas (built once via [remember]) keep
+ * Bottom toolbar wrapping [MarkdownToolbar]. Stable lambdas (built once via [remember]) keep
  * the toolbar from rebuilding undo/redo callbacks on every parent recomposition.
  */
-@OptIn(ExperimentalRichTextApi::class)
 @Composable
 internal fun EditNoteBottomBarSection(
-    richTextState: RichTextState,
+    markdownEditorState: MarkdownEditorState,
     undoController: UndoRedoController,
     bridge: EditorBodyBridge,
     isEditMode: Boolean,
+    imeVisible: Boolean = false,
 ) {
     val onUndo =
-        remember(richTextState, undoController, bridge) {
+        remember(markdownEditorState, undoController, bridge) {
             {
-                undoController.undo(richTextState.toMarkdown())?.let { previous ->
-                    richTextState.setMarkdown(previous)
-                    bridge.reset(previous)
+                undoController.undo(markdownEditorState.markdown)?.let { previous ->
+                    markdownEditorState.setMarkdown(previous)
+                    bridge.replaceFromHistory(previous)
                 }
                 Unit
             }
         }
     val onRedo =
-        remember(richTextState, undoController, bridge) {
+        remember(markdownEditorState, undoController, bridge) {
             {
-                undoController.redo(richTextState.toMarkdown())?.let { next ->
-                    richTextState.setMarkdown(next)
-                    bridge.reset(next)
+                undoController.redo(markdownEditorState.markdown)?.let { next ->
+                    markdownEditorState.setMarkdown(next)
+                    bridge.replaceFromHistory(next)
                 }
                 Unit
             }
         }
     AnimatedVisibility(visible = isEditMode) {
         EditNoteFormatBarContent(
-            richTextState = richTextState,
+            markdownEditorState = markdownEditorState,
             undoController = undoController,
             onUndo = onUndo,
             onRedo = onRedo,
+            imeVisible = imeVisible,
         )
     }
 }
 
 /**
- * Static content of the rich-text format bar (no visibility animation wrapping).
+ * Static content of the markdown format bar (no visibility animation wrapping).
  *
  * Extracted from [EditNoteBottomBarSection] so the parent [androidx.compose.animation.AnimatedContent]
  * in the editor's bottomBar can drive the transition between this toolbar and the
@@ -507,13 +513,13 @@ internal fun EditNoteBottomBarSection(
  * Driving both from a single `AnimatedContent` keeps the swap to one synchronized
  * M3E spatial-spring transition.
  */
-@OptIn(ExperimentalRichTextApi::class)
 @Composable
 internal fun EditNoteFormatBarContent(
-    richTextState: RichTextState,
+    markdownEditorState: MarkdownEditorState,
     undoController: UndoRedoController,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
+    imeVisible: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     Surface(
@@ -523,12 +529,12 @@ internal fun EditNoteFormatBarContent(
                 .fillMaxWidth()
                 .imePadding(),
     ) {
-        RichTextToolbar(
-            state = richTextState,
+        MarkdownToolbar(
+            state = markdownEditorState,
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .navigationBarsPadding(),
+                    .then(if (imeVisible) Modifier else Modifier.navigationBarsPadding()),
             canUndo = undoController.canUndo,
             canRedo = undoController.canRedo,
             onUndo = onUndo,
@@ -593,97 +599,43 @@ internal class UndoRedoController {
     }
 }
 
-@OptIn(ExperimentalRichTextApi::class)
-private fun clearPendingSpanStyles(state: RichTextState) {
-    val current = state.currentSpanStyle
-    if (current.fontWeight == FontWeight.Bold) {
-        state.toggleSpanStyle(SpanStyle(fontWeight = FontWeight.Bold))
-    }
-    if (current.fontStyle == FontStyle.Italic) {
-        state.toggleSpanStyle(SpanStyle(fontStyle = FontStyle.Italic))
-    }
-    current.textDecoration?.let { deco ->
-        if (TextDecoration.Underline in deco) {
-            state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.Underline))
-        }
-        if (TextDecoration.LineThrough in deco) {
-            state.toggleSpanStyle(SpanStyle(textDecoration = TextDecoration.LineThrough))
-        }
-    }
-    val size = current.fontSize
-    if (size.isSpecified) {
-        state.toggleSpanStyle(SpanStyle(fontSize = size, fontWeight = FontWeight.Bold))
-    }
-}
-
-@OptIn(ExperimentalRichTextApi::class)
-private fun handleRichEditorKey(
-    event: KeyEvent,
-    state: RichTextState,
-): Boolean {
-    if (event.type != KeyEventType.KeyDown) return false
-    return when (event.key) {
-        Key.Backspace -> {
-            val sel = state.selection
-            if (!sel.collapsed || sel.start == 0) return false
-            val text = state.annotatedString.text
-            val atLineStart = text.getOrNull(sel.start - 1) == '\n'
-            val inList = state.isUnorderedList || state.isOrderedList
-            if (atLineStart && inList) {
-                if (state.isUnorderedList) state.removeUnorderedList() else state.removeOrderedList()
-            }
-            false
-        }
-        Key.Tab -> {
-            if (!(state.isUnorderedList || state.isOrderedList)) return false
-            if (event.isShiftPressed) {
-                if (state.canDecreaseListLevel) state.decreaseListLevel()
-            } else {
-                if (state.canIncreaseListLevel) state.increaseListLevel()
-            }
-            true
-        }
-        else -> false
-    }
-}
-
-@OptIn(ExperimentalRichTextApi::class)
 @Composable
-internal fun EditNoteRichEditorSection(
-    richTextState: RichTextState,
+internal fun EditNoteMarkdownEditorSection(
+    markdownEditorState: MarkdownEditorState,
     bodyPlaceholder: String,
     isEditMode: Boolean,
     existing: Boolean,
+    autoFocusBodyOnEdit: Boolean,
+    scrollState: ScrollState,
+    displayMode: MarkdownEditorDisplayMode,
+    onMarkdownChanged: (String) -> Unit,
 ) {
-    val bodyEmpty = richTextState.annotatedString.isEmpty()
+    val bodyEmpty = markdownEditorState.markdown.isEmpty()
+
+    LaunchedEffect(isEditMode, autoFocusBodyOnEdit, markdownEditorState) {
+        if (!isEditMode || !autoFocusBodyOnEdit) return@LaunchedEffect
+
+        delay(120)
+        if (!markdownEditorState.shouldAutoFocusBodyOnEdit()) return@LaunchedEffect
+        markdownEditorState.focusAtEndAndShowKeyboard()
+    }
+
     // Only the "new note" flow may show the real editor while not in edit mode (empty draft).
     // Existing notes in view mode must use read-only body UI so typing does not fight the bridge.
     if (isEditMode || (!existing && bodyEmpty)) {
-        BasicRichTextEditor(
-            state = richTextState,
+        MarkdownTextEditor(
+            state = markdownEditorState,
+            bodyPlaceholder = bodyPlaceholder,
             textStyle =
                 MaterialTheme.typography.bodyLarge.copy(
                     color = MaterialTheme.colorScheme.onSurface,
                 ),
-            keyboardOptions =
-                androidx.compose.foundation.text
-                    .KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 140.dp)
-                    .onPreviewKeyEvent { event -> handleRichEditorKey(event, richTextState) },
-            decorationBox = { inner ->
-                if (richTextState.annotatedString.isEmpty()) {
-                    Text(
-                        bodyPlaceholder,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                    )
-                }
-                inner()
-            },
+                    .heightIn(min = 140.dp),
+            scrollState = scrollState,
+            displayMode = displayMode,
         )
     } else if (existing && bodyEmpty) {
         Column(
@@ -709,8 +661,8 @@ internal fun EditNoteRichEditorSection(
         }
     } else {
         SelectionContainer {
-            RichText(
-                state = richTextState,
+            MarkdownText(
+                markdown = markdownEditorState.markdown,
                 style =
                     MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onSurface,
@@ -719,9 +671,33 @@ internal fun EditNoteRichEditorSection(
                     Modifier
                         .fillMaxWidth()
                         .heightIn(min = 140.dp),
+                onChecklistToggle = { lineIndex, checked ->
+                    val updatedMarkdown = markdownEditorState.markdown.withChecklistLineToggled(lineIndex, checked)
+                    markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
+                    onMarkdownChanged(updatedMarkdown)
+                },
             )
         }
     }
+}
+
+private fun String.withChecklistLineToggled(
+    lineIndex: Int,
+    checked: Boolean,
+): String {
+    val lines = lines().toMutableList()
+    val line = lines.getOrNull(lineIndex) ?: return this
+    val match = Regex("""^(\s*- \[)[ xX](]\s+)""").find(line) ?: return this
+    val updatedLine =
+        match.groupValues[1] +
+            (if (checked) "x" else " ") +
+            match.groupValues[2] +
+            line.substring(match.range.last + 1)
+    if (updatedLine == line) {
+        return this
+    }
+    lines[lineIndex] = updatedLine
+    return lines.joinToString("\n")
 }
 
 /**
@@ -738,9 +714,10 @@ internal fun EditNoteScrollableContent(
     vm: EditNoteViewModel,
     horizontalPadding: Dp,
     padding: PaddingValues,
-    richTextState: RichTextState,
+    markdownEditorState: MarkdownEditorState,
     bodyPlaceholder: String,
     isEditMode: Boolean,
+    markdownDisplayMode: MarkdownEditorDisplayMode,
     existing: Boolean,
     shelfState: NoteShelfState,
     pictureViewerOpen: Boolean,
@@ -753,8 +730,10 @@ internal fun EditNoteScrollableContent(
     onOpenAttachments: () -> Unit,
     blurModifier: Modifier,
     scrollState: ScrollState = rememberScrollState(),
+    scrollEnabled: Boolean = true,
 ) {
     val readOnly = shelfState != NoteShelfState.ACTIVE
+    val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
     // NOTE: do NOT attach scrollBehavior.nestedScrollConnection here. It is already attached on
     // the Scaffold in EditNoteScreen. Double-attachment causes the top bar to consume each
     // scroll delta twice and produces a glitchy overscroll bounce.
@@ -765,6 +744,12 @@ internal fun EditNoteScrollableContent(
     // "crack" on the editor; the Expressive spring gives a soft, rounded settle that matches
     // the rest of the motion language in the app.
     val overscrollEffect = rememberExpressiveOverscrollEffect()
+    val scrollModifier =
+        Modifier.verticalScroll(
+            state = scrollState,
+            enabled = scrollEnabled,
+            overscrollEffect = overscrollEffect,
+        )
     Column(
         modifier =
             Modifier
@@ -777,7 +762,7 @@ internal fun EditNoteScrollableContent(
                 // DelegatableNode to the chain.
                 .clipToBounds()
                 .overscroll(overscrollEffect)
-                .verticalScroll(state = scrollState, overscrollEffect = overscrollEffect)
+                .then(scrollModifier)
                 .padding(horizontal = horizontalPadding),
     ) {
         Spacer(Modifier.height(padding.calculateTopPadding()))
@@ -809,11 +794,15 @@ internal fun EditNoteScrollableContent(
         }
         Spacer(Modifier.height(16.dp))
 
-        EditNoteRichEditorSection(
-            richTextState = richTextState,
+        EditNoteMarkdownEditorSection(
+            markdownEditorState = markdownEditorState,
             bodyPlaceholder = bodyPlaceholder,
             isEditMode = isEditMode && !readOnly,
             existing = existing,
+            autoFocusBodyOnEdit = existing,
+            scrollState = scrollState,
+            displayMode = markdownDisplayMode,
+            onMarkdownChanged = vm::setBody,
         )
         Spacer(Modifier.height(24.dp))
         OptionsPanelSection(
@@ -826,7 +815,13 @@ internal fun EditNoteScrollableContent(
             onOpenTags = if (readOnly) ({}) else onOpenTags,
             onOpenAttachments = if (readOnly) ({}) else onOpenAttachments,
         )
-        Spacer(Modifier.height(40.dp + padding.calculateBottomPadding()))
+        Spacer(
+            Modifier.height(
+                40.dp +
+                    padding.calculateBottomPadding() +
+                    if (isEditMode && !readOnly) imeBottomPadding else 0.dp,
+            ),
+        )
     }
 }
 

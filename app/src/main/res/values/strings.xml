@@ -175,7 +175,13 @@
     <string name="cd_underline">Underline</string>
     <string name="cd_strikethrough">Strikethrough</string>
     <string name="cd_bullet_list">Bullet List</string>
+    <string name="cd_checklist">Checklist</string>
+    <string name="cd_quote">Quote</string>
+    <string name="cd_inline_code">Inline code</string>
+    <string name="cd_code_block">Code block</string>
     <string name="cd_numbered_list">Numbered List</string>
+    <string name="cd_switch_to_live_preview">Switch to live preview</string>
+    <string name="cd_switch_to_markdown_code">Switch to markdown code</string>
     <string name="cd_reorder_drag_handle">Reorder</string>
     <string name="edit_remove_picture_cd">Remove picture</string>
 
@@ -537,6 +543,8 @@
     <string name="google_tasks_import_clear_selection">Clear selection</string>
     <string name="google_tasks_import_selection_count">%1$d / %2$d</string>
     <string name="google_tasks_import_run">Import %1$d</string>
+    <string name="google_tasks_import_importing">Importing tasks…</string>
+    <string name="google_tasks_import_importing_progress">Importing %1$d / %2$d tasks</string>
     <string name="google_tasks_import_overwrite">Overwrite tasks I have already imported</string>
     <string name="google_tasks_import_mode_one_note_per_task">One note per task</string>
     <string name="google_tasks_import_mode_group_by_list">One note per list</string>
@@ -547,6 +555,37 @@
     <string name="google_tasks_import_error_takeout_parse">Could not read this file. Choose the Google Tasks Tasks.json file from Takeout.</string>
     <string name="google_tasks_import_error_auth_default">Could not sign in to Google. Try a different account.</string>
     <string name="google_tasks_import_error_unknown_default">Something went wrong while talking to Google Tasks</string>
+    <string name="google_tasks_import_search_hint">Search %1$d tasks</string>
+    <string name="google_tasks_import_skip_imported_pill">Skip imported</string>
+    <string name="google_tasks_import_overwrite_imported_pill">Overwrite imported</string>
+    <string name="google_tasks_import_skip_imported_menu_label">Skip already-imported</string>
+    <string name="google_tasks_import_overwrite_imported_menu_label">Overwrite already-imported</string>
+    <string name="google_tasks_import_select_all_n">Select all %1$d</string>
+    <string name="google_tasks_import_deselect_all">Deselect all</string>
+    <string name="google_tasks_import_hero_selected_of_total">selected of %1$d</string>
+    <string name="google_tasks_import_hero_caveat_compact">Times default to 9 AM, edit after import</string>
+    <string name="google_tasks_import_imported_inline_label">imported</string>
+    <string name="google_tasks_import_group_selection_count">%1$d of %2$d selected</string>
+    <string name="google_tasks_import_source_label">Source</string>
+    <string name="google_tasks_import_source_google_subtitle">%1$d tasks · %2$d lists</string>
+    <string name="google_tasks_import_source_takeout_title">Takeout JSON</string>
+    <string name="google_tasks_import_source_takeout_subtitle">%1$d tasks · %2$d lists</string>
+    <string name="google_tasks_import_source_chip_google_title">Google · %1$s</string>
+    <string name="google_tasks_import_source_chip_takeout_title">Takeout · loaded file</string>
+    <string name="google_tasks_import_source_action_refresh">Refresh from Google</string>
+    <string name="google_tasks_import_source_action_switch_account">Switch Google account</string>
+    <string name="google_tasks_import_source_action_use_takeout">Use Takeout JSON instead</string>
+    <string name="google_tasks_import_source_action_connect_google">Connect Google account instead</string>
+    <string name="google_tasks_import_source_action_disconnect">Disconnect</string>
+    <string name="google_tasks_import_source_switch_confirm_title">Discard %1$d selected?</string>
+    <string name="google_tasks_import_source_switch_confirm_body">Switching the source will clear your current selection and reload tasks from the new place.</string>
+    <string name="google_tasks_import_source_switch_confirm_continue">Switch source</string>
+    <string name="google_tasks_import_source_chip_expand_cd">Show source options</string>
+    <string name="google_tasks_import_source_chip_collapse_cd">Hide source options</string>
+    <string name="google_tasks_import_group_collapse_cd">Collapse %1$s</string>
+    <string name="google_tasks_import_group_expand_cd">Expand %1$s</string>
+    <string name="google_tasks_import_no_search_match">No matches for \"%1$s\"</string>
+    <string name="google_tasks_import_hide_source_options">Hide source options</string>
 
     <!-- Settings: backup and restore -->
     <string name="settings_backup_section">Backup &amp; restore</string>

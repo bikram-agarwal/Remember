@@ -1208,6 +1208,7 @@ private fun SheetDropdown(
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { onExpandedChange(false) },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             content()
         }

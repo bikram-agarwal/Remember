@@ -40,8 +40,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mohamedrejeb.richeditor.annotation.ExperimentalRichTextApi
-import com.mohamedrejeb.richeditor.model.rememberRichTextState
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
@@ -105,7 +103,6 @@ fun EditNoteRoute(
 @OptIn(
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
-    ExperimentalRichTextApi::class,
 )
 @Composable
 fun EditNoteScreen(
@@ -159,18 +156,25 @@ fun EditNoteScreen(
     val readOnly = shelfState != NoteShelfState.ACTIVE
 
     var isEditMode by remember(existing, forceEdit) { mutableStateOf(!existing || forceEdit) }
-    // Force view mode on read-only shelves so pickers and the rich editor don't accept edits.
+    var markdownDisplayMode by rememberSaveable { mutableStateOf(MarkdownEditorDisplayMode.LivePreview) }
+    // Force view mode on read-only shelves so pickers and the markdown editor don't accept edits.
     LaunchedEffect(readOnly) {
         if (readOnly && isEditMode) isEditMode = false
     }
 
-    val richTextState = rememberRichTextState()
+    val markdownEditorState = remember(editorNoteKey) { MarkdownEditorState() }
     val undoController = remember(editorNoteKey) { UndoRedoController() }
+    val markdownSelectionActive by remember {
+        derivedStateOf {
+            markdownEditorState.selectionRevision
+            isEditMode && markdownEditorState.hasSelection
+        }
+    }
 
     val bridge =
         rememberEditorBodyBridge(
             vm = vm,
-            richTextState = richTextState,
+            markdownEditorState = markdownEditorState,
             undoController = undoController,
             isEditMode = isEditMode,
             appScope = appScope,
@@ -290,7 +294,16 @@ fun EditNoteScreen(
                 existing = existing,
                 isEditMode = isEditMode,
                 readOnly = readOnly,
+                markdownDisplayMode = markdownDisplayMode,
                 onBack = handleBack,
+                onToggleMarkdownDisplayMode = {
+                    markdownDisplayMode =
+                        if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
+                            MarkdownEditorDisplayMode.LivePreview
+                        } else {
+                            MarkdownEditorDisplayMode.MarkdownCode
+                        }
+                },
                 onSave = saveAndExitEditMode,
             )
         },
@@ -318,25 +331,25 @@ fun EditNoteScreen(
                 }
             val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
             val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-            // Stable callbacks - the RichTextToolbar / action item rows are lambda-heavy
+            // Stable callbacks - the MarkdownToolbar / action item rows are lambda-heavy
             // and re-allocating on every recomposition defeats their skippable-composable
             // optimization.
             val onUndo =
-                remember(richTextState, undoController, bridge) {
+                remember(markdownEditorState, undoController, bridge) {
                     {
-                        undoController.undo(richTextState.toMarkdown())?.let { previous ->
-                            richTextState.setMarkdown(previous)
-                            bridge.reset(previous)
+                        undoController.undo(markdownEditorState.markdown)?.let { previous ->
+                            markdownEditorState.setMarkdown(previous)
+                            bridge.replaceFromHistory(previous)
                         }
                         Unit
                     }
                 }
             val onRedo =
-                remember(richTextState, undoController, bridge) {
+                remember(markdownEditorState, undoController, bridge) {
                     {
-                        undoController.redo(richTextState.toMarkdown())?.let { next ->
-                            richTextState.setMarkdown(next)
-                            bridge.reset(next)
+                        undoController.redo(markdownEditorState.markdown)?.let { next ->
+                            markdownEditorState.setMarkdown(next)
+                            bridge.replaceFromHistory(next)
                         }
                         Unit
                     }
@@ -357,10 +370,11 @@ fun EditNoteScreen(
                 when (currentSlot) {
                     EditorBottomSlot.Format ->
                         EditNoteFormatBarContent(
-                            richTextState = richTextState,
+                            markdownEditorState = markdownEditorState,
                             undoController = undoController,
                             onUndo = onUndo,
                             onRedo = onRedo,
+                            imeVisible = imeVisible,
                         )
                     EditorBottomSlot.Action ->
                         NoteActionBottomBarContent(
@@ -410,9 +424,10 @@ fun EditNoteScreen(
             vm = vm,
             horizontalPadding = 20.dp,
             padding = padding,
-            richTextState = richTextState,
+            markdownEditorState = markdownEditorState,
             bodyPlaceholder = bodyPlaceholder,
             isEditMode = isEditMode,
+            markdownDisplayMode = markdownDisplayMode,
             existing = existing,
             shelfState = shelfState,
             pictureViewerOpen = pictureViewer != null,
@@ -427,6 +442,7 @@ fun EditNoteScreen(
             onOpenAttachments = { attachmentsPickerOpen = true },
             blurModifier = blurMod,
             scrollState = contentScrollState,
+            scrollEnabled = !markdownSelectionActive,
         )
 
         // Pickers each collect only the slice they need, lazily, so they impose no overhead

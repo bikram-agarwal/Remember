@@ -70,7 +70,7 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -126,6 +126,7 @@ import dev.bikram.remember.ui.components.AppIconImage
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
+import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
@@ -719,7 +720,7 @@ fun SettingsRoute(
                                     )
                                 }
                                 Spacer(Modifier.width(16.dp))
-                                Switch(
+                                RememberSwitch(
                                     checked = notificationsGranted,
                                     onCheckedChange = { wantEnabled ->
                                         when {
@@ -737,6 +738,18 @@ fun SettingsRoute(
                                             else -> { }
                                         }
                                     },
+                                    thumbContent =
+                                        if (notificationsGranted) {
+                                            {
+                                                RememberMaterialRoundedSymbol(
+                                                    name = "check",
+                                                    size = SwitchDefaults.IconSize,
+                                                    weight = FontWeight.Bold,
+                                                )
+                                            }
+                                        } else {
+                                            null
+                                        },
                                 )
                             }
                         }
@@ -1686,7 +1699,11 @@ private fun UpdateCheckScheduleDropdown(
         )
         RememberOutlinedButton(onClick = { expanded = true }) {
             Text(updateScheduleSummaryBeforeColon(selected))
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
                 UpdateCheckSchedule.entries.forEach { option ->
                     RememberDropdownMenuItem(
                         text = { Text(updateScheduleLabel(option)) },
@@ -1721,9 +1738,21 @@ private fun UpdateSettingsToggleItem(
             modifier = Modifier.weight(1f),
         )
         Spacer(Modifier.width(16.dp))
-        Switch(
+        RememberSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
+            thumbContent =
+                if (checked) {
+                    {
+                        RememberMaterialRoundedSymbol(
+                            name = "check",
+                            size = SwitchDefaults.IconSize,
+                            weight = FontWeight.Bold,
+                        )
+                    }
+                } else {
+                    null
+                },
         )
     }
 }
@@ -1939,7 +1968,7 @@ private fun BackupFolderSettingsToggleItem(
             )
         }
         Spacer(Modifier.width(16.dp))
-        Switch(
+        RememberSwitch(
             checked = checked,
             onCheckedChange = { enabled ->
                 when {
@@ -1949,6 +1978,18 @@ private fun BackupFolderSettingsToggleItem(
                 }
             },
             enabled = switchInteractive,
+            thumbContent =
+                if (checked) {
+                    {
+                        RememberMaterialRoundedSymbol(
+                            name = "check",
+                            size = SwitchDefaults.IconSize,
+                            weight = FontWeight.Bold,
+                        )
+                    }
+                } else {
+                    null
+                },
         )
     }
 }
@@ -1984,6 +2025,7 @@ private fun SettingsInfoDropdown(
             expanded = menuExpanded,
             onDismissRequest = { menuExpanded = false },
             modifier = Modifier.widthIn(max = 260.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             Column(
                 modifier =
@@ -2223,7 +2265,22 @@ private fun SettingsToggleRow(
             )
         }
         Spacer(Modifier.width(16.dp))
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        RememberSwitch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            thumbContent =
+                if (checked) {
+                    {
+                        RememberMaterialRoundedSymbol(
+                            name = "check",
+                            size = SwitchDefaults.IconSize,
+                            weight = FontWeight.Bold,
+                        )
+                    }
+                } else {
+                    null
+                },
+        )
     }
 }
 
@@ -2273,10 +2330,22 @@ private fun ToggleRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Switch(
+        RememberSwitch(
             checked = checked,
             onCheckedChange = if (enabled) onChange else null,
             enabled = enabled,
+            thumbContent =
+                if (checked) {
+                    {
+                        RememberMaterialRoundedSymbol(
+                            name = "check",
+                            size = SwitchDefaults.IconSize,
+                            weight = FontWeight.Bold,
+                        )
+                    }
+                } else {
+                    null
+                },
         )
     }
 }
@@ -2289,7 +2358,11 @@ private fun SwipeGestureModeDropdown(
     var expanded by rememberSaveable { mutableStateOf(false) }
     RememberOutlinedButton(onClick = { expanded = true }) {
         Text(swipeGestureModeLabel(current))
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ) {
             SwipeGestureMode.entries.forEach { mode ->
                 RememberDropdownMenuItem(
                     text = { Text(swipeGestureModeLabel(mode)) },
@@ -2371,7 +2444,11 @@ private fun SwipeRevealSlotDropdown(
         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
     ) {
         SwipeActionLabelContent(action = current)
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ) {
             RememberDropdownMenuItem(
                 text = { Text(stringResource(R.string.settings_swipe_none)) },
                 leadingIcon = { SwipeActionIcon(action = null) },
@@ -2405,7 +2482,11 @@ private fun NoteSwipeActionDropdown(
     var expanded by rememberSaveable { mutableStateOf(false) }
     RememberOutlinedButton(onClick = { expanded = true }) {
         SwipeActionLabelContent(action = current)
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+        ) {
             SwipeActionDisplayOrder.filter { it != excluded }.forEach { action ->
                 RememberDropdownMenuItem(
                     text = { Text(noteSwipeActionLabel(action)) },

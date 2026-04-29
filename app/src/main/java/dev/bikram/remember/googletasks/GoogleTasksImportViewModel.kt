@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.remember.data.NoteRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -39,6 +40,7 @@ class GoogleTasksImportViewModel
         @param:ApplicationContext
         private val appContext: Context,
         private val repository: GoogleTasksRepository,
+        private val noteRepository: NoteRepository,
         private val importer: GoogleTasksImporter,
         private val prefs: GoogleTasksImportPrefs,
     ) : ViewModel() {
@@ -73,6 +75,22 @@ class GoogleTasksImportViewModel
                     rememberedEmail = current.rememberedEmail,
                     selectedMethod = method,
                 )
+            }
+        }
+
+        /**
+         * Reload tasks from the currently-connected Google account without nuking the loaded
+         * lists or the user's selection. Surfaces the same loading panel as the initial fetch
+         * because the network round-trip is identical. No-op when offline (no cached token);
+         * the bottom sheet "Refresh from Google" entry is hidden in that case.
+         */
+        fun refreshFromGoogle() {
+            val token = cachedToken
+            val current = _state.value
+            if (token == null || current.selectedMethod != ImportMethod.GrantPermission) return
+            viewModelScope.launch {
+                _state.update { it.copy(isFetching = true, error = null) }
+                fetchEverything()
             }
         }
 
@@ -124,7 +142,7 @@ class GoogleTasksImportViewModel
                     }
                 parsed
                     .onSuccess { importData ->
-                        val alreadyImported = prefs.importedMap()
+                        val alreadyImported = refreshedImportedMap()
                         _state.update {
                             it.copy(
                                 selectedMethod = ImportMethod.ManualImport,
@@ -290,7 +308,7 @@ class GoogleTasksImportViewModel
                     }
                 }
             }
-            val alreadyImported = prefs.importedMap()
+            val alreadyImported = refreshedImportedMap()
             _state.update {
                 it.copy(
                     isFetching = false,
@@ -307,6 +325,10 @@ class GoogleTasksImportViewModel
 
         fun toggleListFilter(listId: String?) {
             _state.update { it.copy(listFilterId = listId) }
+        }
+
+        fun setSearchQuery(query: String) {
+            _state.update { it.copy(searchQuery = query) }
         }
 
         fun toggleSelection(googleTaskId: String) {
@@ -327,6 +349,39 @@ class GoogleTasksImportViewModel
             }
         }
 
+        /**
+         * Select-or-clear every visible task in [listId]. Used by the per-group checkbox in the
+         * grouped LoadedPanel layout - the group's checkbox is "checked" only when every visible
+         * task in that group is currently selected, so we mirror that semantic when toggling.
+         */
+        fun toggleSelectAllInList(listId: String) {
+            _state.update { current ->
+                val visibleIds =
+                    current
+                        .visibleTasks()
+                        .filter { it.taskListId == listId }
+                        .map { it.task.id }
+                        .toSet()
+                if (visibleIds.isEmpty()) return@update current
+                val anyMissing = visibleIds.any { it !in current.selectedTaskIds }
+                val next = current.selectedTaskIds.toMutableSet()
+                if (anyMissing) next.addAll(visibleIds) else next.removeAll(visibleIds)
+                current.copy(selectedTaskIds = next)
+            }
+        }
+
+        fun toggleListCollapse(listId: String) {
+            _state.update { current ->
+                val next = current.collapsedListIds.toMutableSet()
+                if (!next.add(listId)) next.remove(listId)
+                current.copy(collapsedListIds = next)
+            }
+        }
+
+        fun clearSelection() {
+            _state.update { it.copy(selectedTaskIds = emptySet()) }
+        }
+
         fun setImportMode(mode: ImportMode) {
             _state.update { it.copy(importMode = mode) }
         }
@@ -341,15 +396,23 @@ class GoogleTasksImportViewModel
             val toImport = current.visibleTasks().filter { it.task.id in current.selectedTaskIds }
             if (toImport.isEmpty()) return
             viewModelScope.launch {
-                _state.update { it.copy(isImporting = true) }
-                val alreadyImported = prefs.importedMap()
+                _state.update {
+                    it.copy(
+                        isImporting = true,
+                        importCompletedCount = 0,
+                        importTotalCount = toImport.size,
+                    )
+                }
+                val freshAlreadyImported = refreshedImportedMap()
                 val outcome =
                     importer.import(
                         tasks = toImport,
                         mode = current.importMode,
-                        alreadyImported = alreadyImported,
+                        alreadyImported = freshAlreadyImported,
                         overwrite = current.overwriteAlreadyImported,
-                    )
+                    ) { completedCount ->
+                        _state.update { it.copy(importCompletedCount = completedCount) }
+                    }
                 prefs.recordImported(outcome.googleTaskIdToRememberNoteId)
                 _state.update {
                     it.copy(
@@ -359,8 +422,32 @@ class GoogleTasksImportViewModel
                         lastOutcome = outcome,
                     )
                 }
-                _effects.value = GoogleTasksImportEffect.ImportFinished(outcome)
             }
+        }
+
+        fun dismissImportOutcome() {
+            _state.update {
+                it.copy(
+                    importCompletedCount = 0,
+                    importTotalCount = 0,
+                    lastOutcome = null,
+                )
+            }
+        }
+
+        private suspend fun refreshedImportedMap(): Map<String, Long> {
+            val importedMap = prefs.importedMap()
+            if (importedMap.isEmpty()) {
+                return emptyMap()
+            }
+            val existingNoteIds =
+                importedMap.values
+                    .distinct()
+                    .filterTo(mutableSetOf()) { noteId ->
+                        noteRepository.get(noteId) != null
+                    }
+            prefs.pruneMissing(existingNoteIds)
+            return importedMap.filterValues { noteId -> noteId in existingNoteIds }
         }
     }
 
@@ -376,18 +463,37 @@ data class GoogleTasksImportUiState(
     val connected: Boolean = false,
     val isFetching: Boolean = false,
     val isImporting: Boolean = false,
+    val importCompletedCount: Int = 0,
+    val importTotalCount: Int = 0,
     val taskLists: List<GoogleTaskList> = emptyList(),
     val tasks: List<TaskToImport> = emptyList(),
     val takeoutStats: GoogleTasksTakeoutStats? = null,
     val selectedTaskIds: Set<String> = emptySet(),
     val alreadyImportedIds: Set<String> = emptySet(),
     val listFilterId: String? = null,
+    val searchQuery: String = "",
+    /** Source-list IDs whose group is currently collapsed in the grouped LoadedPanel view. */
+    val collapsedListIds: Set<String> = emptySet(),
     val importMode: ImportMode = ImportMode.ONE_NOTE_PER_TASK,
     val overwriteAlreadyImported: Boolean = false,
     val error: ImportError? = null,
     val lastOutcome: ImportOutcome? = null,
 ) {
-    fun visibleTasks(): List<TaskToImport> = if (listFilterId == null) tasks else tasks.filter { it.taskListId == listFilterId }
+    /**
+     * Tasks the user is currently looking at after applying the list filter and search query.
+     * Both filters compose; an empty query is the identity. The grouped LoadedPanel iterates
+     * this and bins by [TaskToImport.taskListId].
+     */
+    fun visibleTasks(): List<TaskToImport> {
+        val byList = if (listFilterId == null) tasks else tasks.filter { it.taskListId == listFilterId }
+        val query = searchQuery.trim()
+        if (query.isEmpty()) return byList
+        return byList.filter { wrapper ->
+            val title = wrapper.task.title.orEmpty()
+            val notes = wrapper.task.notes.orEmpty()
+            title.contains(query, ignoreCase = true) || notes.contains(query, ignoreCase = true)
+        }
+    }
 
     val isLoaded: Boolean get() = !isFetching && connected && taskLists.isNotEmpty()
     val isEmpty: Boolean get() = !isFetching && connected && taskLists.isEmpty()
