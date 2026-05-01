@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.settings
 
 import android.os.Build
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -8,14 +9,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -55,6 +58,9 @@ import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.PaletteDifferentiationStatus
+import dev.bikram.remember.ui.theme.contrastingTextColor
+import dev.bikram.remember.ui.theme.paletteDifferentiationStatus
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -135,6 +141,9 @@ fun AppearanceSection(
             )
         }
 
+        Spacer(Modifier.height(14.dp))
+        ThemePreviewCard(colorSource = state.colorSource)
+
         Spacer(Modifier.height(12.dp))
         GroupedListColumn {
             GroupedListItem(position = GroupPosition.FIRST) {
@@ -149,8 +158,8 @@ fun AppearanceSection(
                 AppearanceSettingsToggleItem(
                     title = stringResource(R.string.appearance_shading_title),
                     subtitle = stringResource(R.string.appearance_shading_subtitle),
-                    checked = state.fixedCardColors,
-                    onCheckedChange = { scope.launch { prefs.setFixedCardColors(it) } },
+                    checked = state.useEnhancedShading,
+                    onCheckedChange = { scope.launch { prefs.setUseEnhancedShading(it) } },
                 )
             }
             GroupedListItem(position = GroupPosition.MIDDLE) {
@@ -267,7 +276,7 @@ private fun CustomHexSheet(
         normalized?.let {
             runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
         }
-    val previewShape = RoundedCornerShape(12.dp)
+    val previewShape = MaterialTheme.shapes.medium
     val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
 
     androidx.compose.ui.window.Dialog(
@@ -376,3 +385,234 @@ private fun themeModeLabel(mode: ThemeMode): String =
             ThemeMode.BLACK -> R.string.appearance_theme_black
         },
     )
+
+/**
+ * Live preview card showing how the active palette + style produce surface and accent
+ * tones. Two strips:
+ *
+ *  1. Surface ladder: 6 swatches mapped to surfaceContainerLowest, surface,
+ *     surfaceContainerLow, surfaceContainer, surfaceContainerHigh, surfaceContainerHighest.
+ *     Helps users see whether their palette gives clean tonal separation between
+ *     "recessed" and "raised" surfaces - a flat ladder is a sign the seed + style combo
+ *     collapses too monochromatic.
+ *
+ *  2. Accent containers: primaryContainer, secondaryContainer, tertiaryContainer with
+ *     "Aa" rendered in the corresponding onContainer color so users can spot-check both
+ *     hue separation and text contrast in one glance.
+ *
+ * The status pill in the header uses [paletteDifferentiationStatus] to nudge users toward
+ * a different palette style when the active combo is too flat.
+ */
+@Composable
+private fun ThemePreviewCard(colorSource: ColorSource) {
+    val scheme = MaterialTheme.colorScheme
+    val status = remember(scheme) { paletteDifferentiationStatus(scheme) }
+    val title =
+        stringResource(
+            R.string.appearance_preview_title_named,
+            colorSourceDisplayName(colorSource),
+        )
+
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.largeIncreased,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f),
+                )
+                ThemePreviewStatusPill(status = status)
+            }
+            SurfaceLadderStrip(scheme = scheme)
+            AccentContainersStrip(scheme = scheme)
+        }
+    }
+}
+
+@Composable
+private fun ThemePreviewStatusPill(status: PaletteDifferentiationStatus) {
+    val good = status == PaletteDifferentiationStatus.GOOD
+    val container =
+        if (good) {
+            MaterialTheme.colorScheme.tertiaryContainer
+        } else {
+            MaterialTheme.colorScheme.errorContainer
+        }
+    val onContainer =
+        if (good) {
+            MaterialTheme.colorScheme.onTertiaryContainer
+        } else {
+            MaterialTheme.colorScheme.onErrorContainer
+        }
+    val label =
+        if (good) {
+            stringResource(R.string.appearance_preview_status_good)
+        } else {
+            stringResource(R.string.appearance_preview_status_low)
+        }
+    Surface(
+        shape = MaterialTheme.shapes.extraExtraLarge,
+        color = container,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .clip(MaterialTheme.shapes.extraExtraLarge)
+                        .background(onContainer.copy(alpha = 0.7f)),
+            )
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = onContainer,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SurfaceLadderStrip(scheme: ColorScheme) {
+    val swatches =
+        listOf(
+            scheme.surfaceContainerLowest to stringResource(R.string.appearance_preview_label_lowest),
+            scheme.surface to stringResource(R.string.appearance_preview_label_surface),
+            scheme.surfaceContainerLow to stringResource(R.string.appearance_preview_label_low),
+            scheme.surfaceContainer to stringResource(R.string.appearance_preview_label_base),
+            scheme.surfaceContainerHigh to stringResource(R.string.appearance_preview_label_high),
+            scheme.surfaceContainerHighest to stringResource(R.string.appearance_preview_label_highest),
+        )
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = stringResource(R.string.appearance_preview_surface_ladder),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .clip(MaterialTheme.shapes.small)
+                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small),
+        ) {
+            swatches.forEach { (color, label) ->
+                Box(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(color),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = contrastingTextColor(color),
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = stringResource(R.string.appearance_preview_recessed),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+            Text(
+                text = stringResource(R.string.appearance_preview_raised),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccentContainersStrip(scheme: ColorScheme) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = stringResource(R.string.appearance_preview_accent_containers),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AccentChip(
+                modifier = Modifier.weight(1f),
+                container = scheme.primaryContainer,
+                onContainer = scheme.onPrimaryContainer,
+                label = stringResource(R.string.appearance_preview_label_primary),
+            )
+            AccentChip(
+                modifier = Modifier.weight(1f),
+                container = scheme.secondaryContainer,
+                onContainer = scheme.onSecondaryContainer,
+                label = stringResource(R.string.appearance_preview_label_secondary),
+            )
+            AccentChip(
+                modifier = Modifier.weight(1f),
+                container = scheme.tertiaryContainer,
+                onContainer = scheme.onTertiaryContainer,
+                label = stringResource(R.string.appearance_preview_label_tertiary),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AccentChip(
+    modifier: Modifier,
+    container: Color,
+    onContainer: Color,
+    label: String,
+) {
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.medium,
+        color = container,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = onContainer.copy(alpha = 0.72f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "Aa",
+                style = MaterialTheme.typography.titleMedium,
+                color = onContainer,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
+}

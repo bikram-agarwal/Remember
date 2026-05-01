@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,8 +27,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Badge
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
@@ -267,6 +268,12 @@ fun HistoryRoute(
     LaunchedEffect(section) { vm.clearSelection() }
     LaunchedEffect(selectableVisibleIds) { vm.pruneSelection(selectableVisibleIds) }
     LaunchedEffect(section, items.size) { onVisibleItemCountChange(items.size) }
+    LaunchedEffect(section, items.isEmpty()) {
+        if (items.isEmpty()) {
+            topBarState.heightOffset = 0f
+            topBarState.contentOffset = 0f
+        }
+    }
 
     Scaffold(
         modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -290,7 +297,8 @@ fun HistoryRoute(
                 title = {
                     Text(
                         text = stringResource(R.string.main_tab_history),
-                        style = MaterialTheme.typography.headlineMedium,
+                        style = MaterialTheme.typography.headlineLargeEmphasized,
+                        fontWeight = FontWeight.Bold,
                     )
                 },
                 actions = {
@@ -443,6 +451,7 @@ fun HistoryRoute(
     }
 }
 
+@Suppress("DEPRECATION")
 @Composable
 private fun HistorySelectionActionBar(
     visible: Boolean,
@@ -468,19 +477,20 @@ private fun HistorySelectionActionBar(
             exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
         ) {
             Surface(
-                shape = RoundedCornerShape(50),
+                shape = MaterialTheme.shapes.extraExtraLarge,
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 tonalElevation = 3.dp,
                 shadowElevation = 3.dp,
             ) {
-                Row(
+                ButtonGroup(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     val exitLabel = stringResource(R.string.home_select_exit_cd)
+                    val exitInteractionSource = remember { MutableInteractionSource() }
                     RememberFilledTonalIconButton(
                         onClick = onClearSelection,
+                        modifier = Modifier.animateWidth(exitInteractionSource),
+                        interactionSource = exitInteractionSource,
                         tooltipLabel = exitLabel,
                     ) {
                         RememberMaterialRoundedSymbol(
@@ -492,8 +502,11 @@ private fun HistorySelectionActionBar(
                     if (section == HistorySection.TRASH) {
                         val restoreLabel = stringResource(R.string.edit_bottom_bar_restore)
                         val cdRestore = stringResource(R.string.edit_bottom_bar_restore_cd)
+                        val restoreInteractionSource = remember { MutableInteractionSource() }
                         RememberFilledTonalIconButton(
                             onClick = onRestoreSelected,
+                            modifier = Modifier.animateWidth(restoreInteractionSource),
+                            interactionSource = restoreInteractionSource,
                             tooltipLabel = restoreLabel,
                         ) {
                             RememberMaterialRoundedSymbol(
@@ -504,8 +517,11 @@ private fun HistorySelectionActionBar(
                         }
                         val archiveLabel = stringResource(R.string.edit_bottom_bar_archive)
                         val cdArchive = stringResource(R.string.edit_bottom_bar_archive_cd)
+                        val archiveInteractionSource = remember { MutableInteractionSource() }
                         RememberFilledTonalIconButton(
                             onClick = onArchiveSelected,
+                            modifier = Modifier.animateWidth(archiveInteractionSource),
+                            interactionSource = archiveInteractionSource,
                             tooltipLabel = archiveLabel,
                         ) {
                             RememberMaterialRoundedSymbol(
@@ -517,8 +533,11 @@ private fun HistorySelectionActionBar(
                     } else {
                         val unarchiveLabel = stringResource(R.string.edit_bottom_bar_unarchive)
                         val cdUnarchive = stringResource(R.string.edit_bottom_bar_unarchive_cd)
+                        val unarchiveInteractionSource = remember { MutableInteractionSource() }
                         RememberFilledTonalIconButton(
                             onClick = onUnarchiveSelected,
+                            modifier = Modifier.animateWidth(unarchiveInteractionSource),
+                            interactionSource = unarchiveInteractionSource,
                             tooltipLabel = unarchiveLabel,
                         ) {
                             RememberMaterialRoundedSymbol(
@@ -529,8 +548,11 @@ private fun HistorySelectionActionBar(
                         }
                         val trashLabel = stringResource(R.string.common_move_to_trash)
                         val cdTrash = stringResource(R.string.history_archive_move_to_trash_cd)
+                        val trashInteractionSource = remember { MutableInteractionSource() }
                         RememberFilledTonalIconButton(
                             onClick = onTrashSelected,
+                            modifier = Modifier.animateWidth(trashInteractionSource),
+                            interactionSource = trashInteractionSource,
                             tooltipLabel = trashLabel,
                         ) {
                             RememberMaterialRoundedSymbol(
@@ -542,8 +564,11 @@ private fun HistorySelectionActionBar(
                     }
                     val deleteForeverLabel = stringResource(R.string.edit_bottom_bar_delete_forever)
                     val cdDeleteForever = stringResource(R.string.edit_bottom_bar_delete_forever_cd)
+                    val deleteForeverInteractionSource = remember { MutableInteractionSource() }
                     RememberFilledTonalIconButton(
                         onClick = onDeleteForeverSelected,
+                        modifier = Modifier.animateWidth(deleteForeverInteractionSource),
+                        interactionSource = deleteForeverInteractionSource,
                         tooltipLabel = deleteForeverLabel,
                         colors =
                             IconButtonDefaults.filledTonalIconButtonColors(
@@ -571,7 +596,7 @@ private fun RetentionNotice(modifier: Modifier = Modifier) {
             modifier
                 .background(
                     MaterialTheme.colorScheme.surfaceContainerHigh,
-                    RoundedCornerShape(16.dp),
+                    MaterialTheme.shapes.large,
                 ).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -691,7 +716,7 @@ private fun HistorySwipeCard(
     MultiActionSwipeRevealCard(
         startActions = startActions,
         endActions = endActions,
-        cardShape = RoundedCornerShape(12.dp),
+        cardShape = MaterialTheme.shapes.medium,
         hapticEnabled = hapticEnabled,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -746,7 +771,7 @@ private fun TrashDaysLeftBadge(
                     } else {
                         MaterialTheme.colorScheme.surfaceContainerHigh
                     },
-                    RoundedCornerShape(999.dp),
+                    MaterialTheme.shapes.extraExtraLarge,
                 ).padding(horizontal = 10.dp, vertical = 4.dp),
     )
 }

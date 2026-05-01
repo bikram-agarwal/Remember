@@ -5,6 +5,10 @@ import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.ImageDecoder
+import android.graphics.Rect
 import android.net.Uri
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.AndroidEntryPoint
@@ -20,10 +24,13 @@ import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.di.ApplicationScope
+import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.edit.iconEmojiPayload
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 @AndroidEntryPoint
 class ReminderReceiver : BroadcastReceiver() {
@@ -66,6 +73,22 @@ class ReminderReceiver : BroadcastReceiver() {
     }
 
     companion object {
+        private const val NOTIFICATION_HERO_WIDTH_PX = 1280
+        private const val NOTIFICATION_HERO_HEIGHT_PX = 720
+        private val notificationMarkdownHeadingRegex = Regex("""^\s*#{1,6}\s+""")
+        private val notificationMarkdownChecklistRegex = Regex("""^\s*[-*+]\s+\[[ xX]\]\s+""")
+        private val notificationMarkdownBulletRegex = Regex("""^\s*[-*+]\s+""")
+        private val notificationMarkdownQuoteRegex = Regex("""^\s*>\s?""")
+        private val notificationMarkdownCodeFenceRegex = Regex("""^\s*```.*$""")
+        private val notificationMarkdownLinkRegex = Regex("""\[([^]]+)]\([^)]+\)""")
+        private val notificationMarkdownInlineCodeRegex = Regex("""`([^`]+)`""")
+        private val notificationMarkdownBoldItalicRegex = Regex("""\*\*\*(.+?)\*\*\*""")
+        private val notificationMarkdownBoldRegex = Regex("""\*\*(.+?)\*\*""")
+        private val notificationMarkdownItalicRegex = Regex("""(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)""")
+        private val notificationMarkdownStrikeRegex = Regex("""~~(.+?)~~""")
+        private val notificationMarkdownUnderlineOpenRegex = Regex("""<u>""", RegexOption.IGNORE_CASE)
+        private val notificationMarkdownUnderlineCloseRegex = Regex("""</u>""", RegexOption.IGNORE_CASE)
+
         fun showNotification(
             context: Context,
             note: NoteEntity,
@@ -86,9 +109,8 @@ class ReminderReceiver : BroadcastReceiver() {
                 NotificationCompat
                     .Builder(context, channelId)
                     .setSmallIcon(R.drawable.ic_stat_remember)
-                    .setContentTitle(
-                        notificationTitle(context, note),
-                    ).setContentText(summary(context, note, items))
+                    .setContentTitle(notificationTitle(context, note))
+                    .setContentText(summary(context, note, items))
                     .setPriority(priorityFor(note.importance))
                     .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -98,7 +120,18 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(true)
 
-            if (note.kind == NoteKind.LIST) {
+            val heroBitmap = decodeNotificationHeroBitmap(context, note)
+            if (heroBitmap != null) {
+                builder
+                    .setStyle(
+                        NotificationCompat
+                            .BigPictureStyle()
+                            .bigPicture(heroBitmap)
+                            .setBigContentTitle(notificationTitle(context, note))
+                            .setSummaryText(summary(context, note, items, expanded = true))
+                            .showBigPictureWhenCollapsed(true),
+                    )
+            } else if (note.kind == NoteKind.LIST) {
                 builder.setStyle(
                     NotificationCompat
                         .BigTextStyle()
@@ -136,6 +169,98 @@ class ReminderReceiver : BroadcastReceiver() {
             nm.notify(ReminderScheduler.pendingRequestCodeForNote(note.id), builder.build())
         }
 
+        private fun decodeNotificationHeroBitmap(
+            context: Context,
+            note: NoteEntity,
+        ): Bitmap? {
+            val pictureUri = note.pictureUri?.takeIf { it.isNotBlank() } ?: return null
+            val source =
+                runCatching {
+                    ImageDecoder.createSource(context.contentResolver, Uri.parse(pictureUri))
+                }.getOrNull() ?: return null
+            val decodedBitmap =
+                runCatching {
+                    ImageDecoder.decodeBitmap(source) { decoder, imageInfo, _ ->
+                        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+                        decoder.setTargetSampleSize(
+                            notificationHeroSampleSize(
+                                sourceWidthPx = imageInfo.size.width,
+                                sourceHeightPx = imageInfo.size.height,
+                            ),
+                        )
+                    }
+                }.getOrNull() ?: return null
+
+            val framedBitmap =
+                createCroppedBitmap(
+                    sourceBitmap = decodedBitmap,
+                    targetWidthPx = NOTIFICATION_HERO_WIDTH_PX,
+                    targetHeightPx = NOTIFICATION_HERO_HEIGHT_PX,
+                    framing = HeroFraming.fromJsonString(note.pictureHeroFraming),
+                )
+            if (framedBitmap !== decodedBitmap) {
+                decodedBitmap.recycle()
+            }
+            return framedBitmap
+        }
+
+        private fun notificationHeroSampleSize(
+            sourceWidthPx: Int,
+            sourceHeightPx: Int,
+        ): Int {
+            if (sourceWidthPx <= 0 || sourceHeightPx <= 0) return 1
+
+            var sampleSize = 1
+            var nextSampleSize = sampleSize * 2
+            while (
+                sourceWidthPx / nextSampleSize >= NOTIFICATION_HERO_WIDTH_PX &&
+                sourceHeightPx / nextSampleSize >= NOTIFICATION_HERO_HEIGHT_PX
+            ) {
+                sampleSize = nextSampleSize
+                nextSampleSize = sampleSize * 2
+            }
+            return sampleSize
+        }
+
+        private fun createCroppedBitmap(
+            sourceBitmap: Bitmap,
+            targetWidthPx: Int,
+            targetHeightPx: Int,
+            framing: HeroFraming? = null,
+        ): Bitmap {
+            val sourceWidthPx = sourceBitmap.width.toFloat().coerceAtLeast(1f)
+            val sourceHeightPx = sourceBitmap.height.toFloat().coerceAtLeast(1f)
+            val clampedFraming = framing?.clamped()
+            val coverScale = max(targetWidthPx / sourceWidthPx, targetHeightPx / sourceHeightPx)
+            val displayScale = coverScale * (clampedFraming?.zoom ?: 1f).coerceIn(1f, 8f)
+            val scaledWidthPx = sourceWidthPx * displayScale
+            val scaledHeightPx = sourceHeightPx * displayScale
+            val leftUnclamped =
+                if (clampedFraming == null) {
+                    (targetWidthPx - scaledWidthPx) / 2f
+                } else {
+                    targetWidthPx / 2f - clampedFraming.focalX * sourceWidthPx * displayScale
+                }
+            val topUnclamped =
+                if (clampedFraming == null) {
+                    (targetHeightPx - scaledHeightPx) / 2f
+                } else {
+                    targetHeightPx / 2f - clampedFraming.focalY * sourceHeightPx * displayScale
+                }
+            val destinationLeftPx = leftUnclamped.coerceIn(targetWidthPx - scaledWidthPx, 0f)
+            val destinationTopPx = topUnclamped.coerceIn(targetHeightPx - scaledHeightPx, 0f)
+            val destinationRect =
+                Rect(
+                    destinationLeftPx.roundToInt(),
+                    destinationTopPx.roundToInt(),
+                    (destinationLeftPx + scaledWidthPx).roundToInt(),
+                    (destinationTopPx + scaledHeightPx).roundToInt(),
+                )
+            val outputBitmap = Bitmap.createBitmap(targetWidthPx, targetHeightPx, Bitmap.Config.ARGB_8888)
+            Canvas(outputBitmap).drawBitmap(sourceBitmap, null, destinationRect, null)
+            return outputBitmap
+        }
+
         private fun notificationTitle(
             context: Context,
             note: NoteEntity,
@@ -158,7 +283,12 @@ class ReminderReceiver : BroadcastReceiver() {
                         .filterNot { it.checked }
                         .sortedBy { it.sortOrder }
                         .map { item ->
-                            val text = item.text.trim()
+                            val text =
+                                notificationPlainText(item.text)
+                                    .lineSequence()
+                                    .firstOrNull { line -> line.isNotBlank() }
+                                    ?.trim()
+                                    .orEmpty()
                             if (item.depth > 0 && text.isNotBlank()) "  $text" else text
                         }.filter { it.isNotBlank() }
                         .toList()
@@ -174,11 +304,80 @@ class ReminderReceiver : BroadcastReceiver() {
                 }
             }
 
-            return if (note.body.isNotBlank()) {
-                note.body.take(120)
+            val renderedBody = notificationPlainText(note.body)
+            return if (renderedBody.isNotBlank()) {
+                if (expanded) {
+                    renderedBody
+                } else {
+                    renderedBody
+                        .lineSequence()
+                        .firstOrNull { line -> line.isNotBlank() }
+                        ?.take(120)
+                        .orEmpty()
+                }
             } else {
                 context.getString(R.string.reminder_notification_fallback)
             }
+        }
+
+        private fun notificationPlainText(markdown: String): String {
+            var insideCodeBlock = false
+            val renderedLines = mutableListOf<String>()
+            markdown.lines().forEach { rawLine ->
+                val trimmedLine = rawLine.trimEnd()
+                if (notificationMarkdownCodeFenceRegex.matches(trimmedLine)) {
+                    insideCodeBlock = !insideCodeBlock
+                    return@forEach
+                }
+
+                val renderedLine =
+                    if (insideCodeBlock) {
+                        trimmedLine
+                    } else {
+                        notificationPlainTextLine(trimmedLine)
+                    }
+                if (renderedLine.isNotBlank()) {
+                    renderedLines.add(renderedLine)
+                }
+            }
+            return renderedLines.joinToString("\n").trim()
+        }
+
+        private fun notificationPlainTextLine(line: String): String {
+            var renderedLine =
+                line
+                    .replace(notificationMarkdownHeadingRegex, "")
+                    .replace(notificationMarkdownChecklistRegex, "")
+                    .replace(notificationMarkdownBulletRegex, "")
+                    .replace(notificationMarkdownQuoteRegex, "")
+                    .replace(notificationMarkdownUnderlineOpenRegex, "")
+                    .replace(notificationMarkdownUnderlineCloseRegex, "")
+
+            renderedLine =
+                notificationMarkdownLinkRegex.replace(renderedLine) { matchResult ->
+                    matchResult.groupValues[1]
+                }
+            renderedLine =
+                notificationMarkdownInlineCodeRegex.replace(renderedLine) { matchResult ->
+                    matchResult.groupValues[1]
+                }
+            renderedLine =
+                notificationMarkdownBoldItalicRegex.replace(renderedLine) { matchResult ->
+                    matchResult.groupValues[1]
+                }
+            renderedLine =
+                notificationMarkdownBoldRegex.replace(renderedLine) { matchResult ->
+                    matchResult.groupValues[1]
+                }
+            renderedLine =
+                notificationMarkdownItalicRegex.replace(renderedLine) { matchResult ->
+                    matchResult.groupValues[1]
+                }
+            renderedLine =
+                notificationMarkdownStrikeRegex.replace(renderedLine) { matchResult ->
+                    matchResult.groupValues[1]
+                }
+            return renderedLine.trim()
         }
 
         /**

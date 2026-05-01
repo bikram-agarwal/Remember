@@ -13,12 +13,13 @@ import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RememberReservedTags
-import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.nav.Routes
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -40,7 +41,6 @@ class EditNoteViewModel
     @Inject
     constructor(
         private val repository: NoteRepository,
-        private val themePrefs: ThemePrefs,
         private val appMediaStorage: AppMediaStorage? = null,
         savedStateHandle: SavedStateHandle,
     ) : ViewModel() {
@@ -100,6 +100,10 @@ class EditNoteViewModel
 
         private val _tags = MutableStateFlow<List<String>>(emptyList())
         val tags: StateFlow<List<String>> = _tags.asStateFlow()
+        val activeTagSuggestions: StateFlow<List<String>> =
+            repository
+                .observeActiveTagSuggestions()
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
         private val _attachments = MutableStateFlow<List<NoteAttachmentEntity>>(emptyList())
         val attachments: StateFlow<List<NoteAttachmentEntity>> = _attachments.asStateFlow()
@@ -292,7 +296,7 @@ class EditNoteViewModel
             if (newColors.isNotEmpty()) {
                 viewModelScope.launch {
                     newColors.forEach { (name, hex) ->
-                        repository.tagRepository?.setTagColor(name, hex) ?: themePrefs.setTagColor(name, hex)
+                        repository.tagRepository?.setTagColor(name, hex)
                     }
                 }
             }

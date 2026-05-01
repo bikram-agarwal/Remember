@@ -18,7 +18,7 @@ class ViewOptionsPrefs(
     }
 
     val state: Flow<ViewOptions> =
-        context.settingsDataStore.data.map { prefs ->
+        context.viewOptionsDataStore.data.map { prefs ->
             val defaultViewOptions = ViewOptions()
             ViewOptions(
                 sortKey =
@@ -34,7 +34,7 @@ class ViewOptionsPrefs(
         }
 
     suspend fun setViewOptions(value: ViewOptions) {
-        context.settingsDataStore.edit {
+        context.viewOptionsDataStore.edit {
             it[Keys.SORT_KEY] = value.sortKey.name
             it[Keys.SORT_DIR] = value.sortDir.name
             it[Keys.GROUP_BY] = value.groupBy.name
@@ -42,7 +42,7 @@ class ViewOptionsPrefs(
     }
 
     suspend fun exportForBackup(): JSONObject {
-        val prefs = context.settingsDataStore.data.first()
+        val prefs = context.viewOptionsDataStore.data.first()
         val defaultViewOptions = ViewOptions()
         return JSONObject().apply {
             put(Keys.SORT_KEY.name, prefs[Keys.SORT_KEY] ?: defaultViewOptions.sortKey.name)
@@ -53,7 +53,7 @@ class ViewOptionsPrefs(
 
     suspend fun importFromBackup(json: JSONObject?) {
         if (json == null || json.length() == 0) return
-        context.settingsDataStore.edit { mutable ->
+        context.viewOptionsDataStore.edit { mutable ->
             fun stringOrNull(key: String): String? = if (json.has(key) && !json.isNull(key)) json.getString(key) else null
             stringOrNull(Keys.SORT_KEY.name)?.let { mutable[Keys.SORT_KEY] = it }
             stringOrNull(Keys.SORT_DIR.name)?.let { mutable[Keys.SORT_DIR] = it }

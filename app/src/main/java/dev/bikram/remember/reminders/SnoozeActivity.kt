@@ -22,12 +22,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +56,7 @@ import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.edit.CalendarPickerDialog
 import dev.bikram.remember.ui.edit.ReminderTimePickerDialog
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
@@ -119,25 +120,27 @@ class SnoozeActivity : ComponentActivity() {
             val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
                 initialValue = InteractionState(),
             )
-            RememberTheme(
-                themeState = themeState.copy(tagColors = tagColors),
-                interactionState = interactionState,
-                paintBackground = false,
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            // Scrim so the home / caller activity behind the snooze dialog
-                            // is dimmed and the user's focus lands on the floating window.
-                            .background(Color.Black.copy(alpha = 0.55f))
-                            .clickable { finish() },
-                    contentAlignment = Alignment.Center,
+            CompositionLocalProvider(LocalTagColors provides tagColors) {
+                RememberTheme(
+                    themeState = themeState,
+                    interactionState = interactionState,
+                    paintBackground = false,
                 ) {
-                    SnoozeDialogContent(
-                        onSnooze = { timeMillis -> snoozeAndFinish(noteId, timeMillis) },
-                        onDismiss = { finish() },
-                    )
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                // Scrim so the home / caller activity behind the snooze dialog
+                                // is dimmed and the user's focus lands on the floating window.
+                                .background(Color.Black.copy(alpha = 0.55f))
+                                .clickable { finish() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        SnoozeDialogContent(
+                            onSnooze = { timeMillis -> snoozeAndFinish(noteId, timeMillis) },
+                            onDismiss = { finish() },
+                        )
+                    }
                 }
             }
         }
@@ -240,7 +243,7 @@ fun SnoozeDialogContent(
     var customTimePickerOpen by remember { mutableStateOf(false) }
 
     Surface(
-        shape = RoundedCornerShape(28.dp),
+        shape = MaterialTheme.shapes.extraLargeIncreased,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         // Tonal lift tints the surface (Material's compositing) and shadow gives the
         // real drop-shadow that makes the dialog look lifted off the dimmed scrim.
@@ -382,7 +385,7 @@ private fun SnoozePresetRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(14.dp))
+                .clip(MaterialTheme.shapes.medium)
                 .tapSoundClickable(onClick = onClick)
                 .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,

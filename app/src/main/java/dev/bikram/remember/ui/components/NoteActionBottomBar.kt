@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -227,7 +226,7 @@ private fun ActionItem(
         modifier =
             Modifier
                 .width(72.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.large)
                 .clickable(onClick = onClick)
                 .padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -266,7 +265,7 @@ private fun EditActionItem(
         modifier =
             Modifier
                 .width(72.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.large)
                 .clickable(
                     onClick = {
                         if (isEditMode && hapticEnabled) hostView.performSaveHaptic()
@@ -347,7 +346,7 @@ private fun DoneActionItem(
         modifier =
             Modifier
                 .width(72.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.large)
                 .clickable(
                     onClick = {
                         if (!completed) {
@@ -413,7 +412,7 @@ private fun FavoriteActionItem(
         modifier =
             Modifier
                 .width(72.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.large)
                 .clickable(
                     onClick = {
                         if (!favorite) {

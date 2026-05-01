@@ -1,22 +1,27 @@
 package dev.bikram.remember.data
 
 import android.content.Context
+import androidx.compose.runtime.Immutable
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentList
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 
+@Immutable
 data class InteractionState(
     val hapticFeedbackEnabled: Boolean = true,
     val swipeGestureMode: SwipeGestureMode = SwipeGestureMode.REVEAL_ACTIONS,
     val swipeStartToEnd: NoteSwipeAction = NoteSwipeAction.EDIT,
     val swipeEndToStart: NoteSwipeAction = NoteSwipeAction.TRASH,
-    val swipeStartToEndRevealActions: List<NoteSwipeAction?> = DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS,
-    val swipeEndToStartRevealActions: List<NoteSwipeAction?> = DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS,
+    val swipeStartToEndRevealActions: PersistentList<NoteSwipeAction?> = DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS,
+    val swipeEndToStartRevealActions: PersistentList<NoteSwipeAction?> = DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS,
 )
 
 enum class SwipeGestureMode {
@@ -24,11 +29,11 @@ enum class SwipeGestureMode {
     REVEAL_ACTIONS,
 }
 
-val DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS: List<NoteSwipeAction?> =
-    listOf(NoteSwipeAction.EDIT, NoteSwipeAction.DUPLICATE, NoteSwipeAction.TOGGLE_FAVORITE)
+val DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS: PersistentList<NoteSwipeAction?> =
+    persistentListOf(NoteSwipeAction.EDIT, NoteSwipeAction.DUPLICATE, NoteSwipeAction.TOGGLE_FAVORITE)
 
-val DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS: List<NoteSwipeAction?> =
-    listOf(NoteSwipeAction.MARK_DONE, NoteSwipeAction.ARCHIVE, NoteSwipeAction.TRASH)
+val DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS: PersistentList<NoteSwipeAction?> =
+    persistentListOf(NoteSwipeAction.MARK_DONE, NoteSwipeAction.ARCHIVE, NoteSwipeAction.TRASH)
 
 private val Context.interactionDataStore by preferencesDataStore(name = "interaction_prefs")
 
@@ -174,7 +179,7 @@ class InteractionPrefs(
     private fun sanitizedRevealActions(
         stored: List<String?>,
         defaults: List<NoteSwipeAction?>,
-    ): List<NoteSwipeAction?> {
+    ): PersistentList<NoteSwipeAction?> {
         val hasStoredValue = stored.any { value -> value != null }
         val source =
             if (hasStoredValue) {
@@ -190,7 +195,7 @@ class InteractionPrefs(
                     noteSwipeActionFromStoredName(value)
                 }
             },
-        )
+        ).toPersistentList()
     }
 
     private fun noteSwipeActionFromStoredName(value: String): NoteSwipeAction? {

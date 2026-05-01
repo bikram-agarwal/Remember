@@ -15,17 +15,72 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK, BLACK }
 enum class ColorSource {
     DEFAULT,
     MATERIAL_YOU,
-    SAPPHIRE,
-    EMERALD,
-    AMBER,
-    VIOLET,
-    CORAL,
-    TEAL,
-    LIME,
-    ROSE,
-    SLATE,
     CUSTOM,
+
+    /**
+     * Curated three-color palette sets. Each entry below is a hand-tuned
+     * primary/secondary/tertiary triplet that's guaranteed to render as visually distinct
+     * accents across all palette styles - including TonalSpot and other low-chroma styles
+     * that would otherwise collapse single-seed schemes onto a single hue. Palette-style
+     * chips still apply to surfaces, on-colors, and outlines when a curated triplet is
+     * active.
+     */
+    CURATED_EMBER,
+    CURATED_GROVE,
+    CURATED_HONEY,
+    CURATED_OCEAN,
+    CURATED_IRIS,
+    CURATED_DUSK,
+    CURATED_BERRY,
+
+    /**
+     * Legacy single-seed presets - removed from the picker. Kept here so DataStore reads
+     * and backup restores from older app versions still parse; [migrated] maps each to
+     * its hue-family survivor before any UI sees the value.
+     */
+    @Deprecated("Migrated to CURATED_OCEAN")
+    SAPPHIRE,
+
+    @Deprecated("Migrated to DEFAULT (Forest is now the default)")
+    EMERALD,
+
+    @Deprecated("Forest promoted to DEFAULT; standalone preset removed")
+    CURATED_FOREST,
+
+    @Deprecated("Migrated to CURATED_GROVE")
+    AMBER,
+
+    @Deprecated("Migrated to CURATED_DUSK")
+    VIOLET,
+
+    @Deprecated("Migrated to CURATED_EMBER")
+    CORAL,
+
+    @Deprecated("Migrated to CURATED_OCEAN")
+    TEAL,
+
+    @Deprecated("Migrated to CURATED_FOREST")
+    LIME,
+
+    @Deprecated("Migrated to CURATED_BERRY")
+    ROSE,
+
+    @Deprecated("Migrated to DEFAULT")
+    SLATE,
 }
+
+@Suppress("DEPRECATION")
+internal fun ColorSource.migrated(): ColorSource =
+    when (this) {
+        ColorSource.SAPPHIRE, ColorSource.TEAL -> ColorSource.CURATED_OCEAN
+        ColorSource.EMERALD, ColorSource.LIME, ColorSource.CURATED_FOREST -> ColorSource.DEFAULT
+        ColorSource.AMBER -> ColorSource.CURATED_GROVE
+        ColorSource.CORAL -> ColorSource.CURATED_EMBER
+        ColorSource.ROSE -> ColorSource.CURATED_BERRY
+        ColorSource.VIOLET -> ColorSource.CURATED_DUSK
+        ColorSource.SLATE -> ColorSource.DEFAULT
+        else -> this
+    }
 
 enum class PaletteStyleOpt {
     TONAL_SPOT,
@@ -46,11 +101,9 @@ data class ThemeState(
     val customSeeds: List<String> = emptyList(),
     val activeCustomSeed: String = "",
     val useGradient: Boolean = true,
-    val fixedCardColors: Boolean = false,
+    val useEnhancedShading: Boolean = false,
     val heroOnCards: Boolean = true,
     val blurBars: Boolean = true,
-    /** Map of lowercased tag name → hex color string ("#RRGGBB"). */
-    val tagColors: Map<String, String> = emptyMap(),
 )
 
 class ThemePrefs(
@@ -63,52 +116,66 @@ class ThemePrefs(
         val CUSTOM_SEEDS = stringPreferencesKey("custom_seeds")
         val ACTIVE_CUSTOM_SEED = stringPreferencesKey("active_custom_seed")
         val USE_GRADIENT = booleanPreferencesKey("use_gradient")
-        val FIXED_CARD_COLORS = booleanPreferencesKey("fixed_card_colors")
+        val USE_ENHANCED_SHADING = booleanPreferencesKey("use_enhanced_shading")
         val HERO_ON_CARDS = booleanPreferencesKey("hero_on_cards")
         val BLUR_BARS = booleanPreferencesKey("blur_bars")
-        val TAG_COLORS = stringPreferencesKey("tag_colors")
     }
 
     val state: Flow<ThemeState> =
-        context.settingsDataStore.data.map { p ->
+        context.themePrefsDataStore.data.map { p ->
             ThemeState(
                 themeMode =
                     runCatching { ThemeMode.valueOf(p[Keys.THEME_MODE] ?: "") }
                         .getOrDefault(ThemeMode.SYSTEM),
                 colorSource =
                     runCatching { ColorSource.valueOf(p[Keys.COLOR_SOURCE] ?: "") }
-                        .getOrDefault(ColorSource.MATERIAL_YOU),
+                        .getOrDefault(ColorSource.MATERIAL_YOU)
+                        .migrated(),
                 paletteStyle =
                     runCatching { PaletteStyleOpt.valueOf(p[Keys.PALETTE_STYLE] ?: "") }
                         .getOrDefault(PaletteStyleOpt.TONAL_SPOT),
                 customSeeds = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty()),
-                activeCustomSeed = p[Keys.ACTIVE_CUSTOM_SEED].orEmpty(),
+                activeCustomSeed = normalizeHex(p[Keys.ACTIVE_CUSTOM_SEED].orEmpty()).orEmpty(),
                 useGradient = p[Keys.USE_GRADIENT] ?: true,
-                fixedCardColors = p[Keys.FIXED_CARD_COLORS] ?: false,
+                useEnhancedShading = p[Keys.USE_ENHANCED_SHADING] ?: false,
                 heroOnCards = p[Keys.HERO_ON_CARDS] ?: true,
                 blurBars = p[Keys.BLUR_BARS] ?: true,
-                tagColors = decodeTagColors(p[Keys.TAG_COLORS].orEmpty()),
             )
         }
 
     suspend fun setThemeMode(mode: ThemeMode) {
-        context.settingsDataStore.edit { it[Keys.THEME_MODE] = mode.name }
+        context.themePrefsDataStore.edit { it[Keys.THEME_MODE] = mode.name }
+    }
+
+    /**
+     * Rewrite a deprecated color_source string (e.g. "SAPPHIRE", "ROSE") to its hue-family
+     * survivor in DataStore so subsequent reads don't pay the migration cost. Safe to call
+     * on every app start - a no-op when the stored value is already current.
+     */
+    suspend fun migrateLegacyColorSourceIfNeeded() {
+        context.themePrefsDataStore.edit { p ->
+            val raw = p[Keys.COLOR_SOURCE] ?: return@edit
+            val parsed = runCatching { ColorSource.valueOf(raw) }.getOrNull() ?: return@edit
+            val migrated = parsed.migrated()
+            if (migrated != parsed) p[Keys.COLOR_SOURCE] = migrated.name
+        }
     }
 
     suspend fun setColorSource(source: ColorSource) {
-        context.settingsDataStore.edit { it[Keys.COLOR_SOURCE] = source.name }
+        context.themePrefsDataStore.edit { it[Keys.COLOR_SOURCE] = source.name }
     }
 
     suspend fun setActiveCustomSeed(hex: String) {
-        context.settingsDataStore.edit {
-            it[Keys.ACTIVE_CUSTOM_SEED] = hex
+        val normalized = normalizeHex(hex) ?: return
+        context.themePrefsDataStore.edit {
+            it[Keys.ACTIVE_CUSTOM_SEED] = normalized
             it[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
         }
     }
 
     suspend fun addCustomSeed(hex: String) {
         val normalized = normalizeHex(hex) ?: return
-        context.settingsDataStore.edit { p ->
+        context.themePrefsDataStore.edit { p ->
             val current = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty())
             if (current.contains(normalized)) {
                 p[Keys.ACTIVE_CUSTOM_SEED] = normalized
@@ -122,7 +189,7 @@ class ThemePrefs(
 
     suspend fun removeCustomSeed(hex: String) {
         val normalized = normalizeHex(hex) ?: return
-        context.settingsDataStore.edit { p ->
+        context.themePrefsDataStore.edit { p ->
             val current = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty())
             val next = current.filterNot { it.equals(normalized, ignoreCase = true) }
             p[Keys.CUSTOM_SEEDS] = encodeSeeds(next)
@@ -134,78 +201,53 @@ class ThemePrefs(
     }
 
     suspend fun setPaletteStyle(style: PaletteStyleOpt) {
-        context.settingsDataStore.edit { it[Keys.PALETTE_STYLE] = style.name }
+        context.themePrefsDataStore.edit { it[Keys.PALETTE_STYLE] = style.name }
     }
 
     suspend fun setUseGradient(value: Boolean) {
-        context.settingsDataStore.edit { it[Keys.USE_GRADIENT] = value }
+        context.themePrefsDataStore.edit { it[Keys.USE_GRADIENT] = value }
     }
 
-    suspend fun setFixedCardColors(value: Boolean) {
-        context.settingsDataStore.edit { it[Keys.FIXED_CARD_COLORS] = value }
+    suspend fun setUseEnhancedShading(value: Boolean) {
+        context.themePrefsDataStore.edit { it[Keys.USE_ENHANCED_SHADING] = value }
     }
 
     suspend fun setHeroOnCards(value: Boolean) {
-        context.settingsDataStore.edit { it[Keys.HERO_ON_CARDS] = value }
+        context.themePrefsDataStore.edit { it[Keys.HERO_ON_CARDS] = value }
     }
 
     suspend fun setBlurBars(value: Boolean) {
-        context.settingsDataStore.edit { it[Keys.BLUR_BARS] = value }
-    }
-
-    suspend fun setTagColor(
-        tag: String,
-        hex: String,
-    ) {
-        val normalized = normalizeHex(hex) ?: return
-        val key = tag.trim().lowercase()
-        if (key.isBlank()) return
-        context.settingsDataStore.edit { p ->
-            val current = decodeTagColors(p[Keys.TAG_COLORS].orEmpty())
-            p[Keys.TAG_COLORS] = encodeTagColors(current + (key to normalized))
-        }
-    }
-
-    suspend fun removeTagColor(tag: String) {
-        val key = tag.trim().lowercase()
-        context.settingsDataStore.edit { p ->
-            val current = decodeTagColors(p[Keys.TAG_COLORS].orEmpty())
-            p[Keys.TAG_COLORS] = encodeTagColors(current - key)
-        }
-    }
-
-    private fun decodeTagColors(value: String): Map<String, String> {
-        if (value.isBlank()) return emptyMap()
-        return runCatching {
-            val obj = org.json.JSONObject(value)
-            buildMap {
-                obj.keys().forEach { k -> put(k, obj.getString(k)) }
-            }
-        }.getOrDefault(emptyMap())
-    }
-
-    private fun encodeTagColors(map: Map<String, String>): String {
-        val obj = org.json.JSONObject()
-        map.forEach { (k, v) -> obj.put(k, v) }
-        return obj.toString()
+        context.themePrefsDataStore.edit { it[Keys.BLUR_BARS] = value }
     }
 
     private fun decodeSeeds(value: String): List<String> {
-        if (value.isBlank()) return emptyList()
-        return runCatching {
-            val arr = JSONArray(value)
-            List(arr.length()) { arr.getString(it) }
-        }.getOrDefault(emptyList())
+        val normalizedSeeds = decodeNormalizedSeeds(value)
+        return normalizedSeeds ?: emptyList()
     }
 
-    private fun encodeSeeds(v: List<String>): String {
-        val arr = JSONArray()
-        v.forEach { arr.put(it) }
-        return arr.toString()
+    private fun decodeNormalizedSeeds(value: String): List<String>? {
+        if (value.isBlank()) return emptyList()
+        return runCatching {
+            val jsonArray = JSONArray(value)
+            buildList {
+                for (index in 0 until jsonArray.length()) {
+                    val normalized = normalizeHex(jsonArray.getString(index)) ?: continue
+                    if (!contains(normalized)) {
+                        add(normalized)
+                    }
+                }
+            }
+        }.getOrNull()
+    }
+
+    private fun encodeSeeds(seeds: List<String>): String {
+        val jsonArray = JSONArray()
+        seeds.forEach { jsonArray.put(it) }
+        return jsonArray.toString()
     }
 
     suspend fun exportForBackup(): JSONObject {
-        val prefs = context.settingsDataStore.data.first()
+        val prefs = context.themePrefsDataStore.data.first()
         return JSONObject().apply {
             put(Keys.THEME_MODE.name, prefs[Keys.THEME_MODE].orEmpty())
             put(Keys.COLOR_SOURCE.name, prefs[Keys.COLOR_SOURCE].orEmpty())
@@ -213,35 +255,77 @@ class ThemePrefs(
             put(Keys.CUSTOM_SEEDS.name, prefs[Keys.CUSTOM_SEEDS].orEmpty())
             put(Keys.ACTIVE_CUSTOM_SEED.name, prefs[Keys.ACTIVE_CUSTOM_SEED].orEmpty())
             put(Keys.USE_GRADIENT.name, prefs[Keys.USE_GRADIENT] ?: true)
-            put(Keys.FIXED_CARD_COLORS.name, prefs[Keys.FIXED_CARD_COLORS] ?: false)
+            put(Keys.USE_ENHANCED_SHADING.name, prefs[Keys.USE_ENHANCED_SHADING] ?: false)
             put(Keys.HERO_ON_CARDS.name, prefs[Keys.HERO_ON_CARDS] ?: true)
             put(Keys.BLUR_BARS.name, prefs[Keys.BLUR_BARS] ?: true)
-            put(Keys.TAG_COLORS.name, prefs[Keys.TAG_COLORS].orEmpty())
         }
     }
 
     suspend fun importFromBackup(json: JSONObject?) {
         if (json == null || json.length() == 0) return
-        context.settingsDataStore.edit { mutable ->
-            fun stringOrNull(key: String): String? = if (json.has(key) && !json.isNull(key)) json.getString(key) else null
-            stringOrNull(Keys.THEME_MODE.name)?.let { mutable[Keys.THEME_MODE] = it }
-            stringOrNull(Keys.COLOR_SOURCE.name)?.let { mutable[Keys.COLOR_SOURCE] = it }
-            stringOrNull(Keys.PALETTE_STYLE.name)?.let { mutable[Keys.PALETTE_STYLE] = it }
-            stringOrNull(Keys.CUSTOM_SEEDS.name)?.let { mutable[Keys.CUSTOM_SEEDS] = it }
-            stringOrNull(Keys.ACTIVE_CUSTOM_SEED.name)?.let { mutable[Keys.ACTIVE_CUSTOM_SEED] = it }
-            if (json.has(Keys.USE_GRADIENT.name) && !json.isNull(Keys.USE_GRADIENT.name)) {
-                mutable[Keys.USE_GRADIENT] = json.getBoolean(Keys.USE_GRADIENT.name)
+        context.themePrefsDataStore.edit { mutable ->
+            fun stringOrNull(key: String): String? {
+                if (!json.has(key) || json.isNull(key)) return null
+                return runCatching { json.getString(key) }.getOrNull()
             }
-            if (json.has(Keys.FIXED_CARD_COLORS.name) && !json.isNull(Keys.FIXED_CARD_COLORS.name)) {
-                mutable[Keys.FIXED_CARD_COLORS] = json.getBoolean(Keys.FIXED_CARD_COLORS.name)
+
+            fun booleanOrNull(key: String): Boolean? {
+                if (!json.has(key) || json.isNull(key)) return null
+                return when (val rawValue = json.opt(key)) {
+                    is Boolean -> rawValue
+                    is String ->
+                        when (rawValue.trim().lowercase()) {
+                            "true" -> true
+                            "false" -> false
+                            else -> null
+                        }
+                    else -> null
+                }
             }
-            if (json.has(Keys.HERO_ON_CARDS.name) && !json.isNull(Keys.HERO_ON_CARDS.name)) {
-                mutable[Keys.HERO_ON_CARDS] = json.getBoolean(Keys.HERO_ON_CARDS.name)
+
+            val themeMode =
+                stringOrNull(Keys.THEME_MODE.name)?.let { raw ->
+                    runCatching { ThemeMode.valueOf(raw) }.getOrNull()
+                }
+            val colorSource =
+                stringOrNull(Keys.COLOR_SOURCE.name)?.let { raw ->
+                    runCatching { ColorSource.valueOf(raw) }.getOrNull()?.migrated()
+                }
+            val paletteStyle =
+                stringOrNull(Keys.PALETTE_STYLE.name)?.let { raw ->
+                    runCatching { PaletteStyleOpt.valueOf(raw) }.getOrNull()
+                }
+            val activeCustomSeed = stringOrNull(Keys.ACTIVE_CUSTOM_SEED.name)?.let { normalizeHex(it) }
+            val customSeeds =
+                stringOrNull(Keys.CUSTOM_SEEDS.name)?.let { rawSeeds ->
+                    decodeNormalizedSeeds(rawSeeds)
+                }
+            val seedsToStore =
+                if (customSeeds != null && activeCustomSeed != null && !customSeeds.contains(activeCustomSeed)) {
+                    customSeeds + activeCustomSeed
+                } else {
+                    customSeeds
+                }
+
+            themeMode?.let { mutable[Keys.THEME_MODE] = it.name }
+            if (colorSource != ColorSource.CUSTOM || activeCustomSeed != null) {
+                colorSource?.let { mutable[Keys.COLOR_SOURCE] = it.name }
             }
-            if (json.has(Keys.BLUR_BARS.name) && !json.isNull(Keys.BLUR_BARS.name)) {
-                mutable[Keys.BLUR_BARS] = json.getBoolean(Keys.BLUR_BARS.name)
+            paletteStyle?.let { mutable[Keys.PALETTE_STYLE] = it.name }
+            seedsToStore?.let { mutable[Keys.CUSTOM_SEEDS] = encodeSeeds(it) }
+            activeCustomSeed?.let { mutable[Keys.ACTIVE_CUSTOM_SEED] = it }
+            booleanOrNull(Keys.USE_GRADIENT.name)?.let { value ->
+                mutable[Keys.USE_GRADIENT] = value
             }
-            stringOrNull(Keys.TAG_COLORS.name)?.let { mutable[Keys.TAG_COLORS] = it }
+            booleanOrNull(Keys.USE_ENHANCED_SHADING.name)?.let { value ->
+                mutable[Keys.USE_ENHANCED_SHADING] = value
+            }
+            booleanOrNull(Keys.HERO_ON_CARDS.name)?.let { value ->
+                mutable[Keys.HERO_ON_CARDS] = value
+            }
+            booleanOrNull(Keys.BLUR_BARS.name)?.let { value ->
+                mutable[Keys.BLUR_BARS] = value
+            }
         }
     }
 }

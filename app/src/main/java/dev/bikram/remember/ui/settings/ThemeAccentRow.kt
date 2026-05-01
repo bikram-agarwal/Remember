@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -40,42 +41,23 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilterChip
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
-import dev.bikram.remember.ui.theme.seedColorFor
+import dev.bikram.remember.ui.theme.ColorSourceSpec
+import dev.bikram.remember.ui.theme.ColorSourceSwatchType
+import dev.bikram.remember.ui.theme.colorSourceSpecFor
+import dev.bikram.remember.ui.theme.colorSourceSpecsInPickerOrder
 
-private val accentPresetOrder: List<ColorSource> =
-    listOf(
-        ColorSource.DEFAULT,
-        ColorSource.MATERIAL_YOU,
-        ColorSource.SAPPHIRE,
-        ColorSource.EMERALD,
-        ColorSource.AMBER,
-        ColorSource.VIOLET,
-        ColorSource.CORAL,
-        ColorSource.TEAL,
-        ColorSource.LIME,
-        ColorSource.ROSE,
-        ColorSource.SLATE,
-    )
+// Material You leads the row when available so the wallpaper-driven option is what users
+// see first. DEFAULT (Forest - the green/teal/lime triplet baked into the app) sits next as
+// the factory default, followed by the named curated triplets ordered Ember → Grove → Honey
+// → Ocean → Iris → Dusk → Berry so the row reads red → orange → gold → blue → indigo →
+// violet → pink. Custom hexes and the +Add affordance follow inside ThemeAccentRow itself.
+private val accentPresetSpecs: List<ColorSourceSpec> = colorSourceSpecsInPickerOrder
 
 private val paletteStyleOrder: List<PaletteStyleOpt> = PaletteStyleOpt.entries.toList()
 
-private fun colorSourceIsSeedBased(source: ColorSource): Boolean =
-    when (source) {
-        ColorSource.CUSTOM,
-        ColorSource.SAPPHIRE,
-        ColorSource.EMERALD,
-        ColorSource.AMBER,
-        ColorSource.VIOLET,
-        ColorSource.CORAL,
-        ColorSource.TEAL,
-        ColorSource.LIME,
-        ColorSource.ROSE,
-        ColorSource.SLATE,
-        -> true
-        else -> false
-    }
-
-fun colorSourcePaletteChipsEnabled(source: ColorSource): Boolean = source == ColorSource.DEFAULT || colorSourceIsSeedBased(source)
+// Palette-style availability lives with the color source spec so the picker and resolver
+// agree on which sources are style-driven.
+fun colorSourcePaletteChipsEnabled(source: ColorSource): Boolean = colorSourceSpecFor(source).supportsPaletteStyle
 
 private fun customHexSwatchSelected(
     colorSource: ColorSource,
@@ -108,8 +90,8 @@ fun ThemeAccentRow(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(accentPresetOrder, key = { "preset_${it.name}" }) { source ->
-            val isSelected = colorSource == source
+        items(accentPresetSpecs, key = { "preset_${it.source.name}" }) { spec ->
+            val isSelected = colorSource == spec.source
             val borderColor =
                 if (isSelected) {
                     MaterialTheme.colorScheme.primary
@@ -126,13 +108,13 @@ fun ThemeAccentRow(
                             color = borderColor,
                             shape = CircleShape,
                         ).tapSoundClickable(
-                            onClick = { onSelectPreset(source) },
+                            onClick = { onSelectPreset(spec.source) },
                             indication = ripple(bounded = true),
                             interactionSource = remember { MutableInteractionSource() },
                         ).semantics { role = Role.RadioButton },
                 contentAlignment = Alignment.Center,
             ) {
-                ThemeAccentCircleContent(source = source)
+                ThemeAccentCircleContent(spec = spec)
             }
         }
         items(savedCustomSeedHexes, key = { "hex_$it" }) { storedHex ->
@@ -203,35 +185,9 @@ fun ThemeAccentRow(
 }
 
 @Composable
-private fun ThemeAccentCircleContent(source: ColorSource) {
-    when (source) {
-        ColorSource.DEFAULT ->
-            Row(
-                modifier =
-                    Modifier
-                        .size(44.dp)
-                        .clip(CircleShape),
-            ) {
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .background(Color(0xFF485CC7)),
-                )
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .background(Color(0xFF775A30)),
-                )
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .background(Color(0xFF8C4A63)),
-                )
-            }
-        ColorSource.MATERIAL_YOU ->
+private fun ThemeAccentCircleContent(spec: ColorSourceSpec) {
+    when (spec.swatchType) {
+        ColorSourceSwatchType.MATERIAL_YOU ->
             Box(
                 modifier =
                     Modifier
@@ -255,15 +211,58 @@ private fun ThemeAccentCircleContent(source: ColorSource) {
                     weight = FontWeight.Medium,
                 )
             }
-        else -> {
-            val seed = seedColorFor(source, "")
+        ColorSourceSwatchType.TRIPLET -> {
+            val triplet = requireNotNull(spec.triplet)
+            CuratedTripletSwatch(
+                primary = triplet.primary,
+                secondary = triplet.secondary,
+                tertiary = triplet.tertiary,
+            )
+        }
+        ColorSourceSwatchType.SOLID ->
             Box(
                 modifier =
                     Modifier
                         .size(44.dp)
                         .clip(CircleShape)
-                        .background(seed),
+                        .background(spec.representativeColor),
             )
+    }
+}
+
+/**
+ * Renders a 44dp circle with the primary filling the top half and the secondary/tertiary
+ * splitting the bottom half, mirroring the stock Android Material You wallpaper-color
+ * picker. Primary dominates so the preset's identity hue is unambiguous, while the bottom
+ * split still surfaces accent variety at a glance.
+ */
+@Composable
+private fun CuratedTripletSwatch(
+    primary: Color,
+    secondary: Color,
+    tertiary: Color,
+) {
+    Column(
+        modifier =
+            Modifier
+                .size(44.dp)
+                .clip(CircleShape),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+                    .background(primary),
+        )
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+        ) {
+            Box(Modifier.weight(1f).fillMaxHeight().background(secondary))
+            Box(Modifier.weight(1f).fillMaxHeight().background(tertiary))
         }
     }
 }
@@ -315,5 +314,28 @@ private fun paletteStyleLabel(style: PaletteStyleOpt): String =
             PaletteStyleOpt.MONOCHROME -> R.string.palette_style_monochrome
             PaletteStyleOpt.FIDELITY -> R.string.palette_style_fidelity
             PaletteStyleOpt.CONTENT -> R.string.palette_style_content
+        },
+    )
+
+/**
+ * User-facing name for a color source - shown in the preview card title and accessibility
+ * labels. Deprecated sources never reach the UI (the data layer migrates them on read), so
+ * the else branch is just a defensive fallback for any future stragglers.
+ */
+@Composable
+fun colorSourceDisplayName(source: ColorSource): String =
+    stringResource(
+        when (source) {
+            ColorSource.MATERIAL_YOU -> R.string.color_source_material_you
+            ColorSource.DEFAULT -> R.string.color_source_forest
+            ColorSource.CURATED_EMBER -> R.string.color_source_ember
+            ColorSource.CURATED_GROVE -> R.string.color_source_grove
+            ColorSource.CURATED_HONEY -> R.string.color_source_honey
+            ColorSource.CURATED_OCEAN -> R.string.color_source_ocean
+            ColorSource.CURATED_IRIS -> R.string.color_source_iris
+            ColorSource.CURATED_DUSK -> R.string.color_source_dusk
+            ColorSource.CURATED_BERRY -> R.string.color_source_berry
+            ColorSource.CUSTOM -> R.string.color_source_custom
+            else -> R.string.color_source_custom
         },
     )

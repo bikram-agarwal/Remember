@@ -12,8 +12,8 @@ private val LightContent = Color(0xFF1C1B1F)
 /**
  * Elevated card colors used by every list card so all cards read the same as
  * Settings and Edit panels. Uses the theme's surfaceContainer directly; the
- * `fixedCardColors` toggle is handled upstream in [RememberTheme] by gating the same
- * primary surface boost path as FilePipe (`useEnhancedShading` equivalent).
+ * enhanced shading toggle is handled upstream in [RememberTheme] by gating the
+ * primary surface boost path.
  *
  * Reads [LocalIsDark] (provided by [RememberTheme]) instead of recomputing luminance
  * per call - this is hit on every list card and shows up under repeated profiling.

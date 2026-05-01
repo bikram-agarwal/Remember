@@ -2,6 +2,7 @@ package dev.bikram.remember.ui.edit
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -43,9 +44,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -66,7 +69,6 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
-import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
@@ -74,6 +76,7 @@ import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.components.ArchivedBanner
 import dev.bikram.remember.ui.components.ArchivedBannerState
 import dev.bikram.remember.ui.components.NoteActionBottomBar
@@ -92,7 +95,6 @@ import java.io.File
 
 @Composable
 fun EditListRoute(
-    repository: NoteRepository,
     appScope: CoroutineScope,
     noteId: Long?,
     forceEdit: Boolean = false,
@@ -114,6 +116,7 @@ fun EditListRoute(
     val actions by vm.actions.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
     val attachments by vm.attachments.collectAsStateWithLifecycle()
+    val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
     val archived by vm.archived.collectAsStateWithLifecycle()
     val trashed by vm.trashed.collectAsStateWithLifecycle()
 
@@ -128,14 +131,19 @@ fun EditListRoute(
         androidx.compose.ui.res
             .stringResource(dev.bikram.remember.R.string.edit_list_title_new)
     val context = androidx.compose.ui.platform.LocalContext.current
+    RememberPredictiveBackHandler(onBack = onBack)
+
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
+    val sharedBoundsSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
+    val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
     val sharedModifier =
         if (sharedScope != null && navScope != null && noteId != null) {
             with(sharedScope) {
                 Modifier.sharedBounds(
                     sharedContentState = rememberSharedContentState(key = "note-card-$noteId"),
                     animatedVisibilityScope = navScope,
+                    boundsTransform = sharedBoundsTransform,
                 )
             }
         } else {
@@ -180,7 +188,6 @@ fun EditListRoute(
 
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
         EditListScreen(
-            repository = repository,
             title = title,
             favorite = favorite,
             items = items,
@@ -193,10 +200,12 @@ fun EditListRoute(
             iconKey = iconKey,
             actions = actions,
             tags = tags,
+            activeTagSuggestions = activeTagSuggestions,
             attachments = attachments,
             archived = archived,
             trashed = trashed,
             existing = noteId != null,
+            sharedNoteId = noteId,
             persistedForToolbar = hasPersistedRow,
             forceEdit = forceEdit,
             onTitleChange = vm::setTitle,
@@ -238,10 +247,183 @@ fun EditListRoute(
     }
 }
 
+@Composable
+@OptIn(ExperimentalMaterial3Api::class)
+private fun EditListTopBarSection(
+    scrollBehavior: TopAppBarScrollBehavior,
+    title: String,
+    titlePlaceholder: String,
+    iconKey: String?,
+    isEditMode: Boolean,
+    readOnly: Boolean,
+    sharedNoteId: Long?,
+    sharedTransitionActive: Boolean,
+    titleFocusRequester: FocusRequester,
+    onTitleChange: (String) -> Unit,
+    onBack: () -> Unit,
+    onSave: () -> Unit,
+) {
+    Box {
+        LargeTopAppBar(
+            colors = transparentLargeTopAppBarColors(),
+            title = {
+                val collapseFraction = scrollBehavior.state.collapsedFraction
+                val expandedStyle = MaterialTheme.typography.headlineMedium
+                val collapsedStyle = MaterialTheme.typography.titleLarge
+                val titleStyle =
+                    expandedStyle.copy(
+                        fontSize =
+                            androidx.compose.ui.unit.lerp(
+                                expandedStyle.fontSize,
+                                collapsedStyle.fontSize,
+                                collapseFraction,
+                            ),
+                        lineHeight =
+                            androidx.compose.ui.unit.lerp(
+                                expandedStyle.lineHeight,
+                                collapsedStyle.lineHeight,
+                                collapseFraction,
+                            ),
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                val iconSize =
+                    androidx.compose.ui.unit
+                        .lerp(28.dp, 22.dp, collapseFraction)
+                val iconGap =
+                    androidx.compose.ui.unit
+                        .lerp(12.dp, 8.dp, collapseFraction)
+                val headerSymbol = iconSymbolName(iconKey)
+                val headerBrandDrawable = iconDrawableRes(iconKey)
+                val headerEmoji = iconEmojiPayload(iconKey)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .alpha(if (sharedTransitionActive) 0f else 1f),
+                ) {
+                    if (headerSymbol != null) {
+                        RememberMaterialRoundedSymbol(
+                            name = headerSymbol,
+                            size = iconSize,
+                            tint = MaterialTheme.colorScheme.primary,
+                            weight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.width(iconGap))
+                    } else if (headerBrandDrawable != null) {
+                        Icon(
+                            painterResource(headerBrandDrawable),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(iconSize),
+                        )
+                        Spacer(Modifier.width(iconGap))
+                    } else if (headerEmoji != null) {
+                        Text(
+                            text = headerEmoji,
+                            style = titleStyle.copy(fontSize = iconSize.value.sp),
+                        )
+                        Spacer(Modifier.width(iconGap))
+                    } else {
+                        RememberMaterialRoundedSymbol(
+                            name = DEFAULT_LIST_HEADER_SYMBOL,
+                            size = iconSize,
+                            tint = MaterialTheme.colorScheme.primary,
+                            weight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.width(iconGap))
+                    }
+                    if ((isEditMode && !readOnly) || title.isEmpty()) {
+                        BasicTextField(
+                            value = title,
+                            onValueChange = { if (it.length <= 80) onTitleChange(it) },
+                            textStyle = titleStyle,
+                            enabled = !readOnly,
+                            keyboardOptions =
+                                androidx.compose.foundation.text.KeyboardOptions(
+                                    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                                    imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                                ),
+                            singleLine = true,
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(titleFocusRequester),
+                            decorationBox = { inner ->
+                                if (title.isEmpty()) {
+                                    Text(
+                                        text = titlePlaceholder,
+                                        style =
+                                            titleStyle.copy(
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                            ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                inner()
+                            },
+                        )
+                    } else {
+                        androidx.compose.foundation.text.selection.SelectionContainer {
+                            Text(
+                                text = title,
+                                style = titleStyle,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            },
+            navigationIcon = {
+                RememberIconButton(onClick = onBack) {
+                    RememberMaterialRoundedSymbol(
+                        name = "arrow_back",
+                        size = 24.dp,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        weight = FontWeight.Medium,
+                    )
+                }
+            },
+            actions = {
+                // In edit mode the NoteActionBottomBar slides out, so Save lives here.
+                // Outside edit mode this slot stays empty and the action bar handles Edit /
+                // Favorite / Archive / Trash.
+                if (isEditMode && !readOnly) {
+                    val saveCd = stringResource(R.string.edit_save_cd)
+                    RememberIconButton(
+                        onClick = onSave,
+                        modifier = Modifier.semantics { contentDescription = saveCd },
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "check",
+                            size = 24.dp,
+                            tint = MaterialTheme.colorScheme.primary,
+                            weight = FontWeight.Medium,
+                        )
+                    }
+                }
+            },
+            scrollBehavior = scrollBehavior,
+        )
+        ExpandedEditorSharedTopBarAnchor(
+            sharedNoteId = sharedNoteId,
+            title = title,
+            fallbackTitle = titlePlaceholder,
+            iconKey = iconKey,
+            isChecklist = true,
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        )
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditListScreen(
-    repository: NoteRepository,
     title: String,
     favorite: Boolean,
     items: List<EditableItem>,
@@ -254,10 +436,12 @@ fun EditListScreen(
     iconKey: String?,
     actions: List<NoteAction>,
     tags: List<String>,
+    activeTagSuggestions: List<String>,
     attachments: List<NoteAttachmentEntity>,
     archived: Boolean,
     trashed: Boolean,
     existing: Boolean,
+    sharedNoteId: Long?,
     persistedForToolbar: Boolean,
     forceEdit: Boolean = false,
     completed: Boolean,
@@ -389,6 +573,11 @@ fun EditListScreen(
     // still gates it so the bar slides out when the keyboard appears.
     val actionBarVisible = bottomBarVisible && !isEditMode && !imeVisible
 
+    val sharedTransitionActive =
+        dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
+            ?.isTransitionActive == true &&
+            sharedNoteId != null
+
     // Save path for the top-bar Save icon (only visible while in edit mode): flips edit
     // mode off AND asks the route-level callback to flush the VM and flash the toast so
     // users get feedback that their Save tap did something beyond dismissing the toolbar.
@@ -404,145 +593,19 @@ fun EditListScreen(
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         topBar = {
-            LargeTopAppBar(
-                colors = transparentLargeTopAppBarColors(),
-                title = {
-                    val collapseFraction = scrollBehavior.state.collapsedFraction
-                    val expandedStyle = MaterialTheme.typography.headlineMedium
-                    val collapsedStyle = MaterialTheme.typography.titleLarge
-                    val titleStyle =
-                        expandedStyle.copy(
-                            fontSize =
-                                androidx.compose.ui.unit.lerp(
-                                    expandedStyle.fontSize,
-                                    collapsedStyle.fontSize,
-                                    collapseFraction,
-                                ),
-                            lineHeight =
-                                androidx.compose.ui.unit.lerp(
-                                    expandedStyle.lineHeight,
-                                    collapsedStyle.lineHeight,
-                                    collapseFraction,
-                                ),
-                            color = MaterialTheme.colorScheme.onSurface,
-                        )
-                    val iconSize =
-                        androidx.compose.ui.unit
-                            .lerp(28.dp, 22.dp, collapseFraction)
-                    val iconGap =
-                        androidx.compose.ui.unit
-                            .lerp(12.dp, 8.dp, collapseFraction)
-                    val headerSymbol = iconSymbolName(iconKey)
-                    val headerBrandDrawable = iconDrawableRes(iconKey)
-                    val headerEmoji = iconEmojiPayload(iconKey)
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        if (headerSymbol != null) {
-                            RememberMaterialRoundedSymbol(
-                                name = headerSymbol,
-                                size = iconSize,
-                                tint = MaterialTheme.colorScheme.primary,
-                                weight = FontWeight.Medium,
-                            )
-                            Spacer(Modifier.width(iconGap))
-                        } else if (headerBrandDrawable != null) {
-                            Icon(
-                                painterResource(headerBrandDrawable),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(iconSize),
-                            )
-                            Spacer(Modifier.width(iconGap))
-                        } else if (headerEmoji != null) {
-                            Text(
-                                text = headerEmoji,
-                                style = titleStyle.copy(fontSize = iconSize.value.sp),
-                            )
-                            Spacer(Modifier.width(iconGap))
-                        } else {
-                            RememberMaterialRoundedSymbol(
-                                name = DEFAULT_LIST_HEADER_SYMBOL,
-                                size = iconSize,
-                                tint = MaterialTheme.colorScheme.primary,
-                                weight = FontWeight.Medium,
-                            )
-                            Spacer(Modifier.width(iconGap))
-                        }
-                        if ((isEditMode && !readOnly) || title.isEmpty()) {
-                            BasicTextField(
-                                value = title,
-                                onValueChange = { if (it.length <= 80) onTitleChange(it) },
-                                textStyle = titleStyle,
-                                enabled = !readOnly,
-                                keyboardOptions =
-                                    androidx.compose.foundation.text.KeyboardOptions(
-                                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
-                                        imeAction = androidx.compose.ui.text.input.ImeAction.Next,
-                                    ),
-                                singleLine = true,
-                                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .focusRequester(newListTitleFocus),
-                                decorationBox = { inner ->
-                                    if (title.isEmpty()) {
-                                        Text(
-                                            text = titlePlaceholder,
-                                            style =
-                                                titleStyle.copy(
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                                ),
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                    inner()
-                                },
-                            )
-                        } else {
-                            androidx.compose.foundation.text.selection.SelectionContainer {
-                                Text(
-                                    text = title,
-                                    style = titleStyle,
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
-                        }
-                    }
-                },
-                navigationIcon = {
-                    RememberIconButton(onClick = onBack) {
-                        RememberMaterialRoundedSymbol(
-                            name = "arrow_back",
-                            size = 24.dp,
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            weight = FontWeight.Medium,
-                        )
-                    }
-                },
-                actions = {
-                    // In edit mode the NoteActionBottomBar slides out, so Save lives here.
-                    // Outside edit mode this slot stays empty and the action bar handles
-                    // Edit / Favorite / Archive / Trash.
-                    if (isEditMode && !readOnly) {
-                        val saveCd = stringResource(R.string.edit_save_cd)
-                        RememberIconButton(
-                            onClick = saveAndExitEditMode,
-                            modifier = Modifier.semantics { contentDescription = saveCd },
-                        ) {
-                            RememberMaterialRoundedSymbol(
-                                name = "check",
-                                size = 24.dp,
-                                tint = MaterialTheme.colorScheme.primary,
-                                weight = FontWeight.Medium,
-                            )
-                        }
-                    }
-                },
+            EditListTopBarSection(
                 scrollBehavior = scrollBehavior,
+                title = title,
+                titlePlaceholder = titlePlaceholder,
+                iconKey = iconKey,
+                isEditMode = isEditMode,
+                readOnly = readOnly,
+                sharedNoteId = sharedNoteId,
+                sharedTransitionActive = sharedTransitionActive,
+                titleFocusRequester = newListTitleFocus,
+                onTitleChange = onTitleChange,
+                onBack = onBack,
+                onSave = saveAndExitEditMode,
             )
         },
         bottomBar = {
@@ -995,7 +1058,7 @@ fun EditListScreen(
         if (tagsPickerOpen) {
             TagEditorSheet(
                 initial = tags,
-                repository = repository,
+                availableTags = activeTagSuggestions,
                 onConfirm = { newTags, newColors ->
                     onTagsWithColorsChange(newTags, newColors)
                     tagsPickerOpen = false
@@ -1113,7 +1176,7 @@ private fun PictureHero(
                     Modifier
                         .fillMaxSize()
                         .then(sharedModifier)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(MaterialTheme.shapes.large)
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                         .tapSoundClickable(onClick = onOpenFull),
             ) {

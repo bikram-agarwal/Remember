@@ -44,6 +44,7 @@ fun AppBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
     ) {
+        RememberPredictiveBackHandler(onBack = onDismiss)
         Column(modifier = Modifier.navigationBarsPadding()) {
             if (showTitleBar) {
                 Column(
@@ -55,7 +56,7 @@ fun AppBottomSheet(
                     ) {
                         Text(
                             title,
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleLargeEmphasized,
                             color = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.weight(1f),
                         )

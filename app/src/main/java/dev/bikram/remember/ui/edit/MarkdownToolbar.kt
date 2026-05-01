@@ -2,17 +2,18 @@ package dev.bikram.remember.ui.edit
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupScope
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -23,7 +24,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
@@ -39,6 +39,8 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 
+@Suppress("DEPRECATION")
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun MarkdownToolbar(
     state: MarkdownEditorState,
@@ -61,16 +63,14 @@ internal fun MarkdownToolbar(
         )
     }
 
-    Row(
+    ButtonGroup(
         modifier =
             modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
+                .clip(MaterialTheme.shapes.small)
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 .horizontalScroll(rememberScrollState())
                 .padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
         val colors =
             IconButtonDefaults.iconButtonColors(
@@ -202,18 +202,22 @@ internal fun MarkdownToolbar(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun MarkdownToolbarIconButton(
+private fun ButtonGroupScope.MarkdownToolbarIconButton(
     symbolName: String,
     contentDescription: String,
     colors: IconButtonColors,
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     RememberIconButton(
         onClick = onClick,
         enabled = enabled,
         colors = colors,
+        modifier = Modifier.animateWidth(interactionSource),
+        interactionSource = interactionSource,
     ) {
         RememberMaterialRoundedSymbol(
             name = symbolName,
@@ -223,17 +227,21 @@ private fun MarkdownToolbarIconButton(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun MarkdownToolbarTextButton(
+private fun ButtonGroupScope.MarkdownToolbarTextButton(
     label: String,
     contentDescription: String,
     colors: IconButtonColors,
     onClick: () -> Unit,
     fontFamily: FontFamily? = null,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     RememberIconButton(
         onClick = onClick,
         colors = colors,
+        modifier = Modifier.animateWidth(interactionSource),
+        interactionSource = interactionSource,
     ) {
         Text(
             text = label,
@@ -245,8 +253,9 @@ private fun MarkdownToolbarTextButton(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun HeadingButton(
+private fun ButtonGroupScope.HeadingButton(
     label: String,
     contentDescription: String,
     active: Boolean,
@@ -254,9 +263,12 @@ private fun HeadingButton(
     colors: IconButtonColors,
     activeColors: IconButtonColors,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     RememberIconButton(
         onClick = onClick,
         colors = if (active) activeColors else colors,
+        modifier = Modifier.animateWidth(interactionSource),
+        interactionSource = interactionSource,
     ) {
         Text(
             text = label,

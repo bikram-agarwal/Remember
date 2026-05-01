@@ -235,7 +235,6 @@ fun RememberNavGraph(
                     LocalNavAnimatedVisibilityScope provides this@composable,
                 ) {
                     EditNoteRoute(
-                        repository = repository,
                         appScope = appScope,
                         noteId = id.takeIf { it > 0 },
                         forceEdit = forceEdit,
@@ -274,7 +273,6 @@ fun RememberNavGraph(
                     LocalNavAnimatedVisibilityScope provides this@composable,
                 ) {
                     EditListRoute(
-                        repository = repository,
                         appScope = appScope,
                         noteId = id.takeIf { it > 0 },
                         forceEdit = forceEdit,

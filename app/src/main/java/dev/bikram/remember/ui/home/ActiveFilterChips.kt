@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.home
 
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -20,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -34,6 +37,8 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberCheckbox
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberInputChip
+import dev.bikram.remember.ui.components.tagColor
+import kotlinx.collections.immutable.toPersistentSet
 
 private val ActiveChipHeight = 32.dp
 
@@ -112,6 +117,12 @@ fun ActiveFilterChips(
             label = tagLabel,
             selected = filter.tags.isNotEmpty(),
             enabled = availableTags.isNotEmpty(),
+            avatar =
+                filter.tags.singleOrNull()?.let { selectedTag ->
+                    {
+                        TagColorAvatar(tag = selectedTag)
+                    }
+                },
         ) {
             availableTags.forEach { tag ->
                 val checked = filter.tags.any { selectedTag -> selectedTag.equals(tag, ignoreCase = true) }
@@ -125,7 +136,7 @@ fun ActiveFilterChips(
                         } else {
                             nextTags.add(tag)
                         }
-                        onChange(filter.copy(tags = nextTags))
+                        onChange(filter.copy(tags = nextTags.toPersistentSet()))
                     },
                 )
             }
@@ -192,6 +203,7 @@ private fun FilterDropdownChip(
     label: String,
     selected: Boolean,
     enabled: Boolean = true,
+    avatar: @Composable (() -> Unit)? = null,
     menuContent: @Composable () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
@@ -202,6 +214,7 @@ private fun FilterDropdownChip(
             enabled = enabled,
             label = { Text(label) },
             modifier = Modifier.height(ActiveChipHeight),
+            avatar = avatar,
             trailingIcon = {
                 RememberMaterialRoundedSymbol(
                     name = "expand_more",
@@ -217,6 +230,21 @@ private fun FilterDropdownChip(
         ) {
             menuContent()
         }
+    }
+}
+
+@Composable
+private fun TagColorAvatar(tag: String) {
+    Box(
+        modifier = Modifier.padding(start = 4.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(12.dp)
+                    .clip(CircleShape)
+                    .background(tagColor(tag)),
+        )
     }
 }
 

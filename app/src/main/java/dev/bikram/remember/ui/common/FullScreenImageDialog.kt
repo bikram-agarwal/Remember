@@ -1,6 +1,5 @@
 package dev.bikram.remember.ui.common
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.fadeIn
@@ -166,7 +165,7 @@ fun FullScreenHeroImageOverlay(
         modifier = modifier,
     ) {
         val visibleImageUri = effectiveImageUri ?: return@AnimatedVisibility
-        BackHandler(onBack = onDismiss)
+        RememberPredictiveBackHandler(onBack = onDismiss)
         val closeLabel = stringResource(R.string.common_back)
         val closeSemantics =
             remember(closeLabel) {

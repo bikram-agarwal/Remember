@@ -28,6 +28,7 @@ import dev.bikram.remember.googletasks.GoogleTasksImporter
 import dev.bikram.remember.googletasks.GoogleTasksRepository
 import dev.bikram.remember.reminders.ReminderScheduler
 import dev.bikram.remember.widget.NotesWidgetUpdater
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -79,12 +80,10 @@ object RememberModule {
     @Singleton
     fun provideTagRepository(
         database: RememberDatabase,
-        themePrefs: ThemePrefs,
     ): TagRepository =
         TagRepository(
             tagDao = database.tagDao(),
             noteDao = database.noteDao(),
-            themePrefs = themePrefs,
             database = database,
         )
 
@@ -96,6 +95,8 @@ object RememberModule {
         tagRepository: TagRepository,
         notesWidgetUpdater: NotesWidgetUpdater,
         appMediaStorage: AppMediaStorage,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
+        @DefaultDispatcher defaultDispatcher: CoroutineDispatcher,
     ): NoteRepository =
         NoteRepository(
             noteDao = database.noteDao(),
@@ -106,6 +107,8 @@ object RememberModule {
             notesWidgetUpdater = notesWidgetUpdater,
             database = database,
             appMediaStorage = appMediaStorage,
+            ioDispatcher = ioDispatcher,
+            defaultDispatcher = defaultDispatcher,
         )
 
     @Provides
@@ -224,29 +227,26 @@ object RememberModule {
     fun provideAppStartupWarmup(
         @ApplicationScope applicationScope: CoroutineScope,
         noteRepository: NoteRepository,
-        tagRepository: TagRepository,
+        @IoDispatcher ioDispatcher: CoroutineDispatcher,
     ): AppStartupWarmup =
         AppStartupWarmup(
             applicationScope = applicationScope,
             noteRepository = noteRepository,
-            tagRepository = tagRepository,
+            ioDispatcher = ioDispatcher,
         )
 }
 
 class AppStartupWarmup(
     private val applicationScope: CoroutineScope,
     private val noteRepository: NoteRepository,
-    private val tagRepository: TagRepository,
+    private val ioDispatcher: CoroutineDispatcher,
 ) {
     fun start() {
         // Warm the first Home query while the system splash / initial composition is still
         // happening, so the first fullscreen Home frame is less likely to render before Room
         // has produced the active notes list.
-        applicationScope.launch(Dispatchers.IO) {
+        applicationScope.launch(ioDispatcher) {
             noteRepository.observeActive().first()
-        }
-        applicationScope.launch {
-            tagRepository.synchronizeLegacyTagColors()
         }
     }
 }

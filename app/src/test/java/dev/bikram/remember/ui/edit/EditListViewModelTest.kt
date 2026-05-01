@@ -118,7 +118,6 @@ class EditListViewModelTest {
             }
         return EditListViewModel(
             repository = store.repository(),
-            themePrefs = null,
             savedStateHandle = savedStateHandle,
         )
     }

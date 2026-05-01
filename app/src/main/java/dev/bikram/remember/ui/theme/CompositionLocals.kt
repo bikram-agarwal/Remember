@@ -23,9 +23,7 @@ val LocalHeroOnCards = compositionLocalOf { false }
 
 val LocalBlurBars = compositionLocalOf { true }
 
-val LocalFixedCardColors = compositionLocalOf { false }
-
-val LocalTagColors = compositionLocalOf<Map<String, String>> { emptyMap() }
+val LocalUseEnhancedShading = compositionLocalOf { false }
 
 /**
  * The full, already-collected [ThemeState]. Provided once from RememberTheme so downstream

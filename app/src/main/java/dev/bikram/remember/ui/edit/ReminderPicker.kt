@@ -12,8 +12,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -33,7 +31,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DatePicker
@@ -77,7 +74,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -345,7 +341,7 @@ fun ReminderPickerSheet(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.errorContainer)
                         .tapSoundClickable {
                             val intent =
@@ -623,11 +619,7 @@ internal fun CalendarPickerDialog(
                         .widthIn(min = 328.dp, max = 400.dp)
                         .wrapContentHeight()
                         .animateContentSize(
-                            animationSpec =
-                                spring<androidx.compose.ui.unit.IntSize>(
-                                    dampingRatio = Spring.DampingRatioNoBouncy,
-                                    stiffness = Spring.StiffnessMediumLow,
-                                ),
+                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
                         ).padding(horizontal = 16.dp)
                         .clickable(
                             // Catch clicks on the surface so they don't leak to the dismiss background
@@ -809,7 +801,7 @@ private fun PillRow(
             Modifier
                 .fillMaxWidth()
                 .height(PillHeight)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(MaterialTheme.shapes.large)
                 .background(
                     // Use full-opacity primaryContainer for the activated state so the pill
                     // stays clearly distinct from the sheet background even in seed-based
@@ -899,7 +891,7 @@ private fun RepeatConfig(
     onEndCountText: (String) -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = Modifier.fillMaxWidth(),
     ) {
@@ -1132,7 +1124,7 @@ private fun CompactDigitField(
         } else {
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         }
-    val outlineShape = RoundedCornerShape(12.dp)
+    val outlineShape = MaterialTheme.shapes.medium
     Box(
         modifier =
             modifier
@@ -1184,11 +1176,11 @@ private fun SheetDropdown(
                 Modifier
                     .fillMaxWidth()
                     .height(RepeatRowHeight)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(MaterialTheme.shapes.medium)
                     .border(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = MaterialTheme.shapes.medium,
                     ).tapSoundClickable { onExpandedChange(true) }
                     .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,

@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -87,7 +86,7 @@ fun OptionsPanel(
 
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.largeIncreased,
         color = MaterialTheme.colorScheme.surfaceContainer,
         tonalElevation = 1.dp,
         shadowElevation = 0.dp,
@@ -265,7 +264,7 @@ fun MediaStorageChip(
             modifier.semantics {
                 this.contentDescription = chipContentDescription
             },
-        shape = RoundedCornerShape(999.dp),
+        shape = MaterialTheme.shapes.extraExtraLarge,
         color =
             if (storedInApp) {
                 MaterialTheme.colorScheme.primaryContainer

@@ -8,9 +8,12 @@ import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import dev.bikram.remember.R
+import kotlinx.serialization.Serializable
 
+@Serializable
 enum class NoteKind { NOTE, LIST }
 
+@Serializable
 enum class Importance { LOW, DEFAULT, HIGH }
 
 @StringRes
@@ -21,8 +24,10 @@ fun Importance.labelRes(): Int =
         Importance.HIGH -> R.string.importance_high
     }
 
+@Serializable
 enum class Visibility { SECRET, PRIVATE, PUBLIC }
 
+@Serializable
 enum class ActionType {
     CALL_NUMBER,
     SEND_MESSAGE,
@@ -70,6 +75,7 @@ fun ActionType.dataLabelRes(): Int =
         ActionType.SNOOZE -> R.string.action_field_snooze_blank
     }
 
+@Serializable
 data class NoteAction(
     val type: ActionType,
     val title: String,

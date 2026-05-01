@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
@@ -47,7 +46,7 @@ fun UpdateAvailableGlobalBanner(
     onOpenSettingsClick: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme
-    val expressiveShape = RoundedCornerShape(28.dp)
+    val expressiveShape = MaterialTheme.shapes.extraLargeIncreased
     OutlinedCard(
         modifier = modifier.fillMaxWidth(),
         shape = expressiveShape,
@@ -143,7 +142,7 @@ fun PlayStoreGlobalUpdateBanner(
 ) {
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
-    val expressiveShape = RoundedCornerShape(28.dp)
+    val expressiveShape = MaterialTheme.shapes.extraLargeIncreased
     when (state) {
         is PlayInAppUpdateBannerUiState.Hidden -> Unit
         is PlayInAppUpdateBannerUiState.Downloading -> {

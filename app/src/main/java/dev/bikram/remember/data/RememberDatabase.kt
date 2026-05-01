@@ -6,10 +6,17 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 
 class Converters {
+    private val json =
+        Json {
+            encodeDefaults = true
+            ignoreUnknownKeys = true
+        }
+
     @TypeConverter fun fromKind(kind: NoteKind): String = kind.name
 
     @TypeConverter fun toKind(value: String): NoteKind = NoteKind.valueOf(value)
@@ -23,47 +30,21 @@ class Converters {
     @TypeConverter fun toVisibility(value: String): Visibility = Visibility.valueOf(value)
 
     @TypeConverter
-    fun fromActions(v: List<NoteAction>): String {
-        val arr = JSONArray()
-        v.forEach { a ->
-            arr.put(
-                JSONObject()
-                    .put("t", a.type.name)
-                    .put("ti", a.title)
-                    .put("d", a.details)
-                    .put("e", a.extra ?: JSONObject.NULL),
-            )
-        }
-        return arr.toString()
-    }
+    fun fromActions(v: List<NoteAction>): String = json.encodeToString(v)
 
     @TypeConverter
     fun toActions(value: String): List<NoteAction> {
         if (value.isBlank()) return emptyList()
-        val arr = JSONArray(value)
-        return List(arr.length()) { i ->
-            val o = arr.getJSONObject(i)
-            NoteAction(
-                type = ActionType.valueOf(o.getString("t")),
-                title = o.getString("ti"),
-                details = o.getString("d"),
-                extra = if (o.isNull("e")) null else o.getString("e"),
-            )
-        }
+        return runCatching { json.decodeFromString<List<NoteAction>>(value) }.getOrDefault(emptyList())
     }
 
     @TypeConverter
-    fun fromStringList(v: List<String>): String {
-        val arr = JSONArray()
-        v.forEach { arr.put(it) }
-        return arr.toString()
-    }
+    fun fromStringList(v: List<String>): String = json.encodeToString(v)
 
     @TypeConverter
     fun toStringList(value: String): List<String> {
         if (value.isBlank()) return emptyList()
-        val arr = JSONArray(value)
-        return List(arr.length()) { arr.getString(it) }
+        return runCatching { json.decodeFromString<List<String>>(value) }.getOrDefault(emptyList())
     }
 
     @TypeConverter

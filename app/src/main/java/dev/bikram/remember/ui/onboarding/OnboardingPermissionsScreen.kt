@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -247,7 +246,7 @@ fun OnboardingPermissionsScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
-            shape = RoundedCornerShape(50),
+            shape = MaterialTheme.shapes.extraExtraLarge,
             contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
         ) {
             val motionScheme = MaterialTheme.motionScheme
@@ -401,7 +400,7 @@ private fun ChecklistIllustrationCard(
     val scheme = MaterialTheme.colorScheme
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
+        shape = MaterialTheme.shapes.medium,
         color = scheme.primaryContainer,
         tonalElevation = 8.dp,
         shadowElevation = 8.dp,
@@ -440,7 +439,7 @@ private fun NoteIllustrationCard(
     val scheme = MaterialTheme.colorScheme
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         color = scheme.surfaceContainerHighest.copy(alpha = 0.92f),
         tonalElevation = 4.dp,
         shadowElevation = 8.dp,
@@ -485,7 +484,7 @@ private fun IllustrationLine(
     color: Color,
 ) {
     Box(
-        modifier = modifier.background(color, RoundedCornerShape(50)),
+        modifier = modifier.background(color, MaterialTheme.shapes.extraExtraLarge),
     )
 }
 
@@ -551,7 +550,7 @@ private fun PermissionStatusCard(
     val scheme = MaterialTheme.colorScheme
     val motionScheme = MaterialTheme.motionScheme
     val cardPadding = if (primaryAction) 16.dp else 10.dp
-    val cardShape = if (primaryAction) 22.dp else 20.dp
+    val cardShape = if (primaryAction) MaterialTheme.shapes.largeIncreased else MaterialTheme.shapes.large
     val iconSize = if (primaryAction) 54.dp else 44.dp
     val bodyStartPadding = iconSize + 10.dp
     val topBodySpacing = if (primaryAction) 12.dp else 7.dp
@@ -590,7 +589,7 @@ private fun PermissionStatusCard(
             modifier
                 .fillMaxWidth()
                 .scale(scale),
-        shape = RoundedCornerShape(cardShape),
+        shape = cardShape,
         border = BorderStroke(if (granted) 1.4.dp else 1.dp, borderColor),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = if (granted) 3.dp else 1.dp),
@@ -650,7 +649,7 @@ private fun PermissionStatusCard(
                         onClick = {},
                         enabled = false,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(50),
+                        shape = MaterialTheme.shapes.extraExtraLarge,
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
                         colors =
                             ButtonDefaults.outlinedButtonColors(
@@ -682,7 +681,7 @@ private fun PermissionStatusCard(
                         onClick = onAction,
                         enabled = actionEnabled,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(50),
+                        shape = MaterialTheme.shapes.extraExtraLarge,
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
                         colors =
                             ButtonDefaults.buttonColors(
@@ -702,7 +701,7 @@ private fun PermissionStatusCard(
                         onClick = onAction,
                         enabled = actionEnabled,
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(50),
+                        shape = MaterialTheme.shapes.extraExtraLarge,
                         contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
                     ) {
                         Text(
@@ -751,7 +750,7 @@ private fun StatusPill(
 ) {
     val scheme = MaterialTheme.colorScheme
     Surface(
-        shape = RoundedCornerShape(50),
+        shape = MaterialTheme.shapes.extraExtraLarge,
         color =
             if (emphasized) {
                 scheme.primaryContainer

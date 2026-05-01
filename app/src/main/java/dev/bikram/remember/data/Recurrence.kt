@@ -1,6 +1,10 @@
 package dev.bikram.remember.data
 
-import org.json.JSONObject
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
@@ -9,13 +13,18 @@ import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.Calendar
 
+@Serializable
 enum class RecurrenceUnit { DAY, WEEK, MONTH, YEAR }
 
+@Serializable
 enum class RecurrenceEndKind { NEVER, ON_DATE, AFTER_COUNT }
 
 /** Monthly recurrence sub-rule. Either by fixed day-of-month, or by Nth weekday. */
+@Serializable
 sealed class MonthlyMode {
     /** Fire on the N-th day of the month (1..31). If the month is shorter the closest valid day is used. */
+    @Serializable
+    @SerialName("day_of_month")
     data class ByDayOfMonth(
         val day: Int,
     ) : MonthlyMode()
@@ -25,12 +34,15 @@ sealed class MonthlyMode {
      * ordinal: 1=first, 2=second, 3=third, 4=fourth, 5=last (uses LAST).
      * weekday: Calendar.SUNDAY (1) … Calendar.SATURDAY (7).
      */
+    @Serializable
+    @SerialName("nth_weekday")
     data class ByNthWeekday(
         val ordinal: Int,
         val weekday: Int,
     ) : MonthlyMode()
 }
 
+@Serializable
 data class RecurrenceRule(
     val unit: RecurrenceUnit,
     val interval: Int = 1,
@@ -111,56 +123,21 @@ data class RecurrenceRule(
         }
 
     companion object {
+        private val json =
+            Json {
+                classDiscriminator = "type"
+                encodeDefaults = true
+                ignoreUnknownKeys = true
+            }
+
         fun toJson(rule: RecurrenceRule?): String? {
             if (rule == null) return null
-            val safe = rule.sanitized()
-            val o = JSONObject()
-            o.put("u", safe.unit.name)
-            o.put("i", safe.interval)
-            if (safe.daysOfWeek.isNotEmpty()) {
-                o.put("dw", safe.daysOfWeek.sorted().joinToString(","))
-            }
-            safe.monthlyMode?.let { mm ->
-                when (mm) {
-                    is MonthlyMode.ByDayOfMonth -> o.put("md", mm.day)
-                    is MonthlyMode.ByNthWeekday -> {
-                        o.put("mo", mm.ordinal)
-                        o.put("mw", mm.weekday)
-                    }
-                }
-            }
-            o.put("ek", safe.endKind.name)
-            safe.endDate?.let { o.put("ed", it) }
-            safe.endCount?.let { o.put("ec", it) }
-            return o.toString()
+            return json.encodeToString(rule.sanitized())
         }
 
         fun fromJson(value: String?): RecurrenceRule? {
             if (value.isNullOrBlank()) return null
-            return runCatching {
-                val o = JSONObject(value)
-                val mode =
-                    when {
-                        o.has("md") -> MonthlyMode.ByDayOfMonth(o.getInt("md"))
-                        o.has("mo") -> MonthlyMode.ByNthWeekday(o.getInt("mo"), o.getInt("mw"))
-                        else -> null
-                    }
-                RecurrenceRule(
-                    unit = RecurrenceUnit.valueOf(o.getString("u")),
-                    interval = o.optInt("i", 1),
-                    daysOfWeek =
-                        o
-                            .optString("dw", "")
-                            .takeIf { it.isNotBlank() }
-                            ?.split(",")
-                            ?.mapNotNull { it.toIntOrNull() }
-                            ?.toSet() ?: emptySet(),
-                    monthlyMode = mode,
-                    endKind = RecurrenceEndKind.valueOf(o.optString("ek", RecurrenceEndKind.NEVER.name)),
-                    endDate = if (o.has("ed")) o.getLong("ed") else null,
-                    endCount = if (o.has("ec")) o.getInt("ec") else null,
-                ).sanitized()
-            }.getOrNull()
+            return runCatching { json.decodeFromString<RecurrenceRule>(value).sanitized() }.getOrNull()
         }
     }
 }

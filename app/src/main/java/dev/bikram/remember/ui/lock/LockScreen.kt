@@ -30,6 +30,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import dev.bikram.remember.R
@@ -125,6 +126,8 @@ fun LockScreen(
                 Text(
                     unlockTitle,
                     style = MaterialTheme.typography.headlineSmall,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(Modifier.height(8.dp))
                 Text(
@@ -204,6 +207,7 @@ private fun DeviceUnlockButton(onClick: () -> Unit) {
         modifier =
             Modifier
                 .size(96.dp)
+                .clip(CircleShape)
                 .tapSoundClickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
@@ -266,6 +270,7 @@ private fun DigitKey(
         modifier =
             Modifier
                 .size(72.dp)
+                .clip(CircleShape)
                 .tapSoundClickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
@@ -289,6 +294,7 @@ private fun ActionKey(
         modifier =
             Modifier
                 .size(72.dp)
+                .clip(CircleShape)
                 .tapSoundClickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {

@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -22,6 +21,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -169,10 +169,11 @@ private fun ActionRow(
     onRemove: () -> Unit,
 ) {
     val removeActionCd = stringResource(R.string.common_remove)
+    val rowShape = MaterialTheme.shapes.medium
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = rowShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth().tapSoundClickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clip(rowShape).tapSoundClickable(onClick = onClick),
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -216,12 +217,14 @@ private fun ActionRow(
 
 @Composable
 private fun AddActionRow(onClick: () -> Unit) {
+    val rowShape = MaterialTheme.shapes.medium
     Surface(
-        shape = RoundedCornerShape(12.dp),
+        shape = rowShape,
         color = MaterialTheme.colorScheme.primaryContainer,
         modifier =
             Modifier
                 .fillMaxWidth()
+                .clip(rowShape)
                 .tapSoundClickable(onClick = onClick),
     ) {
         Row(

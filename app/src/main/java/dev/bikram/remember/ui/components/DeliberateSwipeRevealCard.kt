@@ -1,8 +1,6 @@
 package dev.bikram.remember.ui.components
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -31,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.onSizeChanged
@@ -60,7 +59,7 @@ fun DeliberateSwipeRevealCard(
     onSwipeStartToEnd: () -> Unit,
     onSwipeEndToStart: () -> Unit,
     hapticEnabled: Boolean,
-    backgroundContent: @Composable BoxScope.(draggingFromStart: Boolean) -> Unit,
+    backgroundContent: @Composable BoxScope.(draggingFromStart: Boolean, revealProgress: Float) -> Unit,
     modifier: Modifier = Modifier,
     allowSwipeStartToEnd: Boolean = true,
     allowSwipeEndToStart: Boolean = true,
@@ -70,6 +69,7 @@ fun DeliberateSwipeRevealCard(
     val scope = rememberCoroutineScope()
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
+    val swipeSettleSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
 
     BoxWithConstraints(modifier = modifier.clip(cardShape)) {
         val constraintWidthPx =
@@ -137,11 +137,7 @@ fun DeliberateSwipeRevealCard(
                                                     val anim = Animatable(start)
                                                     anim.animateTo(
                                                         targetValue = 0f,
-                                                        animationSpec =
-                                                            spring(
-                                                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                                                stiffness = Spring.StiffnessMedium,
-                                                            ),
+                                                        animationSpec = swipeSettleSpec,
                                                     ) {
                                                         offsetX = value
                                                     }
@@ -161,10 +157,16 @@ fun DeliberateSwipeRevealCard(
             val fixed = Constraints.fixed(cardWidth, cardHeight)
             val backgroundMeasurable =
                 subcompose("background") {
+                    val revealProgress =
+                        if (thresholdPx.isFinite() && thresholdPx > 0f) {
+                            (abs(offsetX) / thresholdPx).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
                     Box(Modifier.fillMaxSize()) {
                         when {
-                            offsetX > 4f -> backgroundContent(true)
-                            offsetX < -4f -> backgroundContent(false)
+                            offsetX > 4f -> backgroundContent(true, revealProgress)
+                            offsetX < -4f -> backgroundContent(false, revealProgress)
                         }
                     }
                 }.first()
@@ -205,6 +207,7 @@ fun MultiActionSwipeRevealCard(
     val scope = rememberCoroutineScope()
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
+    val swipeSettleSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
     val maxRevealWidthPx =
         with(androidx.compose.ui.platform.LocalDensity.current) {
             maxRevealWidth.toPx()
@@ -276,11 +279,7 @@ fun MultiActionSwipeRevealCard(
                                             val anim = Animatable(offsetX)
                                             anim.animateTo(
                                                 targetValue = target,
-                                                animationSpec =
-                                                    spring(
-                                                        dampingRatio = Spring.DampingRatioNoBouncy,
-                                                        stiffness = Spring.StiffnessMedium,
-                                                    ),
+                                                animationSpec = swipeSettleSpec,
                                             ) {
                                                 offsetX = value
                                             }
@@ -298,11 +297,13 @@ fun MultiActionSwipeRevealCard(
             val fixed = Constraints.fixed(cardWidth, cardHeight)
             val backgroundMeasurable =
                 subcompose("background") {
+                    val revealProgress = (abs(offsetX) / maxRevealWidthPx).coerceIn(0f, 1f)
                     Box(Modifier.fillMaxSize()) {
                         if (offsetX > 4f && startActions.isNotEmpty()) {
                             SwipeActionRail(
                                 actions = startActions,
                                 revealWidth = maxRevealWidth,
+                                revealProgress = revealProgress,
                                 alignToStart = true,
                                 onActionClick = {
                                     scope.launch { offsetX = 0f }
@@ -312,6 +313,7 @@ fun MultiActionSwipeRevealCard(
                             SwipeActionRail(
                                 actions = endActions,
                                 revealWidth = maxRevealWidth,
+                                revealProgress = revealProgress,
                                 alignToStart = false,
                                 onActionClick = {
                                     scope.launch { offsetX = 0f }
@@ -333,6 +335,7 @@ fun MultiActionSwipeRevealCard(
 private fun BoxScope.SwipeActionRail(
     actions: List<SwipeRevealTile>,
     revealWidth: Dp,
+    revealProgress: Float,
     alignToStart: Boolean,
     onActionClick: () -> Unit,
 ) {
@@ -368,6 +371,7 @@ private fun BoxScope.SwipeActionRail(
             actions.forEach { action ->
                 SwipeActionTile(
                     action = action,
+                    revealProgress = revealProgress,
                     modifier =
                         Modifier
                             .weight(1f)
@@ -382,9 +386,11 @@ private fun BoxScope.SwipeActionRail(
 @Composable
 private fun SwipeActionTile(
     action: SwipeRevealTile,
+    revealProgress: Float,
     modifier: Modifier,
     onActionClick: () -> Unit,
 ) {
+    val tileScale = 0.88f + 0.12f * revealProgress
     Box(
         modifier =
             modifier
@@ -398,6 +404,12 @@ private fun SwipeActionTile(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
+            modifier =
+                Modifier.graphicsLayer {
+                    alpha = revealProgress
+                    scaleX = tileScale
+                    scaleY = tileScale
+                },
         ) {
             RememberMaterialRoundedSymbol(
                 name = action.symbolName,

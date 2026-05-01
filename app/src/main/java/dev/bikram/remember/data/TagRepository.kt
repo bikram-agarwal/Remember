@@ -2,7 +2,6 @@ package dev.bikram.remember.data
 
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.util.Locale
 
@@ -14,7 +13,6 @@ data class TagEditResult(
 class TagRepository(
     private val tagDao: TagDao,
     private val noteDao: NoteDao,
-    private val themePrefs: ThemePrefs? = null,
     private val database: RememberDatabase? = null,
     private val clock: () -> Long = System::currentTimeMillis,
 ) {
@@ -108,19 +106,6 @@ class TagRepository(
         return result
     }
 
-    suspend fun synchronizeLegacyTagColors() {
-        val prefs = themePrefs ?: return
-        val legacyColors = prefs.state.first().tagColors
-        if (legacyColors.isEmpty()) return
-        val activeTags = tagDao.observeAllTags().first()
-        activeTags.forEach { tag ->
-            if (tag.colorHex != null) return@forEach
-            val legacyColor = legacyColors[tag.normalizedName] ?: return@forEach
-            val normalizedColor = normalizeHex(legacyColor) ?: return@forEach
-            tagDao.updateTag(tag.copy(colorHex = normalizedColor, updatedAt = clock()))
-        }
-    }
-
     private suspend fun editTagInTransaction(
         oldNormalizedName: String,
         newName: String,
@@ -170,8 +155,15 @@ class TagRepository(
         val cleanedName = tagName.trim()
         val normalizedName = normalizeTagName(cleanedName)
         tagDao.getByNormalizedName(normalizedName)?.let { existingTag ->
-            if (colorHex != null && existingTag.colorHex == null) {
-                val updatedTag = existingTag.copy(colorHex = colorHex, updatedAt = clock())
+            val shouldAdoptDisplayName = existingTag.name != cleanedName
+            val shouldAdoptColor = colorHex != null && existingTag.colorHex == null
+            if (shouldAdoptDisplayName || shouldAdoptColor) {
+                val updatedTag =
+                    existingTag.copy(
+                        name = if (shouldAdoptDisplayName) cleanedName else existingTag.name,
+                        colorHex = if (shouldAdoptColor) colorHex else existingTag.colorHex,
+                        updatedAt = clock(),
+                    )
                 tagDao.updateTag(updatedTag)
                 return updatedTag
             }

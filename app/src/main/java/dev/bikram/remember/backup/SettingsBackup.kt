@@ -39,7 +39,7 @@ object SettingsBackup {
     ) {
         if (root == null) return
         themePrefs.importFromBackup(root.optJSONObject(KEY_THEME))
-        viewOptionsPrefs.importFromBackup(root.optJSONObject(KEY_VIEW_OPTIONS) ?: root.optJSONObject(KEY_THEME))
+        viewOptionsPrefs.importFromBackup(root.optJSONObject(KEY_VIEW_OPTIONS))
         lockPrefs.importFromBackup(root.optJSONObject(KEY_LOCK))
         interactionPrefs.importFromBackup(root.optJSONObject(KEY_INTERACTION))
         backupPrefs.importFromBackup(root.optJSONObject(KEY_BACKUP))

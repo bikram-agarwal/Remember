@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.components
 
+import androidx.compose.animation.BoundsTransform
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,9 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -26,6 +27,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
@@ -54,13 +56,13 @@ import dev.bikram.remember.ui.edit.iconSymbolName
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
+import dev.bikram.remember.ui.theme.RoundedPolygonShape
 import dev.bikram.remember.ui.theme.elevatedCardColors
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val CardShape = RoundedCornerShape(12.dp)
-
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NoteCard(
     note: NoteWithItems,
@@ -76,16 +78,44 @@ fun NoteCard(
     val heroPictureUri = note.note.pictureUri?.takeIf { heroEnabled }
     val showHero = heroPictureUri != null
     val surface = MaterialTheme.colorScheme.surface
+    val cardShape = MaterialTheme.shapes.medium
     val favoriteIconDescription = stringResource(R.string.notecard_favorite_cd)
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
+    val sharedBoundsSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
+    val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
     val sharedModifier =
         if (sharedScope != null && navScope != null) {
             with(sharedScope) {
                 Modifier.sharedBounds(
                     sharedContentState = rememberSharedContentState(key = "note-card-${note.note.id}"),
                     animatedVisibilityScope = navScope,
+                    boundsTransform = sharedBoundsTransform,
+                )
+            }
+        } else {
+            Modifier
+        }
+    val sharedTitleModifier =
+        if (sharedScope != null && navScope != null) {
+            with(sharedScope) {
+                Modifier.sharedBounds(
+                    sharedContentState = rememberSharedContentState(key = "note-title-${note.note.id}"),
+                    animatedVisibilityScope = navScope,
+                    boundsTransform = sharedBoundsTransform,
+                )
+            }
+        } else {
+            Modifier
+        }
+    val sharedIconModifier =
+        if (sharedScope != null && navScope != null) {
+            with(sharedScope) {
+                Modifier.sharedElement(
+                    sharedContentState = rememberSharedContentState(key = "note-icon-${note.note.id}"),
+                    animatedVisibilityScope = navScope,
+                    boundsTransform = sharedBoundsTransform,
                 )
             }
         } else {
@@ -95,13 +125,13 @@ fun NoteCard(
     val selectionBorderColor = MaterialTheme.colorScheme.primary
     val selectionBorder =
         if (selected) {
-            Modifier.border(BorderStroke(2.dp, selectionBorderColor), CardShape)
+            Modifier.border(BorderStroke(2.dp, selectionBorderColor), cardShape)
         } else {
             Modifier
         }
     val favoriteBorder =
         if (note.note.favorite && !selected) {
-            Modifier.border(BorderStroke(1.dp, Color(0xFFFF9EBC).copy(alpha = 0.70f)), CardShape)
+            Modifier.border(BorderStroke(1.dp, Color(0xFFFF9EBC).copy(alpha = 0.70f)), cardShape)
         } else {
             Modifier
         }
@@ -116,11 +146,11 @@ fun NoteCard(
             modifier
                 .fillMaxWidth()
                 .then(sharedModifier)
-                .clip(CardShape)
+                .clip(cardShape)
                 .then(favoriteBorder)
                 .then(selectionBorder)
                 .then(clickableModifier),
-        shape = CardShape,
+        shape = cardShape,
         color = cardColors.containerColor,
         contentColor = cardColors.contentColor,
         tonalElevation = 1.dp,
@@ -164,7 +194,7 @@ fun NoteCard(
                                 size = 18.dp,
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 weight = FontWeight.Medium,
-                                modifier = Modifier.alpha(0.75f),
+                                modifier = Modifier.then(sharedIconModifier).alpha(0.75f),
                             )
                             Spacer(Modifier.width(8.dp))
                         } else if (headerBrandDrawable != null) {
@@ -172,14 +202,14 @@ fun NoteCard(
                                 painterResource(headerBrandDrawable),
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp).alpha(0.75f),
+                                modifier = Modifier.size(18.dp).then(sharedIconModifier).alpha(0.75f),
                             )
                             Spacer(Modifier.width(8.dp))
                         } else if (cardEmoji != null) {
                             Text(
                                 text = cardEmoji,
                                 style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
-                                modifier = Modifier.alpha(0.85f),
+                                modifier = Modifier.then(sharedIconModifier).alpha(0.85f),
                             )
                             Spacer(Modifier.width(8.dp))
                         } else if (note.note.kind == NoteKind.LIST) {
@@ -188,7 +218,7 @@ fun NoteCard(
                                 size = 18.dp,
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 weight = FontWeight.Medium,
-                                modifier = Modifier.alpha(0.65f),
+                                modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
                             )
                             Spacer(Modifier.width(8.dp))
                         } else if (note.note.kind == NoteKind.NOTE) {
@@ -197,25 +227,27 @@ fun NoteCard(
                                 size = 18.dp,
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 weight = FontWeight.Medium,
-                                modifier = Modifier.alpha(0.65f),
+                                modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
                             )
                             Spacer(Modifier.width(8.dp))
                         }
-                        Text(
-                            text =
-                                note.note.title.ifBlank {
-                                    if (note.note.kind == NoteKind.NOTE) {
-                                        stringResource(R.string.edit_note_title_new)
-                                    } else {
-                                        stringResource(R.string.edit_list_title_new)
-                                    }
-                                },
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.weight(1f),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Box(modifier = Modifier.weight(1f).then(sharedTitleModifier)) {
+                            Text(
+                                text =
+                                    note.note.title.ifBlank {
+                                        if (note.note.kind == NoteKind.NOTE) {
+                                            stringResource(R.string.edit_note_title_new)
+                                        } else {
+                                            stringResource(R.string.edit_list_title_new)
+                                        }
+                                    },
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.fillMaxWidth(),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                         if (note.note.favorite) {
                             RememberMaterialRoundedSymbol(
                                 name = "favorite",
@@ -255,18 +287,20 @@ fun NoteCard(
                 }
             }
             if (selected) {
+                val selectionBadgeShape = remember { RoundedPolygonShape(MaterialShapes.Cookie7Sided) }
                 Box(
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
-                            .padding(10.dp)
-                            .size(24.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape),
+                            .padding(9.dp)
+                            .size(26.dp)
+                            .clip(selectionBadgeShape)
+                            .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center,
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = "check",
-                        size = 16.dp,
+                        size = 15.dp,
                         tint = MaterialTheme.colorScheme.onPrimary,
                         weight = FontWeight.Medium,
                     )
@@ -368,13 +402,27 @@ private fun MetadataRow(
             // repeat icon precedes the date as a glanceable indicator.
             if (reminderAt != null) {
                 val cdReminder = stringResource(R.string.notecard_reminder_cd)
+                RememberMaterialRoundedSymbol(
+                    name = "notifications",
+                    size = 14.dp,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    weight = FontWeight.Medium,
+                    modifier =
+                        Modifier
+                            .semantics { contentDescription = cdReminder }
+                            .alpha(0.68f),
+                )
                 if (isRecurring) {
+                    val cdRecurring = stringResource(R.string.notecard_recurring_cd)
                     RememberMaterialRoundedSymbol(
                         name = "repeat",
                         size = 14.dp,
                         tint = MaterialTheme.colorScheme.onSurface,
                         weight = FontWeight.Medium,
-                        modifier = Modifier.alpha(0.6f),
+                        modifier =
+                            Modifier
+                                .semantics { contentDescription = cdRecurring }
+                                .alpha(0.68f),
                     )
                 }
                 Text(
@@ -384,7 +432,6 @@ private fun MetadataRow(
                     fontWeight = FontWeight.Medium,
                     modifier =
                         Modifier
-                            .semantics { contentDescription = cdReminder }
                             .alpha(0.85f),
                 )
             }

@@ -12,7 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -33,7 +33,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.theme.LocalTagColors
+import dev.bikram.remember.ui.tags.LocalTagColors
 
 /** Parse "#RRGGBB" into a Compose Color. Returns null if invalid. */
 fun parseHexColor(hex: String): Color? =
@@ -50,8 +50,6 @@ fun tagColor(tag: String): Color {
     return hex?.let { parseHexColor(it) } ?: TagPalette.defaultFor(key)
 }
 
-private val TagAccentStripShape = RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp)
-
 /** Left edge of note cards: colored strip from tag palette (gradient when several tags). */
 @Composable
 fun TagAccentCardStrip(
@@ -60,6 +58,11 @@ fun TagAccentCardStrip(
 ) {
     if (tags.isEmpty()) return
     val tagColorMap = LocalTagColors.current
+    val tagAccentStripShape =
+        MaterialTheme.shapes.large.copy(
+            topEnd = CornerSize(0.dp),
+            bottomEnd = CornerSize(0.dp),
+        )
     val brush =
         remember(tags, tagColorMap) {
             val orderedColors =
@@ -78,7 +81,7 @@ fun TagAccentCardStrip(
             modifier
                 .width(5.dp)
                 .fillMaxHeight()
-                .clip(TagAccentStripShape)
+                .clip(tagAccentStripShape)
                 .background(brush),
     )
 }
@@ -135,7 +138,7 @@ fun TagChipFilled(
     val contentColor = TagPalette.textOn(color)
     val horizontal = if (compact) 8.dp else 12.dp
     val vertical = if (compact) 3.dp else 6.dp
-    val shape = RoundedCornerShape(if (compact) 8.dp else 14.dp)
+    val shape = if (compact) MaterialTheme.shapes.small else MaterialTheme.shapes.medium
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -147,8 +150,17 @@ fun TagChipFilled(
                     width = if (highlighted) 2.dp else 0.dp,
                     color = if (highlighted) MaterialTheme.colorScheme.primary else Color.Transparent,
                     shape = shape,
-                ).let { if (onClick != null) it.tapSoundClickable(onClick = onClick) else it }
-                .padding(horizontal = horizontal, vertical = vertical),
+                )
+                // .clip(shape) before the clickable bounds the ripple to the chip's pill
+                // outline. Without it the ripple draws as a rectangle that bleeds past
+                // the rounded edges of the chip.
+                .let {
+                    if (onClick != null) {
+                        it.clip(shape).tapSoundClickable(onClick = onClick)
+                    } else {
+                        it
+                    }
+                }.padding(horizontal = horizontal, vertical = vertical),
     ) {
         Text(
             text = tag,

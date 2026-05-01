@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -100,7 +99,7 @@ fun OnboardingTitleScreen(
                     modifier =
                         Modifier
                             .size(120.dp)
-                            .clip(RoundedCornerShape(percent = 25)),
+                            .clip(MaterialTheme.shapes.extraLarge),
                 )
                 Spacer(Modifier.height(24.dp))
                 AnimatedVisibility(
@@ -135,7 +134,7 @@ fun OnboardingTitleScreen(
             enter = blockEnter,
         ) {
             Surface(
-                shape = RoundedCornerShape(50),
+                shape = MaterialTheme.shapes.extraExtraLarge,
                 color = scheme.surfaceContainerHigh,
             ) {
                 Row(
@@ -173,7 +172,7 @@ fun OnboardingTitleScreen(
             RememberButton(
                 onClick = onLetsBegin,
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(50),
+                shape = MaterialTheme.shapes.extraExtraLarge,
                 contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
             ) {
                 Text(

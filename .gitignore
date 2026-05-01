@@ -1,5 +1,7 @@
+.claude/
 .gradle/
 .kotlin/
+.idea/
 build/
 localdocs/
 devRelease.lnk

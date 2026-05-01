@@ -1,11 +1,16 @@
 package dev.bikram.remember.data
 
+import androidx.compose.runtime.Immutable
+import kotlinx.collections.immutable.PersistentSet
+import kotlinx.collections.immutable.persistentSetOf
+
 enum class FilterType { ALL, NOTE, LIST }
 
+@Immutable
 data class NotesFilter(
     val text: String = "",
     val type: FilterType = FilterType.ALL,
-    val tags: Set<String> = emptySet(),
+    val tags: PersistentSet<String> = persistentSetOf(),
     val hasReminder: Boolean? = null,
     val hasPicture: Boolean? = null,
     val hasAttachment: Boolean? = null,

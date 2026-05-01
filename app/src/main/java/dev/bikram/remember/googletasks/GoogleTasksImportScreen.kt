@@ -28,18 +28,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearWavyProgressIndicator
-import androidx.compose.material3.ListItem
-import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -48,6 +43,7 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
@@ -86,10 +82,7 @@ import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberSegmentedButton
 import dev.bikram.remember.ui.components.RememberTextButton
-import dev.bikram.remember.ui.components.settings.GroupPosition
-import dev.bikram.remember.ui.components.settings.groupedItemShape
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.theme.elevatedCardColors
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
@@ -211,7 +204,7 @@ fun GoogleTasksImportRoute(
                             Modifier
                                 .padding(start = 4.dp)
                                 .size(40.dp)
-                                .clip(RoundedCornerShape(20.dp))
+                                .clip(MaterialTheme.shapes.extraExtraLarge)
                                 .tapSoundClickable(onClick = onBack),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -437,7 +430,7 @@ private fun TakeoutImportPanel(
         )
         Spacer(Modifier.height(16.dp))
         Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 1.dp,
         ) {
@@ -628,27 +621,47 @@ private fun LoadedPanel(
             }
         }
 
-        SourceSheet(
+        // Bottom action stack:
+        //   1) On-demand SourcePopup floats just above the import button when expanded.
+        //   2) Always-visible ImportButtonGroup (segmented pill: Import N tasks + chevron).
+        // The popup uses AnimatedVisibility for a smooth slide-up; the import button
+        // stays anchored so the user's primary action is reachable in both states.
+        Column(
             modifier = Modifier.align(Alignment.BottomCenter),
-            state = state,
-            expanded = sourceSheetExpanded,
-            selectedCount = totalSelected,
-            onChipTap = { sourceSheetExpanded = !sourceSheetExpanded },
-            onRefresh = {
-                sourceSheetExpanded = false
-                onRefresh()
-            },
-            onSwitchAccount = { attemptSwitch(PendingSourceSwitch.SwitchGoogleAccount) },
-            onSwitchToTakeout = { attemptSwitch(PendingSourceSwitch.SwitchToTakeout) },
-            onSwitchToGoogle = { attemptSwitch(PendingSourceSwitch.SwitchToGoogle) },
-            onDisconnect = { attemptSwitch(PendingSourceSwitch.Disconnect) },
-            onImport = onImport,
-            isImporting = state.isImporting,
-            importCompletedCount = state.importCompletedCount,
-            importTotalCount = state.importTotalCount,
-            lastOutcome = state.lastOutcome,
-            onImportingDone = onImportingDone,
-        )
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            AnimatedVisibility(
+                visible = sourceSheetExpanded,
+                enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
+                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
+            ) {
+                SourcePopup(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
+                    state = state,
+                    isImporting = state.isImporting,
+                    onRefresh = {
+                        sourceSheetExpanded = false
+                        onRefresh()
+                    },
+                    onSwitchAccount = { attemptSwitch(PendingSourceSwitch.SwitchGoogleAccount) },
+                    onSwitchToTakeout = { attemptSwitch(PendingSourceSwitch.SwitchToTakeout) },
+                    onSwitchToGoogle = { attemptSwitch(PendingSourceSwitch.SwitchToGoogle) },
+                    onDisconnect = { attemptSwitch(PendingSourceSwitch.Disconnect) },
+                )
+            }
+            Spacer(Modifier.height(if (sourceSheetExpanded) 8.dp else 0.dp))
+            ImportButtonGroup(
+                selectedCount = totalSelected,
+                sourceExpanded = sourceSheetExpanded,
+                isImporting = state.isImporting,
+                importCompletedCount = state.importCompletedCount,
+                importTotalCount = state.importTotalCount,
+                lastOutcome = state.lastOutcome,
+                onImport = onImport,
+                onSourceToggle = { sourceSheetExpanded = !sourceSheetExpanded },
+                onImportingDone = onImportingDone,
+            )
+        }
 
         pendingSourceSwitch?.let { switch ->
             SourceSwitchConfirmation(
@@ -715,17 +728,6 @@ private fun groupVisibleTasks(
     }
 }
 
-private fun groupPositionFor(
-    index: Int,
-    totalCount: Int,
-): GroupPosition =
-    when {
-        totalCount <= 1 -> GroupPosition.ONLY
-        index == 0 -> GroupPosition.FIRST
-        index == totalCount - 1 -> GroupPosition.LAST
-        else -> GroupPosition.MIDDLE
-    }
-
 /**
  * Hero card showing the live count of selected tasks. The big display number is the dramatic
  * focal point - users glance at this to understand "how much have I staged for import" without
@@ -739,7 +741,7 @@ private fun ImportHeroCard(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = MaterialTheme.shapes.extraLargeIncreased,
         color = MaterialTheme.colorScheme.primaryContainer,
         contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
     ) {
@@ -789,7 +791,7 @@ private fun SearchPill(
     val cursorColor = MaterialTheme.colorScheme.primary
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = MaterialTheme.shapes.extraLargeIncreased,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
     ) {
@@ -827,7 +829,7 @@ private fun SearchPill(
                     modifier =
                         Modifier
                             .size(28.dp)
-                            .clip(RoundedCornerShape(14.dp))
+                            .clip(MaterialTheme.shapes.extraExtraLarge)
                             .tapSoundClickable { onQueryChange("") },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -864,6 +866,10 @@ private fun ControlPillRow(
     onSelectAllToggle: () -> Unit,
     onClearSelection: () -> Unit,
 ) {
+    // Pack the four controls left-to-right with a consistent 8dp gap. The previous design
+    // pushed the icon buttons to the right edge with a Spacer(weight=1f), which on narrow
+    // phones squeezed the last icon into an oval. Letting them sit flush after the
+    // dropdowns gives every control its natural size and keeps tap targets uniform.
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -877,7 +883,6 @@ private fun ControlPillRow(
             overwrite = overwrite,
             onChange = onOverwriteChange,
         )
-        Spacer(Modifier.weight(1f))
         val allSelected = visibleCount > 0 && selectedVisibleCount >= visibleCount
         RememberFilledTonalIconButton(
             onClick = onSelectAllToggle,
@@ -958,10 +963,19 @@ private fun SkipOverwriteDropdown(
 }
 
 /**
- * Source-list group card. Header has a tri-state checkbox (all / some / none of the visible
- * tasks in this list selected), the list title, the per-group selected/total counter, and a
- * chevron that rotates 90deg when expanded. Tap the header anywhere to collapse/expand;
- * tap the checkbox specifically to toggle select-all-in-list without changing collapse state.
+ * Source-list group block: a header card on top + (when expanded) a stack of independent
+ * task cards below. Header layout from left to right:
+ *   - Checkbox (tri-state-ish; checked when all-in-group selected) - tap toggles
+ *     select-all for the visible tasks in this group.
+ *   - Chevron + title + body - tap toggles collapse.
+ *   - Selection-count chip (e.g. "2 / 22") on the far right - primary-tinted when any
+ *     selected, muted when zero. Visually decoupled from the checkbox so the count is
+ *     a *passive* status indicator while the checkbox is the active control.
+ *
+ * Tasks render as separate Surface cards in a Column with vertical spacing rather than
+ * a single shared Surface. The expand/collapse animation animates the entire stack
+ * in/out; AnimatedVisibility skips composition while collapsed so off-screen task cards
+ * don't pay recomposition cost.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -979,6 +993,7 @@ private fun GroupCard(
             group.tasks.count { it.task.id in selectedTaskIds }
         }
     val allSelected = selectedInGroup == group.tasks.size && group.tasks.isNotEmpty()
+    val anySelected = selectedInGroup > 0
     val rotation by animateFloatAsState(
         targetValue = if (collapsed) 0f else 90f,
         label = "groupCardChevron",
@@ -986,103 +1001,155 @@ private fun GroupCard(
     val expandLabel = stringResource(R.string.google_tasks_import_group_expand_cd, group.list.title)
     val collapseLabel = stringResource(R.string.google_tasks_import_group_collapse_cd, group.list.title)
 
-    // Fully-selected groups get a primary-coloured border and a faint primaryContainer wash
-    // so they pop visually against the rest of the list. Empty / partially-selected groups
-    // sit on a regular surfaceContainerHigh card with a quiet outline border.
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        GroupHeaderCard(
+            title = group.list.title,
+            selectedInGroup = selectedInGroup,
+            totalInGroup = group.totalInList,
+            allSelected = allSelected,
+            anySelected = anySelected,
+            collapsed = collapsed,
+            chevronRotation = rotation,
+            expandLabel = expandLabel,
+            collapseLabel = collapseLabel,
+            onHeaderClick = onHeaderClick,
+            onCheckboxClick = onCheckboxClick,
+        )
+        AnimatedVisibility(
+            visible = !collapsed,
+            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+        ) {
+            // Indent task cards 16dp from the left edge of the group header so they
+            // visually nest under the group rather than sitting at the same level.
+            Column(
+                modifier = Modifier.padding(start = 16.dp, top = 2.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                group.tasks.forEach { wrapper ->
+                    TaskRow(
+                        wrapper = wrapper,
+                        selected = wrapper.task.id in selectedTaskIds,
+                        alreadyImported = wrapper.task.id in alreadyImportedIds,
+                        onToggle = { onTaskToggle(wrapper.task.id) },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun GroupHeaderCard(
+    title: String,
+    selectedInGroup: Int,
+    totalInGroup: Int,
+    allSelected: Boolean,
+    anySelected: Boolean,
+    collapsed: Boolean,
+    chevronRotation: Float,
+    expandLabel: String,
+    collapseLabel: String,
+    onHeaderClick: () -> Unit,
+    onCheckboxClick: () -> Unit,
+) {
+    // Match the TaskRow M3 multi-select pattern: selected = background colour shift,
+    // unselected = quiet surface fill, no borders. Fully-selected group uses the same
+    // secondaryContainer slot tasks use so a "fully selected group" reads as one
+    // continuous selection band when expanded.
     val cardColor =
         if (allSelected) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+            MaterialTheme.colorScheme.secondaryContainer
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh
         }
-    val cardBorder =
-        if (allSelected) {
-            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant)
-        }
+    val headerShape = MaterialTheme.shapes.largeIncreased
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = headerShape,
         color = cardColor,
-        border = cardBorder,
     ) {
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                // Checkbox area gets its own click target - tapping it toggles select-all-in-list
-                // without affecting collapse state. Disable the inner Checkbox's own click (set
-                // onCheckedChange = null) so only the outer Box click fires, avoiding double-toggle.
-                Box(
-                    modifier =
-                        Modifier
-                            .tapSoundClickable(onClick = onCheckboxClick)
-                            .padding(start = 12.dp, top = 12.dp, end = 4.dp, bottom = 12.dp),
-                ) {
-                    RememberCheckbox(
-                        checked = allSelected,
-                        onCheckedChange = null,
-                    )
-                }
-                Row(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .semantics { contentDescription = if (collapsed) expandLabel else collapseLabel }
-                            .tapSoundClickable(onClick = onHeaderClick)
-                            .padding(end = 12.dp, top = 12.dp, bottom = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = group.list.title,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            text =
-                                stringResource(
-                                    R.string.google_tasks_import_group_selection_count,
-                                    selectedInGroup,
-                                    group.totalInList,
-                                ),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                    RememberMaterialRoundedSymbol(
-                        name = "chevron_right",
-                        size = 20.dp,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        weight = FontWeight.Medium,
-                        modifier = Modifier.graphicsLayer { rotationZ = rotation },
-                    )
-                }
-            }
-            AnimatedVisibility(
-                visible = !collapsed,
-                enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
-            ) {
-                Column {
-                    group.tasks.forEachIndexed { index, wrapper ->
-                        TaskRow(
-                            wrapper = wrapper,
-                            position = groupPositionFor(index, group.tasks.size),
-                            selected = wrapper.task.id in selectedTaskIds,
-                            alreadyImported = wrapper.task.id in alreadyImportedIds,
-                            onToggle = { onTaskToggle(wrapper.task.id) },
-                        )
-                    }
-                }
-            }
+        // Single click target spanning the entire surface, with clip applied BEFORE the
+        // clickable so the ripple is bounded by the rounded shape rather than the
+        // rectangular Row layout. The checkbox inside owns its own click via
+        // RememberCheckbox(onCheckedChange = ...) and consumes the tap, so tapping it
+        // toggles select-all-in-group without firing the surface's expand/collapse.
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .clip(headerShape)
+                    .semantics { contentDescription = if (collapsed) expandLabel else collapseLabel }
+                    .tapSoundClickable(onClick = onHeaderClick)
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            RememberCheckbox(
+                checked = allSelected,
+                onCheckedChange = { onCheckboxClick() },
+            )
+            RememberMaterialRoundedSymbol(
+                name = "chevron_right",
+                size = 20.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
+                modifier = Modifier.graphicsLayer { rotationZ = chevronRotation },
+            )
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            GroupCountChip(
+                selected = selectedInGroup,
+                total = totalInGroup,
+                anySelected = anySelected,
+            )
         }
+    }
+}
+
+/**
+ * Compact "n / N" chip that sits at the far right of the group header. When any task in
+ * the group is selected the chip uses primary-on-primaryContainer so the user gets a
+ * quick visual cue scrolling past collapsed groups - "this one already has selections".
+ * Zero-selected groups stay on the muted surface palette.
+ */
+@Composable
+private fun GroupCountChip(
+    selected: Int,
+    total: Int,
+    anySelected: Boolean,
+) {
+    val container =
+        if (anySelected) {
+            MaterialTheme.colorScheme.primaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainerHighest
+        }
+    val labelColor =
+        if (anySelected) {
+            MaterialTheme.colorScheme.onPrimaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    Surface(
+        shape = MaterialTheme.shapes.extraExtraLarge,
+        color = container,
+    ) {
+        Text(
+            text = stringResource(R.string.google_tasks_import_group_count_chip, selected, total),
+            style = MaterialTheme.typography.labelSmall,
+            color = labelColor,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+        )
     }
 }
 
@@ -1091,7 +1158,7 @@ private fun GroupCard(
 private fun NoSearchResultsRow(query: String) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.largeIncreased,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
         Row(
@@ -1115,159 +1182,95 @@ private fun NoSearchResultsRow(query: String) {
 }
 
 /**
- * Inline bottom sheet hosting the source chip and the import action. Two visual states:
- *  - Collapsed: drag handle, source chip, import button. Mirrors the previous BottomBar's
- *    footprint so the layout doesn't jump.
- *  - Expanded: drag handle, "Source" label, current-source identity card, list of switch
- *    actions (refresh / switch account / use the other method / disconnect), then the import
- *    button below a divider so the primary action stays accessible while picking a source.
+ * Floating segmented import button anchored at the bottom of the LoadedPanel. Two segments:
+ *   - Wide left: primary "Import N tasks" action.
+ *   - Narrow right: chevron toggle that raises [SourcePopup] above the button without
+ *     pushing the import action out of the way.
  *
- * While an import is in progress (or has just finished) the sheet renders a wavy progress
- * card in place of the import button, replacing the previous ImportingProgressCard logic.
+ * While an import is running (or has just finished) the wide segment is replaced by an
+ * inline progress / done card; the narrow chevron stays in place so the user can still
+ * reach the source picker if they need to abort and retry.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SourceSheet(
+private fun ImportButtonGroup(
     modifier: Modifier = Modifier,
-    state: GoogleTasksImportUiState,
-    expanded: Boolean,
     selectedCount: Int,
-    onChipTap: () -> Unit,
-    onRefresh: () -> Unit,
-    onSwitchAccount: () -> Unit,
-    onSwitchToTakeout: () -> Unit,
-    onSwitchToGoogle: () -> Unit,
-    onDisconnect: () -> Unit,
-    onImport: () -> Unit,
+    sourceExpanded: Boolean,
     isImporting: Boolean,
     importCompletedCount: Int,
     importTotalCount: Int,
     lastOutcome: ImportOutcome?,
+    onImport: () -> Unit,
+    onSourceToggle: () -> Unit,
     onImportingDone: () -> Unit,
 ) {
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val isGoogle = state.selectedMethod == ImportMethod.GrantPermission
-    val canRefresh = isGoogle && !isImporting
-
-    // Sheet uses surfaceContainerHighest plus a chunky tonal elevation so it visually lifts
-    // off the page. The thin top border is outline-tinted so there's an unmistakable visual
-    // boundary between the sheet and the LazyColumn behind it - even when the surface tones
-    // happen to be close in this seed-driven palette.
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
-        tonalElevation = 6.dp,
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
+    val chevronRotation by animateFloatAsState(
+        targetValue = if (sourceExpanded) 180f else 0f,
+        label = "sourceChevron",
+    )
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, bottom = navInset + 12.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp + navInset),
-        ) {
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .height(4.dp)
-                            .width(36.dp)
-                            .clip(RoundedCornerShape(2.dp))
-                            .background(MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-
-            SourceChipRow(
-                state = state,
-                onClick = onChipTap,
-                chevronUp = expanded,
+        if (isImporting || lastOutcome != null) {
+            ImportProgressInline(
+                completedCount = importCompletedCount,
+                totalCount = importTotalCount,
+                outcome = lastOutcome,
+                onDone = onImportingDone,
             )
-            Spacer(Modifier.height(10.dp))
-
-            AnimatedVisibility(
-                visible = expanded,
-                enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
-            ) {
-                Column {
-                    Text(
-                        text = stringResource(R.string.google_tasks_import_source_label),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-                    )
-                    // Each action row gets its own colored chip-icon so the list of actions
-                    // doesn't read as a wall of identical-tinted glyphs. The colors map to
-                    // semantic intent: refresh = primary (the most common action), switch
-                    // account = secondary (related to current source), takeout = tertiary
-                    // (different hue), disconnect = error (destructive).
-                    if (isGoogle) {
-                        SourceActionRow(
-                            symbolName = "refresh",
-                            label = stringResource(R.string.google_tasks_import_source_action_refresh),
-                            enabled = canRefresh,
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            onClick = onRefresh,
-                        )
-                        SourceActionRow(
-                            symbolName = "switch_account",
-                            label = stringResource(R.string.google_tasks_import_source_action_switch_account),
-                            iconTint = MaterialTheme.colorScheme.secondary,
-                            onClick = onSwitchAccount,
-                        )
-                        SourceActionRow(
-                            symbolName = "upload_file",
-                            label = stringResource(R.string.google_tasks_import_source_action_use_takeout),
-                            iconTint = MaterialTheme.colorScheme.tertiary,
-                            onClick = onSwitchToTakeout,
-                        )
+        } else {
+            // The official split button keeps the source picker and primary import action
+            // together while letting the leading action animate into its disabled state.
+            val hasSelection = selectedCount > 0
+            val cdLabel =
+                if (sourceExpanded) {
+                    stringResource(R.string.google_tasks_import_source_chip_collapse_cd)
+                } else {
+                    stringResource(R.string.google_tasks_import_source_chip_expand_cd)
+                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    if (hasSelection) {
+                        Arrangement.spacedBy(SplitButtonDefaults.Spacing)
                     } else {
-                        SourceActionRow(
-                            symbolName = "upload_file",
-                            label = stringResource(R.string.google_tasks_import_source_action_use_takeout),
-                            iconTint = MaterialTheme.colorScheme.tertiary,
-                            onClick = onSwitchToTakeout,
-                        )
-                        SourceActionRow(
-                            symbolName = "account_circle",
-                            label = stringResource(R.string.google_tasks_import_source_action_connect_google),
-                            iconTint = MaterialTheme.colorScheme.primary,
-                            onClick = onSwitchToGoogle,
-                        )
-                    }
-                    SourceActionRow(
-                        symbolName = "logout",
-                        label = stringResource(R.string.google_tasks_import_source_action_disconnect),
-                        destructive = true,
-                        onClick = onDisconnect,
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Box(
+                        Arrangement.End
+                    },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (hasSelection) {
+                    SplitButtonDefaults.LeadingButton(
+                        onClick = onImport,
                         modifier =
                             Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                    )
-                    Spacer(Modifier.height(10.dp))
+                                .weight(1f)
+                                .height(48.dp),
+                    ) {
+                        Text(text = stringResource(R.string.google_tasks_import_run, selectedCount))
+                    }
                 }
-            }
-
-            if (isImporting || lastOutcome != null) {
-                ImportProgressInline(
-                    completedCount = importCompletedCount,
-                    totalCount = importTotalCount,
-                    outcome = lastOutcome,
-                    onDone = onImportingDone,
-                )
-            } else {
-                RememberButton(
-                    onClick = onImport,
-                    enabled = selectedCount > 0,
-                    modifier = Modifier.fillMaxWidth(),
+                SplitButtonDefaults.TrailingButton(
+                    checked = sourceExpanded,
+                    onCheckedChange = { onSourceToggle() },
+                    modifier =
+                        Modifier
+                            .width(56.dp)
+                            .height(48.dp),
                 ) {
-                    Text(text = stringResource(R.string.google_tasks_import_run, selectedCount))
+                    RememberMaterialRoundedSymbol(
+                        name = "expand_less",
+                        size = 22.dp,
+                        weight = FontWeight.Medium,
+                        modifier =
+                            Modifier
+                                .graphicsLayer { rotationZ = chevronRotation }
+                                .semantics { contentDescription = cdLabel },
+                    )
                 }
             }
         }
@@ -1275,92 +1278,87 @@ private fun SourceSheet(
 }
 
 /**
- * Compact source chip shown in the collapsed sheet. Title + subtitle line communicate the
- * active source at a glance; tap surface forwards to the sheet's expand handler. Up-chevron
- * hint signals "tap to see more".
+ * Inline popup that rises above the import button when the user taps the chevron. Hosts
+ * the source identity card + four action rows (refresh / switch / use Takeout / disconnect).
+ * Tapping the chevron again or any action row collapses the popup. This is intentionally
+ * NOT a ModalBottomSheet - we want the page content to stay visible behind it and the
+ * import button to remain reachable below it.
  */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun SourceChipRow(
+private fun SourcePopup(
+    modifier: Modifier = Modifier,
     state: GoogleTasksImportUiState,
-    onClick: () -> Unit,
-    chevronUp: Boolean,
+    isImporting: Boolean,
+    onRefresh: () -> Unit,
+    onSwitchAccount: () -> Unit,
+    onSwitchToTakeout: () -> Unit,
+    onSwitchToGoogle: () -> Unit,
+    onDisconnect: () -> Unit,
 ) {
     val isGoogle = state.selectedMethod == ImportMethod.GrantPermission
-    val title =
-        if (isGoogle) {
-            stringResource(
-                R.string.google_tasks_import_source_chip_google_title,
-                state.accountEmail.orEmpty().ifBlank { stringResource(R.string.google_tasks_import_signed_in_unknown_email) },
-            )
-        } else {
-            stringResource(R.string.google_tasks_import_source_chip_takeout_title)
-        }
-    val subtitle =
-        stringResource(
-            R.string.google_tasks_import_source_google_subtitle,
-            state.tasks.size,
-            state.taskLists.size,
-        )
-    val cdLabel =
-        if (chevronUp) {
-            stringResource(R.string.google_tasks_import_source_chip_collapse_cd)
-        } else {
-            stringResource(R.string.google_tasks_import_source_chip_expand_cd)
-        }
-    // secondaryContainer pulls the chip toward a different color slot than the sheet's
-    // surface tone, so the chip reads as a clearly distinct, tappable thing inside the sheet
-    // rather than melting into it.
+    val canRefresh = isGoogle && !isImporting
     Surface(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .semantics { contentDescription = cdLabel }
-                .tapSoundClickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.secondaryContainer,
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.extraLarge,
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        tonalElevation = 6.dp,
+        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.4f)),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(28.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f)),
-                contentAlignment = Alignment.Center,
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = if (isGoogle) "account_circle" else "upload_file",
-                    size = 18.dp,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    weight = FontWeight.Medium,
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            RememberMaterialRoundedSymbol(
-                name = if (chevronUp) "expand_more" else "expand_less",
-                size = 20.dp,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                weight = FontWeight.Medium,
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                text = stringResource(R.string.google_tasks_import_source_label),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
             )
+            SourceIdentityCard(state = state)
+            Spacer(Modifier.height(8.dp))
+            // Contextual action set: Google mode and Takeout mode each show a different
+            // list. We do NOT show "Use Takeout JSON instead" when already in Takeout mode,
+            // and the destructive row reads "Disconnect" for Google (sign-out semantics)
+            // vs "Cancel" for Takeout (just clears the loaded file - there's no account
+            // to disconnect from).
+            if (isGoogle) {
+                SourceActionRow(
+                    symbolName = "refresh",
+                    label = stringResource(R.string.google_tasks_import_source_action_refresh),
+                    enabled = canRefresh,
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    onClick = onRefresh,
+                )
+                SourceActionRow(
+                    symbolName = "switch_account",
+                    label = stringResource(R.string.google_tasks_import_source_action_switch_account),
+                    iconTint = MaterialTheme.colorScheme.secondary,
+                    onClick = onSwitchAccount,
+                )
+                SourceActionRow(
+                    symbolName = "upload_file",
+                    label = stringResource(R.string.google_tasks_import_source_action_use_takeout),
+                    iconTint = MaterialTheme.colorScheme.tertiary,
+                    onClick = onSwitchToTakeout,
+                )
+                SourceActionRow(
+                    symbolName = "logout",
+                    label = stringResource(R.string.google_tasks_import_source_action_disconnect),
+                    destructive = true,
+                    onClick = onDisconnect,
+                )
+            } else {
+                SourceActionRow(
+                    symbolName = "account_circle",
+                    label = stringResource(R.string.google_tasks_import_source_action_connect_google),
+                    iconTint = MaterialTheme.colorScheme.primary,
+                    onClick = onSwitchToGoogle,
+                )
+                SourceActionRow(
+                    symbolName = "close",
+                    label = stringResource(R.string.google_tasks_import_source_action_cancel_takeout),
+                    destructive = true,
+                    onClick = onDisconnect,
+                )
+            }
         }
     }
 }
@@ -1386,7 +1384,7 @@ private fun SourceIdentityCard(state: GoogleTasksImportUiState) {
     // from the surrounding surfaceContainerHighest sheet.
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.tertiaryContainer,
     ) {
         Row(
@@ -1398,7 +1396,7 @@ private fun SourceIdentityCard(state: GoogleTasksImportUiState) {
                 modifier =
                     Modifier
                         .size(32.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(MaterialTheme.shapes.small)
                         .background(MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.12f)),
                 contentAlignment = Alignment.Center,
             ) {
@@ -1479,7 +1477,7 @@ private fun SourceActionRow(
             modifier =
                 Modifier
                     .size(32.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .clip(MaterialTheme.shapes.small)
                     .background(chipBackground),
             contentAlignment = Alignment.Center,
         ) {
@@ -1526,7 +1524,7 @@ private fun ImportProgressInline(
     )
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.extraLarge,
         color = MaterialTheme.colorScheme.primaryContainer,
     ) {
         Column(
@@ -1614,7 +1612,7 @@ private fun SourceSwitchConfirmation(
 private fun TakeoutCollapseSummary(stats: GoogleTasksTakeoutStats) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         tonalElevation = 1.dp,
     ) {
@@ -1689,10 +1687,23 @@ private fun ImportModeDropdown(
     }
 }
 
+/**
+ * Standalone task card following the M3 multi-select list pattern. The visual delta
+ * between selected and unselected is purely a background-colour shift to
+ * `secondaryContainer` (the M3 "this is selected" container) - NO border treatment, no
+ * extra elevation, no opacity changes. That keeps the list scannable and avoids the
+ * "every selected card has a chunky outline" problem from the previous design.
+ *
+ * Already-imported tasks dim to 0.6 alpha and show a muted "imported" label so users
+ * can see they've already handled them at a glance, without making them unselectable
+ * (the user might want to re-import via the Overwrite imported pill).
+ *
+ * The list-name chip is intentionally absent - the GroupCard header above already
+ * labels the source list, so re-stating it on every row was redundant noise.
+ */
 @Composable
 private fun TaskRow(
     wrapper: TaskToImport,
-    position: GroupPosition,
     selected: Boolean,
     alreadyImported: Boolean,
     onToggle: () -> Unit,
@@ -1714,90 +1725,111 @@ private fun TaskRow(
             ?.trim()
             .orEmpty()
     val statusCompleted = wrapper.task.status.equals(GoogleTaskStatus.COMPLETED, ignoreCase = true)
-    val cardColors = elevatedCardColors()
 
+    val cardColor =
+        if (selected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surfaceContainer
+        }
+    val titleColor =
+        if (selected) {
+            MaterialTheme.colorScheme.onSecondaryContainer
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
+    val supportingColor =
+        if (selected) {
+            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f)
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    val cardAlpha = if (alreadyImported && !selected) 0.6f else 1f
+
+    val cardShape = MaterialTheme.shapes.medium
     Surface(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .graphicsLayer { alpha = cardAlpha }
+                // Clip to the rounded shape BEFORE the clickable so the ripple is bounded
+                // by the same rounded outline the surface paints. Without this clip, the
+                // clickable's ripple uses the rectangular layout bounds and the long-press
+                // ripple shows sharp corners that bleed past the rounded card edges.
+                .clip(cardShape)
                 .tapSoundClickable(onClick = onToggle),
-        shape = groupedItemShape(position),
-        color = cardColors.containerColor,
-        contentColor = cardColors.contentColor,
-        tonalElevation = 1.dp,
-        shadowElevation = 0.dp,
+        shape = cardShape,
+        color = cardColor,
     ) {
-        ListItem(
-            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
-            leadingContent = {
-                RememberCheckbox(
-                    checked = selected,
-                    onCheckedChange = { onToggle() },
-                )
-            },
-            headlineContent = {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            RememberCheckbox(
+                checked = selected,
+                onCheckedChange = null,
+            )
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = displayTitle.ifBlank { stringResource(R.string.google_tasks_import_untitled_task) },
                     style = MaterialTheme.typography.bodyLarge,
+                    color = titleColor,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                 )
-            },
-            supportingContent = {
-                Column {
-                    if (noteSnippet.isNotBlank()) {
-                        Text(
-                            text = noteSnippet,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                if (noteSnippet.isNotBlank()) {
+                    Text(
+                        text = noteSnippet,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = supportingColor,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                val hasMeta = dueLabel != null || statusCompleted || alreadyImported
+                if (hasMeta) {
                     Row(
                         modifier = Modifier.padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        AssistChip(
-                            onClick = {},
-                            label = {
-                                Text(
-                                    wrapper.taskListTitle,
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            },
-                            colors =
-                                AssistChipDefaults.assistChipColors(
-                                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                    labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
-                                ),
-                        )
                         if (dueLabel != null) {
                             Text(
                                 text = stringResource(R.string.google_tasks_import_due_label, dueLabel),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = supportingColor,
                             )
                         }
                         if (statusCompleted) {
                             Text(
                                 text = stringResource(R.string.google_tasks_import_completed_chip),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.tertiary,
+                                color =
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.tertiary
+                                    },
                             )
                         }
                         if (alreadyImported) {
                             Text(
                                 text = stringResource(R.string.google_tasks_import_already_imported_chip),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                color =
+                                    if (selected) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
                             )
                         }
                     }
                 }
-            },
-        )
+            }
+        }
     }
 }
 

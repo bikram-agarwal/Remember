@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -39,12 +40,14 @@ import dev.bikram.remember.ui.components.PlayStoreGlobalUpdateBanner
 import dev.bikram.remember.ui.components.SwipeDismissableUpdatePromoBanner
 import dev.bikram.remember.ui.lock.LockScreen
 import dev.bikram.remember.ui.nav.RememberNavGraph
+import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
 import dev.bikram.remember.update.PlayInAppUpdateProgressController
 import dev.bikram.remember.update.RememberUpdateState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -81,6 +84,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         handleIntent(intent)
+        applicationScope.launch { themePrefs.migrateLegacyColorSourceIfNeeded() }
         setContent {
             val themeState by themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
@@ -91,21 +95,23 @@ class MainActivity : FragmentActivity() {
             val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
                 initialValue = InteractionState(),
             )
-            RememberTheme(
-                themeState = themeState.copy(tagColors = tagColors),
-                interactionState = interactionState,
-            ) {
-                AppRoot(
-                    noteRepository = noteRepository,
-                    onboardingPrefs = onboardingPrefs,
-                    interactionPrefs = interactionPrefs,
-                    lockPrefs = lockPrefs,
-                    rememberUpdateState = rememberUpdateState,
-                    playInAppUpdateProgressController = playInAppUpdateProgressController,
-                    appScope = applicationScope,
-                    launchFlow = pendingLaunch,
-                    appUnlocked = appUnlocked,
-                )
+            CompositionLocalProvider(LocalTagColors provides tagColors) {
+                RememberTheme(
+                    themeState = themeState,
+                    interactionState = interactionState,
+                ) {
+                    AppRoot(
+                        noteRepository = noteRepository,
+                        onboardingPrefs = onboardingPrefs,
+                        interactionPrefs = interactionPrefs,
+                        lockPrefs = lockPrefs,
+                        rememberUpdateState = rememberUpdateState,
+                        playInAppUpdateProgressController = playInAppUpdateProgressController,
+                        appScope = applicationScope,
+                        launchFlow = pendingLaunch,
+                        appUnlocked = appUnlocked,
+                    )
+                }
             }
         }
     }
@@ -179,12 +185,7 @@ private fun AppRoot(
     val currentLockState = lockState
 
     if (currentLockState == null) {
-        androidx.compose.foundation.layout
-            .Box(
-                modifier =
-                    androidx.compose.ui.Modifier
-                        .fillMaxSize(),
-            )
+        Box(modifier = Modifier.fillMaxSize())
         return
     }
 

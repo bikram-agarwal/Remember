@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.edit
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -32,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
@@ -41,9 +43,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
-import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
+import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.components.NoteActionBottomBarContent
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
@@ -63,7 +65,6 @@ private enum class EditorBottomSlot { Format, Action, None }
 
 @Composable
 fun EditNoteRoute(
-    repository: NoteRepository,
     appScope: CoroutineScope,
     noteId: Long?,
     forceEdit: Boolean = false,
@@ -71,15 +72,19 @@ fun EditNoteRoute(
 ) {
     val vm: EditNoteViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
+    val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
+    val sharedBoundsSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
+    val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
     val sharedModifier =
         if (sharedScope != null && navScope != null && noteId != null) {
             with(sharedScope) {
                 Modifier.sharedBounds(
                     sharedContentState = rememberSharedContentState(key = "note-card-$noteId"),
                     animatedVisibilityScope = navScope,
+                    boundsTransform = sharedBoundsTransform,
                 )
             }
         } else {
@@ -89,11 +94,12 @@ fun EditNoteRoute(
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
         EditNoteScreen(
             vm = vm,
-            repository = repository,
             appScope = appScope,
             editorNoteKey = noteId ?: 0L,
             existing = noteId != null,
             persistedForToolbar = hasPersistedRow,
+            activeTagSuggestions = activeTagSuggestions,
+            sharedNoteId = noteId,
             forceEdit = forceEdit,
             onBack = onBack,
         )
@@ -107,11 +113,12 @@ fun EditNoteRoute(
 @Composable
 fun EditNoteScreen(
     vm: EditNoteViewModel,
-    repository: NoteRepository,
     appScope: CoroutineScope,
     editorNoteKey: Long,
     existing: Boolean,
     persistedForToolbar: Boolean,
+    activeTagSuggestions: List<String>,
+    sharedNoteId: Long?,
     forceEdit: Boolean = false,
     onBack: () -> Unit,
 ) {
@@ -204,6 +211,7 @@ fun EditNoteScreen(
         }
         onBack()
     }
+    RememberPredictiveBackHandler(onBack = handleBack)
 
     // Hoisted scroll state so the bottom action bar can hide on scroll-down and re-show on
     // scroll-up. Also keyed off IME visibility so the rich-text toolbar has the stage alone
@@ -292,6 +300,7 @@ fun EditNoteScreen(
                 scrollBehavior = scrollBehavior,
                 titlePlaceholder = titlePlaceholder,
                 existing = existing,
+                sharedNoteId = sharedNoteId,
                 isEditMode = isEditMode,
                 readOnly = readOnly,
                 markdownDisplayMode = markdownDisplayMode,
@@ -488,7 +497,7 @@ fun EditNoteScreen(
             val tags by vm.tags.collectAsState()
             TagEditorSheet(
                 initial = tags,
-                repository = repository,
+                availableTags = activeTagSuggestions,
                 onConfirm = { newTags, newColors ->
                     vm.saveTagsWithColors(newTags, newColors)
                     tagsPickerOpen = false

@@ -17,14 +17,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,7 +41,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
-import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.AppBottomSheet
@@ -54,12 +51,8 @@ import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.components.parseHexColor
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.theme.LocalTagColors
-import kotlinx.coroutines.flow.collect
+import dev.bikram.remember.ui.tags.LocalTagColors
 
-private val SwatchCorner = RoundedCornerShape(10.dp)
-private val PillCorner = RoundedCornerShape(12.dp)
-private val HexSwatchCorner = RoundedCornerShape(6.dp)
 private val FieldHeight = 40.dp
 private val SwatchGap = 8.dp
 
@@ -67,16 +60,11 @@ private val SwatchGap = 8.dp
 @Composable
 fun TagEditorSheet(
     initial: List<String>,
-    repository: NoteRepository,
+    availableTags: List<String>,
     onConfirm: (List<String>, Map<String, String>) -> Unit,
     onEditExistingTag: (oldName: String, newName: String, colorHex: String?, resetColor: Boolean) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var remoteTags by remember { mutableStateOf<List<String>>(emptyList()) }
-    LaunchedEffect(repository) {
-        repository.observeActiveTagSuggestions().collect { remoteTags = it }
-    }
-
     var tags by rememberSaveable { mutableStateOf(initial) }
     var draftName by rememberSaveable { mutableStateOf("") }
     val firstHex = paletteHex(TagPalette.presets[0])
@@ -90,6 +78,7 @@ fun TagEditorSheet(
     val trimmedDraft = draftName.trim()
     val chosenColor: Color = parseHexColor(lastValidHex) ?: TagPalette.presets[0]
     val chosenHex: String = lastValidHex
+    val hexSwatchShape = MaterialTheme.shapes.extraSmall
 
     fun hexForTag(tag: String): String {
         val key = tag.trim().lowercase()
@@ -136,7 +125,7 @@ fun TagEditorSheet(
         val finalColors: Map<String, String>
         if (trimmed.isNotBlank() && tags.none { it.equals(trimmed, ignoreCase = true) }) {
             finalTags = tags + trimmed
-            finalColors = newColors + (trimmed.lowercase() to chosenHex)
+            finalColors = newColors + (trimmed to chosenHex)
         } else {
             finalTags = tags
             finalColors = newColors
@@ -147,7 +136,7 @@ fun TagEditorSheet(
     val suggestions: List<String> =
         run {
             val seen = LinkedHashMap<String, String>()
-            (remoteTags + tags + newColors.keys).forEach { raw ->
+            (availableTags + tags + newColors.keys).forEach { raw ->
                 val trim = raw.trim()
                 if (trim.isBlank()) return@forEach
                 val key = trim.lowercase()
@@ -310,12 +299,12 @@ fun TagEditorSheet(
                         modifier =
                             Modifier
                                 .size(20.dp)
-                                .clip(HexSwatchCorner)
+                                .clip(hexSwatchShape)
                                 .background(chosenColor)
                                 .border(
                                     width = 1.dp,
                                     color = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f),
-                                    shape = HexSwatchCorner,
+                                    shape = hexSwatchShape,
                                 ),
                     )
                 },
@@ -353,12 +342,13 @@ internal fun CompactOutlinedField(
     leading: (@Composable () -> Unit)? = null,
 ) {
     val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    val pillShape = MaterialTheme.shapes.medium
     Row(
         modifier =
             modifier
                 .height(FieldHeight)
-                .clip(PillCorner)
-                .border(width = 1.dp, color = borderColor, shape = PillCorner)
+                .clip(pillShape)
+                .border(width = 1.dp, color = borderColor, shape = pillShape)
                 .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -405,6 +395,7 @@ internal fun ColorGrid(
     onSelect: (String) -> Unit,
 ) {
     val grid = TagPalette.grid
+    val swatchShape = MaterialTheme.shapes.small
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(SwatchGap),
@@ -424,7 +415,7 @@ internal fun ColorGrid(
                             Modifier
                                 .weight(1f, fill = true)
                                 .aspectRatio(1f)
-                                .clip(SwatchCorner)
+                                .clip(swatchShape)
                                 .background(color)
                                 .border(
                                     width = if (selected) 2.dp else 1.dp,
@@ -434,7 +425,7 @@ internal fun ColorGrid(
                                         } else {
                                             MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
                                         },
-                                    shape = SwatchCorner,
+                                    shape = swatchShape,
                                 ).tapSoundClickable { onSelect(hex) },
                         contentAlignment = Alignment.Center,
                     ) {

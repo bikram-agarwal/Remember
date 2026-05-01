@@ -75,7 +75,7 @@ class BackupIo(
             repository.tagRepository
                 ?.observeTagColorMap()
                 ?.first()
-                .orEmpty()
+                ?: emptyMap()
         val root =
             JSONObject().apply {
                 put("version", SCHEMA_VERSION)
@@ -379,7 +379,6 @@ class BackupIo(
                         )
                     }
                 importSettingsFromJson(payload.settingsJson)
-                repository.tagRepository?.synchronizeLegacyTagColors()
                 count
             } finally {
                 payload.extractRoot?.deleteRecursively()
@@ -582,9 +581,7 @@ class BackupIo(
             val settingsText = if (settingsFile.isFile) settingsFile.readText(Charsets.UTF_8) else null
             val settingsJson = settingsText?.let { runCatching { JSONObject(it) }.getOrNull() }
             importSettingsFromJson(settingsJson)
-            importFromJsonText(notesText, extractRoot, preserveNoteIds).also {
-                repository.tagRepository?.synchronizeLegacyTagColors()
-            }
+            importFromJsonText(notesText, extractRoot, preserveNoteIds)
         } finally {
             extractRoot.deleteRecursively()
         }

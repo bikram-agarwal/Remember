@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -75,7 +74,6 @@ private fun BulkTagIntent.next(): BulkTagIntent =
     }
 
 private val BulkTagFieldHeight = 40.dp
-private val BulkTagHexSwatchCorner = RoundedCornerShape(6.dp)
 
 /**
  * Bottom sheet for applying / removing tags on a batch of selected notes.
@@ -119,6 +117,7 @@ fun BulkTagSheet(
         trimmedDraft.isNotBlank() &&
             normalizedLowerTags.contains(trimmedDraft.lowercase())
     val chosenColor: Color = parseHexColor(lastValidHex) ?: TagPalette.presets[0]
+    val hexSwatchShape = MaterialTheme.shapes.extraSmall
     val canStageNewTag = trimmedDraft.isNotBlank() && !draftIsDuplicate
 
     val hasPending = tagIntents.values.any { it != BulkTagIntent.NEUTRAL }
@@ -127,7 +126,7 @@ fun BulkTagSheet(
         if (!canStageNewTag) return
         extraAdded.add(trimmedDraft)
         tagIntents[trimmedDraft] = BulkTagIntent.ADD
-        newTagColorsState[trimmedDraft.lowercase()] = lastValidHex
+        newTagColorsState[trimmedDraft] = lastValidHex
         draftName = ""
     }
 
@@ -153,7 +152,7 @@ fun BulkTagSheet(
                             .toSet()
                     val colors =
                         newTagColorsState
-                            .filterKeys { key -> adds.any { it.lowercase() == key } }
+                            .filterKeys { key -> adds.any { tag -> tag.equals(key, ignoreCase = true) } }
                             .toMap()
                     onApply(adds, removes, colors)
                     // Selection mode exits after apply (VM clears selectedIds) - the sheet must
@@ -189,7 +188,10 @@ fun BulkTagSheet(
                     // A tag staged during this sheet session has its color in newTagColorsState
                     // but NOT yet in LocalTagColors (that only updates post-apply). Prefer the
                     // pending color so the chip matches what the user just picked in the form.
-                    val pendingHex = newTagColorsState[tag.lowercase()]
+                    val pendingHex =
+                        newTagColorsState.entries
+                            .firstOrNull { (tagName) -> tagName.equals(tag, ignoreCase = true) }
+                            ?.value
                     val chipColor = pendingHex?.let { parseHexColor(it) } ?: tagColor(tag)
                     TriStateTagChip(
                         tag = tag,
@@ -287,14 +289,14 @@ fun BulkTagSheet(
                                 modifier =
                                     Modifier
                                         .size(20.dp)
-                                        .clip(BulkTagHexSwatchCorner)
+                                        .clip(hexSwatchShape)
                                         .background(chosenColor)
                                         .border(
                                             width = 1.dp,
                                             color =
                                                 MaterialTheme.colorScheme.outline
                                                     .copy(alpha = 0.45f),
-                                            shape = BulkTagHexSwatchCorner,
+                                            shape = hexSwatchShape,
                                         ),
                             )
                         },

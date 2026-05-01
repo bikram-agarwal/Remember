@@ -1,10 +1,16 @@
 package dev.bikram.remember.data
 
 import androidx.room.withTransaction
+import dev.bikram.remember.di.DefaultDispatcher
+import dev.bikram.remember.di.IoDispatcher
 import dev.bikram.remember.reminders.ReminderScheduler
 import dev.bikram.remember.widget.NotesWidgetUpdater
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 
 data class NoteOptions(
@@ -45,25 +51,28 @@ class NoteRepository(
     private val database: RememberDatabase? = null,
     private val notesWidgetUpdater: NotesWidgetUpdater? = null,
     private val appMediaStorage: AppMediaStorage? = null,
+    @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) {
-    fun observeActive(): Flow<List<NoteWithItems>> = noteDao.observeActive()
+    fun observeActive(): Flow<List<NoteWithItems>> = noteDao.observeActive().flowOn(ioDispatcher)
 
     /** Distinct tag names from non-trashed notes; for suggestion UIs (sheet-scoped collection preferred). */
     fun observeActiveTagSuggestions(): Flow<List<String>> =
-        tagRepository?.observeActiveTagSuggestions()
-            ?: observeActive().map { notes ->
-                notes
-                    .flatMap { it.note.tags }
-                    .filterNot { it == RememberReservedTags.FAVORITE }
-                    .distinct()
-                    .sorted()
-            }
+        tagRepository?.observeActiveTagSuggestions()?.flowOn(ioDispatcher)
+            ?: observeActive()
+                .map { notes ->
+                    notes
+                        .flatMap { it.note.tags }
+                        .filterNot { it == RememberReservedTags.FAVORITE }
+                        .distinct()
+                        .sorted()
+                }.flowOn(defaultDispatcher)
 
-    fun observeTrashed(): Flow<List<NoteWithItems>> = noteDao.observeTrashed()
+    fun observeTrashed(): Flow<List<NoteWithItems>> = noteDao.observeTrashed().flowOn(ioDispatcher)
 
-    fun observeArchived(): Flow<List<NoteWithItems>> = noteDao.observeArchived()
+    fun observeArchived(): Flow<List<NoteWithItems>> = noteDao.observeArchived().flowOn(ioDispatcher)
 
-    fun observe(id: Long): Flow<NoteWithItems?> = noteDao.observe(id)
+    fun observe(id: Long): Flow<NoteWithItems?> = noteDao.observe(id).flowOn(ioDispatcher)
 
     suspend fun get(id: Long): NoteWithItems? = noteDao.get(id)
 
@@ -76,36 +85,45 @@ class NoteRepository(
     fun searchNotes(query: String): Flow<List<NoteWithItems>> {
         val fts = toFtsPrefixQuery(query)
         return if (fts.isEmpty()) {
-            kotlinx.coroutines.flow.flowOf(emptyList())
+            flowOf(emptyList())
         } else {
-            combine(noteDao.searchNotes(fts), noteDao.observeActive()) { ftsMatches, activeNotes ->
+            combine(
+                noteDao.searchNotes(fts).flowOn(ioDispatcher),
+                noteDao.observeActive().flowOn(ioDispatcher),
+            ) { ftsMatches, activeNotes ->
                 mergeSearchMatches(ftsMatches, activeNotes, query)
             }
-        }
+        }.flowOn(defaultDispatcher)
     }
 
     /** Same FTS prefix match as [searchNotes], but scoped to archived notes only. */
     fun searchArchivedNotes(query: String): Flow<List<NoteWithItems>> {
         val fts = toFtsPrefixQuery(query)
         return if (fts.isEmpty()) {
-            kotlinx.coroutines.flow.flowOf(emptyList())
+            flowOf(emptyList())
         } else {
-            combine(noteDao.searchArchived(fts), noteDao.observeArchived()) { ftsMatches, archivedNotes ->
+            combine(
+                noteDao.searchArchived(fts).flowOn(ioDispatcher),
+                noteDao.observeArchived().flowOn(ioDispatcher),
+            ) { ftsMatches, archivedNotes ->
                 mergeSearchMatches(ftsMatches, archivedNotes, query)
             }
-        }
+        }.flowOn(defaultDispatcher)
     }
 
     /** Same FTS prefix match as [searchNotes], but scoped to trashed notes only. */
     fun searchTrashedNotes(query: String): Flow<List<NoteWithItems>> {
         val fts = toFtsPrefixQuery(query)
         return if (fts.isEmpty()) {
-            kotlinx.coroutines.flow.flowOf(emptyList())
+            flowOf(emptyList())
         } else {
-            combine(noteDao.searchTrashed(fts), noteDao.observeTrashed()) { ftsMatches, trashedNotes ->
+            combine(
+                noteDao.searchTrashed(fts).flowOn(ioDispatcher),
+                noteDao.observeTrashed().flowOn(ioDispatcher),
+            ) { ftsMatches, trashedNotes ->
                 mergeSearchMatches(ftsMatches, trashedNotes, query)
             }
-        }
+        }.flowOn(defaultDispatcher)
     }
 
     private fun mergeSearchMatches(

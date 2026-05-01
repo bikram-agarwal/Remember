@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
@@ -48,6 +47,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -286,6 +286,7 @@ internal fun EditNoteTopBarSection(
     scrollBehavior: TopAppBarScrollBehavior,
     titlePlaceholder: String,
     existing: Boolean,
+    sharedNoteId: Long?,
     isEditMode: Boolean,
     readOnly: Boolean,
     markdownDisplayMode: MarkdownEditorDisplayMode,
@@ -295,6 +296,10 @@ internal fun EditNoteTopBarSection(
 ) {
     val title by vm.title.collectAsStateWithLifecycle()
     val iconKey by vm.iconKey.collectAsStateWithLifecycle()
+    val sharedTransitionActive =
+        dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
+            ?.isTransitionActive == true &&
+            sharedNoteId != null
 
     val newNoteTitleFocus = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -306,156 +311,172 @@ internal fun EditNoteTopBarSection(
         }
     }
 
-    LargeTopAppBar(
-        colors = transparentLargeTopAppBarColors(),
-        title = {
-            val collapseFraction = scrollBehavior.state.collapsedFraction
-            val expandedStyle = MaterialTheme.typography.headlineMedium
-            val collapsedStyle = MaterialTheme.typography.titleLarge
-            val titleStyle =
-                expandedStyle.copy(
-                    fontSize = lerp(expandedStyle.fontSize, collapsedStyle.fontSize, collapseFraction),
-                    lineHeight = lerp(expandedStyle.lineHeight, collapsedStyle.lineHeight, collapseFraction),
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-            val iconSize = lerp(28.dp, 22.dp, collapseFraction)
-            val iconGap = lerp(12.dp, 8.dp, collapseFraction)
-            val headerSymbol = iconSymbolName(iconKey)
-            val headerBrandDrawable = iconDrawableRes(iconKey)
-            val headerEmoji = iconEmojiPayload(iconKey)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                if (headerSymbol != null) {
-                    RememberMaterialRoundedSymbol(
-                        name = headerSymbol,
-                        size = iconSize,
-                        tint = MaterialTheme.colorScheme.primary,
-                        weight = FontWeight.Medium,
+    Box {
+        LargeTopAppBar(
+            colors = transparentLargeTopAppBarColors(),
+            title = {
+                val collapseFraction = scrollBehavior.state.collapsedFraction
+                val expandedStyle = MaterialTheme.typography.headlineMedium
+                val collapsedStyle = MaterialTheme.typography.titleLarge
+                val titleStyle =
+                    expandedStyle.copy(
+                        fontSize = lerp(expandedStyle.fontSize, collapsedStyle.fontSize, collapseFraction),
+                        lineHeight = lerp(expandedStyle.lineHeight, collapsedStyle.lineHeight, collapseFraction),
+                        color = MaterialTheme.colorScheme.onSurface,
                     )
-                    Spacer(Modifier.width(iconGap))
-                } else if (headerBrandDrawable != null) {
-                    Icon(
-                        painterResource(headerBrandDrawable),
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(iconSize),
-                    )
-                    Spacer(Modifier.width(iconGap))
-                } else if (headerEmoji != null) {
-                    Text(
-                        text = headerEmoji,
-                        style = titleStyle.copy(fontSize = iconSize.value.sp),
-                    )
-                    Spacer(Modifier.width(iconGap))
-                } else {
-                    RememberMaterialRoundedSymbol(
-                        name = DEFAULT_NOTE_HEADER_SYMBOL,
-                        size = iconSize,
-                        tint = MaterialTheme.colorScheme.primary,
-                        weight = FontWeight.Medium,
-                    )
-                    Spacer(Modifier.width(iconGap))
-                }
-                if ((isEditMode && !readOnly) || title.isEmpty()) {
-                    BasicTextField(
-                        value = title,
-                        onValueChange = { if (it.length <= 80) vm.setTitle(it) },
-                        textStyle = titleStyle,
-                        enabled = !readOnly,
-                        keyboardOptions =
-                            androidx.compose.foundation.text.KeyboardOptions(
-                                capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
-                                imeAction = androidx.compose.ui.text.input.ImeAction.Next,
-                            ),
-                        singleLine = true,
-                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .focusRequester(newNoteTitleFocus),
-                        decorationBox = { inner ->
-                            if (title.isEmpty()) {
-                                Text(
-                                    text = titlePlaceholder,
-                                    style =
-                                        titleStyle.copy(
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                        ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                            inner()
-                        },
-                    )
-                } else {
-                    SelectionContainer {
+                val iconSize = lerp(28.dp, 22.dp, collapseFraction)
+                val iconGap = lerp(12.dp, 8.dp, collapseFraction)
+                val headerSymbol = iconSymbolName(iconKey)
+                val headerBrandDrawable = iconDrawableRes(iconKey)
+                val headerEmoji = iconEmojiPayload(iconKey)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .alpha(if (sharedTransitionActive) 0f else 1f),
+                ) {
+                    if (headerSymbol != null) {
+                        RememberMaterialRoundedSymbol(
+                            name = headerSymbol,
+                            size = iconSize,
+                            tint = MaterialTheme.colorScheme.primary,
+                            weight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.width(iconGap))
+                    } else if (headerBrandDrawable != null) {
+                        Icon(
+                            painterResource(headerBrandDrawable),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(iconSize),
+                        )
+                        Spacer(Modifier.width(iconGap))
+                    } else if (headerEmoji != null) {
                         Text(
-                            text = title,
-                            style = titleStyle,
-                            modifier = Modifier.fillMaxWidth(),
+                            text = headerEmoji,
+                            style = titleStyle.copy(fontSize = iconSize.value.sp),
+                        )
+                        Spacer(Modifier.width(iconGap))
+                    } else {
+                        RememberMaterialRoundedSymbol(
+                            name = DEFAULT_NOTE_HEADER_SYMBOL,
+                            size = iconSize,
+                            tint = MaterialTheme.colorScheme.primary,
+                            weight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.width(iconGap))
+                    }
+                    if ((isEditMode && !readOnly) || title.isEmpty()) {
+                        BasicTextField(
+                            value = title,
+                            onValueChange = { if (it.length <= 80) vm.setTitle(it) },
+                            textStyle = titleStyle,
+                            enabled = !readOnly,
+                            keyboardOptions =
+                                androidx.compose.foundation.text.KeyboardOptions(
+                                    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                                    imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                                ),
+                            singleLine = true,
+                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .focusRequester(newNoteTitleFocus),
+                            decorationBox = { inner ->
+                                if (title.isEmpty()) {
+                                    Text(
+                                        text = titlePlaceholder,
+                                        style =
+                                            titleStyle.copy(
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                            ),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                }
+                                inner()
+                            },
+                        )
+                    } else {
+                        SelectionContainer {
+                            Text(
+                                text = title,
+                                style = titleStyle,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                }
+            },
+            navigationIcon = {
+                RememberIconButton(onClick = onBack) {
+                    RememberMaterialRoundedSymbol(
+                        name = "arrow_back",
+                        size = 24.dp,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        weight = FontWeight.Medium,
+                    )
+                }
+            },
+            actions = {
+                // In edit mode the NoteActionBottomBar slides out (the rich-text toolbar owns the
+                // bottom slot), so we surface Save here instead. Outside edit mode this slot is
+                // empty - the action bar handles Edit / Favorite / Archive / Trash.
+                if (isEditMode && !readOnly && onSave != null) {
+                    val toggleCd =
+                        stringResource(
+                            if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
+                                R.string.cd_switch_to_live_preview
+                            } else {
+                                R.string.cd_switch_to_markdown_code
+                            },
+                        )
+                    RememberIconButton(
+                        onClick = onToggleMarkdownDisplayMode,
+                        modifier = Modifier.semantics { contentDescription = toggleCd },
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name =
+                                if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
+                                    "visibility"
+                                } else {
+                                    "code"
+                                },
+                            size = 24.dp,
+                            tint = MaterialTheme.colorScheme.primary,
+                            weight = FontWeight.Medium,
+                        )
+                    }
+                    val saveCd = stringResource(R.string.edit_save_cd)
+                    RememberIconButton(
+                        onClick = onSave,
+                        modifier = Modifier.semantics { contentDescription = saveCd },
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "check",
+                            size = 24.dp,
+                            tint = MaterialTheme.colorScheme.primary,
+                            weight = FontWeight.Medium,
                         )
                     }
                 }
-            }
-        },
-        navigationIcon = {
-            RememberIconButton(onClick = onBack) {
-                RememberMaterialRoundedSymbol(
-                    name = "arrow_back",
-                    size = 24.dp,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    weight = FontWeight.Medium,
-                )
-            }
-        },
-        actions = {
-            // In edit mode the NoteActionBottomBar slides out (the rich-text toolbar owns the
-            // bottom slot), so we surface Save here instead. Outside edit mode this slot is
-            // empty - the action bar handles Edit / Favorite / Archive / Trash.
-            if (isEditMode && !readOnly && onSave != null) {
-                val toggleCd =
-                    stringResource(
-                        if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
-                            R.string.cd_switch_to_live_preview
-                        } else {
-                            R.string.cd_switch_to_markdown_code
-                        },
-                    )
-                RememberIconButton(
-                    onClick = onToggleMarkdownDisplayMode,
-                    modifier = Modifier.semantics { contentDescription = toggleCd },
-                ) {
-                    RememberMaterialRoundedSymbol(
-                        name =
-                            if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
-                                "visibility"
-                            } else {
-                                "code"
-                            },
-                        size = 24.dp,
-                        tint = MaterialTheme.colorScheme.primary,
-                        weight = FontWeight.Medium,
-                    )
-                }
-                val saveCd = stringResource(R.string.edit_save_cd)
-                RememberIconButton(
-                    onClick = onSave,
-                    modifier = Modifier.semantics { contentDescription = saveCd },
-                ) {
-                    RememberMaterialRoundedSymbol(
-                        name = "check",
-                        size = 24.dp,
-                        tint = MaterialTheme.colorScheme.primary,
-                        weight = FontWeight.Medium,
-                    )
-                }
-            }
-        },
-        scrollBehavior = scrollBehavior,
-    )
+            },
+            scrollBehavior = scrollBehavior,
+        )
+        ExpandedEditorSharedTopBarAnchor(
+            sharedNoteId = sharedNoteId,
+            title = title,
+            fallbackTitle = titlePlaceholder,
+            iconKey = iconKey,
+            isChecklist = false,
+            modifier =
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
+        )
+    }
 }
 
 /**
@@ -944,7 +965,7 @@ private fun EditNotePictureHero(
                     Modifier
                         .fillMaxSize()
                         .then(sharedModifier)
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(MaterialTheme.shapes.large)
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                         .tapSoundClickable(onClick = onOpenFull),
             ) {

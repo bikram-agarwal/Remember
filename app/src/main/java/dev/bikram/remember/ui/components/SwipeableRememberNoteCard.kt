@@ -1,7 +1,6 @@
 package dev.bikram.remember.ui.components
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -11,13 +10,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -29,8 +28,6 @@ import dev.bikram.remember.data.SwipeGestureMode
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.semanticSwipeBackground
 import dev.bikram.remember.ui.theme.semanticSwipeIconTint
-
-private val NoteCardShape = RoundedCornerShape(12.dp)
 
 @Composable
 fun SwipeableRememberNoteCard(
@@ -47,6 +44,7 @@ fun SwipeableRememberNoteCard(
     val swipeEnd = interaction.swipeEndToStart
     val noteCompleted = note.note.completedAt != null
     val noteFavorite = note.note.favorite
+    val noteCardShape = MaterialTheme.shapes.medium
     if (!swipeEnabled) {
         NoteCard(
             note = note,
@@ -80,7 +78,7 @@ fun SwipeableRememberNoteCard(
                             onClick = { onSwipeAction(note, action) },
                         )
                     },
-            cardShape = NoteCardShape,
+            cardShape = noteCardShape,
             hapticEnabled = interaction.hapticFeedbackEnabled,
         ) {
             NoteCard(
@@ -95,17 +93,17 @@ fun SwipeableRememberNoteCard(
     DeliberateSwipeRevealCard(
         modifier = modifier.fillMaxWidth(),
         commitThresholdFraction = 0.35f,
-        cardShape = NoteCardShape,
+        cardShape = noteCardShape,
         hapticEnabled = interaction.hapticFeedbackEnabled,
         allowSwipeStartToEnd = swipeEnabled,
         allowSwipeEndToStart = swipeEnabled,
         onSwipeStartToEnd = { onSwipeAction(note, swipeStart) },
         onSwipeEndToStart = { onSwipeAction(note, swipeEnd) },
-        backgroundContent = { fromStart ->
+        backgroundContent = { fromStart, revealProgress ->
             val action = if (fromStart) swipeStart else swipeEnd
             val backgroundColor by animateColorAsState(
                 targetValue = action.semanticSwipeBackground(),
-                animationSpec = tween(300),
+                animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
                 label = "swipeBg",
             )
             val tint = action.semanticSwipeIconTint()
@@ -128,7 +126,16 @@ fun SwipeableRememberNoteCard(
                         noteCompleted ||
                         action == NoteSwipeAction.TOGGLE_FAVORITE &&
                         noteFavorite
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                val contentScale = 0.88f + 0.12f * revealProgress
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier =
+                        Modifier.graphicsLayer {
+                            alpha = revealProgress
+                            scaleX = contentScale
+                            scaleY = contentScale
+                        },
+                ) {
                     if (fromStart) {
                         RememberMaterialRoundedSymbol(
                             name = action.materialSymbolName,
