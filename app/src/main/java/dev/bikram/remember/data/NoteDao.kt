@@ -114,7 +114,7 @@ interface NoteDao {
     @Update
     suspend fun update(note: NoteEntity)
 
-    @Query("UPDATE notes SET pinned = :favorite, updatedAt = :updatedAt WHERE id = :id")
+    @Query("UPDATE notes SET favorite = :favorite, updatedAt = :updatedAt WHERE id = :id")
     suspend fun setFavorite(
         id: Long,
         favorite: Boolean,
@@ -130,8 +130,7 @@ interface NoteDao {
     @Query(
         "UPDATE notes " +
             "SET trashed = :trashed, " +
-            "pinned = CASE WHEN :trashed THEN 0 ELSE pinned END, " +
-            "archived = CASE WHEN :trashed THEN 0 ELSE archived END, " +
+            "archived = 0, " +
             "trashedAt = CASE WHEN :trashed THEN :updatedAt ELSE NULL END, " +
             "updatedAt = :updatedAt " +
             "WHERE id = :id",
@@ -143,15 +142,14 @@ interface NoteDao {
     )
 
     /**
-     * Archiving clears pinned (parity with trash) and cannot coexist with trashed = 1;
-     * if the note was in the trash, archiving lifts it out first.
+     * Archive is just another shelf: it cannot coexist with trash, but user intent
+     * like Favorite must survive archive and undo.
      */
     @Query(
         "UPDATE notes " +
             "SET archived = :archived, " +
-            "pinned = CASE WHEN :archived THEN 0 ELSE pinned END, " +
-            "trashed = CASE WHEN :archived THEN 0 ELSE trashed END, " +
-            "trashedAt = CASE WHEN :archived THEN NULL ELSE trashedAt END, " +
+            "trashed = 0, " +
+            "trashedAt = NULL, " +
             "updatedAt = :updatedAt " +
             "WHERE id = :id",
     )

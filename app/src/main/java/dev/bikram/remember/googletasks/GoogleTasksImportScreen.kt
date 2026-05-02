@@ -63,6 +63,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -108,6 +109,7 @@ fun GoogleTasksImportRoute(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val vm: GoogleTasksImportViewModel = hiltViewModel()
 
     val state by vm.state.collectAsStateWithLifecycle()
@@ -147,17 +149,17 @@ fun GoogleTasksImportRoute(
     LaunchedEffect(state.error) {
         val message =
             when (val err = state.error) {
-                ImportError.Network -> context.getString(R.string.google_tasks_import_error_network)
-                ImportError.ConsentDenied -> context.getString(R.string.google_tasks_import_error_consent)
+                ImportError.Network -> resources.getString(R.string.google_tasks_import_error_network)
+                ImportError.ConsentDenied -> resources.getString(R.string.google_tasks_import_error_consent)
                 is ImportError.TakeoutParseFailed ->
                     err.message
-                        ?: context.getString(R.string.google_tasks_import_error_takeout_parse)
+                        ?: resources.getString(R.string.google_tasks_import_error_takeout_parse)
                 is ImportError.AuthFailed ->
                     err.message
-                        ?: context.getString(R.string.google_tasks_import_error_auth_default)
+                        ?: resources.getString(R.string.google_tasks_import_error_auth_default)
                 is ImportError.Unknown ->
                     err.message
-                        ?: context.getString(R.string.google_tasks_import_error_unknown_default)
+                        ?: resources.getString(R.string.google_tasks_import_error_unknown_default)
                 null -> return@LaunchedEffect
             }
         snackbarHostState.showSnackbar(message)
@@ -174,7 +176,7 @@ fun GoogleTasksImportRoute(
             return@LaunchedEffect
         }
         val message =
-            context.getString(
+            resources.getString(
                 R.string.google_tasks_import_takeout_collapse_summary,
                 stats.collapsedInstanceCount,
                 stats.recurringSeriesCount,
@@ -277,7 +279,8 @@ fun GoogleTasksImportRoute(
                                 vm.setImportMethod(ImportMethod.GrantPermission)
                                 vm.connect()
                             },
-                            onDisconnect = vm::switchAccount,
+                            onDisconnect = vm::disconnect,
+                            onCancelTakeout = vm::cancelTakeoutImport,
                             onImport = vm::runImport,
                             onImportingDone = {
                                 vm.dismissImportOutcome()
@@ -541,6 +544,7 @@ private fun LoadedPanel(
     onSwitchToTakeout: () -> Unit,
     onSwitchToGoogle: () -> Unit,
     onDisconnect: () -> Unit,
+    onCancelTakeout: () -> Unit,
     onImport: () -> Unit,
     onImportingDone: () -> Unit,
 ) {
@@ -555,11 +559,15 @@ private fun LoadedPanel(
     var pendingSourceSwitch by rememberSaveable { mutableStateOf<PendingSourceSwitch?>(null) }
 
     val attemptSwitch: (PendingSourceSwitch) -> Unit = { switch ->
-        if (totalSelected > 0) {
+        val exitsLoadedTakeout =
+            state.selectedMethod == ImportMethod.ManualImport &&
+                state.tasks.isNotEmpty() &&
+                (switch == PendingSourceSwitch.SwitchToGoogle || switch == PendingSourceSwitch.CancelTakeout)
+        if (totalSelected > 0 || exitsLoadedTakeout) {
             pendingSourceSwitch = switch
         } else {
             sourceSheetExpanded = false
-            switch.run(onSwitchAccount, onSwitchToTakeout, onSwitchToGoogle, onDisconnect)
+            switch.run(onSwitchAccount, onSwitchToTakeout, onSwitchToGoogle, onDisconnect, onCancelTakeout)
         }
     }
 
@@ -647,6 +655,7 @@ private fun LoadedPanel(
                     onSwitchToTakeout = { attemptSwitch(PendingSourceSwitch.SwitchToTakeout) },
                     onSwitchToGoogle = { attemptSwitch(PendingSourceSwitch.SwitchToGoogle) },
                     onDisconnect = { attemptSwitch(PendingSourceSwitch.Disconnect) },
+                    onCancelTakeout = { attemptSwitch(PendingSourceSwitch.CancelTakeout) },
                 )
             }
             Spacer(Modifier.height(if (sourceSheetExpanded) 8.dp else 0.dp))
@@ -666,11 +675,18 @@ private fun LoadedPanel(
         pendingSourceSwitch?.let { switch ->
             SourceSwitchConfirmation(
                 selectedCount = totalSelected,
+                pendingSourceSwitch = switch,
                 onContinue = {
                     val confirmed = switch
                     pendingSourceSwitch = null
                     sourceSheetExpanded = false
-                    confirmed.run(onSwitchAccount, onSwitchToTakeout, onSwitchToGoogle, onDisconnect)
+                    confirmed.run(
+                        onSwitchAccount,
+                        onSwitchToTakeout,
+                        onSwitchToGoogle,
+                        onDisconnect,
+                        onCancelTakeout,
+                    )
                 },
                 onDismiss = { pendingSourceSwitch = null },
             )
@@ -680,14 +696,14 @@ private fun LoadedPanel(
 
 /**
  * Decides which sub-action the user picked from the source sheet so the confirmation flow
- * can defer execution until the user resolves the dialog. The four cases line up with the
- * four rows in the expanded sheet.
+ * can defer execution until the user resolves the dialog.
  */
 private enum class PendingSourceSwitch {
     SwitchGoogleAccount,
     SwitchToTakeout,
     SwitchToGoogle,
     Disconnect,
+    CancelTakeout,
     ;
 
     fun run(
@@ -695,11 +711,13 @@ private enum class PendingSourceSwitch {
         onSwitchToTakeout: () -> Unit,
         onSwitchToGoogle: () -> Unit,
         onDisconnect: () -> Unit,
+        onCancelTakeout: () -> Unit,
     ) = when (this) {
         SwitchGoogleAccount -> onSwitchAccount()
         SwitchToTakeout -> onSwitchToTakeout()
         SwitchToGoogle -> onSwitchToGoogle()
         Disconnect -> onDisconnect()
+        CancelTakeout -> onCancelTakeout()
     }
 }
 
@@ -1295,6 +1313,7 @@ private fun SourcePopup(
     onSwitchToTakeout: () -> Unit,
     onSwitchToGoogle: () -> Unit,
     onDisconnect: () -> Unit,
+    onCancelTakeout: () -> Unit,
 ) {
     val isGoogle = state.selectedMethod == ImportMethod.GrantPermission
     val canRefresh = isGoogle && !isImporting
@@ -1356,7 +1375,7 @@ private fun SourcePopup(
                     symbolName = "close",
                     label = stringResource(R.string.google_tasks_import_source_action_cancel_takeout),
                     destructive = true,
-                    onClick = onDisconnect,
+                    onClick = onCancelTakeout,
                 )
             }
         }
@@ -1577,32 +1596,59 @@ private fun ImportProgressInline(
 }
 
 /**
- * Confirmation shown when a user taps a source-switch action with a non-empty selection
- * (going through with the switch silently nukes [selectedCount] tasks). The continue button
- * is the destructive role, since the user is acknowledging the data loss.
+ * Confirmation shown when a user taps a source action with a non-empty selection.
+ * Continuing clears the current task selection/source before anything is saved to Remember.
  */
 @Composable
 private fun SourceSwitchConfirmation(
     selectedCount: Int,
+    pendingSourceSwitch: PendingSourceSwitch,
     onContinue: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(stringResource(R.string.google_tasks_import_source_switch_confirm_title, selectedCount))
+            Text(
+                when (pendingSourceSwitch) {
+                    PendingSourceSwitch.SwitchToGoogle,
+                    PendingSourceSwitch.CancelTakeout,
+                    -> stringResource(R.string.google_tasks_import_cancel_takeout_confirm_title)
+                    else -> stringResource(R.string.google_tasks_import_source_switch_confirm_title, selectedCount)
+                },
+            )
         },
         text = {
-            Text(stringResource(R.string.google_tasks_import_source_switch_confirm_body))
+            Text(
+                when (pendingSourceSwitch) {
+                    PendingSourceSwitch.CancelTakeout ->
+                        stringResource(R.string.google_tasks_import_cancel_takeout_confirm_body)
+                    else -> stringResource(R.string.google_tasks_import_source_switch_confirm_body)
+                },
+            )
         },
         confirmButton = {
             RememberTextButton(onClick = onContinue) {
-                Text(stringResource(R.string.google_tasks_import_source_switch_confirm_continue))
+                Text(
+                    when (pendingSourceSwitch) {
+                        PendingSourceSwitch.SwitchToGoogle,
+                        PendingSourceSwitch.CancelTakeout,
+                        -> stringResource(R.string.common_yes)
+                        else -> stringResource(R.string.google_tasks_import_source_switch_confirm_continue)
+                    },
+                )
             }
         },
         dismissButton = {
             RememberTextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_cancel))
+                Text(
+                    when (pendingSourceSwitch) {
+                        PendingSourceSwitch.SwitchToGoogle,
+                        PendingSourceSwitch.CancelTakeout,
+                        -> stringResource(R.string.common_no)
+                        else -> stringResource(R.string.common_cancel)
+                    },
+                )
             }
         },
     )

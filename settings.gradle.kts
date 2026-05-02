@@ -25,4 +25,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "Remember"
 include(":app")
-include(":baselineprofile")

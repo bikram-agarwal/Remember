@@ -30,6 +30,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -40,19 +42,15 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
-import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
-import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
-import dev.bikram.remember.ui.edit.iconDrawableRes
-import dev.bikram.remember.ui.edit.iconEmojiPayload
-import dev.bikram.remember.ui.edit.iconSymbolName
+import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
@@ -62,6 +60,12 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+/**
+ * Backward-compatible wrapper that accepts the raw [NoteWithItems] and converts it to
+ * the immutable [NoteCardUiModel] before delegating to the model-based composable.
+ * Prefer the [NoteCardUiModel] overload from new call sites so the UI tree stays
+ * skippable on identical data.
+ */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NoteCard(
@@ -71,15 +75,86 @@ fun NoteCard(
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
 ) {
+    NoteCard(
+        model = remember(note) { note.toNoteCardUiModel() },
+        onClick = onClick,
+        modifier = modifier,
+        onLongClick = onLongClick,
+        selected = selected,
+    )
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun NoteCard(
+    model: NoteCardUiModel,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    selected: Boolean = false,
+) {
     val cardColors = elevatedCardColors()
-    val visibleTags = RememberReservedTags.userVisibleTags(note.note.tags)
+    val visibleTags = model.visibleTags
     val hasTagStrip = visibleTags.isNotEmpty()
     val heroEnabled = LocalHeroOnCards.current
-    val heroPictureUri = note.note.pictureUri?.takeIf { heroEnabled }
+    val heroPictureUri = model.pictureUri?.takeIf { heroEnabled }
     val showHero = heroPictureUri != null
     val surface = MaterialTheme.colorScheme.surface
     val cardShape = MaterialTheme.shapes.medium
     val favoriteIconDescription = stringResource(R.string.notecard_favorite_cd)
+
+    // Pre-resolve every fragment of the merged TalkBack announcement so the body of
+    // [remember] below can stay context-free. The five child icon contentDescriptions
+    // (favorite, picture, attachment, reminder, recurring) further down the tree stay
+    // in place; with [Modifier.semantics(mergeDescendants = true)] + an explicit parent
+    // contentDescription the parent's string is what TalkBack reads, so the children
+    // become harmless ornaments instead of getting announced one-by-one.
+    val cdNotePrefix = stringResource(R.string.notecard_cd_note, model.title)
+    val cdListPrefix = stringResource(R.string.notecard_cd_list, model.title)
+    val cdSeparator = stringResource(R.string.notecard_cd_separator)
+    val cdTagsTemplate = stringResource(R.string.notecard_cd_tags)
+    val cdSelected = stringResource(R.string.notecard_cd_selected)
+    val cdCompleted = stringResource(R.string.notecard_cd_completed)
+    val cdReminderForAnnouncement = stringResource(R.string.notecard_reminder_cd)
+    val cdRecurringForAnnouncement = stringResource(R.string.notecard_recurring_cd)
+    val cdPictureForAnnouncement = stringResource(R.string.notecard_picture_cd)
+    val cdAttachmentForAnnouncement = stringResource(R.string.notecard_attachment_cd)
+    val noteCardAnnouncement =
+        remember(
+            model.kind,
+            model.title,
+            model.body,
+            model.completed,
+            model.favorite,
+            model.reminderAt,
+            model.recurring,
+            model.pictureUri,
+            model.hasAttachment,
+            model.visibleTags,
+            selected,
+        ) {
+            buildList {
+                add(if (model.kind == NoteKind.LIST) cdListPrefix else cdNotePrefix)
+                if (selected) add(cdSelected)
+                if (model.completed) add(cdCompleted)
+                // Body preview is meaningful for note cards; list cards visually show
+                // checklist items, not the body, so we skip it for those.
+                if (model.kind != NoteKind.LIST && model.body.isNotBlank()) {
+                    val firstLine =
+                        model.body.lineSequence().firstOrNull { it.isNotBlank() }
+                            ?: model.body
+                    add(firstLine.trim().take(120))
+                }
+                if (model.visibleTags.isNotEmpty()) {
+                    add(cdTagsTemplate.format(model.visibleTags.joinToString(", ")))
+                }
+                if (model.reminderAt != null) add(cdReminderForAnnouncement)
+                if (model.recurring) add(cdRecurringForAnnouncement)
+                if (model.favorite) add(favoriteIconDescription)
+                if (model.pictureUri != null) add(cdPictureForAnnouncement)
+                if (model.hasAttachment) add(cdAttachmentForAnnouncement)
+            }.joinToString(cdSeparator)
+        }
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
@@ -89,7 +164,7 @@ fun NoteCard(
         if (sharedScope != null && navScope != null) {
             with(sharedScope) {
                 Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(key = "note-card-${note.note.id}"),
+                    sharedContentState = rememberSharedContentState(key = "note-card-${model.id}"),
                     animatedVisibilityScope = navScope,
                     boundsTransform = sharedBoundsTransform,
                 )
@@ -101,7 +176,7 @@ fun NoteCard(
         if (sharedScope != null && navScope != null) {
             with(sharedScope) {
                 Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(key = "note-title-${note.note.id}"),
+                    sharedContentState = rememberSharedContentState(key = "note-title-${model.id}"),
                     animatedVisibilityScope = navScope,
                     boundsTransform = sharedBoundsTransform,
                 )
@@ -113,7 +188,7 @@ fun NoteCard(
         if (sharedScope != null && navScope != null) {
             with(sharedScope) {
                 Modifier.sharedElement(
-                    sharedContentState = rememberSharedContentState(key = "note-icon-${note.note.id}"),
+                    sharedContentState = rememberSharedContentState(key = "note-icon-${model.id}"),
                     animatedVisibilityScope = navScope,
                     boundsTransform = sharedBoundsTransform,
                 )
@@ -130,7 +205,7 @@ fun NoteCard(
             Modifier
         }
     val favoriteBorder =
-        if (note.note.favorite && !selected) {
+        if (model.favorite && !selected) {
             Modifier.border(BorderStroke(1.dp, Color(0xFFFF9EBC).copy(alpha = 0.70f)), cardShape)
         } else {
             Modifier
@@ -141,6 +216,15 @@ fun NoteCard(
         } else {
             Modifier.tapSoundClickable(onClick = onClick)
         }
+    // Subtle pink wash on favorited cards: blend ~7% of the favorite-pink swatch into
+    // the card's base container color so the card reads as "loved" at a glance without
+    // competing with selection highlight, picture hero, or tag accents.
+    val tintedContainerColor =
+        if (model.favorite) {
+            lerp(cardColors.containerColor, Color(0xFFFF9EBC), 0.07f)
+        } else {
+            cardColors.containerColor
+        }
     Surface(
         modifier =
             modifier
@@ -149,9 +233,12 @@ fun NoteCard(
                 .clip(cardShape)
                 .then(favoriteBorder)
                 .then(selectionBorder)
-                .then(clickableModifier),
+                .then(clickableModifier)
+                .semantics(mergeDescendants = true) {
+                    contentDescription = noteCardAnnouncement
+                },
         shape = cardShape,
-        color = cardColors.containerColor,
+        color = tintedContainerColor,
         contentColor = cardColors.contentColor,
         tonalElevation = 1.dp,
         shadowElevation = 0.dp,
@@ -161,12 +248,34 @@ fun NoteCard(
                 HeroBackground(
                     uri = heroPictureUri,
                     framing =
-                        remember(note.note.pictureHeroFraming) {
-                            HeroFraming.fromJsonString(note.note.pictureHeroFraming)
+                        remember(model.pictureHeroFraming) {
+                            HeroFraming.fromJsonString(model.pictureHeroFraming)
                         },
-                    cacheRevision = note.note.updatedAt,
+                    cacheRevision = model.pictureCacheRevision,
                     scrimTop = surface.copy(alpha = 0.20f),
                     scrimBottom = surface.copy(alpha = 0.48f),
+                )
+            }
+            // Watermark heart for favorited cards. Tilted ~-15deg, low alpha, parked at
+            // the top-end. It deliberately sits *behind* the selection check overlay
+            // and the trash "30 days left" chip (both painted later in this Box / by
+            // the call site), so those affordances always win the corner. The heart is
+            // ornament-only -- TalkBack ignores it because the parent Surface already
+            // declares mergeDescendants and contentDescription includes "Favorite".
+            if (model.favorite) {
+                RememberMaterialRoundedSymbol(
+                    name = "favorite",
+                    filled = true,
+                    size = 96.dp,
+                    tint = Color(0xFFFF9EBC),
+                    weight = FontWeight.Bold,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .graphicsLayer {
+                                rotationZ = -15f
+                                alpha = 0.13f
+                            },
                 )
             }
             Row(
@@ -185,57 +294,55 @@ fun NoteCard(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val headerSymbol = iconSymbolName(note.note.iconKey)
-                        val headerBrandDrawable = iconDrawableRes(note.note.iconKey)
-                        val cardEmoji = iconEmojiPayload(note.note.iconKey)
-                        if (headerSymbol != null) {
-                            RememberMaterialRoundedSymbol(
-                                name = headerSymbol,
-                                size = 18.dp,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                weight = FontWeight.Medium,
-                                modifier = Modifier.then(sharedIconModifier).alpha(0.75f),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        } else if (headerBrandDrawable != null) {
-                            Icon(
-                                painterResource(headerBrandDrawable),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp).then(sharedIconModifier).alpha(0.75f),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        } else if (cardEmoji != null) {
-                            Text(
-                                text = cardEmoji,
-                                style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
-                                modifier = Modifier.then(sharedIconModifier).alpha(0.85f),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        } else if (note.note.kind == NoteKind.LIST) {
-                            RememberMaterialRoundedSymbol(
-                                name = DEFAULT_LIST_HEADER_SYMBOL,
-                                size = 18.dp,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                weight = FontWeight.Medium,
-                                modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        } else if (note.note.kind == NoteKind.NOTE) {
-                            RememberMaterialRoundedSymbol(
-                                name = DEFAULT_NOTE_HEADER_SYMBOL,
-                                size = 18.dp,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                weight = FontWeight.Medium,
-                                modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
-                            )
-                            Spacer(Modifier.width(8.dp))
+                        when (val headerIcon = model.icon) {
+                            is NoteIcon.Symbol ->
+                                RememberMaterialRoundedSymbol(
+                                    name = headerIcon.name,
+                                    size = 18.dp,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.then(sharedIconModifier).alpha(0.75f),
+                                )
+                            is NoteIcon.Drawable ->
+                                Icon(
+                                    painterResource(headerIcon.resId),
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier =
+                                        Modifier
+                                            .size(18.dp)
+                                            .then(sharedIconModifier)
+                                            .alpha(0.75f),
+                                )
+                            is NoteIcon.Emoji ->
+                                Text(
+                                    text = headerIcon.text,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
+                                    modifier = Modifier.then(sharedIconModifier).alpha(0.85f),
+                                )
+                            NoteIcon.ListPlaceholder ->
+                                RememberMaterialRoundedSymbol(
+                                    name = DEFAULT_LIST_HEADER_SYMBOL,
+                                    size = 18.dp,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
+                                )
+                            NoteIcon.NotePlaceholder ->
+                                RememberMaterialRoundedSymbol(
+                                    name = DEFAULT_NOTE_HEADER_SYMBOL,
+                                    size = 18.dp,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
+                                )
                         }
+                        Spacer(Modifier.width(8.dp))
                         Box(modifier = Modifier.weight(1f).then(sharedTitleModifier)) {
                             Text(
                                 text =
-                                    note.note.title.ifBlank {
-                                        if (note.note.kind == NoteKind.NOTE) {
+                                    model.title.ifBlank {
+                                        if (model.kind == NoteKind.NOTE) {
                                             stringResource(R.string.edit_note_title_new)
                                         } else {
                                             stringResource(R.string.edit_list_title_new)
@@ -248,26 +355,20 @@ fun NoteCard(
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
-                        if (note.note.favorite) {
-                            RememberMaterialRoundedSymbol(
-                                name = "favorite",
-                                size = 16.dp,
-                                tint = Color(0xFFFF9EBC),
-                                weight = FontWeight.Medium,
-                                opticalCenterYOffset = 1.dp,
-                                modifier =
-                                    Modifier
-                                        .semantics { contentDescription = favoriteIconDescription }
-                                        .alpha(0.90f),
-                            )
-                        }
+                        // Favorite was previously a small inline heart at the title's
+                        // trailing edge. It overlapped with the top-end selection
+                        // check and trash days-left chip. The favorite cue now lives
+                        // as a low-alpha tilted watermark in the card's top-right
+                        // corner (rendered on the outer Box below) plus a subtle
+                        // pink tint on the card surface; the announcement still
+                        // includes "Favorite" via the parent contentDescription.
                     }
                     Spacer(Modifier.height(6.dp))
-                    when (note.note.kind) {
+                    when (model.kind) {
                         NoteKind.NOTE -> {
-                            if (note.note.body.isNotBlank()) {
+                            if (model.body.isNotBlank()) {
                                 MarkdownText(
-                                    markdown = note.note.body,
+                                    markdown = model.body,
                                     style = MaterialTheme.typography.bodyMedium,
                                     maxLines = 3,
                                     overflow = TextOverflow.Ellipsis,
@@ -281,9 +382,13 @@ fun NoteCard(
                                 )
                             }
                         }
-                        NoteKind.LIST -> ChecklistPreview(note.items)
+                        NoteKind.LIST ->
+                            ChecklistPreview(
+                                items = model.checklistPreviewItems,
+                                hiddenCount = model.checklistHiddenItemCount,
+                            )
                     }
-                    MetadataRow(note = note, visibleTags = visibleTags)
+                    MetadataRow(model = model, visibleTags = visibleTags)
                 }
             }
             if (selected) {
@@ -335,15 +440,15 @@ private fun BoxScope.HeroBackground(
 
 @Composable
 private fun MetadataRow(
-    note: NoteWithItems,
+    model: NoteCardUiModel,
     visibleTags: List<String>,
 ) {
     val tags = visibleTags.take(3)
     val extraTags = (visibleTags.size - tags.size).coerceAtLeast(0)
-    val reminderAt = note.note.reminderAt
-    val isRecurring = note.note.recurrence != null
-    val hasPicture = note.note.pictureUri != null
-    val hasAttachment = note.attachments.isNotEmpty()
+    val reminderAt = model.reminderAt
+    val isRecurring = model.recurring
+    val hasPicture = model.pictureUri != null
+    val hasAttachment = model.hasAttachment
     val anyMetadata = tags.isNotEmpty() || reminderAt != null || hasPicture || hasAttachment
     if (!anyMetadata) return
 
@@ -460,8 +565,8 @@ private fun TagMini(label: String) {
 
 @Composable
 private fun ChecklistPreview(
-    items: List<ChecklistItemEntity>,
-    limit: Int = 2,
+    items: List<NoteCardChecklistItemUiModel>,
+    hiddenCount: Int,
 ) {
     if (items.isEmpty()) {
         Text(
@@ -471,16 +576,8 @@ private fun ChecklistPreview(
         )
         return
     }
-    // Room's @Relation returns items in primary-key order (insertion order), not user-visible
-    // order. Match the list editor: unchecked (active) rows first, then checked (completed),
-    // each block sorted by sortOrder so the home preview matches what the user sees after
-    // checking items off (they move to the completed section rather than staying in insertion
-    // order in the flat relation list).
-    val ordered =
-        items.filter { !it.checked }.sortedBy { it.sortOrder } +
-            items.filter { it.checked }.sortedBy { it.sortOrder }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        ordered.take(limit).forEach { item ->
+        items.forEach { item ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // Indent children one gutter's width to mirror the editor hierarchy.
                 if (item.depth > 0) Spacer(Modifier.width(16.dp))
@@ -502,11 +599,10 @@ private fun ChecklistPreview(
                 )
             }
         }
-        val extra = ordered.size - limit
-        if (extra > 0) {
+        if (hiddenCount > 0) {
             Spacer(Modifier.height(2.dp))
             Text(
-                text = stringResource(R.string.notecard_extra_items, extra),
+                text = stringResource(R.string.notecard_extra_items, hiddenCount),
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.alpha(0.6f),
             )

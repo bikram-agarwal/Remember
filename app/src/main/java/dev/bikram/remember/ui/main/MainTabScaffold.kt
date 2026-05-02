@@ -3,20 +3,19 @@ package dev.bikram.remember.ui.main
 import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -32,13 +31,14 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.FloatingActionButtonMenu
+import androidx.compose.material3.FloatingActionButtonMenuItem
 import androidx.compose.material3.FloatingToolbarDefaults
 import androidx.compose.material3.HorizontalFloatingToolbar
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
@@ -58,20 +58,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
 import dev.bikram.remember.R
@@ -92,8 +86,10 @@ import dev.bikram.remember.ui.history.HistoryRoute
 import dev.bikram.remember.ui.history.HistorySection
 import dev.bikram.remember.ui.home.HomeRoute
 import dev.bikram.remember.ui.settings.SettingsRoute
+import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.RoundedPolygonShape
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.launch
 
 /**
@@ -130,17 +126,14 @@ fun MainTabScaffold(
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
     var clearTrashOpen by rememberSaveable { mutableStateOf(false) }
     var moveArchiveToTrashOpen by rememberSaveable { mutableStateOf(false) }
+    var closeNotesRevealRequest by rememberSaveable { mutableStateOf(0) }
     var historySection by rememberSaveable { mutableStateOf(HistorySection.ARCHIVE) }
     var historyVisibleItemCount by rememberSaveable { mutableStateOf(0) }
     val tabStateHolder = rememberSaveableStateHolder()
     val context = LocalContext.current
-
-    // FAB position captured from the toolbar's floatingActionButton slot, in root-window
-    // coordinates. The speed-dial overlay reads it to anchor menu items above the FAB
-    // without contributing to the toolbar's layout, which is what kept the previous
-    // version's nav pill stable.
-    var fabPositionInRoot by remember { mutableStateOf<Offset?>(null) }
-    var fabSizePx by remember { mutableStateOf(IntSize.Zero) }
+    val shareText = stringResource(R.string.main_share_text)
+    val shareChooserTitle = stringResource(R.string.main_share_chooser_title)
+    val reducedMotion = LocalReducedMotion.current
 
     // Back handling: when the FAB speed dial is open, back closes it first.
     // On History/Settings tab, back returns to the Notes tab instead of exiting.
@@ -170,8 +163,10 @@ fun MainTabScaffold(
             AnimatedContent(
                 targetState = tab,
                 transitionSpec = {
-                    val forward = targetState.ordinal > initialState.ordinal
-                    if (forward) {
+                    if (reducedMotion) {
+                        fadeIn(animationSpec = tween(durationMillis = 0)) togetherWith
+                            fadeOut(animationSpec = tween(durationMillis = 0))
+                    } else if (targetState.ordinal > initialState.ordinal) {
                         (slideInHorizontally { it } + fadeIn()) togetherWith
                             (slideOutHorizontally { -it / 3 } + fadeOut())
                     } else {
@@ -187,6 +182,7 @@ fun MainTabScaffold(
                         MainTab.Notes ->
                             HomeRoute(
                                 interactionPrefs = interactionPrefs,
+                                closeRevealRequest = closeNotesRevealRequest,
                                 onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
                                 onCreateNote = {
                                     fabExpanded = false
@@ -218,8 +214,8 @@ fun MainTabScaffold(
             // Tapping the scrim collapses the menu, matching standard speed-dial dismiss.
             AnimatedVisibility(
                 visible = fabExpanded && tab == MainTab.Notes,
-                enter = fadeIn(MaterialTheme.motionScheme.fastEffectsSpec()),
-                exit = fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()),
+                enter = fadeIn(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
+                exit = fadeOut(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 Box(
@@ -230,11 +226,12 @@ fun MainTabScaffold(
                 )
             }
 
-            // Bottom strip: the nav pill is centered on screen on its own, and the FAB sits
-            // 12.dp to the right of the pill. Layout is the same on all tabs - only the FAB
-            // contents differ. Because the pill is screen-centered (not the pill+FAB unit),
-            // the FAB ends up nearer the screen's right edge, which lets the speed dial that
-            // expands above it sit close to the right edge too.
+            // Bottom strip. Pill mode (phones) re-uses the original CenteredPillWithSideFab
+            // layout so the FAB visually attaches to the pill at the same position as
+            // before; the layout's measure logic clamps its reported height to the FAB's
+            // *core* size, so when the FloatingActionButtonMenu's content expands the
+            // wrapper grows upward beyond the strip's reported bounds without pushing the
+            // pill. Rail mode is unaffected - the FAB sits in its own BottomEnd box.
             if (useAdaptiveNavigationRail) {
                 Box(
                     modifier =
@@ -246,14 +243,15 @@ fun MainTabScaffold(
                     MainFabSlot(
                         tab = tab,
                         fabExpanded = fabExpanded,
-                        onToggleNotesFab = { fabExpanded = !fabExpanded },
+                        onToggleNotesFab = {
+                            closeNotesRevealRequest++
+                            fabExpanded = !fabExpanded
+                        },
                         historySection = historySection,
                         historyVisibleItemCount = historyVisibleItemCount,
                         onClearTrashRequest = { clearTrashOpen = true },
                         onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
                         onShareApp = {
-                            val shareText = context.getString(R.string.main_share_text)
-                            val shareChooserTitle = context.getString(R.string.main_share_chooser_title)
                             val send =
                                 Intent(Intent.ACTION_SEND).apply {
                                     type = "text/plain"
@@ -261,9 +259,20 @@ fun MainTabScaffold(
                                 }
                             context.startActivity(Intent.createChooser(send, shareChooserTitle))
                         },
-                        onFabBounds = { offset, size ->
-                            fabPositionInRoot = offset
-                            fabSizePx = size
+                        onPickImport = {
+                            closeNotesRevealRequest++
+                            fabExpanded = false
+                            onImportGoogleTasks()
+                        },
+                        onPickList = {
+                            closeNotesRevealRequest++
+                            fabExpanded = false
+                            onCreateList()
+                        },
+                        onPickNote = {
+                            closeNotesRevealRequest++
+                            fabExpanded = false
+                            onCreateNote()
                         },
                     )
                 }
@@ -280,6 +289,7 @@ fun MainTabScaffold(
                         RememberFloatingNavPill(
                             currentTab = tab,
                             onTabClick = { selected ->
+                                closeNotesRevealRequest++
                                 tab = selected
                                 fabExpanded = false
                             },
@@ -289,14 +299,15 @@ fun MainTabScaffold(
                         MainFabSlot(
                             tab = tab,
                             fabExpanded = fabExpanded,
-                            onToggleNotesFab = { fabExpanded = !fabExpanded },
+                            onToggleNotesFab = {
+                                closeNotesRevealRequest++
+                                fabExpanded = !fabExpanded
+                            },
                             historySection = historySection,
                             historyVisibleItemCount = historyVisibleItemCount,
                             onClearTrashRequest = { clearTrashOpen = true },
                             onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
                             onShareApp = {
-                                val shareText = context.getString(R.string.main_share_text)
-                                val shareChooserTitle = context.getString(R.string.main_share_chooser_title)
                                 val send =
                                     Intent(Intent.ACTION_SEND).apply {
                                         type = "text/plain"
@@ -304,35 +315,27 @@ fun MainTabScaffold(
                                     }
                                 context.startActivity(Intent.createChooser(send, shareChooserTitle))
                             },
-                            onFabBounds = { offset, size ->
-                                fabPositionInRoot = offset
-                                fabSizePx = size
+                            onPickImport = {
+                                closeNotesRevealRequest++
+                                fabExpanded = false
+                                onImportGoogleTasks()
+                            },
+                            onPickList = {
+                                closeNotesRevealRequest++
+                                fabExpanded = false
+                                onCreateList()
+                            },
+                            onPickNote = {
+                                closeNotesRevealRequest++
+                                fabExpanded = false
+                                onCreateNote()
                             },
                         )
                     },
+                    fabRightInset = if (tab == MainTab.Notes) 16.dp else 0.dp,
+                    fabBottomInset = if (tab == MainTab.Notes) 16.dp else 0.dp,
                 )
             }
-
-            // Speed dial overlay: absolutely positioned above the captured FAB bounds, so
-            // expanding it cannot shift the toolbar. End-aligned with the FAB's right edge,
-            // which matches the M3 Expressive `FloatingActionButtonMenu` default placement.
-            SpeedDialOverlay(
-                visible = fabExpanded && tab == MainTab.Notes && fabPositionInRoot != null,
-                fabPositionInRoot = fabPositionInRoot,
-                fabSizePx = fabSizePx,
-                onPickImport = {
-                    fabExpanded = false
-                    onImportGoogleTasks()
-                },
-                onPickList = {
-                    fabExpanded = false
-                    onCreateList()
-                },
-                onPickNote = {
-                    fabExpanded = false
-                    onCreateNote()
-                },
-            )
 
             androidx.compose.material3.SnackbarHost(
                 hostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current,
@@ -354,6 +357,7 @@ fun MainTabScaffold(
                     item(
                         selected = tab == tabItem,
                         onClick = {
+                            closeNotesRevealRequest++
                             tab = tabItem
                             fabExpanded = false
                         },
@@ -452,14 +456,27 @@ private fun RememberFloatingNavPill(
 }
 
 /**
- * Lays out [pill] horizontally centered within the available width, then places [fab]
- * to the right of the pill with a [fabGap] gutter. Both children are vertically
- * centered to one another so a 56.dp FAB and a 64.dp pill share a centerline.
+ * Bottom-strip layout: pill horizontally centered against the strip's full width, FAB
+ * placed just to the right of the pill (or clamped to the strip's right edge if a wide
+ * pill would push it off-screen). Both children share a vertical centerline so the FAB
+ * and the pill optically sit on the same baseline.
  *
- * The layout reports the full constraint width as its measured size so the strip
- * spans navigation-bar to navigation-bar; only the children's positions move. If the
- * pill is wide enough that the FAB would overflow the right edge, the FAB's right
- * edge is clamped to the layout's right edge so it stays on-screen.
+ * Designed to host an M3 Expressive [FloatingActionButtonMenu] in the [fab] slot
+ * without letting the menu's expansion push the pill. Two tricks:
+ *
+ *   1. The [fab] child is measured with `Constraints.Infinity` for height, so the menu
+ *      can grow as tall as it wants when expanded; the strip doesn't cap it.
+ *   2. The strip's reported height is clamped to [fabCoreSize] (not the wrapper's
+ *      potentially-much-larger measured height). The expanded menu overflows upward
+ *      beyond the strip's reported bounds, but Compose draws and hit-tests it because
+ *      no parent in the chain clips. The pill never sees the menu's height.
+ *
+ * Placement of the FAB child anchors the *FAB element* (assumed to sit at the wrapper's
+ * right + bottom minus [fabRightInset] / [fabBottomInset]) at the same screen position
+ * regardless of collapsed/expanded state - menu width and height grow inward
+ * (left and up). The insets are zero for a regular FAB; the Notes
+ * [FloatingActionButtonMenu] uses Material's 16.dp horizontal menu padding and 16.dp
+ * bottom button padding.
  */
 @Composable
 private fun CenteredPillWithSideFab(
@@ -467,6 +484,9 @@ private fun CenteredPillWithSideFab(
     fab: @Composable () -> Unit,
     fabGap: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
+    fabCoreSize: androidx.compose.ui.unit.Dp = 56.dp,
+    fabRightInset: androidx.compose.ui.unit.Dp = 0.dp,
+    fabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     androidx.compose.ui.layout.Layout(
         modifier = modifier,
@@ -477,8 +497,16 @@ private fun CenteredPillWithSideFab(
     ) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val pillPlaceable = measurables[0].measure(loose)
-        val fabPlaceable = measurables[1].measure(loose)
+        // Measure the FAB child unconstrained vertically so the FloatingActionButtonMenu's
+        // expanded items can be as tall as they need without the strip capping them.
+        val fabPlaceable =
+            measurables[1].measure(
+                loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity),
+            )
         val gapPx = fabGap.roundToPx()
+        val fabCorePx = fabCoreSize.roundToPx()
+        val fabRightInsetPx = fabRightInset.roundToPx()
+        val fabBottomInsetPx = fabBottomInset.roundToPx()
 
         val width =
             if (constraints.hasBoundedWidth) {
@@ -486,20 +514,37 @@ private fun CenteredPillWithSideFab(
             } else {
                 pillPlaceable.width + gapPx + fabPlaceable.width
             }
-        val height = maxOf(pillPlaceable.height, fabPlaceable.height)
+        // Strip height tracks the FAB's *core* size rather than the wrapper's measured
+        // height. When the menu is expanded the wrapper is much taller; we deliberately
+        // ignore that so the parent layout doesn't see the bigger height and re-center
+        // the strip (which would push the pill).
+        val stripHeight = maxOf(pillPlaceable.height, fabCorePx)
 
-        layout(width, height) {
-            // Pill: horizontally centered against the layout's full width.
+        layout(width, stripHeight) {
+            // Pill: horizontally centered against the strip's full width and vertically
+            // centered within the strip.
             val pillX = (width - pillPlaceable.width) / 2
-            val pillY = (height - pillPlaceable.height) / 2
+            val pillY = (stripHeight - pillPlaceable.height) / 2
             pillPlaceable.place(pillX, pillY)
 
-            // FAB: just to the right of the pill, clamped to the layout's right edge so
-            // a wide pill cannot push the FAB off-screen.
-            val desiredFabLeft = pillX + pillPlaceable.width + gapPx
-            val maxFabLeft = (width - fabPlaceable.width).coerceAtLeast(0)
-            val fabX = desiredFabLeft.coerceAtMost(maxFabLeft)
-            val fabY = (height - fabPlaceable.height) / 2
+            // FAB child: anchored by the FAB *element* rather than by the wrapper's
+            // outer bounds.
+            //
+            // Horizontally: the FAB element's right edge sits at clamp(pill.right + gap
+            // + fabCore, stripWidth). For a wrapper wider than the FAB (menu expanded)
+            // the wrapper extends LEFT, leaving the FAB element anchored at the same
+            // screen position. FloatingActionButtonMenu adds 16.dp side padding, so
+            // Notes passes that as [fabRightInset].
+            //
+            // Vertically: the FAB element's center sits at the strip's vertical center
+            // (same as pill's). FloatingActionButtonMenu places the button 16.dp above
+            // the wrapper bottom, so Notes passes that as [fabBottomInset].
+            val desiredFabElementRight =
+                pillX + pillPlaceable.width + gapPx + fabCorePx
+            val fabElementRight = desiredFabElementRight.coerceAtMost(width)
+            val fabX = (fabElementRight - fabPlaceable.width + fabRightInsetPx).coerceAtLeast(0)
+            val fabBottomY = (stripHeight + fabCorePx) / 2 + fabBottomInsetPx
+            val fabY = fabBottomY - fabPlaceable.height
             fabPlaceable.place(fabX, fabY)
         }
     }
@@ -515,9 +560,11 @@ private fun FloatingNavTabItem(
     val labelWidth by animateDpAsState(
         targetValue = if (selected) 72.dp else 0.dp,
         animationSpec =
-            spring(
-                dampingRatio = Spring.DampingRatioMediumBouncy,
-                stiffness = Spring.StiffnessLow,
+            reducedMotionAwareSpec(
+                spring(
+                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                    stiffness = Spring.StiffnessLow,
+                ),
             ),
         label = "nav_label_$index",
     )
@@ -571,11 +618,10 @@ private fun FloatingNavTabItem(
 }
 
 /**
- * Per-tab FAB rendered into the toolbar's `floatingActionButton` slot. Notes uses the
- * M3 Expressive `ToggleFloatingActionButton` (which morphs container size, corner
- * radius, and color in lockstep with `checked`); History and Settings use a regular
- * FAB. The Notes FAB also reports its global position via [onFabBounds] so the
- * sibling speed-dial overlay can anchor itself to it.
+ * Per-tab FAB. Notes wraps an M3 Expressive [ToggleFloatingActionButton] inside the
+ * official [FloatingActionButtonMenu] so the speed dial gets the framework's stagger,
+ * predictive-back collapse, and accessibility focus order for free. History and
+ * Settings render a regular FAB without a menu.
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -588,7 +634,9 @@ private fun MainFabSlot(
     onClearTrashRequest: () -> Unit,
     onMoveArchiveToTrashRequest: () -> Unit,
     onShareApp: () -> Unit,
-    onFabBounds: (Offset, IntSize) -> Unit,
+    onPickImport: () -> Unit,
+    onPickList: () -> Unit,
+    onPickNote: () -> Unit,
 ) {
     when (tab) {
         MainTab.Notes -> {
@@ -597,38 +645,118 @@ private fun MainFabSlot(
             val closeDescription = stringResource(R.string.main_fab_close)
             val description = if (fabExpanded) closeDescription else createDescription
             val motionScheme = MaterialTheme.motionScheme
-            val iconColor = MaterialTheme.colorScheme.onPrimaryContainer
+            val iconColor by animateColorAsState(
+                targetValue =
+                    if (fabExpanded) {
+                        MaterialTheme.colorScheme.onPrimary
+                    } else {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    },
+                animationSpec = reducedMotionAwareSpec(motionScheme.defaultEffectsSpec()),
+                label = "notes_fab_icon_color",
+            )
             val fabMorph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Sunny) }
             val shapeProgress by animateFloatAsState(
                 targetValue = if (fabExpanded) 1f else 0f,
-                animationSpec = motionScheme.defaultSpatialSpec(),
+                animationSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec()),
                 label = "notes_fab_shape_morph",
             )
             val iconRotation by animateFloatAsState(
                 targetValue = if (fabExpanded) 45f else 0f,
-                animationSpec = motionScheme.defaultSpatialSpec(),
+                animationSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec()),
                 label = "notes_fab_icon_rotation",
             )
-            ToggleFloatingActionButton(
-                checked = fabExpanded,
-                onCheckedChange = {
-                    playTap()
-                    onToggleNotesFab()
-                },
-                modifier =
-                    Modifier
-                        .clip(MorphPolygonShape(fabMorph, shapeProgress))
-                        .semantics { contentDescription = description }
-                        .onGloballyPositioned { coords ->
-                            onFabBounds(coords.positionInRoot(), coords.size)
+            val fabShape = MorphPolygonShape(fabMorph, shapeProgress)
+            // FloatingActionButtonMenu hosts BOTH the toggle FAB and the menu items. The
+            // FAB element stays anchored (right + bottom of the wrapper); the menu items
+            // expand upward and leftward when [expanded] flips on. The pill-mode caller
+            // ([CenteredPillWithSideFab]) deliberately measures this child with infinite
+            // max height and reports a strip height clamped to the FAB's core size, so
+            // the menu's expansion overflows up into screen space without re-flowing the
+            // pill - what the hand-rolled SpeedDialOverlay used to enforce, now folded
+            // into the surrounding Layout instead.
+            FloatingActionButtonMenu(
+                expanded = fabExpanded,
+                button = {
+                    ToggleFloatingActionButton(
+                        checked = fabExpanded,
+                        onCheckedChange = {
+                            playTap()
+                            onToggleNotesFab()
                         },
+                        modifier =
+                            Modifier
+                                .shadow(
+                                    elevation = 2.dp,
+                                    shape = fabShape,
+                                    clip = false,
+                                ).clip(fabShape)
+                                .semantics { contentDescription = description },
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "add",
+                            size = 26.dp,
+                            tint = iconColor,
+                            weight = FontWeight.Medium,
+                            modifier = Modifier.graphicsLayer { rotationZ = iconRotation },
+                        )
+                    }
+                },
+                horizontalAlignment = Alignment.End,
             ) {
-                RememberMaterialRoundedSymbol(
-                    name = "add",
-                    size = 26.dp,
-                    tint = iconColor,
-                    weight = FontWeight.Medium,
-                    modifier = Modifier.graphicsLayer { rotationZ = iconRotation },
+                FloatingActionButtonMenuItem(
+                    onClick = onPickImport,
+                    icon = {
+                        RememberMaterialRoundedSymbol(
+                            name = "download",
+                            size = 22.dp,
+                            weight = FontWeight.Medium,
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = stringResource(R.string.main_speed_dial_import),
+                            style = MaterialTheme.typography.labelLargeEmphasized,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    },
+                )
+                FloatingActionButtonMenuItem(
+                    onClick = onPickList,
+                    icon = {
+                        RememberMaterialRoundedSymbol(
+                            name = DEFAULT_LIST_HEADER_SYMBOL,
+                            size = 22.dp,
+                            weight = FontWeight.Medium,
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = stringResource(R.string.main_speed_dial_checklist),
+                            style = MaterialTheme.typography.labelLargeEmphasized,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    },
+                )
+                FloatingActionButtonMenuItem(
+                    onClick = onPickNote,
+                    icon = {
+                        RememberMaterialRoundedSymbol(
+                            name = DEFAULT_NOTE_HEADER_SYMBOL,
+                            size = 22.dp,
+                            weight = FontWeight.Medium,
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = stringResource(R.string.main_speed_dial_note),
+                            style = MaterialTheme.typography.labelLargeEmphasized,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                        )
+                    },
                 )
             }
         }
@@ -642,6 +770,7 @@ private fun MainFabSlot(
                     stringResource(R.string.edit_bottom_bar_delete_forever)
                 }
             val iconSize = if (isArchive) 24.dp else 22.dp
+
             SimpleHistoryOrSettingsFab(
                 symbolName = symbolName,
                 description = description,
@@ -690,7 +819,7 @@ private fun SimpleHistoryOrSettingsFab(
         }
     val fabShape =
         remember(symbolName) {
-            RoundedPolygonShape(MaterialShapes.Cookie7Sided)
+            RoundedPolygonShape(MaterialShapes.Cookie9Sided)
         }
     RememberFloatingActionButton(
         onClick = onClick,
@@ -708,128 +837,5 @@ private fun SimpleHistoryOrSettingsFab(
             weight = FontWeight.Medium,
             modifier = Modifier.semantics { contentDescription = description },
         )
-    }
-}
-
-/**
- * Speed-dial overlay anchored to the captured FAB bounds. Items are end-aligned with
- * the FAB's right edge and stack upward from just above the FAB. The overlay does NOT
- * participate in the toolbar's layout, so toggling expanded/collapsed cannot shift
- * the nav pill or the FAB.
- *
- * Each pill sizes to its own intrinsic content (icon + label, left-aligned) so the
- * three pills end up three different widths - the M3 Expressive speed-dial look.
- */
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun androidx.compose.foundation.layout.BoxScope.SpeedDialOverlay(
-    visible: Boolean,
-    fabPositionInRoot: Offset?,
-    fabSizePx: IntSize,
-    onPickImport: () -> Unit,
-    onPickList: () -> Unit,
-    onPickNote: () -> Unit,
-) {
-    val density = LocalDensity.current
-    val gapAboveFab = 12.dp
-    AnimatedVisibility(
-        visible = visible,
-        enter =
-            fadeIn(MaterialTheme.motionScheme.defaultEffectsSpec()) +
-                scaleIn(
-                    MaterialTheme.motionScheme.defaultSpatialSpec(),
-                    initialScale = 0.85f,
-                    transformOrigin = TransformOrigin(1f, 1f),
-                ),
-        exit =
-            fadeOut(MaterialTheme.motionScheme.fastEffectsSpec()) +
-                scaleOut(
-                    MaterialTheme.motionScheme.fastSpatialSpec(),
-                    targetScale = 0.85f,
-                    transformOrigin = TransformOrigin(1f, 1f),
-                ),
-        modifier =
-            Modifier.layout { measurable, constraints ->
-                // Measure the menu unconstrained so each pill keeps its intrinsic width.
-                val placeable =
-                    measurable.measure(
-                        constraints.copy(minWidth = 0, minHeight = 0),
-                    )
-                layout(constraints.maxWidth, constraints.maxHeight) {
-                    val origin = fabPositionInRoot ?: return@layout
-                    val gapPx = with(density) { gapAboveFab.roundToPx() }
-                    // Right-align the menu's right edge with the FAB's right edge so the
-                    // FAB and the menu's pills sit on the same vertical axis on the right.
-                    val x = (origin.x + fabSizePx.width).toInt() - placeable.width
-                    val y = origin.y.toInt() - placeable.height - gapPx
-                    placeable.place(x.coerceAtLeast(0), y.coerceAtLeast(0))
-                }
-            },
-    ) {
-        Column(
-            horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            SpeedDialPill(
-                label = stringResource(R.string.main_speed_dial_import),
-                symbolName = "download",
-                onClick = onPickImport,
-            )
-            SpeedDialPill(
-                label = stringResource(R.string.main_speed_dial_checklist),
-                symbolName = DEFAULT_LIST_HEADER_SYMBOL,
-                onClick = onPickList,
-            )
-            SpeedDialPill(
-                label = stringResource(R.string.main_speed_dial_note),
-                symbolName = DEFAULT_NOTE_HEADER_SYMBOL,
-                onClick = onPickNote,
-            )
-        }
-    }
-}
-
-/**
- * Single speed-dial item rendered with the M3 Expressive pill silhouette: icon on the
- * left, label after a 12.dp gap, both left-aligned. The Surface wraps to its content
- * width so each pill ends up exactly as wide as its label needs.
- */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-private fun SpeedDialPill(
-    label: String,
-    symbolName: String,
-    onClick: () -> Unit,
-) {
-    val playTap = rememberPlayTapSound()
-    Surface(
-        onClick = {
-            playTap()
-            onClick()
-        },
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        tonalElevation = 3.dp,
-        shadowElevation = 3.dp,
-    ) {
-        Row(
-            modifier = Modifier.padding(start = 20.dp, end = 24.dp, top = 14.dp, bottom = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RememberMaterialRoundedSymbol(
-                name = symbolName,
-                size = 22.dp,
-                tint = LocalContentColor.current,
-                weight = FontWeight.Medium,
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLargeEmphasized,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 1,
-            )
-        }
     }
 }

@@ -40,12 +40,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
-import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.components.NoteActionBottomBarContent
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
@@ -130,6 +130,7 @@ fun EditNoteScreen(
     var actionsPickerOpen by rememberSaveable { mutableStateOf(false) }
     var tagsPickerOpen by rememberSaveable { mutableStateOf(false) }
     var attachmentsPickerOpen by rememberSaveable { mutableStateOf(false) }
+    var notificationPermissionSheetOpen by rememberSaveable { mutableStateOf(false) }
     var deleteForeverConfirmOpen by rememberSaveable { mutableStateOf(false) }
 
     var pendingHeroSession by remember { mutableStateOf<Pair<String, File?>?>(null) }
@@ -192,6 +193,12 @@ fun EditNoteScreen(
     val untitledName = stringResource(R.string.edit_note_title_new)
 
     val undoMsg = stringResource(R.string.common_undo)
+    // Snackbar templates for the bottom-bar actions. Reused from the bulk-action
+    // strings since the count placeholder ("%1$d archived") reads naturally with 1.
+    val msgArchived = stringResource(R.string.bulk_action_archived, 1)
+    val msgTrashed = stringResource(R.string.bulk_action_trashed, 1)
+    val msgUnarchived = stringResource(R.string.bulk_action_unarchived, 1)
+    val msgRestored = stringResource(R.string.bulk_action_restored, 1)
 
     val handleBack = {
         appScope.launch {
@@ -211,7 +218,13 @@ fun EditNoteScreen(
         }
         onBack()
     }
-    RememberPredictiveBackHandler(onBack = handleBack)
+    // Use the regular BackHandler instead of PredictiveBackHandler. The predictive
+    // version suspends on `progress.collect { }` until the gesture's flow completes,
+    // so popBackStack does not fire until after the system's predictive preview has
+    // already finished animating - that gap reads as a "moment of nothing" before
+    // the back transition starts. BackHandler fires immediately on commit, letting
+    // the navigation reverse animation pick up where the predictive preview ends.
+    androidx.activity.compose.BackHandler(onBack = handleBack)
 
     // Hoisted scroll state so the bottom action bar can hide on scroll-down and re-show on
     // scroll-up. Also keyed off IME visibility so the rich-text toolbar has the stage alone
@@ -404,20 +417,91 @@ fun EditNoteScreen(
                                 appScope.launch { vm.toggleCompleted() }
                             },
                             onArchive = {
-                                appScope.launch { vm.archiveCurrent(untitledName) }
+                                // Archive follows the same leave-editor flow as Trash: pop
+                                // back immediately, then let the root snackbar host offer Undo.
+                                val archiveStartedFromTrash = trashed
+                                appScope.launch {
+                                    vm.archiveCurrent(untitledName)
+                                    val result =
+                                        snackbarHostState.showSnackbar(
+                                            message = msgArchived,
+                                            actionLabel = undoMsg,
+                                            withDismissAction = true,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                        if (archiveStartedFromTrash) {
+                                            vm.trashCurrent()
+                                        } else {
+                                            vm.unarchiveCurrent()
+                                        }
+                                    }
+                                }
+                                onBack()
                             },
                             onNotification = {
-                                appScope.launch { vm.fireNotification(context, untitledName) }
+                                if (NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                                    appScope.launch { vm.fireNotification(context, untitledName) }
+                                } else {
+                                    notificationPermissionSheetOpen = true
+                                }
                             },
                             onUnarchive = {
-                                appScope.launch { vm.unarchiveCurrent() }
+                                appScope.launch {
+                                    vm.unarchiveCurrent()
+                                    val result =
+                                        snackbarHostState.showSnackbar(
+                                            message = msgUnarchived,
+                                            actionLabel = undoMsg,
+                                            withDismissAction = true,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                        vm.archiveCurrent(untitledName)
+                                    }
+                                }
                             },
                             onTrash = {
-                                appScope.launch { vm.trashCurrent() }
+                                // Trash + back navigation. The snackbar host is at the
+                                // scaffold root so it survives the screen pop and shows
+                                // up on Home. Undo route hits vm.restoreFromTrashCurrent
+                                // even after the screen is gone - the suspend doesn't
+                                // depend on viewModelScope and the VM's loadedId field
+                                // is still in memory long enough to complete the call.
+                                val trashStartedFromArchive = archived
+                                appScope.launch {
+                                    vm.trashCurrent()
+                                    val result =
+                                        snackbarHostState.showSnackbar(
+                                            message = msgTrashed,
+                                            actionLabel = undoMsg,
+                                            withDismissAction = true,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                        if (trashStartedFromArchive) {
+                                            vm.archiveCurrent(untitledName)
+                                        } else {
+                                            vm.restoreFromTrashCurrent()
+                                        }
+                                    }
+                                }
                                 onBack()
                             },
                             onRestore = {
-                                appScope.launch { vm.restoreFromTrashCurrent() }
+                                appScope.launch {
+                                    vm.restoreFromTrashCurrent()
+                                    val result =
+                                        snackbarHostState.showSnackbar(
+                                            message = msgRestored,
+                                            actionLabel = undoMsg,
+                                            withDismissAction = true,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                        vm.trashCurrent()
+                                    }
+                                }
                             },
                             onDeleteForever = { deleteForeverConfirmOpen = true },
                         )
@@ -500,7 +584,6 @@ fun EditNoteScreen(
                 availableTags = activeTagSuggestions,
                 onConfirm = { newTags, newColors ->
                     vm.saveTagsWithColors(newTags, newColors)
-                    tagsPickerOpen = false
                 },
                 onEditExistingTag = vm::editExistingTag,
                 onDismiss = { tagsPickerOpen = false },
@@ -513,6 +596,13 @@ fun EditNoteScreen(
                 onDismiss = { attachmentsPickerOpen = false },
                 onAdd = vm::addAttachment,
                 onRemove = vm::removeAttachment,
+            )
+        }
+        if (notificationPermissionSheetOpen) {
+            NotificationPermissionRequiredSheet(
+                onDismiss = { notificationPermissionSheetOpen = false },
+                titleRes = R.string.notification_permission_required_title,
+                bodyRes = R.string.notification_permission_required_body,
             )
         }
         pendingHeroSession?.let { (pickedUri, copiedFile) ->

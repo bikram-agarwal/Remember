@@ -13,9 +13,5 @@ class NoteBackupDirtyTracker {
         hasPendingChanges.set(true)
     }
 
-    fun clearAfterSuccessfulTreeExport() {
-        hasPendingChanges.set(false)
-    }
-
-    fun hasPendingChangeSinceLastTreeExport(): Boolean = hasPendingChanges.get()
+    fun consumePendingChangeSinceLastTreeExport(): Boolean = hasPendingChanges.getAndSet(false)
 }

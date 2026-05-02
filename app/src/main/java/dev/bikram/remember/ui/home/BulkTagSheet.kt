@@ -80,7 +80,7 @@ private val BulkTagFieldHeight = 40.dp
  *
  * Primary affordance is the grid of existing tag chips: each chip cycles NEUTRAL -> ADD -> REMOVE
  * on tap. A secondary "+ Create new tag" pill expands inline to reveal the full tag creation form
- * (name, color grid, hex entry). The Apply button is pinned to the sheet's action row.
+ * (name, color grid, hex entry). The Apply button stays anchored to the sheet's action row.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable

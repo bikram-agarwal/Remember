@@ -2,9 +2,12 @@ package dev.bikram.remember
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +36,7 @@ import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.data.TagRepository
+import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.di.ApplicationScope
@@ -82,13 +87,30 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT),
+        )
         handleIntent(intent)
         applicationScope.launch { themePrefs.migrateLegacyColorSourceIfNeeded() }
         setContent {
             val themeState by themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
             )
+            val systemDark = isSystemInDarkTheme()
+            val darkTheme =
+                when (themeState.themeMode) {
+                    ThemeMode.SYSTEM -> systemDark
+                    ThemeMode.LIGHT -> false
+                    ThemeMode.DARK -> true
+                    ThemeMode.BLACK -> true
+                }
+            SideEffect {
+                enableEdgeToEdge(
+                    statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+                    navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
+                )
+            }
             val tagColors by tagRepository.observeTagColorMap().collectAsStateWithLifecycle(
                 initialValue = emptyMap(),
             )

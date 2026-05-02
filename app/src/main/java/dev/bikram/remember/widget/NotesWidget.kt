@@ -40,6 +40,8 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.di.NotesWidgetEntryPoint
 import dev.bikram.remember.ui.edit.iconEmojiPayload
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
@@ -61,20 +63,33 @@ class NotesWidget : GlanceAppWidget() {
                 NotesWidgetEntryPoint::class.java,
             )
         val noteRepository = entryPoint.noteRepository()
-        val active = noteRepository.observeActive().first()
         val now = System.currentTimeMillis()
+        val activeAndReminderSummary =
+            coroutineScope {
+                val activeNotesDeferred = async { noteRepository.observeActive().first() }
+                val reminderSummaryDeferred =
+                    async {
+                        noteRepository
+                            .reminderSummaryItems(now)
+                            .take(MAX_REMINDER_SUMMARY_ROWS)
+                    }
+                activeNotesDeferred.await() to reminderSummaryDeferred.await()
+            }
         val favorites =
-            active
+            activeAndReminderSummary
+                .first
                 .asSequence()
                 .filter { it.note.favorite }
                 .take(MAX_FAVORITE_ROWS)
                 .toList()
-        val reminderSummary =
-            noteRepository
-                .reminderSummaryItems(now)
-                .take(MAX_REMINDER_SUMMARY_ROWS)
         provideContent {
-            GlanceTheme { WidgetContent(favorites = favorites, reminderSummary = reminderSummary, now = now) }
+            GlanceTheme {
+                WidgetContent(
+                    favorites = favorites,
+                    reminderSummary = activeAndReminderSummary.second,
+                    now = now,
+                )
+            }
         }
     }
 
@@ -151,7 +166,7 @@ class NotesWidget : GlanceAppWidget() {
                     item { SectionEmpty(context.getString(R.string.widget_section_empty_pinned)) }
                 } else {
                     items(count = favorites.size) { i ->
-                        NoteRow(note = favorites[i], context = context, showReminder = false)
+                        NotificationPreviewRow(note = favorites[i], context = context, showReminder = false)
                     }
                 }
                 item { Spacer(GlanceModifier.height(8.dp)) }
@@ -162,7 +177,7 @@ class NotesWidget : GlanceAppWidget() {
                     }
                 } else {
                     items(count = reminderSummary.size) { index ->
-                        NoteRow(
+                        NotificationPreviewRow(
                             note = reminderSummary[index],
                             context = context,
                             showReminder = true,
@@ -202,7 +217,7 @@ class NotesWidget : GlanceAppWidget() {
     }
 
     @Composable
-    private fun NoteRow(
+    private fun NotificationPreviewRow(
         note: NoteWithItems,
         context: Context,
         showReminder: Boolean,
@@ -219,29 +234,35 @@ class NotesWidget : GlanceAppWidget() {
             modifier =
                 GlanceModifier
                     .fillMaxWidth()
-                    .padding(vertical = 6.dp)
+                    .padding(vertical = 4.dp)
+                    .background(GlanceTheme.colors.surface)
+                    .cornerRadius(18.dp)
+                    .padding(horizontal = 10.dp, vertical = 9.dp)
                     .clickable(actionStartActivity(openIntent)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier =
                     GlanceModifier
-                        .size(6.dp)
-                        .cornerRadius(3.dp)
-                        .background(GlanceTheme.colors.primary),
+                        .size(32.dp)
+                        .cornerRadius(16.dp)
+                        .background(GlanceTheme.colors.primaryContainer),
                 contentAlignment = Alignment.Center,
-            ) { }
+            ) {
+                Text(
+                    text = noteWidgetGlyph(note),
+                    style =
+                        TextStyle(
+                            color = GlanceTheme.colors.primary,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                        ),
+                )
+            }
             Spacer(GlanceModifier.width(10.dp))
             Column(modifier = GlanceModifier.defaultWeight()) {
                 Text(
-                    text =
-                        note.note.title.ifBlank {
-                            if (note.note.kind == NoteKind.NOTE) {
-                                context.getString(R.string.edit_note_title_new)
-                            } else {
-                                context.getString(R.string.edit_list_title_new)
-                            }
-                        },
+                    text = noteWidgetTitle(context, note),
                     maxLines = 1,
                     style =
                         TextStyle(
@@ -250,17 +271,24 @@ class NotesWidget : GlanceAppWidget() {
                             fontWeight = FontWeight.Medium,
                         ),
                 )
+                if (showReminder && note.note.reminderAt != null) {
+                    Text(
+                        text = summaryTimingLabel(context, note.note.reminderAt, now),
+                        maxLines = 1,
+                        style =
+                            TextStyle(
+                                color = GlanceTheme.colors.primary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
+                    )
+                }
                 val subline =
-                    when {
-                        showReminder && note.note.reminderAt != null ->
-                            summaryLine(context, note, now)
-                        else ->
-                            note.note.body.ifBlank {
-                                note.items
-                                    .firstOrNull()
-                                    ?.text
-                                    .orEmpty()
-                            }
+                    note.note.body.ifBlank {
+                        note.items
+                            .firstOrNull()
+                            ?.text
+                            .orEmpty()
                     }
                 if (subline.isNotBlank()) {
                     Text(
@@ -277,12 +305,16 @@ class NotesWidget : GlanceAppWidget() {
         }
     }
 
-    private fun summaryLine(
+    private fun noteWidgetGlyph(note: NoteWithItems): String {
+        val emoji = iconEmojiPayload(note.note.iconKey)
+        if (emoji != null) return emoji
+        return if (note.note.kind == NoteKind.LIST) "L" else "N"
+    }
+
+    private fun noteWidgetTitle(
         context: Context,
         note: NoteWithItems,
-        now: Long,
     ): String {
-        val reminderAt = note.note.reminderAt ?: now
         val title =
             note.note.title.ifBlank {
                 if (note.note.kind == NoteKind.NOTE) {
@@ -291,8 +323,7 @@ class NotesWidget : GlanceAppWidget() {
                     context.getString(R.string.edit_list_title_new)
                 }
             }
-        val emojiTitle = iconEmojiPayload(note.note.iconKey)?.let { emoji -> "$emoji $title" } ?: title
-        return context.getString(R.string.reminder_summary_line, summaryTimingLabel(context, reminderAt, now), emojiTitle)
+        return title
     }
 
     private fun summaryTimingLabel(

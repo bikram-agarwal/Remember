@@ -22,8 +22,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,7 +51,6 @@ import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
@@ -68,10 +67,13 @@ import kotlinx.coroutines.launch
 fun AppearanceSection(
     prefs: ThemePrefs,
     state: ThemeState,
+    snackbarHostState: SnackbarHostState,
 ) {
     val scope = rememberCoroutineScope()
     var customHexOpen by rememberSaveable { mutableStateOf(false) }
     var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
+    val blackThemeEffectsDisabled = state.themeMode == ThemeMode.BLACK
+    val blackThemeEffectsDisabledMessage = stringResource(R.string.appearance_black_theme_effect_disabled)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
@@ -150,7 +152,14 @@ fun AppearanceSection(
                 AppearanceSettingsToggleItem(
                     title = stringResource(R.string.appearance_gradient_title),
                     subtitle = stringResource(R.string.appearance_gradient_subtitle),
-                    checked = state.useGradient,
+                    checked = state.useGradient && !blackThemeEffectsDisabled,
+                    enabled = !blackThemeEffectsDisabled,
+                    onDisabledClick = {
+                        scope.launch {
+                            snackbarHostState.currentSnackbarData?.dismiss()
+                            snackbarHostState.showSnackbar(blackThemeEffectsDisabledMessage)
+                        }
+                    },
                     onCheckedChange = { scope.launch { prefs.setUseGradient(it) } },
                 )
             }
@@ -158,7 +167,14 @@ fun AppearanceSection(
                 AppearanceSettingsToggleItem(
                     title = stringResource(R.string.appearance_shading_title),
                     subtitle = stringResource(R.string.appearance_shading_subtitle),
-                    checked = state.useEnhancedShading,
+                    checked = state.useEnhancedShading || blackThemeEffectsDisabled,
+                    enabled = !blackThemeEffectsDisabled,
+                    onDisabledClick = {
+                        scope.launch {
+                            snackbarHostState.currentSnackbarData?.dismiss()
+                            snackbarHostState.showSnackbar(blackThemeEffectsDisabledMessage)
+                        }
+                    },
                     onCheckedChange = { scope.launch { prefs.setUseEnhancedShading(it) } },
                 )
             }
@@ -213,21 +229,40 @@ private fun AppearanceSettingsToggleItem(
     title: String,
     subtitle: String,
     checked: Boolean,
+    enabled: Boolean = true,
     leadingMaterialSymbolName: String? = null,
+    onDisabledClick: (() -> Unit)? = null,
     onCheckedChange: (Boolean) -> Unit,
 ) {
+    val titleColor =
+        if (enabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        }
+    val subtitleColor =
+        if (enabled) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+        }
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable { onCheckedChange(!checked) }
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .tapSoundClickable {
+                    if (enabled) {
+                        onCheckedChange(!checked)
+                    } else {
+                        onDisabledClick?.invoke()
+                    }
+                }.padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leadingMaterialSymbolName != null) {
             RememberMaterialRoundedSymbol(
                 name = leadingMaterialSymbolName,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = subtitleColor,
                 weight = FontWeight.Medium,
             )
             Spacer(Modifier.width(16.dp))
@@ -236,31 +271,25 @@ private fun AppearanceSettingsToggleItem(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = titleColor,
+            )
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = subtitleColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         Spacer(Modifier.width(16.dp))
-        RememberSwitch(
+        SettingsToggleSwitch(
             checked = checked,
+            enabled = enabled,
+            onDisabledInteraction = onDisabledClick,
             onCheckedChange = onCheckedChange,
-            thumbContent =
-                if (checked) {
-                    {
-                        RememberMaterialRoundedSymbol(
-                            name = "check",
-                            size = SwitchDefaults.IconSize,
-                            weight = FontWeight.Bold,
-                        )
-                    }
-                } else {
-                    null
-                },
         )
     }
 }
@@ -608,7 +637,7 @@ private fun AccentChip(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = "Aa",
+                text = stringResource(R.string.appearance_preview_sample_text),
                 style = MaterialTheme.typography.titleMedium,
                 color = onContainer,
                 fontWeight = FontWeight.Medium,

@@ -61,10 +61,10 @@ class BackupExportCoordinator(
                                     prefs.cloudExportFolderUri,
                                 ).filter { it.isNotBlank() }
                             if (!prefs.autoExportOnChange || backupDestinations.isEmpty()) return@launch
-                            if (!noteBackupDirtyTracker.hasPendingChangeSinceLastTreeExport()) return@launch
+                            if (!noteBackupDirtyTracker.consumePendingChangeSinceLastTreeExport()) return@launch
                             val exportOutcome = backupIo.exportToTreeFolders(backupDestinations)
-                            if (exportOutcome.isSuccess) {
-                                noteBackupDirtyTracker.clearAfterSuccessfulTreeExport()
+                            if (exportOutcome.isFailure) {
+                                noteBackupDirtyTracker.markNotesChangedSinceLastTreeExport()
                             }
                         }
                 }

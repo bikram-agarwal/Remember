@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -30,7 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberOutlinedButton
-import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
@@ -46,7 +44,18 @@ internal fun BackupFolderSettingsToggleItem(
     onDisabledInteraction: (() -> Unit)?,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    val switchInteractive = switchEnabled || onDisabledInteraction != null
+    val titleColor =
+        if (switchEnabled) {
+            MaterialTheme.colorScheme.onSurface
+        } else {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        }
+    val subtitleColor =
+        if (switchEnabled) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+        }
     Row(
         modifier =
             Modifier
@@ -71,46 +80,31 @@ internal fun BackupFolderSettingsToggleItem(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.bodyLarge,
+                    color = titleColor,
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 if (infoTooltipText != null && infoContentDescription != null) {
                     SettingsInfoDropdown(
                         tipText = infoTooltipText,
                         contentDescription = infoContentDescription,
+                        iconTint = subtitleColor,
                     )
                 }
             }
             Text(
                 subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = subtitleColor,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
         }
         Spacer(Modifier.width(16.dp))
-        RememberSwitch(
+        SettingsToggleSwitch(
             checked = checked,
-            onCheckedChange = { enabled ->
-                when {
-                    switchEnabled -> onCheckedChange(enabled)
-                    onDisabledInteraction != null && enabled -> onDisabledInteraction.invoke()
-                    else -> Unit
-                }
-            },
-            enabled = switchInteractive,
-            thumbContent =
-                if (checked) {
-                    {
-                        RememberMaterialRoundedSymbol(
-                            name = "check",
-                            size = SwitchDefaults.IconSize,
-                            weight = FontWeight.Bold,
-                        )
-                    }
-                } else {
-                    null
-                },
+            enabled = switchEnabled,
+            onDisabledInteraction = onDisabledInteraction,
+            onCheckedChange = onCheckedChange,
         )
     }
 }

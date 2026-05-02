@@ -104,7 +104,7 @@ class BackupIo(
             put("title", note.title)
             put("body", note.body)
             put("colorIndex", note.colorIndex)
-            put("pinned", note.favorite)
+            put("favorite", note.favorite)
             put("trashed", note.trashed)
             put("archived", note.archived)
             note.trashedAt?.let { put("trashedAt", it) }
@@ -673,7 +673,7 @@ class BackupIo(
             title = o.optString("title", ""),
             body = o.optString("body", ""),
             colorIndex = o.optInt("colorIndex", 0),
-            favorite = o.optBoolean("pinned", false),
+            favorite = o.optBoolean("favorite", false),
             trashed = o.optBoolean("trashed", false),
             archived = o.optBoolean("archived", false),
             trashedAt = o.optLongOrNull("trashedAt"),

@@ -333,9 +333,8 @@ class NoteRepository(
         val row = noteDao.get(id) ?: return
         val baseTags = row.note.tags.filterNot { it == RememberReservedTags.FAVORITE }
         val newTags = if (favorite) (baseTags + RememberReservedTags.FAVORITE).distinct() else baseTags
-        val now = clock()
         if (row.note.favorite == favorite && row.note.tags == newTags) return
-        noteDao.update(row.note.copy(favorite = favorite, tags = newTags, updatedAt = now))
+        noteDao.update(row.note.copy(favorite = favorite, tags = newTags, updatedAt = clock()))
         notesWidgetUpdater?.refreshAll()
     }
 
@@ -409,6 +408,120 @@ class NoteRepository(
         cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
         refreshReminderSummaryNotification()
         notesWidgetUpdater?.refreshAll()
+    }
+
+    // ---------------------------------------------------------------------------
+    // Bulk operations
+    //
+    // Each method wraps the DAO writes for every id in a single Room transaction
+    // so observers (observeActive / observeArchived / observeTrashed) emit exactly
+    // ONCE per bulk action. Without this, sequential per-id writes caused the
+    // LazyColumn to remove items one-by-one and the user saw a cascade of fade-out
+    // animations even on bulk Archive / Trash. Scheduler cancellations and refresh
+    // side-effects run once after the transaction commits.
+    // ---------------------------------------------------------------------------
+
+    private suspend fun runInTransaction(block: suspend () -> Unit) {
+        if (database != null) database.withTransaction { block() } else block()
+    }
+
+    suspend fun archiveNotes(ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        val now = clock()
+        runInTransaction {
+            ids.forEach { id -> noteDao.setArchived(id, true, now) }
+        }
+        ids.forEach { id ->
+            scheduler?.cancel(id)
+            scheduler?.cancelNotification(id)
+        }
+        refreshReminderSummaryNotification()
+        notesWidgetUpdater?.refreshAll()
+    }
+
+    suspend fun unarchiveNotes(ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        val now = clock()
+        runInTransaction {
+            ids.forEach { id -> noteDao.setArchived(id, false, now) }
+        }
+        // Re-arm reminders after the rows are flipped back to active. Only schedule
+        // for notes that still have a reminderAt set; restored rows without one stay
+        // alarm-free.
+        ids.forEach { id ->
+            val note = noteDao.get(id)?.note ?: return@forEach
+            note.reminderAt?.let { at -> scheduler?.schedule(id, at) }
+        }
+        refreshReminderSummaryNotification()
+        notesWidgetUpdater?.refreshAll()
+    }
+
+    suspend fun moveToTrash(ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        val now = clock()
+        runInTransaction {
+            ids.forEach { id -> noteDao.setTrashed(id, true, now) }
+        }
+        ids.forEach { id ->
+            scheduler?.cancel(id)
+            scheduler?.cancelNotification(id)
+        }
+        refreshReminderSummaryNotification()
+        notesWidgetUpdater?.refreshAll()
+    }
+
+    suspend fun restoreFromTrash(ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        val now = clock()
+        runInTransaction {
+            ids.forEach { id -> noteDao.setTrashed(id, false, now) }
+        }
+        ids.forEach { id ->
+            val note = noteDao.get(id)?.note ?: return@forEach
+            note.reminderAt?.let { at -> scheduler?.schedule(id, at) }
+        }
+        refreshReminderSummaryNotification()
+        notesWidgetUpdater?.refreshAll()
+    }
+
+    /**
+     * Bulk permanent-delete. Captures media URIs before the rows are gone so they can
+     * be cleaned up; cancels any pending alarms first because once the row is deleted
+     * the scheduler has no id left to look up.
+     */
+    suspend fun deleteForever(ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        val deletedNotes = ids.mapNotNull { id -> noteDao.get(id) }
+        ids.forEach { id ->
+            scheduler?.cancel(id)
+            scheduler?.cancelNotification(id)
+        }
+        runInTransaction {
+            ids.forEach { id -> noteDao.deleteById(id) }
+        }
+        cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
+        refreshReminderSummaryNotification()
+        notesWidgetUpdater?.refreshAll()
+    }
+
+    /**
+     * Bulk mark-completed. Each row's logic (including recurrence advancement) is
+     * non-trivial and lives in [markCompleted]; we delegate to that within a single
+     * transaction so all row writes coalesce into one observer emission. The per-id
+     * side-effect helpers fire N times but are idempotent.
+     */
+    suspend fun markCompleted(ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        runInTransaction {
+            ids.forEach { id -> markCompleted(id) }
+        }
+    }
+
+    suspend fun markIncomplete(ids: Collection<Long>) {
+        if (ids.isEmpty()) return
+        runInTransaction {
+            ids.forEach { id -> markIncomplete(id) }
+        }
     }
 
     /**

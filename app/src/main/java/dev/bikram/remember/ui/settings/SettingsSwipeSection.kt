@@ -1,34 +1,43 @@
 package dev.bikram.remember.ui.settings
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ElevatedFilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.SwipeGestureMode
@@ -37,6 +46,14 @@ import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.theme.semanticSwipeBackground
 import dev.bikram.remember.ui.theme.semanticSwipeIconTint
+
+private const val SWIPE_REVEAL_SLOT_COUNT = 3
+private const val SWIPE_REVEAL_TOTAL_SLOT_COUNT = SWIPE_REVEAL_SLOT_COUNT * 2
+
+private enum class SwipeDirectionCue {
+    LEFT,
+    RIGHT,
+}
 
 @Composable
 internal fun SwipeGestureModeDropdown(
@@ -65,53 +82,222 @@ internal fun SwipeGestureModeDropdown(
 }
 
 @Composable
-internal fun SwipeRevealSlotsRow(
-    title: String,
-    actions: List<NoteSwipeAction?>,
-    onActionsChange: (List<NoteSwipeAction?>) -> Unit,
+internal fun SwipeRevealSlotsEditor(
+    startTitle: String,
+    endTitle: String,
+    startActions: List<NoteSwipeAction?>,
+    endActions: List<NoteSwipeAction?>,
+    onActionsChange: (startActions: List<NoteSwipeAction?>, endActions: List<NoteSwipeAction?>) -> Unit,
 ) {
-    val normalizedActions = List(3) { slotIndex -> actions.getOrNull(slotIndex) }
+    val slotActions = fullSwipeSlotActions(startActions, endActions)
+    val slotBounds = remember { mutableStateMapOf<Int, Rect>() }
+    var draggingSlot by remember { mutableStateOf<Int?>(null) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
+    var dragPointerRoot by remember { mutableStateOf(Offset.Zero) }
+
+    fun finishDrag() {
+        val fromSlot = draggingSlot ?: return
+        val toSlot = slotBounds.entries.firstOrNull { (_, bounds) -> bounds.contains(dragPointerRoot) }?.key
+        if (toSlot != null && toSlot != fromSlot) {
+            val nextActions = slotActions.toMutableList()
+            val fromAction = nextActions[fromSlot]
+            nextActions[fromSlot] = nextActions[toSlot]
+            nextActions[toSlot] = fromAction
+            onActionsChange(
+                nextActions.take(SWIPE_REVEAL_SLOT_COUNT),
+                nextActions.drop(SWIPE_REVEAL_SLOT_COUNT),
+            )
+        }
+        draggingSlot = null
+        dragOffset = Offset.Zero
+        dragPointerRoot = Offset.Zero
+    }
+
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
+        SwipeRevealDirectionSlotsRow(
+            title = startTitle,
+            direction = SwipeDirectionCue.RIGHT,
+            slotStartIndex = 0,
+            slotActions = slotActions,
+            draggingSlot = draggingSlot,
+            dragOffset = dragOffset,
+            slotBounds = slotBounds,
+            onSlotBoundsChange = { slotIndex, bounds -> slotBounds[slotIndex] = bounds },
+            onDragStart = { slotIndex, pointerRoot ->
+                draggingSlot = slotIndex
+                dragOffset = Offset.Zero
+                dragPointerRoot = pointerRoot
+            },
+            onDrag = { delta ->
+                dragOffset += delta
+                dragPointerRoot += delta
+            },
+            onDragEnd = ::finishDrag,
+        )
+        SwipeRevealDirectionSlotsRow(
+            title = endTitle,
+            direction = SwipeDirectionCue.LEFT,
+            slotStartIndex = SWIPE_REVEAL_SLOT_COUNT,
+            slotActions = slotActions,
+            draggingSlot = draggingSlot,
+            dragOffset = dragOffset,
+            slotBounds = slotBounds,
+            onSlotBoundsChange = { slotIndex, bounds -> slotBounds[slotIndex] = bounds },
+            onDragStart = { slotIndex, pointerRoot ->
+                draggingSlot = slotIndex
+                dragOffset = Offset.Zero
+                dragPointerRoot = pointerRoot
+            },
+            onDrag = { delta ->
+                dragOffset += delta
+                dragPointerRoot += delta
+            },
+            onDragEnd = ::finishDrag,
+        )
+    }
+}
+
+@Composable
+internal fun SwipeExecuteOneActionsEditor(
+    startTitle: String,
+    endTitle: String,
+    startAction: NoteSwipeAction,
+    endAction: NoteSwipeAction,
+    onStartActionChange: (NoteSwipeAction) -> Unit,
+    onEndActionChange: (NoteSwipeAction) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        SwipeExecuteOneActionRow(
+            title = startTitle,
+            direction = SwipeDirectionCue.RIGHT,
+            action = startAction,
+            excluded = endAction,
+            onActionChange = onStartActionChange,
+        )
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.48f)),
+        )
+        SwipeExecuteOneActionRow(
+            title = endTitle,
+            direction = SwipeDirectionCue.LEFT,
+            action = endAction,
+            excluded = startAction,
+            onActionChange = onEndActionChange,
+        )
+    }
+}
+
+@Composable
+private fun SwipeExecuteOneActionRow(
+    title: String,
+    direction: SwipeDirectionCue,
+    action: NoteSwipeAction,
+    excluded: NoteSwipeAction,
+    onActionChange: (NoteSwipeAction) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        if (direction == SwipeDirectionCue.RIGHT) {
+            NoteSwipeActionDropdown(
+                current = action,
+                excluded = excluded,
+                onSelect = onActionChange,
+                modifier = Modifier.width(156.dp),
             )
-            dev.bikram.remember.ui.components.RememberTextButton(
-                onClick = { onActionsChange(listOf(null, null, null)) },
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-            ) {
-                Text(stringResource(R.string.action_reset))
-            }
+            SwipeDirectionTitle(title = title)
+            SwipeDirectionCueText(direction = direction)
+            Spacer(Modifier.weight(1f))
+        } else {
+            Spacer(Modifier.weight(1f))
+            SwipeDirectionCueText(direction = direction)
+            SwipeDirectionTitle(
+                title = title,
+                textAlign = TextAlign.End,
+            )
+            NoteSwipeActionDropdown(
+                current = action,
+                excluded = excluded,
+                onSelect = onActionChange,
+                modifier = Modifier.width(156.dp),
+            )
         }
-        Spacer(Modifier.height(8.dp))
+    }
+}
+
+@Composable
+private fun SwipeRevealDirectionSlotsRow(
+    title: String,
+    direction: SwipeDirectionCue,
+    slotStartIndex: Int,
+    slotActions: List<NoteSwipeAction>,
+    draggingSlot: Int?,
+    dragOffset: Offset,
+    slotBounds: Map<Int, Rect>,
+    onSlotBoundsChange: (slotIndex: Int, bounds: Rect) -> Unit,
+    onDragStart: (slotIndex: Int, pointerRoot: Offset) -> Unit,
+    onDrag: (delta: Offset) -> Unit,
+    onDragEnd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SwipeDirectionHeader(title = title, direction = direction)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            normalizedActions.forEachIndexed { slotIndex, action ->
-                SwipeRevealSlotDropdown(
-                    current = action,
-                    unavailableActions =
-                        normalizedActions
-                            .filterIndexed { otherIndex, _ -> otherIndex != slotIndex }
-                            .filterNotNull()
-                            .toSet(),
-                    onSelect = { selected ->
-                        val nextActions = normalizedActions.toMutableList()
-                        nextActions[slotIndex] = selected
-                        onActionsChange(nextActions)
-                    },
-                    modifier = Modifier.weight(1f),
+            repeat(SWIPE_REVEAL_SLOT_COUNT) { rowSlotIndex ->
+                val slotIndex = slotStartIndex + rowSlotIndex
+                val action = slotActions[slotIndex]
+                val isDragging = draggingSlot == slotIndex
+                SwipeRevealSlotChip(
+                    action = action,
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .onGloballyPositioned { coordinates ->
+                                onSlotBoundsChange(slotIndex, coordinates.boundsInRoot())
+                            }.zIndex(if (isDragging) 1f else 0f)
+                            .graphicsLayer {
+                                translationX = if (isDragging) dragOffset.x else 0f
+                                translationY = if (isDragging) dragOffset.y else 0f
+                                scaleX = if (isDragging) 1.04f else 1f
+                                scaleY = if (isDragging) 1.04f else 1f
+                            }.pointerInput(slotIndex, action) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = { localOffset ->
+                                        val slotTopLeft = slotBounds[slotIndex]?.topLeft ?: Offset.Zero
+                                        onDragStart(slotIndex, slotTopLeft + localOffset)
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        onDrag(dragAmount)
+                                    },
+                                    onDragCancel = onDragEnd,
+                                    onDragEnd = onDragEnd,
+                                )
+                            },
                 )
             }
         }
@@ -119,46 +305,84 @@ internal fun SwipeRevealSlotsRow(
 }
 
 @Composable
-private fun SwipeRevealSlotDropdown(
-    current: NoteSwipeAction?,
-    unavailableActions: Set<NoteSwipeAction>,
-    onSelect: (NoteSwipeAction?) -> Unit,
-    modifier: Modifier = Modifier,
+private fun SwipeDirectionHeader(
+    title: String,
+    direction: SwipeDirectionCue,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    RememberOutlinedButton(
-        onClick = { expanded = true },
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp),
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        SwipeActionLabelContent(action = current)
-        DropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-        ) {
-            RememberDropdownMenuItem(
-                text = { Text(stringResource(R.string.settings_swipe_none)) },
-                leadingIcon = { SwipeActionIcon(action = null) },
-                onClick = {
-                    onSelect(null)
-                    expanded = false
-                },
-            )
-            SwipeActionDisplayOrder
-                .filter { action -> action == current || action !in unavailableActions }
-                .forEach { action ->
-                    RememberDropdownMenuItem(
-                        text = { Text(noteSwipeActionLabel(action)) },
-                        leadingIcon = { SwipeActionIcon(action = action) },
-                        onClick = {
-                            onSelect(action)
-                            expanded = false
-                        },
-                    )
-                }
+        if (direction == SwipeDirectionCue.RIGHT) {
+            SwipeDirectionTitle(title = title)
+            SwipeDirectionCueText(direction = direction)
+            Spacer(Modifier.weight(1f))
+        } else {
+            Spacer(Modifier.weight(1f))
+            SwipeDirectionCueText(direction = direction)
+            SwipeDirectionTitle(title = title, textAlign = TextAlign.End)
         }
     }
+}
+
+@Composable
+private fun SwipeDirectionTitle(
+    title: String,
+    modifier: Modifier = Modifier,
+    textAlign: TextAlign = TextAlign.Start,
+) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.bodyLarge,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = textAlign,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun SwipeDirectionCueText(
+    direction: SwipeDirectionCue,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text =
+            when (direction) {
+                SwipeDirectionCue.LEFT -> "<--------"
+                SwipeDirectionCue.RIGHT -> "-------->"
+            },
+        style = MaterialTheme.typography.bodyLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 1,
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun SwipeRevealSlotChip(
+    action: NoteSwipeAction,
+    modifier: Modifier = Modifier,
+) {
+    ElevatedFilterChip(
+        selected = true,
+        onClick = {},
+        modifier = modifier,
+        label = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text(
+                    text = noteSwipeActionLabel(action),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        },
+        leadingIcon = { SwipeActionIcon(action = action) },
+    )
 }
 
 @Composable
@@ -166,9 +390,10 @@ internal fun NoteSwipeActionDropdown(
     current: NoteSwipeAction,
     excluded: NoteSwipeAction,
     onSelect: (NoteSwipeAction) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
-    RememberOutlinedButton(onClick = { expanded = true }) {
+    RememberOutlinedButton(onClick = { expanded = true }, modifier = modifier) {
         SwipeActionLabelContent(action = current)
         DropdownMenu(
             expanded = expanded,
@@ -236,6 +461,21 @@ private val SwipeActionDisplayOrder: List<NoteSwipeAction> =
         NoteSwipeAction.TRASH,
     )
 
+private fun fullSwipeSlotActions(
+    startActions: List<NoteSwipeAction?>,
+    endActions: List<NoteSwipeAction?>,
+): List<NoteSwipeAction> {
+    val actions =
+        (startActions + endActions)
+            .filterNotNull()
+            .distinct()
+            .toMutableList()
+    SwipeActionDisplayOrder.forEach { action ->
+        if (action !in actions) actions += action
+    }
+    return actions.take(SWIPE_REVEAL_TOTAL_SLOT_COUNT)
+}
+
 @Composable
 internal fun noteSwipeActionLabel(action: NoteSwipeAction): String =
     stringResource(
@@ -257,95 +497,3 @@ private fun swipeGestureModeLabel(mode: SwipeGestureMode): String =
             SwipeGestureMode.REVEAL_ACTIONS -> R.string.settings_swipe_mode_reveal_actions
         },
     )
-
-@Composable
-internal fun NoteSwipePreviewCard(
-    swipeStartToEnd: NoteSwipeAction,
-    swipeEndToStart: NoteSwipeAction,
-) {
-    val leftBackground by animateColorAsState(
-        targetValue = swipeStartToEnd.semanticSwipeBackground(),
-        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-        label = "leftBg",
-    )
-    val rightBackground by animateColorAsState(
-        targetValue = swipeEndToStart.semanticSwipeBackground(),
-        animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
-        label = "rightBg",
-    )
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .clip(MaterialTheme.shapes.large)
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
-    ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.5f)
-                    .background(leftBackground)
-                    .align(Alignment.CenterStart)
-                    .padding(start = 16.dp),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RememberMaterialRoundedSymbol(
-                    name = swipeStartToEnd.materialSymbolName,
-                    size = 20.dp,
-                    tint = swipeStartToEnd.semanticSwipeIconTint(),
-                    weight = FontWeight.Medium,
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    noteSwipeActionLabel(swipeStartToEnd),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = swipeStartToEnd.semanticSwipeIconTint(),
-                )
-            }
-        }
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.5f)
-                    .background(rightBackground)
-                    .align(Alignment.CenterEnd)
-                    .padding(end = 16.dp),
-            contentAlignment = Alignment.CenterEnd,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    noteSwipeActionLabel(swipeEndToStart),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = swipeEndToStart.semanticSwipeIconTint(),
-                )
-                Spacer(Modifier.width(6.dp))
-                RememberMaterialRoundedSymbol(
-                    name = swipeEndToStart.materialSymbolName,
-                    size = 20.dp,
-                    tint = swipeEndToStart.semanticSwipeIconTint(),
-                    weight = FontWeight.Medium,
-                )
-            }
-        }
-        Box(
-            modifier =
-                Modifier
-                    .align(Alignment.Center)
-                    .fillMaxHeight()
-                    .fillMaxWidth(0.42f)
-                    .clip(MaterialTheme.shapes.small)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                stringResource(R.string.settings_swipe_preview_note),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}

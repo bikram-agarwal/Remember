@@ -55,7 +55,23 @@ If the icon is **only** listed in `BundledMaterialSymbolIcons.kt`, harvesting pi
 
 ## Optional: search behavior
 
-Concept search for the picker lives in `IconPicker.kt` (`searchConceptSynonyms`). Add or adjust synonym lists there when users expect a word (e.g. `"work"`) to surface icons whose **names** do not contain that substring.
+Concept search for the picker is data-driven, fed by two committed JSON files under `app/src/main/res/raw/`:
+
+- `emojis.json` - the picker's emoji list with CLDR keywords (`fire` -> `flame`, `hot`, `lit`, `tool`).
+- `icon_keywords.json` - per-ligature Material Symbols tags (`fitness_center` -> `gym`, `workout`, `dumbbell`).
+
+Both are emitted by Python scripts in `font_subset/`. Re-run them whenever upstream Unicode/CLDR or Material Symbols metadata changes (typically once a year), or after you add/remove icons in `BundledMaterialSymbolIcons.kt`:
+
+```text
+python font_subset/build_emoji_data.py        # writes app/src/main/res/raw/emojis.json
+python font_subset/build_icon_keywords.py     # writes app/src/main/res/raw/icon_keywords.json
+```
+
+Both scripts use stdlib only (no `pip install` required) and cache their downloads under `font_subset/cache/`. Pass `--force-refresh` to bypass the cache. Pass `--emoji-version`, `--cldr-branch`, or `--metadata-url` to pin a specific upstream snapshot.
+
+Ranking lives in `IconPickerSearch.kt`. The scorer is word-boundary-aware (so `lit` does **not** match inside `light`), supports plural/tense stemming (`songs` -> `song`, `running` -> `run`), and Levenshtein-1 fuzzy matching for typos on tokens >= 4 characters (`calender` -> `calendar`). Field weights live in `IconPicker.kt` (`FIELD_WEIGHT_NAME` etc.) so name hits outrank tag hits which outrank category hits. Adjust the constants there if a particular query needs reweighting.
+
+If a concept query returns nothing useful even though the right emoji/icon exists (e.g. CLDR doesn't tag a specific synonym you expect), the cleanest fix is to add the term to the upstream JSON via a small augmentation step in the Python script, **not** by re-introducing a hand-curated synonym map in Kotlin.
 
 ## Do not
 

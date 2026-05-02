@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "da79cfbcae2eefb305ba93205049a729",
+    "identityHash": "a9491595730e3a23b587449de359a7d1",
     "entities": [
       {
         "tableName": "notes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `title` TEXT NOT NULL, `body` TEXT NOT NULL, `colorIndex` INTEGER NOT NULL, `pinned` INTEGER NOT NULL, `trashed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `reminderAt` INTEGER, `importance` TEXT NOT NULL, `visibility` TEXT NOT NULL, `pictureUri` TEXT, `pictureHeroFraming` TEXT, `locked` INTEGER NOT NULL, `iconKey` TEXT, `actions` TEXT NOT NULL, `tags` TEXT NOT NULL, `recurrence` TEXT, `archived` INTEGER NOT NULL, `trashedAt` INTEGER, `completedAt` INTEGER)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `title` TEXT NOT NULL, `body` TEXT NOT NULL, `colorIndex` INTEGER NOT NULL, `favorite` INTEGER NOT NULL, `trashed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `reminderAt` INTEGER, `importance` TEXT NOT NULL, `visibility` TEXT NOT NULL, `pictureUri` TEXT, `pictureHeroFraming` TEXT, `locked` INTEGER NOT NULL, `iconKey` TEXT, `actions` TEXT NOT NULL, `tags` TEXT NOT NULL, `recurrence` TEXT, `archived` INTEGER NOT NULL, `trashedAt` INTEGER, `completedAt` INTEGER)",
         "fields": [
           {
             "fieldPath": "id",
@@ -40,7 +40,7 @@
           },
           {
             "fieldPath": "favorite",
-            "columnName": "pinned",
+            "columnName": "favorite",
             "affinity": "INTEGER",
             "notNull": true
           },
@@ -475,7 +475,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'da79cfbcae2eefb305ba93205049a729')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'a9491595730e3a23b587449de359a7d1')"
     ]
   }
 }

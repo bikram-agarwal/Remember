@@ -1,14 +1,5 @@
 package dev.bikram.remember.ui.home
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,11 +24,14 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,15 +39,22 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,18 +66,23 @@ import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.NotesFilter
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
+import dev.bikram.remember.ui.components.toNoteCardUiModel
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.theme.LocalSnackbarHostState
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import kotlinx.coroutines.launch
 
 @Composable
 fun HomeRoute(
     interactionPrefs: InteractionPrefs,
+    closeRevealRequest: Int,
     onOpenNote: (NoteWithItems, Boolean) -> Unit,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
@@ -86,10 +92,30 @@ fun HomeRoute(
     val interaction by interactionPrefs.state.collectAsStateWithLifecycle(
         initialValue = InteractionState(),
     )
-    LaunchedEffect(vm, onOpenNote) {
+    val snackbarHostState = LocalSnackbarHostState.current
+    val context = LocalContext.current
+    val undoLabel = stringResource(R.string.bulk_action_undo)
+    LaunchedEffect(vm, onOpenNote, snackbarHostState, context, undoLabel) {
         vm.events.collect { event ->
             when (event) {
                 is HomeEvent.OpenNote -> onOpenNote(event.note, event.forceEdit)
+                is HomeEvent.BulkActionPerformed -> {
+                    launch {
+                        // Do not block collection of OpenNote events while the snackbar is visible.
+                        val message = bulkActionSnackbarMessage(context, event.action)
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        val result =
+                            snackbarHostState.showSnackbar(
+                                message = message,
+                                actionLabel = undoLabel,
+                                withDismissAction = true,
+                                duration = SnackbarDuration.Short,
+                            )
+                        if (result == SnackbarResult.ActionPerformed) {
+                            vm.undoLastBulkAction()
+                        }
+                    }
+                }
             }
         }
     }
@@ -108,6 +134,7 @@ fun HomeRoute(
         onArchiveSelected = vm::archiveSelected,
         onTrashSelected = vm::trashSelected,
         onApplyTagsToSelection = vm::applyTagsToSelection,
+        closeRevealRequest = closeRevealRequest,
         onCreateNote = onCreateNote,
         onCreateList = onCreateList,
     )
@@ -130,6 +157,7 @@ fun HomeScreen(
     onArchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
     onApplyTagsToSelection: (Set<String>, Set<String>, Map<String, String>) -> Unit,
+    closeRevealRequest: Int,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
 ) {
@@ -142,6 +170,9 @@ fun HomeScreen(
     var archiveSectionExpanded by rememberSaveable { mutableStateOf(false) }
     var trashSectionExpanded by rememberSaveable { mutableStateOf(false) }
     var initialListLiftApplied by rememberSaveable { mutableStateOf(false) }
+    var revealedNoteCardId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var revealedNoteCardBounds by remember { mutableStateOf<Rect?>(null) }
+    var homeScreenBounds by remember { mutableStateOf<Rect?>(null) }
     // Every section header is collapsible. Done starts collapsed by default because those
     // tasks are already finished; every other section starts expanded.
     var collapsedSectionKeys by rememberSaveable { mutableStateOf(setOf("DONE")) }
@@ -164,22 +195,73 @@ fun HomeScreen(
     androidx.activity.compose.BackHandler(enabled = state.inSelectionMode) {
         onClearSelection()
     }
-    val displayedItems =
+    LaunchedEffect(state.inSelectionMode) {
+        if (state.inSelectionMode) {
+            revealedNoteCardId = null
+        }
+    }
+    LaunchedEffect(closeRevealRequest) {
+        if (closeRevealRequest > 0) {
+            revealedNoteCardId = null
+        }
+    }
+    LaunchedEffect(revealedNoteCardId) {
+        if (revealedNoteCardId == null) {
+            revealedNoteCardBounds = null
+        }
+    }
+    val displayedItems by
         remember(state.items, collapsedSectionKeys) {
-            state.items.filterNot { item ->
-                item is HomeListItem.NoteRow && item.groupKey in collapsedSectionKeys
+            derivedStateOf {
+                state.items.filterNot { item ->
+                    item is HomeListItem.NoteRow && item.groupKey in collapsedSectionKeys
+                }
             }
         }
-    val selectableVisibleIds =
+    val selectableVisibleIds by
         remember(displayedItems) {
-            displayedItems
-                .mapNotNull { item ->
-                    (item as? HomeListItem.NoteRow)?.note?.note?.id
-                }.toSet()
+            derivedStateOf {
+                displayedItems
+                    .mapNotNull { item ->
+                        (item as? HomeListItem.NoteRow)?.card?.id
+                    }.toSet()
+            }
         }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
+        modifier =
+            Modifier
+                .onGloballyPositioned { coordinates ->
+                    homeScreenBounds = coordinates.boundsInRoot()
+                }.pointerInput(revealedNoteCardId, revealedNoteCardBounds) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val downChange =
+                                event.changes.firstOrNull { change ->
+                                    change.changedToDownIgnoreConsumed()
+                                } ?: continue
+                            val activeCardBounds = revealedNoteCardBounds
+                            val screenBounds = homeScreenBounds
+                            val tapPositionInRoot =
+                                if (screenBounds != null) {
+                                    Offset(
+                                        x = screenBounds.left + downChange.position.x,
+                                        y = screenBounds.top + downChange.position.y,
+                                    )
+                                } else {
+                                    downChange.position
+                                }
+                            if (
+                                revealedNoteCardId != null &&
+                                activeCardBounds != null &&
+                                !activeCardBounds.contains(tapPositionInRoot)
+                            ) {
+                                revealedNoteCardId = null
+                            }
+                        }
+                    }
+                }.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         bottomBar = {
             HomeSelectionActionBar(
@@ -196,53 +278,29 @@ fun HomeScreen(
             LargeTopAppBar(
                 colors = transparentLargeTopAppBarColors(),
                 title = {
-                    // M3 Expressive motion: the search field expands out of the search
-                    // button (right edge) with a spring, and collapses back into it on close.
-                    // Selection-mode and app-name changes just crossfade.
-                    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-                    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-                    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-                    val titleTarget =
-                        when {
-                            searchOpen && !state.inSelectionMode -> TopBarTitleTarget.Search
-                            else -> TopBarTitleTarget.AppName
-                        }
-                    AnimatedContent(
-                        targetState = titleTarget,
-                        transitionSpec = {
-                            val enteringSearch = targetState == TopBarTitleTarget.Search
-                            val leavingSearch = initialState == TopBarTitleTarget.Search
-                            val enter =
-                                if (enteringSearch) {
-                                    fadeIn(fadeInSpec) +
-                                        expandHorizontally(spatialSpec, expandFrom = Alignment.End)
-                                } else {
-                                    fadeIn(fadeInSpec)
+                    // Selection mode swaps the title for the plain app name; the
+                    // selection action chrome lives in the `actions` slot. Otherwise
+                    // we hand the whole title row over to SearchableTopBarTitle, which
+                    // owns both the title-or-search-field swap AND the toggle button
+                    // so the search bar visually emerges from the button's left edge.
+                    if (state.inSelectionMode) {
+                        Text(
+                            text = stringResource(R.string.app_name),
+                            style = MaterialTheme.typography.headlineLargeEmphasized,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    } else {
+                        SearchableTopBarTitle(
+                            searchOpen = searchOpen,
+                            query = state.filter.text,
+                            onQueryChange = onQueryChange,
+                            onToggleSearch = {
+                                if (searchOpen && state.filter.text.isNotEmpty()) {
+                                    onQueryChange("")
                                 }
-                            val exit =
-                                if (leavingSearch) {
-                                    fadeOut(fadeOutSpec) +
-                                        shrinkHorizontally(spatialSpec, shrinkTowards = Alignment.End)
-                                } else {
-                                    fadeOut(fadeOutSpec)
-                                }
-                            (enter togetherWith exit).using(SizeTransform(clip = false))
-                        },
-                        label = "topBarTitle",
-                    ) { target ->
-                        when (target) {
-                            TopBarTitleTarget.Search ->
-                                InlineSearchField(
-                                    query = state.filter.text,
-                                    onQueryChange = onQueryChange,
-                                )
-                            TopBarTitleTarget.AppName ->
-                                Text(
-                                    text = stringResource(R.string.app_name),
-                                    style = MaterialTheme.typography.headlineLargeEmphasized,
-                                    fontWeight = FontWeight.Bold,
-                                )
-                        }
+                                searchOpen = !searchOpen
+                            },
+                        )
                     }
                 },
                 actions = {
@@ -284,39 +342,11 @@ fun HomeScreen(
                             )
                         }
                         Spacer(Modifier.width(4.dp))
-                    } else {
-                        // Motion specs for the trailing action cluster. Matches the title
-                        // slot so the search icon swap feels tied to the search field.
-                        val actionFadeIn = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-                        val actionFadeOut = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-                        val scaleIconSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-                        RememberFilledTonalIconButton(onClick = {
-                            if (searchOpen && state.filter.text.isNotEmpty()) onQueryChange("")
-                            searchOpen = !searchOpen
-                        }) {
-                            val cdCloseSearch = stringResource(R.string.cd_close_search)
-                            val cdSearch = stringResource(R.string.cd_search)
-                            AnimatedContent(
-                                targetState = searchOpen,
-                                transitionSpec = {
-                                    (scaleIn(scaleIconSpec) + fadeIn(actionFadeIn)) togetherWith
-                                        (scaleOut(scaleIconSpec) + fadeOut(actionFadeOut))
-                                },
-                                label = "searchIconSwap",
-                            ) { open ->
-                                RememberMaterialRoundedSymbol(
-                                    name = if (open) "close" else "search",
-                                    weight = FontWeight.Medium,
-                                    modifier =
-                                        Modifier.semantics {
-                                            contentDescription =
-                                                if (open) cdCloseSearch else cdSearch
-                                        },
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(4.dp))
                     }
+                    // Non-selection-mode actions live inside [SearchableTopBarTitle] so the
+                    // search bar can visually emerge from the toggle button on the right
+                    // edge of the title row instead of from the actions slot, which would
+                    // sit visually disconnected from where the user just tapped.
                 },
                 scrollBehavior = scrollBehavior,
             )
@@ -424,8 +454,13 @@ fun HomeScreen(
                     items = displayedItems,
                     key = { item ->
                         when (item) {
-                            is HomeListItem.Header -> "h:${item.stableKey}"
-                            is HomeListItem.NoteRow -> "n:${item.groupKey}:${item.note.note.id}"
+                            is HomeListItem.Header -> item.stableKey.hashCode()
+                            is HomeListItem.NoteRow ->
+                                if (item.groupKey.isEmpty()) {
+                                    item.card.id
+                                } else {
+                                    "n:${item.groupKey}:${item.card.id}"
+                                }
                         }
                     },
                     contentType = { item ->
@@ -467,10 +502,12 @@ fun HomeScreen(
                                     ),
                             )
                         is HomeListItem.NoteRow -> {
-                            val noteId = item.note.note.id
+                            val noteId = item.card.id
                             val isSelected = noteId in state.selectedIds
+                            var cardBounds by remember { mutableStateOf<Rect?>(null) }
                             SwipeableRememberNoteCard(
                                 note = item.note,
+                                model = item.card,
                                 interaction = interaction,
                                 onOpenNote = { n ->
                                     if (state.inSelectionMode) {
@@ -481,13 +518,29 @@ fun HomeScreen(
                                 },
                                 onSwipeAction = onSwipeAction,
                                 modifier =
-                                    Modifier.animateItem(
-                                        fadeInSpec = itemFadeInSpec,
-                                        placementSpec = itemPlacementSpec,
-                                        fadeOutSpec = itemFadeOutSpec,
-                                    ),
+                                    Modifier
+                                        .onGloballyPositioned { coordinates ->
+                                            cardBounds = coordinates.boundsInRoot()
+                                            if (revealedNoteCardId == noteId) {
+                                                revealedNoteCardBounds = cardBounds
+                                            }
+                                        }.animateItem(
+                                            fadeInSpec = itemFadeInSpec,
+                                            placementSpec = itemPlacementSpec,
+                                            fadeOutSpec = itemFadeOutSpec,
+                                        ),
                                 selected = isSelected,
                                 onLongClick = { onToggleSelection(noteId) },
+                                activeRevealKey = revealedNoteCardId,
+                                onRevealStarted = { revealedNoteId ->
+                                    revealedNoteCardId = revealedNoteId
+                                    revealedNoteCardBounds = cardBounds
+                                },
+                                onRevealClosed = { revealedNoteId ->
+                                    if (revealedNoteCardId == revealedNoteId) {
+                                        revealedNoteCardId = null
+                                    }
+                                },
                                 // Swipes are meaningless during bulk-select and would visually
                                 // fight the tap-to-toggle gesture.
                                 swipeEnabled = !state.inSelectionMode,
@@ -522,6 +575,7 @@ fun HomeScreen(
                         ) { note ->
                             StateBadgedNoteCard(
                                 note = note,
+                                model = remember(note) { note.toNoteCardUiModel() },
                                 interaction = interaction,
                                 onOpen = onOpenNote,
                                 onSwipeAction = onSwipeAction,
@@ -563,6 +617,7 @@ fun HomeScreen(
                         ) { note ->
                             StateBadgedNoteCard(
                                 note = note,
+                                model = remember(note) { note.toNoteCardUiModel() },
                                 interaction = interaction,
                                 onOpen = onOpenNote,
                                 onSwipeAction = onSwipeAction,

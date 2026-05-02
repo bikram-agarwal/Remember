@@ -63,12 +63,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
+import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
@@ -76,7 +78,6 @@ import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.components.ArchivedBanner
 import dev.bikram.remember.ui.components.ArchivedBannerState
 import dev.bikram.remember.ui.components.NoteActionBottomBar
@@ -130,8 +131,26 @@ fun EditListRoute(
     val untitledName =
         androidx.compose.ui.res
             .stringResource(dev.bikram.remember.R.string.edit_list_title_new)
+    // Snackbar templates for the bottom-bar actions. Reused from the bulk-action
+    // strings since the count placeholder reads naturally with 1.
+    val msgArchived =
+        androidx.compose.ui.res
+            .stringResource(dev.bikram.remember.R.string.bulk_action_archived, 1)
+    val msgTrashed =
+        androidx.compose.ui.res
+            .stringResource(dev.bikram.remember.R.string.bulk_action_trashed, 1)
+    val msgUnarchived =
+        androidx.compose.ui.res
+            .stringResource(dev.bikram.remember.R.string.bulk_action_unarchived, 1)
+    val msgRestored =
+        androidx.compose.ui.res
+            .stringResource(dev.bikram.remember.R.string.bulk_action_restored, 1)
     val context = androidx.compose.ui.platform.LocalContext.current
-    RememberPredictiveBackHandler(onBack = onBack)
+    var notificationPermissionSheetOpen by rememberSaveable { mutableStateOf(false) }
+    // BackHandler fires synchronously on back commit, where PredictiveBackHandler
+    // would suspend on its progress flow until the gesture finishes - producing a
+    // visible delay before the navigation reverse animation begins.
+    androidx.activity.compose.BackHandler(onBack = onBack)
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
@@ -230,19 +249,106 @@ fun EditListRoute(
             onAddAttachment = vm::addAttachment,
             onRemoveAttachment = vm::removeAttachment,
             onTrash = {
-                appScope.launch { vm.trashCurrent() }
+                // Trash + back navigation. Snackbar host lives at the scaffold root
+                // and survives the screen pop, so the message appears on whichever
+                // screen is now on top (typically Home). Undo route calls
+                // restoreFromTrashCurrent on the (now disposed) VM; the suspend itself
+                // doesn't depend on viewModelScope so the call still completes.
+                val trashStartedFromArchive = archived
+                appScope.launch {
+                    vm.trashCurrent()
+                    val result =
+                        snackbarHostState.showSnackbar(
+                            message = msgTrashed,
+                            actionLabel = undoMsg,
+                            withDismissAction = true,
+                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                        )
+                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                        if (trashStartedFromArchive) {
+                            vm.archiveCurrent(untitledName)
+                        } else {
+                            vm.restoreFromTrashCurrent()
+                        }
+                    }
+                }
                 onBack()
             },
-            onArchive = { appScope.launch { vm.archiveCurrent(untitledName) } },
-            onNotification = { appScope.launch { vm.fireNotification(context, untitledName) } },
-            onUnarchive = { appScope.launch { vm.unarchiveCurrent() } },
-            onRestore = { appScope.launch { vm.restoreFromTrashCurrent() } },
+            onArchive = {
+                // Archive follows the same leave-editor flow as Trash: pop back
+                // immediately, then let the root snackbar host offer Undo.
+                val archiveStartedFromTrash = trashed
+                appScope.launch {
+                    vm.archiveCurrent(untitledName)
+                    val result =
+                        snackbarHostState.showSnackbar(
+                            message = msgArchived,
+                            actionLabel = undoMsg,
+                            withDismissAction = true,
+                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                        )
+                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                        if (archiveStartedFromTrash) {
+                            vm.trashCurrent()
+                        } else {
+                            vm.unarchiveCurrent()
+                        }
+                    }
+                }
+                onBack()
+            },
+            onNotification = {
+                if (NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                    appScope.launch { vm.fireNotification(context, untitledName) }
+                } else {
+                    notificationPermissionSheetOpen = true
+                }
+            },
+            onUnarchive = {
+                appScope.launch {
+                    vm.unarchiveCurrent()
+                    val result =
+                        snackbarHostState.showSnackbar(
+                            message = msgUnarchived,
+                            actionLabel = undoMsg,
+                            withDismissAction = true,
+                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                        )
+                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                        vm.archiveCurrent(untitledName)
+                    }
+                }
+            },
+            onRestore = {
+                appScope.launch {
+                    vm.restoreFromTrashCurrent()
+                    val result =
+                        snackbarHostState.showSnackbar(
+                            message = msgRestored,
+                            actionLabel = undoMsg,
+                            withDismissAction = true,
+                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                        )
+                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                        vm.trashCurrent()
+                    }
+                }
+            },
             onDeleteForever = {
+                // Delete-forever has no undo path, so no snackbar fires after - the
+                // AlertDialog inside [EditListScreen] is the user's confirmation moment.
                 appScope.launch { vm.deleteForeverCurrent() }
                 onBack()
             },
             onBack = onBack,
             onSave = onExplicitSave,
+        )
+    }
+    if (notificationPermissionSheetOpen) {
+        NotificationPermissionRequiredSheet(
+            onDismiss = { notificationPermissionSheetOpen = false },
+            titleRes = R.string.notification_permission_required_title,
+            bodyRes = R.string.notification_permission_required_body,
         )
     }
 }
@@ -292,9 +398,6 @@ private fun EditListTopBarSection(
                 val iconGap =
                     androidx.compose.ui.unit
                         .lerp(12.dp, 8.dp, collapseFraction)
-                val headerSymbol = iconSymbolName(iconKey)
-                val headerBrandDrawable = iconDrawableRes(iconKey)
-                val headerEmoji = iconEmojiPayload(iconKey)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier =
@@ -302,37 +405,35 @@ private fun EditListTopBarSection(
                             .fillMaxWidth()
                             .alpha(if (sharedTransitionActive) 0f else 1f),
                 ) {
-                    if (headerSymbol != null) {
-                        RememberMaterialRoundedSymbol(
-                            name = headerSymbol,
-                            size = iconSize,
-                            tint = MaterialTheme.colorScheme.primary,
-                            weight = FontWeight.Medium,
-                        )
-                        Spacer(Modifier.width(iconGap))
-                    } else if (headerBrandDrawable != null) {
-                        Icon(
-                            painterResource(headerBrandDrawable),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(iconSize),
-                        )
-                        Spacer(Modifier.width(iconGap))
-                    } else if (headerEmoji != null) {
-                        Text(
-                            text = headerEmoji,
-                            style = titleStyle.copy(fontSize = iconSize.value.sp),
-                        )
-                        Spacer(Modifier.width(iconGap))
-                    } else {
-                        RememberMaterialRoundedSymbol(
-                            name = DEFAULT_LIST_HEADER_SYMBOL,
-                            size = iconSize,
-                            tint = MaterialTheme.colorScheme.primary,
-                            weight = FontWeight.Medium,
-                        )
-                        Spacer(Modifier.width(iconGap))
+                    when (val headerIcon = resolveNoteIcon(iconKey, NoteKind.LIST)) {
+                        is NoteIcon.Symbol ->
+                            RememberMaterialRoundedSymbol(
+                                name = headerIcon.name,
+                                size = iconSize,
+                                tint = MaterialTheme.colorScheme.primary,
+                                weight = FontWeight.Medium,
+                            )
+                        is NoteIcon.Drawable ->
+                            Icon(
+                                painterResource(headerIcon.resId),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(iconSize),
+                            )
+                        is NoteIcon.Emoji ->
+                            Text(
+                                text = headerIcon.text,
+                                style = titleStyle.copy(fontSize = iconSize.value.sp),
+                            )
+                        NoteIcon.ListPlaceholder, NoteIcon.NotePlaceholder ->
+                            RememberMaterialRoundedSymbol(
+                                name = DEFAULT_LIST_HEADER_SYMBOL,
+                                size = iconSize,
+                                tint = MaterialTheme.colorScheme.primary,
+                                weight = FontWeight.Medium,
+                            )
                     }
+                    Spacer(Modifier.width(iconGap))
                     if ((isEditMode && !readOnly) || title.isEmpty()) {
                         BasicTextField(
                             value = title,
@@ -1018,6 +1119,7 @@ fun EditListScreen(
                     onOpenTags = if (readOnly) ({}) else ({ tagsPickerOpen = true }),
                     onOpenAttachments = if (readOnly) ({}) else ({ attachmentsPickerOpen = true }),
                     readOnly = readOnly,
+                    favorite = favorite,
                 )
                 Spacer(Modifier.height(40.dp + padding.calculateBottomPadding()))
             }
@@ -1061,7 +1163,6 @@ fun EditListScreen(
                 availableTags = activeTagSuggestions,
                 onConfirm = { newTags, newColors ->
                     onTagsWithColorsChange(newTags, newColors)
-                    tagsPickerOpen = false
                 },
                 onEditExistingTag = onEditExistingTag,
                 onDismiss = { tagsPickerOpen = false },

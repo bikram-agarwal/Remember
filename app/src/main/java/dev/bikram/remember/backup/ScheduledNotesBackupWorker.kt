@@ -29,9 +29,12 @@ class ScheduledNotesBackupWorker
             if (!prefs.scheduledExportEnabled || backupDestinations.isEmpty()) {
                 return Result.success()
             }
+            if (!noteBackupDirtyTracker.consumePendingChangeSinceLastTreeExport()) {
+                return Result.success()
+            }
             val exportOutcome = backupIo.exportToTreeFolders(backupDestinations)
-            if (exportOutcome.isSuccess) {
-                noteBackupDirtyTracker.clearAfterSuccessfulTreeExport()
+            if (exportOutcome.isFailure) {
+                noteBackupDirtyTracker.markNotesChangedSinceLastTreeExport()
             }
             return exportOutcome.fold(
                 onSuccess = { Result.success() },

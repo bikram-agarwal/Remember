@@ -37,18 +37,25 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -63,23 +70,33 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.BulkUndoableAction
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
 import dev.bikram.remember.ui.components.EmptyArchiveIllustration
 import dev.bikram.remember.ui.components.EmptyTrashIllustration
 import dev.bikram.remember.ui.components.MultiActionSwipeRevealCard
 import dev.bikram.remember.ui.components.NoteCard
+import dev.bikram.remember.ui.components.NoteCardUiModel
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberSegmentedButton
+import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.SwipeRevealTile
+import dev.bikram.remember.ui.components.toNoteCardUiModel
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.theme.LocalSnackbarHostState
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -88,6 +105,24 @@ import kotlin.math.max
 
 /** Which shelf the user is viewing. */
 enum class HistorySection { ARCHIVE, TRASH }
+
+/**
+ * One-shot events emitted by [HistoryViewModel] for the UI layer to react to.
+ * Currently only carries bulk-action completions so the screen can show an undo
+ * snackbar; modeled as a sealed interface so additional event kinds can be added
+ * without breaking existing collectors.
+ */
+sealed interface HistoryEvent {
+    data class BulkActionPerformed(
+        val action: BulkUndoableAction,
+    ) : HistoryEvent
+}
+
+@Immutable
+private data class HistoryNoteRow(
+    val note: NoteWithItems,
+    val card: NoteCardUiModel,
+)
 
 @HiltViewModel
 class HistoryViewModel
@@ -114,6 +149,24 @@ class HistoryViewModel
         private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
         val selectedIds: StateFlow<Set<Long>> = _selectedIds.asStateFlow()
 
+        private val _events = MutableSharedFlow<HistoryEvent>()
+
+        /**
+         * One-shot events for the UI: bulk-action completions surface a snackbar with
+         * Undo. The repository has already coalesced row writes into a single Flow
+         * emission by the time these fire, so the list has reflowed and the snackbar
+         * lands on settled state.
+         */
+        val events: SharedFlow<HistoryEvent> = _events.asSharedFlow()
+
+        /**
+         * Most recent bulk action originating from selection mode. Cleared after undo,
+         * after deletion is performed (since delete-forever is intentionally not
+         * undoable), or when superseded by the next bulk action.
+         */
+        @Volatile
+        private var lastBulkAction: BulkUndoableAction? = null
+
         fun toggleSelection(id: Long) {
             _selectedIds.value =
                 if (id in _selectedIds.value) {
@@ -136,23 +189,61 @@ class HistoryViewModel
         }
 
         fun restore(note: NoteWithItems) {
-            viewModelScope.launch { repository.restoreFromTrash(note.note.id) }
+            val id = note.note.id
+            viewModelScope.launch {
+                repository.restoreFromTrash(id)
+                emitSingleCardAction(BulkUndoableAction.Restored(setOf(id)))
+            }
         }
 
         fun archiveFromTrash(note: NoteWithItems) {
-            viewModelScope.launch { repository.archiveNote(note.note.id) }
+            val id = note.note.id
+            viewModelScope.launch {
+                repository.archiveNote(id)
+                emitSingleCardAction(BulkUndoableAction.ArchivedFromTrash(setOf(id)))
+            }
         }
 
+        /**
+         * Permanent single-card delete. The screen guards this path with a
+         * confirmation dialog (mirror of the bulk delete sheet); no snackbar fires
+         * after - delete-forever has no undo so the dialog IS the confirmation.
+         * [lastBulkAction] is cleared so a stale undo from an earlier action cannot
+         * fire after the user's confirmed permanent delete.
+         */
         fun deleteForever(note: NoteWithItems) {
-            viewModelScope.launch { repository.deleteForever(note.note.id) }
+            val id = note.note.id
+            viewModelScope.launch {
+                repository.deleteForever(id)
+                lastBulkAction = null
+            }
         }
 
         fun unarchive(note: NoteWithItems) {
-            viewModelScope.launch { repository.unarchiveNote(note.note.id) }
+            val id = note.note.id
+            viewModelScope.launch {
+                repository.unarchiveNote(id)
+                emitSingleCardAction(BulkUndoableAction.Unarchived(setOf(id)))
+            }
         }
 
         fun moveArchivedToTrash(note: NoteWithItems) {
-            viewModelScope.launch { repository.moveToTrash(note.note.id) }
+            val id = note.note.id
+            viewModelScope.launch {
+                repository.moveToTrash(id)
+                emitSingleCardAction(BulkUndoableAction.MovedArchiveToTrash(setOf(id)))
+            }
+        }
+
+        /**
+         * Records [action] as the most-recent undoable action and notifies the screen
+         * so it can show a snackbar. Single-card swipe / tap callbacks share the same
+         * snackbar plumbing as bulk-selection mode; both routes through
+         * [HistoryEvent.BulkActionPerformed] and [undoLastBulkAction].
+         */
+        private suspend fun emitSingleCardAction(action: BulkUndoableAction) {
+            lastBulkAction = action
+            _events.emit(HistoryEvent.BulkActionPerformed(action))
         }
 
         fun emptyTrash() {
@@ -160,47 +251,92 @@ class HistoryViewModel
         }
 
         fun restoreSelected() {
-            val ids = _selectedIds.value.toList()
+            val ids = _selectedIds.value
             if (ids.isEmpty()) return
+            val snapshot = ids.toSet()
             viewModelScope.launch {
-                ids.forEach { repository.restoreFromTrash(it) }
+                repository.restoreFromTrash(snapshot)
                 _selectedIds.value = emptySet()
+                val action = BulkUndoableAction.Restored(snapshot)
+                lastBulkAction = action
+                _events.emit(HistoryEvent.BulkActionPerformed(action))
             }
         }
 
         fun archiveSelectedFromTrash() {
-            val ids = _selectedIds.value.toList()
+            val ids = _selectedIds.value
             if (ids.isEmpty()) return
+            val snapshot = ids.toSet()
             viewModelScope.launch {
-                ids.forEach { repository.archiveNote(it) }
+                repository.archiveNotes(snapshot)
                 _selectedIds.value = emptySet()
+                val action = BulkUndoableAction.ArchivedFromTrash(snapshot)
+                lastBulkAction = action
+                _events.emit(HistoryEvent.BulkActionPerformed(action))
             }
         }
 
         fun unarchiveSelected() {
-            val ids = _selectedIds.value.toList()
+            val ids = _selectedIds.value
             if (ids.isEmpty()) return
+            val snapshot = ids.toSet()
             viewModelScope.launch {
-                ids.forEach { repository.unarchiveNote(it) }
+                repository.unarchiveNotes(snapshot)
                 _selectedIds.value = emptySet()
+                val action = BulkUndoableAction.Unarchived(snapshot)
+                lastBulkAction = action
+                _events.emit(HistoryEvent.BulkActionPerformed(action))
             }
         }
 
         fun moveSelectedArchivedToTrash() {
-            val ids = _selectedIds.value.toList()
+            val ids = _selectedIds.value
             if (ids.isEmpty()) return
+            val snapshot = ids.toSet()
             viewModelScope.launch {
-                ids.forEach { repository.moveToTrash(it) }
+                repository.moveToTrash(snapshot)
                 _selectedIds.value = emptySet()
+                val action = BulkUndoableAction.MovedArchiveToTrash(snapshot)
+                lastBulkAction = action
+                _events.emit(HistoryEvent.BulkActionPerformed(action))
             }
         }
 
+        /**
+         * Permanent delete is intentionally not undoable - rows are gone and reviving
+         * them isn't possible. The screen guards this path with a confirmation
+         * AppBottomSheet before invoking us. We clear [lastBulkAction] so a stale undo
+         * from an earlier action doesn't accidentally fire after the user confirms.
+         */
         fun deleteSelectedForever() {
-            val ids = _selectedIds.value.toList()
+            val ids = _selectedIds.value
             if (ids.isEmpty()) return
+            val snapshot = ids.toSet()
             viewModelScope.launch {
-                ids.forEach { repository.deleteForever(it) }
+                repository.deleteForever(snapshot)
                 _selectedIds.value = emptySet()
+                lastBulkAction = null
+            }
+        }
+
+        /**
+         * Reverses the most recent bulk action by issuing the inverse repository call.
+         * Mirrors [HomeViewModel.undoLastBulkAction]; see [BulkUndoableAction] for the
+         * full inverse mapping table.
+         */
+        fun undoLastBulkAction() {
+            val action = lastBulkAction ?: return
+            lastBulkAction = null
+            viewModelScope.launch {
+                when (action) {
+                    is BulkUndoableAction.Archived -> repository.unarchiveNotes(action.ids)
+                    is BulkUndoableAction.Trashed -> repository.restoreFromTrash(action.ids)
+                    is BulkUndoableAction.MarkedDone -> repository.markIncomplete(action.ids)
+                    is BulkUndoableAction.Restored -> repository.moveToTrash(action.ids)
+                    is BulkUndoableAction.Unarchived -> repository.archiveNotes(action.ids)
+                    is BulkUndoableAction.ArchivedFromTrash -> repository.moveToTrash(action.ids)
+                    is BulkUndoableAction.MovedArchiveToTrash -> repository.archiveNotes(action.ids)
+                }
             }
         }
 
@@ -251,6 +387,15 @@ fun HistoryRoute(
             HistorySection.ARCHIVE -> archived
             HistorySection.TRASH -> trashed
         }
+    val rows =
+        remember(items) {
+            items.map { noteWithItems ->
+                HistoryNoteRow(
+                    note = noteWithItems,
+                    card = noteWithItems.toNoteCardUiModel(),
+                )
+            }
+        }
     val listState =
         when (section) {
             HistorySection.ARCHIVE -> archivedListState
@@ -261,17 +406,48 @@ fun HistoryRoute(
             listState = listState,
             additionalScrollEnabled = topBarState.collapsedFraction > 0f,
         )
-    val selectableVisibleIds = remember(items) { items.map { it.note.id }.toSet() }
+    val selectableVisibleIds = remember(rows) { rows.map { row -> row.card.id }.toSet() }
     val inSelectionMode = selectedIds.isNotEmpty()
+    val snackbarHostState = LocalSnackbarHostState.current
+    val context = LocalContext.current
+    val undoLabel = stringResource(R.string.bulk_action_undo)
+    // Confirmation sheet state for the selection-mode delete-forever path. Permanent
+    // delete has no undo so the user has to confirm explicitly before any rows go.
+    // saveable so a config change mid-confirmation does not blow the dialog away.
+    var bulkDeleteForeverOpen by rememberSaveable { mutableStateOf(false) }
+    // Single-card delete-forever confirmation. Held as a NoteWithItems? so the dialog
+    // also has the row context if we ever want to mention the note's title; the value
+    // is non-saveable (NoteWithItems isn't Parcelable) so a config change while the
+    // dialog is up dismisses it - acceptable for a transient permanent-delete prompt.
+    var pendingDeleteForeverNote by remember { mutableStateOf<NoteWithItems?>(null) }
 
     BackHandler(enabled = inSelectionMode) { vm.clearSelection() }
     LaunchedEffect(section) { vm.clearSelection() }
     LaunchedEffect(selectableVisibleIds) { vm.pruneSelection(selectableVisibleIds) }
-    LaunchedEffect(section, items.size) { onVisibleItemCountChange(items.size) }
-    LaunchedEffect(section, items.isEmpty()) {
-        if (items.isEmpty()) {
+    LaunchedEffect(section, rows.size) { onVisibleItemCountChange(rows.size) }
+    LaunchedEffect(section, rows.isEmpty()) {
+        if (rows.isEmpty()) {
             topBarState.heightOffset = 0f
             topBarState.contentOffset = 0f
+        }
+    }
+    LaunchedEffect(vm, snackbarHostState, context, undoLabel) {
+        vm.events.collect { event ->
+            when (event) {
+                is HistoryEvent.BulkActionPerformed -> {
+                    val message = bulkActionSnackbarMessage(context, event.action)
+                    val result =
+                        snackbarHostState.showSnackbar(
+                            message = message,
+                            actionLabel = undoLabel,
+                            withDismissAction = true,
+                            duration = SnackbarDuration.Short,
+                        )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        vm.undoLastBulkAction()
+                    }
+                }
+            }
         }
     }
 
@@ -285,7 +461,9 @@ fun HistoryRoute(
                 onClearSelection = vm::clearSelection,
                 onRestoreSelected = vm::restoreSelected,
                 onArchiveSelected = vm::archiveSelectedFromTrash,
-                onDeleteForeverSelected = vm::deleteSelectedForever,
+                // Permanent delete is gated by a confirmation sheet; the actual VM
+                // call only fires after the user taps Delete in that sheet.
+                onDeleteForeverSelected = { bulkDeleteForeverOpen = true },
                 onUnarchiveSelected = vm::unarchiveSelected,
                 onTrashSelected = vm::moveSelectedArchivedToTrash,
                 bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
@@ -378,7 +556,7 @@ fun HistoryRoute(
                         )
                     }
                 }
-                if (section == HistorySection.TRASH && trashed.isNotEmpty()) {
+                if (section == HistorySection.TRASH && rows.isNotEmpty()) {
                     RetentionNotice(
                         modifier =
                             Modifier
@@ -388,7 +566,7 @@ fun HistoryRoute(
                 } else {
                     Spacer(Modifier.height(12.dp))
                 }
-                if (items.isNotEmpty()) {
+                if (rows.isNotEmpty()) {
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
@@ -403,29 +581,29 @@ fun HistoryRoute(
                         userScrollEnabled = listScrollEnabled,
                     ) {
                         items(
-                            items = items,
-                            key = { it.note.id },
+                            items = rows,
+                            key = { row -> row.card.id },
                             contentType = { if (section == HistorySection.TRASH) "trashedRow" else "archivedRow" },
-                        ) { note ->
-                            val noteId = note.note.id
+                        ) { row ->
+                            val noteId = row.card.id
                             val isSelected = noteId in selectedIds
                             HistorySwipeCard(
-                                note = note,
+                                model = row.card,
                                 section = section,
-                                daysLeft = vm.daysLeftInTrash(note).takeIf { section == HistorySection.TRASH },
+                                daysLeft = vm.daysLeftInTrash(row.note).takeIf { section == HistorySection.TRASH },
                                 hapticEnabled = interactionState.hapticFeedbackEnabled,
                                 onOpenNote = {
                                     if (inSelectionMode) {
                                         vm.toggleSelection(noteId)
                                     } else {
-                                        onOpenNote(note, false)
+                                        onOpenNote(row.note, false)
                                     }
                                 },
-                                onRestore = { vm.restore(note) },
-                                onArchive = { vm.archiveFromTrash(note) },
-                                onDeleteForever = { vm.deleteForever(note) },
-                                onUnarchive = { vm.unarchive(note) },
-                                onMoveToTrash = { vm.moveArchivedToTrash(note) },
+                                onRestore = { vm.restore(row.note) },
+                                onArchive = { vm.archiveFromTrash(row.note) },
+                                onDeleteForever = { pendingDeleteForeverNote = row.note },
+                                onUnarchive = { vm.unarchive(row.note) },
+                                onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
                                 selected = isSelected,
                                 onLongClick = { vm.toggleSelection(noteId) },
                                 swipeEnabled = !inSelectionMode,
@@ -434,7 +612,7 @@ fun HistoryRoute(
                     }
                 }
             }
-            if (items.isEmpty()) {
+            if (rows.isEmpty()) {
                 // Top padding pushes the centre below the LargeTopAppBar; bottom padding
                 // raises it above the floating pill bar. The two together let Alignment.Center
                 // land on the true midpoint of the visible viewport instead of the midpoint
@@ -447,6 +625,58 @@ fun HistoryRoute(
                             .padding(top = padding.calculateTopPadding(), bottom = pillInset),
                 )
             }
+        }
+    }
+
+    pendingDeleteForeverNote?.let { noteToDelete ->
+        // Single-card delete-forever confirmation. Mirrors the bulk sheet so users
+        // get the same warning regardless of whether they triggered the delete from
+        // the swipe action on one card or from selection mode on many.
+        AppBottomSheet(
+            title = stringResource(R.string.bulk_delete_forever_confirm_title),
+            subtitle = stringResource(R.string.bulk_delete_forever_confirm_subtitle),
+            onDismiss = { pendingDeleteForeverNote = null },
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
+            subtitleSpacing = 12.dp,
+            actions = {
+                RememberTextButton(onClick = { pendingDeleteForeverNote = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+                RememberTextButton(onClick = {
+                    pendingDeleteForeverNote = null
+                    vm.deleteForever(noteToDelete)
+                }) {
+                    Text(stringResource(R.string.edit_bottom_bar_delete_forever))
+                }
+            },
+        ) {
+            // Subtitle covers the warning; no extra body content.
+        }
+    }
+
+    if (bulkDeleteForeverOpen) {
+        // Mirrors the existing main-tab "Empty trash" sheet so the confirmation pattern
+        // is consistent across the app. The selected-count snapshot is captured at open
+        // time; the selection set itself is unchanged until the user confirms.
+        AppBottomSheet(
+            title = stringResource(R.string.bulk_delete_forever_confirm_title),
+            subtitle = stringResource(R.string.bulk_delete_forever_confirm_subtitle),
+            onDismiss = { bulkDeleteForeverOpen = false },
+            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
+            subtitleSpacing = 12.dp,
+            actions = {
+                RememberTextButton(onClick = { bulkDeleteForeverOpen = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+                RememberTextButton(onClick = {
+                    bulkDeleteForeverOpen = false
+                    vm.deleteSelectedForever()
+                }) {
+                    Text(stringResource(R.string.edit_bottom_bar_delete_forever))
+                }
+            },
+        ) {
+            // The subtitle covers the warning fully; no extra body content.
         }
     }
 }
@@ -617,7 +847,7 @@ private fun RetentionNotice(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HistorySwipeCard(
-    note: NoteWithItems,
+    model: NoteCardUiModel,
     section: HistorySection,
     daysLeft: Int?,
     hapticEnabled: Boolean,
@@ -634,7 +864,7 @@ private fun HistorySwipeCard(
     if (!swipeEnabled) {
         Box(Modifier.fillMaxWidth()) {
             NoteCard(
-                note = note,
+                model = model,
                 onClick = onOpenNote,
                 selected = selected,
                 onLongClick = onLongClick,
@@ -722,7 +952,7 @@ private fun HistorySwipeCard(
     ) {
         Box(Modifier.fillMaxWidth()) {
             NoteCard(
-                note = note,
+                model = model,
                 onClick = onOpenNote,
                 selected = selected,
                 onLongClick = onLongClick,

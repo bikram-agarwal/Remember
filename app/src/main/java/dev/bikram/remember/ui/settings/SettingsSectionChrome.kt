@@ -10,6 +10,7 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -236,6 +237,43 @@ internal fun SettingsToggleRow(
 internal fun isPermissionLinked(): Boolean =
     Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
         Build.MANUFACTURER.lowercase() in setOf("google", "samsung", "nothing", "motorola")
+
+@Composable
+internal fun SettingsToggleSwitch(
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onDisabledInteraction: (() -> Unit)? = null,
+) {
+    Box {
+        RememberSwitch(
+            checked = checked,
+            onCheckedChange = if (enabled) onCheckedChange else null,
+            enabled = enabled,
+            thumbContent =
+                if (checked) {
+                    {
+                        RememberMaterialRoundedSymbol(
+                            name = "check",
+                            size = SwitchDefaults.IconSize,
+                            weight = FontWeight.Bold,
+                        )
+                    }
+                } else {
+                    null
+                },
+        )
+        if (!enabled && onDisabledInteraction != null) {
+            Box(
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .clip(MaterialTheme.shapes.extraExtraLarge)
+                        .tapSoundClickable { onDisabledInteraction() },
+            )
+        }
+    }
+}
 
 @Composable
 internal fun ToggleRow(

@@ -104,7 +104,7 @@ fun AppPickerDialog(
                 }
                 current.isEmpty() -> {
                     Text(
-                        "Nothing available",
+                        stringResource(R.string.app_picker_nothing_available),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -188,7 +188,6 @@ fun rememberShortcutPickLauncher(
     return { cn ->
         val launch =
             Intent(Intent.ACTION_CREATE_SHORTCUT).apply {
-                addCategory(Intent.CATEGORY_DEFAULT)
                 component = cn
             }
         launcher.launch(launch)

@@ -5,6 +5,7 @@ import androidx.compose.runtime.Immutable
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.NotesFilter
 import dev.bikram.remember.data.ViewOptions
+import dev.bikram.remember.ui.components.NoteCardUiModel
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentSet
 import kotlinx.collections.immutable.persistentListOf
@@ -35,12 +36,10 @@ sealed class HomeListItem {
      */
     data class NoteRow(
         val note: NoteWithItems,
+        val card: NoteCardUiModel,
         val groupKey: String = "",
     ) : HomeListItem()
 }
-
-/** Drives the M3 Expressive AnimatedContent that swaps the top-bar title. */
-internal enum class TopBarTitleTarget { Search, AppName }
 
 @Immutable
 data class HomeState(

@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.graphics.ImageDecoder
 import android.graphics.Rect
 import android.net.Uri
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.MainActivity
@@ -122,14 +123,18 @@ class ReminderReceiver : BroadcastReceiver() {
 
             val heroBitmap = decodeNotificationHeroBitmap(context, note)
             if (heroBitmap != null) {
+                val bigPictureStyle =
+                    NotificationCompat
+                        .BigPictureStyle()
+                        .bigPicture(heroBitmap)
+                        .setBigContentTitle(notificationTitle(context, note))
+                        .setSummaryText(summary(context, note, items, expanded = true))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    bigPictureStyle.showBigPictureWhenCollapsed(true)
+                }
                 builder
                     .setStyle(
-                        NotificationCompat
-                            .BigPictureStyle()
-                            .bigPicture(heroBitmap)
-                            .setBigContentTitle(notificationTitle(context, note))
-                            .setSummaryText(summary(context, note, items, expanded = true))
-                            .showBigPictureWhenCollapsed(true),
+                        bigPictureStyle,
                     )
             } else if (note.kind == NoteKind.LIST) {
                 builder.setStyle(

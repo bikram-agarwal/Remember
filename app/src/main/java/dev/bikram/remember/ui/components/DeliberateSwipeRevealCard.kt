@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.feedback.performSwipeThresholdHaptic
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -69,7 +70,7 @@ fun DeliberateSwipeRevealCard(
     val scope = rememberCoroutineScope()
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
-    val swipeSettleSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val swipeSettleSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
 
     BoxWithConstraints(modifier = modifier.clip(cardShape)) {
         val constraintWidthPx =
@@ -201,13 +202,17 @@ fun MultiActionSwipeRevealCard(
     hapticEnabled: Boolean,
     modifier: Modifier = Modifier,
     maxRevealWidth: Dp = 240.dp,
+    revealKey: Any? = null,
+    activeRevealKey: Any? = null,
+    onRevealStarted: (() -> Unit)? = null,
+    onRevealClosed: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     val view = LocalView.current
     val scope = rememberCoroutineScope()
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
-    val swipeSettleSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val swipeSettleSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
     val maxRevealWidthPx =
         with(androidx.compose.ui.platform.LocalDensity.current) {
             maxRevealWidth.toPx()
@@ -250,6 +255,18 @@ fun MultiActionSwipeRevealCard(
             }
         }
 
+        LaunchedEffect(activeRevealKey, revealKey) {
+            if (activeRevealKey != revealKey && offsetX != 0f) {
+                val anim = Animatable(offsetX)
+                anim.animateTo(
+                    targetValue = 0f,
+                    animationSpec = swipeSettleSpec,
+                ) {
+                    offsetX = value
+                }
+            }
+        }
+
         SubcomposeLayout(
             Modifier
                 .fillMaxWidth()
@@ -265,6 +282,9 @@ fun MultiActionSwipeRevealCard(
                             .offset { IntOffset(offsetX.roundToInt(), 0) }
                             .pointerInput(startRevealPx, endRevealPx, openThresholdPx) {
                                 detectHorizontalDragGestures(
+                                    onDragStart = {
+                                        onRevealStarted?.invoke()
+                                    },
                                     onHorizontalDrag = { _, dragAmount ->
                                         offsetX = (offsetX + dragAmount).coerceIn(-endRevealPx, startRevealPx)
                                     },
@@ -276,6 +296,11 @@ fun MultiActionSwipeRevealCard(
                                                     offsetX <= -openThresholdPx && endRevealPx > 0f -> -endRevealPx
                                                     else -> 0f
                                                 }
+                                            if (target == 0f) {
+                                                onRevealClosed?.invoke()
+                                            } else {
+                                                onRevealStarted?.invoke()
+                                            }
                                             val anim = Animatable(offsetX)
                                             anim.animateTo(
                                                 targetValue = target,
@@ -306,7 +331,10 @@ fun MultiActionSwipeRevealCard(
                                 revealProgress = revealProgress,
                                 alignToStart = true,
                                 onActionClick = {
-                                    scope.launch { offsetX = 0f }
+                                    scope.launch {
+                                        offsetX = 0f
+                                        onRevealClosed?.invoke()
+                                    }
                                 },
                             )
                         } else if (offsetX < -4f && endActions.isNotEmpty()) {
@@ -316,7 +344,10 @@ fun MultiActionSwipeRevealCard(
                                 revealProgress = revealProgress,
                                 alignToStart = false,
                                 onActionClick = {
-                                    scope.launch { offsetX = 0f }
+                                    scope.launch {
+                                        offsetX = 0f
+                                        onRevealClosed?.invoke()
+                                    }
                                 },
                             )
                         }

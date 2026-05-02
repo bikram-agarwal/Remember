@@ -22,7 +22,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -114,12 +114,19 @@ fun ActionPicker(
     }
 
     if (typePickerOpen) {
-        val context = LocalContext.current
+        val copyToClipboardTitle = stringResource(ActionType.COPY_TO_CLIPBOARD.labelRes())
+        val shareContentTitle = stringResource(ActionType.SHARE_CONTENT.labelRes())
         TypePickerDialog(
             onPick = { type ->
                 typePickerOpen = false
                 if (type == ActionType.COPY_TO_CLIPBOARD || type == ActionType.SHARE_CONTENT) {
-                    val action = NoteAction(type, context.getString(type.labelRes()), "")
+                    val actionTitle =
+                        if (type == ActionType.COPY_TO_CLIPBOARD) {
+                            copyToClipboardTitle
+                        } else {
+                            shareContentTitle
+                        }
+                    val action = NoteAction(type, actionTitle, "")
                     val idx = editingIndex
                     if (idx != null && idx in draft.indices) {
                         val mut = draft.toMutableList()
@@ -328,8 +335,8 @@ private fun SimpleEditor(
     onConfirm: (NoteAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
+    val defaultTitle = stringResource(type.labelRes())
+    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: defaultTitle) }
     var data by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
     val ready = title.isNotBlank() && (!showData || data.isNotBlank())
     EditorShell(
@@ -377,23 +384,24 @@ private fun ContactBackedEditor(
     onConfirm: (NoteAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
+    val resources = LocalResources.current
+    val defaultTitle = stringResource(type.labelRes())
+    val contactVerb =
+        when (type) {
+            ActionType.CALL_NUMBER -> stringResource(R.string.action_contact_verb_call)
+            ActionType.SEND_MESSAGE -> stringResource(R.string.action_contact_verb_message)
+            ActionType.SEND_EMAIL -> stringResource(R.string.action_contact_verb_email)
+            else -> null
+        }
+    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: defaultTitle) }
     var data by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
     val launcher =
         launcherFactory { pick ->
-            val prefixRes =
-                when (type) {
-                    ActionType.CALL_NUMBER -> R.string.action_contact_verb_call
-                    ActionType.SEND_MESSAGE -> R.string.action_contact_verb_message
-                    ActionType.SEND_EMAIL -> R.string.action_contact_verb_email
-                    else -> null
-                }
-            if (prefixRes != null && pick.displayName.isNotBlank()) {
+            if (contactVerb != null && pick.displayName.isNotBlank()) {
                 title =
-                    context.getString(
+                    resources.getString(
                         R.string.actions_contact_title_format,
-                        context.getString(prefixRes),
+                        contactVerb,
                         pick.displayName,
                     )
             }
@@ -439,8 +447,9 @@ private fun AppBackedEditor(
     onConfirm: (NoteAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
+    val resources = LocalResources.current
+    val defaultTitle = stringResource(type.labelRes())
+    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: defaultTitle) }
     var pkg by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
     var pickerOpen by rememberSaveable(type, initialAction) { mutableStateOf(initialAction == null) }
     val ready = title.isNotBlank() && pkg.isNotBlank()
@@ -486,10 +495,9 @@ private fun AppBackedEditor(
             queryIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
             onPick = { app ->
                 pkg = app.packageName
-                val defaultTitle = context.getString(type.labelRes())
                 val newTitle =
                     if (title.isBlank() || title == defaultTitle) {
-                        context.getString(R.string.actions_open_app_title, app.label)
+                        resources.getString(R.string.actions_open_app_title, app.label)
                     } else {
                         title
                     }
@@ -508,8 +516,8 @@ private fun ShortcutBackedEditor(
     onConfirm: (NoteAction) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
-    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: context.getString(type.labelRes())) }
+    val defaultTitle = stringResource(type.labelRes())
+    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: defaultTitle) }
     var uri by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
     var appPickerOpen by rememberSaveable(type, initialAction) { mutableStateOf(initialAction == null) }
     val pickShortcut =
@@ -558,7 +566,7 @@ private fun ShortcutBackedEditor(
     if (appPickerOpen) {
         AppPickerDialog(
             title = stringResource(R.string.actions_pick_app_shortcut),
-            queryIntent = Intent(Intent.ACTION_CREATE_SHORTCUT).addCategory(Intent.CATEGORY_DEFAULT),
+            queryIntent = Intent(Intent.ACTION_CREATE_SHORTCUT),
             onPick = { app ->
                 appPickerOpen = false
                 pickShortcut(app.componentName)

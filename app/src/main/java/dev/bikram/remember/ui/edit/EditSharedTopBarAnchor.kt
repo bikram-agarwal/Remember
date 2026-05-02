@@ -4,6 +4,7 @@ import androidx.compose.animation.BoundsTransform
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
@@ -18,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 
 @Composable
@@ -53,9 +55,16 @@ internal fun ExpandedEditorSharedTopBarAnchor(
         }
     val titleText = title.ifBlank { fallbackTitle }
 
+    // The Row fills width and the title takes weight(1f) so the shared-element bounds
+    // shape matches the card's title bounds (also weight(1f) inside its row). Without
+    // this match, the anchor's title bounds would be the intrinsic text width while
+    // the card's would be the full remaining row width - and during a card->anchor
+    // back animation the source content gets ScaleToBounds(FillWidth)-scaled UP by
+    // ~1.87x to fill the destination's growing width, which is what made the title
+    // visibly grow huge at center-screen during the back gesture.
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier,
+        modifier = modifier.fillMaxWidth(),
     ) {
         EditorSharedHeaderIcon(
             iconKey = iconKey,
@@ -63,7 +72,7 @@ internal fun ExpandedEditorSharedTopBarAnchor(
             modifier = iconModifier,
         )
         Spacer(Modifier.width(12.dp))
-        Box(modifier = titleModifier) {
+        Box(modifier = Modifier.weight(1f).then(titleModifier)) {
             Text(
                 text = titleText,
                 style = MaterialTheme.typography.headlineMedium,
@@ -81,35 +90,45 @@ private fun EditorSharedHeaderIcon(
     isChecklist: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val headerSymbol = iconSymbolName(iconKey)
-    val headerBrandDrawable = iconDrawableRes(iconKey)
-    val headerEmoji = iconEmojiPayload(iconKey)
-    val defaultSymbol = if (isChecklist) DEFAULT_LIST_HEADER_SYMBOL else DEFAULT_NOTE_HEADER_SYMBOL
-    when {
-        headerSymbol != null ->
+    val kind =
+        if (isChecklist) {
+            NoteKind.LIST
+        } else {
+            NoteKind.NOTE
+        }
+    when (val headerIcon = resolveNoteIcon(iconKey, kind)) {
+        is NoteIcon.Symbol ->
             RememberMaterialRoundedSymbol(
-                name = headerSymbol,
+                name = headerIcon.name,
                 size = 28.dp,
                 tint = MaterialTheme.colorScheme.primary,
                 weight = FontWeight.Medium,
                 modifier = modifier,
             )
-        headerBrandDrawable != null ->
+        is NoteIcon.Drawable ->
             Icon(
-                painterResource(headerBrandDrawable),
+                painterResource(headerIcon.resId),
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = modifier.size(28.dp),
             )
-        headerEmoji != null ->
+        is NoteIcon.Emoji ->
             Text(
-                text = headerEmoji,
+                text = headerIcon.text,
                 style = MaterialTheme.typography.headlineMedium.copy(fontSize = 28.sp),
                 modifier = modifier,
             )
-        else ->
+        NoteIcon.ListPlaceholder ->
             RememberMaterialRoundedSymbol(
-                name = defaultSymbol,
+                name = DEFAULT_LIST_HEADER_SYMBOL,
+                size = 28.dp,
+                tint = MaterialTheme.colorScheme.primary,
+                weight = FontWeight.Medium,
+                modifier = modifier,
+            )
+        NoteIcon.NotePlaceholder ->
+            RememberMaterialRoundedSymbol(
+                name = DEFAULT_NOTE_HEADER_SYMBOL,
                 size = 28.dp,
                 tint = MaterialTheme.colorScheme.primary,
                 weight = FontWeight.Medium,

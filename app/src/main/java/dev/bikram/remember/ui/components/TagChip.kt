@@ -130,6 +130,8 @@ fun TagChipFilled(
     color: Color = tagColor(tag),
     faded: Boolean = false,
     highlighted: Boolean = false,
+    leadingIconName: String? = null,
+    highlightedIconName: String? = "edit",
     onClick: (() -> Unit)? = null,
     onRemove: (() -> Unit)? = null,
     compact: Boolean = false,
@@ -162,6 +164,14 @@ fun TagChipFilled(
                     }
                 }.padding(horizontal = horizontal, vertical = vertical),
     ) {
+        if (leadingIconName != null) {
+            RememberMaterialRoundedSymbol(
+                name = leadingIconName,
+                size = 14.dp,
+                tint = contentColor,
+                weight = FontWeight.Medium,
+            )
+        }
         Text(
             text = tag,
             style =
@@ -173,9 +183,9 @@ fun TagChipFilled(
             color = contentColor,
             maxLines = 1,
         )
-        if (highlighted) {
+        if (highlighted && highlightedIconName != null) {
             RememberMaterialRoundedSymbol(
-                name = "edit",
+                name = highlightedIconName,
                 size = 14.dp,
                 tint = contentColor,
                 weight = FontWeight.Medium,

@@ -8,6 +8,7 @@ import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.SortDir
 import dev.bikram.remember.data.SortKey
 import dev.bikram.remember.data.ViewOptions
+import dev.bikram.remember.ui.components.toNoteCardUiModel
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
@@ -49,7 +50,13 @@ internal fun arrangeItems(
                 ),
             )
             overdueNotes.forEach { noteWithItems ->
-                add(HomeListItem.NoteRow(noteWithItems, groupKey = "OVERDUE"))
+                add(
+                    HomeListItem.NoteRow(
+                        note = noteWithItems,
+                        card = noteWithItems.toNoteCardUiModel(),
+                        groupKey = "OVERDUE",
+                    ),
+                )
             }
         }
         addAll(arrangeMiddle(remainingActiveNotes, opts))
@@ -63,7 +70,13 @@ internal fun arrangeItems(
                 ),
             )
             doneNotes.forEach { noteWithItems ->
-                add(HomeListItem.NoteRow(noteWithItems, groupKey = "DONE"))
+                add(
+                    HomeListItem.NoteRow(
+                        note = noteWithItems,
+                        card = noteWithItems.toNoteCardUiModel(),
+                        groupKey = "DONE",
+                    ),
+                )
             }
         }
     }
@@ -155,7 +168,13 @@ private fun arrangeMiddle(
                     ),
                 )
                 section.items.forEach { noteWithItems ->
-                    add(HomeListItem.NoteRow(noteWithItems, groupKey = section.key))
+                    add(
+                        HomeListItem.NoteRow(
+                            note = noteWithItems,
+                            card = noteWithItems.toNoteCardUiModel(),
+                            groupKey = section.key,
+                        ),
+                    )
                 }
             }
         }
@@ -168,8 +187,21 @@ private fun arrangeByGroupBy(
     opts: ViewOptions,
 ): List<HomeListItem> =
     when (opts.groupBy) {
-        GroupBy.DATE -> activeNotes.map { noteWithItems -> HomeListItem.NoteRow(noteWithItems) }
-        GroupBy.NONE -> activeNotes.map { noteWithItems -> HomeListItem.NoteRow(noteWithItems, groupKey = "ACTIVE") }
+        GroupBy.DATE ->
+            activeNotes.map { noteWithItems ->
+                HomeListItem.NoteRow(
+                    note = noteWithItems,
+                    card = noteWithItems.toNoteCardUiModel(),
+                )
+            }
+        GroupBy.NONE ->
+            activeNotes.map { noteWithItems ->
+                HomeListItem.NoteRow(
+                    note = noteWithItems,
+                    card = noteWithItems.toNoteCardUiModel(),
+                    groupKey = "ACTIVE",
+                )
+            }
         GroupBy.TYPE -> arrangeByType(activeNotes)
         GroupBy.TAG -> arrangeByTag(activeNotes)
     }
@@ -188,7 +220,13 @@ private fun arrangeByType(activeNotes: List<NoteWithItems>): List<HomeListItem> 
                 ),
             )
             notesOnly.forEach { noteWithItems ->
-                add(HomeListItem.NoteRow(noteWithItems, groupKey = "TYPE_NOTE"))
+                add(
+                    HomeListItem.NoteRow(
+                        note = noteWithItems,
+                        card = noteWithItems.toNoteCardUiModel(),
+                        groupKey = "TYPE_NOTE",
+                    ),
+                )
             }
         }
         if (listsOnly.isNotEmpty()) {
@@ -201,7 +239,13 @@ private fun arrangeByType(activeNotes: List<NoteWithItems>): List<HomeListItem> 
                 ),
             )
             listsOnly.forEach { noteWithItems ->
-                add(HomeListItem.NoteRow(noteWithItems, groupKey = "TYPE_LIST"))
+                add(
+                    HomeListItem.NoteRow(
+                        note = noteWithItems,
+                        card = noteWithItems.toNoteCardUiModel(),
+                        groupKey = "TYPE_LIST",
+                    ),
+                )
             }
         }
     }
@@ -234,7 +278,13 @@ private fun arrangeByTag(activeNotes: List<NoteWithItems>): List<HomeListItem> {
                 val sectionKey = "TAG_$tag"
                 add(HomeListItem.Header(label = tag, count = notesInTag.size, stableKey = sectionKey))
                 notesInTag.forEach { noteWithItems ->
-                    add(HomeListItem.NoteRow(noteWithItems, groupKey = sectionKey))
+                    add(
+                        HomeListItem.NoteRow(
+                            note = noteWithItems,
+                            card = noteWithItems.toNoteCardUiModel(),
+                            groupKey = sectionKey,
+                        ),
+                    )
                 }
             }
         }
@@ -248,7 +298,13 @@ private fun arrangeByTag(activeNotes: List<NoteWithItems>): List<HomeListItem> {
                 ),
             )
             untaggedNotes.forEach { noteWithItems ->
-                add(HomeListItem.NoteRow(noteWithItems, groupKey = "TAG_UNTAGGED"))
+                add(
+                    HomeListItem.NoteRow(
+                        note = noteWithItems,
+                        card = noteWithItems.toNoteCardUiModel(),
+                        groupKey = "TAG_UNTAGGED",
+                    ),
+                )
             }
         }
     }
@@ -266,6 +322,15 @@ private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
             SortKey.CREATED -> compareBy { noteWithItems -> noteWithItems.note.createdAt }
             SortKey.REMINDER -> compareBy { noteWithItems -> noteWithItems.note.reminderAt ?: Long.MAX_VALUE }
         }
+    val createdTieBreaker: Comparator<NoteWithItems> =
+        compareBy<NoteWithItems> { noteWithItems -> noteWithItems.note.createdAt }
+            .thenBy { noteWithItems -> noteWithItems.note.id }
+    val directedCreatedTieBreaker =
+        if (opts.sortDir == SortDir.DESC) {
+            createdTieBreaker.reversed()
+        } else {
+            createdTieBreaker
+        }
     val directed =
         if (opts.sortDir == SortDir.DESC) {
             ascendingBase.reversed()
@@ -274,6 +339,7 @@ private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
         }
     return if (opts.sortKey == SortKey.REMINDER) {
         Comparator { firstNote, secondNote ->
+
             val firstHasNoReminder = firstNote.note.reminderAt == null
             val secondHasNoReminder = secondNote.note.reminderAt == null
             when {

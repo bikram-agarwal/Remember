@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,21 +39,26 @@ internal fun NotesEmptyState(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         if (pristineVault) {
-            EmptyNotesIllustration()
-            Spacer(Modifier.height(24.dp))
-            Text(
-                text = stringResource(R.string.home_no_notes_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.home_no_notes_subtitle),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(horizontal = 24.dp),
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+            ) {
+                EmptyNotesIllustration()
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    text = stringResource(R.string.home_no_notes_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.home_no_notes_subtitle),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
+            }
             Spacer(Modifier.height(24.dp))
             RememberButton(
                 onClick = onCreateNote,
@@ -82,8 +88,6 @@ internal fun NotesEmptyState(
                 Text(stringResource(R.string.home_create_list))
             }
         } else {
-            EmptyFilterIllustration()
-            Spacer(Modifier.height(18.dp))
             val titleText =
                 when {
                     filter.text.isNotBlank() ->
@@ -92,25 +96,32 @@ internal fun NotesEmptyState(
                         stringResource(R.string.home_no_results_filters_title)
                     else -> stringResource(R.string.home_nothing_here)
                 }
-            Text(
-                text = titleText,
-                style = MaterialTheme.typography.headlineSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(6.dp))
             val hintText =
                 if (filter.text.isNotBlank()) {
                     stringResource(R.string.home_no_results_hint)
                 } else {
                     stringResource(R.string.home_no_results_filters_hint)
                 }
-            Text(
-                text = hintText,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.semantics(mergeDescendants = true) {},
+            ) {
+                EmptyFilterIllustration()
+                Spacer(Modifier.height(18.dp))
+                Text(
+                    text = titleText,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    textAlign = TextAlign.Center,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = hintText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }

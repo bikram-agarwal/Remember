@@ -70,6 +70,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
+import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.ui.common.HERO_MASK_ASPECT_RATIO
 import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
@@ -275,8 +276,8 @@ internal fun rememberEditorBodyBridge(
 }
 
 /**
- * Top app bar that reads its mutable state slices ([title], [pinned], [iconKey]) directly
- * from the VM. The rest of the screen does not collect these flows so title typing only
+ * Top app bar that reads its mutable state slices ([title], [iconKey]) directly from
+ * the VM. The rest of the screen does not collect these flows so title typing only
  * recomposes the title field area.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -326,9 +327,6 @@ internal fun EditNoteTopBarSection(
                     )
                 val iconSize = lerp(28.dp, 22.dp, collapseFraction)
                 val iconGap = lerp(12.dp, 8.dp, collapseFraction)
-                val headerSymbol = iconSymbolName(iconKey)
-                val headerBrandDrawable = iconDrawableRes(iconKey)
-                val headerEmoji = iconEmojiPayload(iconKey)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier =
@@ -336,37 +334,35 @@ internal fun EditNoteTopBarSection(
                             .fillMaxWidth()
                             .alpha(if (sharedTransitionActive) 0f else 1f),
                 ) {
-                    if (headerSymbol != null) {
-                        RememberMaterialRoundedSymbol(
-                            name = headerSymbol,
-                            size = iconSize,
-                            tint = MaterialTheme.colorScheme.primary,
-                            weight = FontWeight.Medium,
-                        )
-                        Spacer(Modifier.width(iconGap))
-                    } else if (headerBrandDrawable != null) {
-                        Icon(
-                            painterResource(headerBrandDrawable),
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(iconSize),
-                        )
-                        Spacer(Modifier.width(iconGap))
-                    } else if (headerEmoji != null) {
-                        Text(
-                            text = headerEmoji,
-                            style = titleStyle.copy(fontSize = iconSize.value.sp),
-                        )
-                        Spacer(Modifier.width(iconGap))
-                    } else {
-                        RememberMaterialRoundedSymbol(
-                            name = DEFAULT_NOTE_HEADER_SYMBOL,
-                            size = iconSize,
-                            tint = MaterialTheme.colorScheme.primary,
-                            weight = FontWeight.Medium,
-                        )
-                        Spacer(Modifier.width(iconGap))
+                    when (val headerIcon = resolveNoteIcon(iconKey, NoteKind.NOTE)) {
+                        is NoteIcon.Symbol ->
+                            RememberMaterialRoundedSymbol(
+                                name = headerIcon.name,
+                                size = iconSize,
+                                tint = MaterialTheme.colorScheme.primary,
+                                weight = FontWeight.Medium,
+                            )
+                        is NoteIcon.Drawable ->
+                            Icon(
+                                painterResource(headerIcon.resId),
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(iconSize),
+                            )
+                        is NoteIcon.Emoji ->
+                            Text(
+                                text = headerIcon.text,
+                                style = titleStyle.copy(fontSize = iconSize.value.sp),
+                            )
+                        NoteIcon.ListPlaceholder, NoteIcon.NotePlaceholder ->
+                            RememberMaterialRoundedSymbol(
+                                name = DEFAULT_NOTE_HEADER_SYMBOL,
+                                size = iconSize,
+                                tint = MaterialTheme.colorScheme.primary,
+                                weight = FontWeight.Medium,
+                            )
                     }
+                    Spacer(Modifier.width(iconGap))
                     if ((isEditMode && !readOnly) || title.isEmpty()) {
                         BasicTextField(
                             value = title,
@@ -629,7 +625,9 @@ internal fun EditNoteMarkdownEditorSection(
     autoFocusBodyOnEdit: Boolean,
     scrollState: ScrollState,
     displayMode: MarkdownEditorDisplayMode,
+    assignedTags: List<String>,
     onMarkdownChanged: (String) -> Unit,
+    onAddTag: (String, String) -> Unit,
 ) {
     val bodyEmpty = markdownEditorState.markdown.isEmpty()
 
@@ -657,6 +655,8 @@ internal fun EditNoteMarkdownEditorSection(
                     .heightIn(min = 140.dp),
             scrollState = scrollState,
             displayMode = displayMode,
+            assignedTags = assignedTags,
+            onAddTag = onAddTag,
         )
     } else if (existing && bodyEmpty) {
         Column(
@@ -755,6 +755,7 @@ internal fun EditNoteScrollableContent(
 ) {
     val readOnly = shelfState != NoteShelfState.ACTIVE
     val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+    val assignedTags by vm.tags.collectAsStateWithLifecycle()
     // NOTE: do NOT attach scrollBehavior.nestedScrollConnection here. It is already attached on
     // the Scaffold in EditNoteScreen. Double-attachment causes the top bar to consume each
     // scroll delta twice and produces a glitchy overscroll bounce.
@@ -790,7 +791,7 @@ internal fun EditNoteScrollableContent(
         // Order: tag color strip -> hero image -> shelf banner -> body. The banner sits right
         // above the note body so the "why is this disabled" hint is adjacent to the content it
         // gates, not buried at the top of the scroll above decorative chrome.
-        TagAccentSection(vm)
+        TagAccentEditorStrip(tags = assignedTags)
         PictureHeroSection(
             vm = vm,
             viewerOpen = pictureViewerOpen,
@@ -823,7 +824,9 @@ internal fun EditNoteScrollableContent(
             autoFocusBodyOnEdit = existing,
             scrollState = scrollState,
             displayMode = markdownDisplayMode,
+            assignedTags = assignedTags,
             onMarkdownChanged = vm::setBody,
+            onAddTag = vm::addTag,
         )
         Spacer(Modifier.height(24.dp))
         OptionsPanelSection(
@@ -844,12 +847,6 @@ internal fun EditNoteScrollableContent(
             ),
         )
     }
-}
-
-@Composable
-private fun TagAccentSection(vm: EditNoteViewModel) {
-    val tags by vm.tags.collectAsStateWithLifecycle()
-    TagAccentEditorStrip(tags = tags)
 }
 
 @Composable
@@ -891,6 +888,7 @@ private fun OptionsPanelSection(
     val actions by vm.actions.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
     val attachments by vm.attachments.collectAsStateWithLifecycle()
+    val favorite by vm.favorite.collectAsStateWithLifecycle()
 
     OptionsPanel(
         reminderAt = reminderAt,
@@ -910,6 +908,7 @@ private fun OptionsPanelSection(
         onOpenTags = onOpenTags,
         onOpenAttachments = onOpenAttachments,
         readOnly = readOnly,
+        favorite = favorite,
     )
 }
 

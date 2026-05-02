@@ -25,6 +25,8 @@ val LocalBlurBars = compositionLocalOf { true }
 
 val LocalUseEnhancedShading = compositionLocalOf { false }
 
+val LocalReducedMotion = compositionLocalOf { false }
+
 /**
  * The full, already-collected [ThemeState]. Provided once from RememberTheme so downstream
  * screens (Settings, etc.) can read it synchronously on first composition — no flash from

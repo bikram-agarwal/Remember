@@ -52,17 +52,6 @@ class ActionReceiver : BroadcastReceiver() {
                     }
 
                 try {
-                    // ACTION_CLOSE_SYSTEM_DIALOGS was restricted to system apps in API 31+.
-                    // The broadcast is best-effort: it still works on older devices and on
-                    // permissive OEM builds, and we already swallow the SecurityException
-                    // when the platform refuses it.
-                    @Suppress("DEPRECATION")
-                    val closeIntent = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
-                    try {
-                        context.sendBroadcast(closeIntent)
-                    } catch (_: SecurityException) {
-                    }
-
                     fire(context, repository, noteWithItems, action)
                 } catch (t: Throwable) {
                     val message = t.message.orEmpty().ifBlank { context.getString(R.string.common_empty) }

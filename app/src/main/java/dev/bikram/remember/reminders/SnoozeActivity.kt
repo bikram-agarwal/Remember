@@ -36,7 +36,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -220,6 +222,9 @@ fun SnoozeDialogContent(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
+    val configuration = LocalConfiguration.current
+    val locale = configuration.locales[0]
     // Capture once at composition. We never re-read the wall clock during the
     // session; if the user lingers in the sheet for hours the absolute targets
     // would otherwise drift, and recomputing every recomposition would shift
@@ -232,10 +237,10 @@ fun SnoozeDialogContent(
         }
     val timeFormatter = remember(context) { timeFormatterFor(context) }
     val nowLabel =
-        remember(now, timeFormatter) {
-            val dayPart = now.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault())
+        remember(now, timeFormatter, locale, resources) {
+            val dayPart = now.dayOfWeek.getDisplayName(java.time.format.TextStyle.SHORT, locale)
             val timePart = now.format(timeFormatter)
-            context.getString(R.string.snooze_activity_now_format, "$dayPart $timePart")
+            resources.getString(R.string.snooze_activity_now_format, "$dayPart $timePart")
         }
     val presets = remember(now) { computeSnoozePresets(context, now, timeFormatter) }
 
@@ -264,7 +269,7 @@ fun SnoozeDialogContent(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
-                    text = stringResource(R.string.snooze_activity_title).lowercase(Locale.getDefault()),
+                    text = stringResource(R.string.snooze_activity_title).lowercase(locale),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

@@ -2,8 +2,14 @@
 
 package dev.bikram.remember.ui.theme
 
-import android.os.SystemClock
+import android.app.WallpaperColors
+import android.app.WallpaperManager
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.view.SoundEffectConstants
+import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -13,8 +19,12 @@ import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.MotionScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -29,6 +39,28 @@ import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 import dev.bikram.remember.ui.feedback.LocalTapSound
 
 val LocalIsDark = staticCompositionLocalOf { false }
+
+private const val MIN_TAP_SOUND_SPACING_MS = 85L
+
+private class TapSoundPlayer(
+    private val view: View,
+) {
+    private var tapSoundReady = true
+
+    fun play() {
+        if (!tapSoundReady) return
+        tapSoundReady = false
+        view.playSoundEffect(SoundEffectConstants.CLICK)
+        view.handler?.postDelayed(
+            {
+                tapSoundReady = true
+            },
+            MIN_TAP_SOUND_SPACING_MS,
+        ) ?: run {
+            tapSoundReady = true
+        }
+    }
+}
 
 /**
  * Pass [paintBackground] = false when the host activity is translucent (e.g. the snooze
@@ -53,8 +85,11 @@ fun RememberTheme(
             ThemeMode.BLACK -> true
         }
     val black = themeState.themeMode == ThemeMode.BLACK
+    val effectiveUseGradient = themeState.useGradient && !black
 
     val context = LocalContext.current
+    val reducedMotion = rememberSystemReducedMotionEnabled(context)
+    val wallpaperTint = rememberWallpaperTintColor(context, enabled = effectiveUseGradient)
     val colorResolution =
         rememberResolvedColorScheme(
             context = context,
@@ -86,30 +121,21 @@ fun RememberTheme(
         }
     }
 
-    val realTapSound =
+    val playTapSound =
         remember(view) {
-            val lastTapTimeMs = longArrayOf(0L)
-            val minTapSoundSpacingMs = 85L
-            {
-                val now = SystemClock.uptimeMillis()
-                if (now - lastTapTimeMs[0] >= minTapSoundSpacingMs) {
-                    lastTapTimeMs[0] = now
-                    // view.isShown is sometimes false in dialogs/sheets
-                    view.playSoundEffect(SoundEffectConstants.CLICK)
-                }
-            }
+            TapSoundPlayer(view)::play
         }
-    val playTapSound = realTapSound
 
     CompositionLocalProvider(
         LocalIsDark provides darkTheme,
-        LocalUseGradient provides themeState.useGradient,
+        LocalUseGradient provides effectiveUseGradient,
         LocalHeroOnCards provides themeState.heroOnCards,
         LocalBlurBars provides themeState.blurBars,
         LocalUseEnhancedShading provides themeState.useEnhancedShading,
         LocalThemeState provides themeState,
         LocalTapSound provides playTapSound,
         LocalHapticEnabled provides interactionState.hapticFeedbackEnabled,
+        LocalReducedMotion provides reducedMotion,
     ) {
         MaterialExpressiveTheme(
             colorScheme = colorResolution.colorScheme,
@@ -122,10 +148,11 @@ fun RememberTheme(
                 // never change the page backdrop.
                 if (paintBackground) {
                     GradientBackground(
-                        useGradient = themeState.useGradient,
+                        useGradient = effectiveUseGradient,
                         pageBackground = colorResolution.backgroundScheme.background,
                         gradientBase = colorResolution.backgroundScheme.surface,
                         gradientTop = colorResolution.backgroundScheme.primaryContainer,
+                        wallpaperTint = wallpaperTint,
                     )
                 }
                 content()
@@ -140,14 +167,21 @@ private fun GradientBackground(
     pageBackground: Color,
     gradientBase: Color,
     gradientTop: Color,
+    wallpaperTint: Color?,
 ) {
     if (useGradient) {
         val gradientBrush =
-            remember(gradientBase, gradientTop) {
+            remember(gradientBase, gradientTop, wallpaperTint) {
+                val topColor =
+                    if (wallpaperTint != null) {
+                        blendColors(gradientTop, wallpaperTint, wallpaperWeight = 0.28f)
+                    } else {
+                        gradientTop
+                    }
                 Brush.verticalGradient(
                     colorStops =
                         arrayOf(
-                            0f to gradientTop.copy(alpha = 0.45f),
+                            0f to topColor.copy(alpha = 0.48f),
                             0.55f to gradientBase.copy(alpha = 0f),
                         ),
                 )
@@ -161,4 +195,92 @@ private fun GradientBackground(
     } else {
         Box(Modifier.fillMaxSize().background(pageBackground))
     }
+}
+
+@Composable
+private fun rememberSystemReducedMotionEnabled(context: android.content.Context): Boolean {
+    val contentResolver = context.contentResolver
+
+    fun readReducedMotion(): Boolean {
+        val animationScale =
+            Settings.Global.getFloat(
+                contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f,
+            )
+        return animationScale == 0f
+    }
+
+    var reducedMotion by remember(contentResolver) { mutableStateOf(readReducedMotion()) }
+    DisposableEffect(contentResolver) {
+        val observer =
+            object : ContentObserver(Handler(Looper.getMainLooper())) {
+                override fun onChange(selfChange: Boolean) {
+                    reducedMotion = readReducedMotion()
+                }
+            }
+        contentResolver.registerContentObserver(
+            Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE),
+            false,
+            observer,
+        )
+        onDispose {
+            contentResolver.unregisterContentObserver(observer)
+        }
+    }
+    return reducedMotion
+}
+
+@Composable
+private fun rememberWallpaperTintColor(
+    context: android.content.Context,
+    enabled: Boolean,
+): Color? {
+    if (!enabled) return null
+
+    val applicationContext = context.applicationContext
+    val wallpaperManager = remember(applicationContext) { WallpaperManager.getInstance(applicationContext) }
+
+    fun readWallpaperTint(): Color? {
+        val colors =
+            runCatching {
+                wallpaperManager.getWallpaperColors(WallpaperManager.FLAG_SYSTEM)
+            }.getOrNull()
+        return colors?.toComposeTint()
+    }
+
+    var wallpaperTint by remember(wallpaperManager) { mutableStateOf(readWallpaperTint()) }
+    DisposableEffect(wallpaperManager) {
+        val listener =
+            WallpaperManager.OnColorsChangedListener { colors, which ->
+                if (which and WallpaperManager.FLAG_SYSTEM != 0) {
+                    wallpaperTint = colors?.toComposeTint()
+                }
+            }
+        wallpaperManager.addOnColorsChangedListener(listener, Handler(Looper.getMainLooper()))
+        onDispose {
+            wallpaperManager.removeOnColorsChangedListener(listener)
+        }
+    }
+    return wallpaperTint
+}
+
+private fun WallpaperColors.toComposeTint(): Color {
+    val color = primaryColor
+    return Color(color.toArgb())
+}
+
+private fun blendColors(
+    base: Color,
+    wallpaper: Color,
+    wallpaperWeight: Float,
+): Color {
+    val clampedWeight = wallpaperWeight.coerceIn(0f, 1f)
+    val baseWeight = 1f - clampedWeight
+    return Color(
+        red = base.red * baseWeight + wallpaper.red * clampedWeight,
+        green = base.green * baseWeight + wallpaper.green * clampedWeight,
+        blue = base.blue * baseWeight + wallpaper.blue * clampedWeight,
+        alpha = base.alpha,
+    )
 }

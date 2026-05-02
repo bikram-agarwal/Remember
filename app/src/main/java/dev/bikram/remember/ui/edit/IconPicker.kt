@@ -1,35 +1,59 @@
 package dev.bikram.remember.ui.edit
+
 import android.content.res.Resources
+import android.widget.Toast
 import androidx.annotation.StringRes
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
+import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,18 +61,33 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
+import dev.bikram.remember.data.ICON_PICKER_MAX_FAVORITES
+import dev.bikram.remember.data.IconPickerFavoritesState
+import dev.bikram.remember.data.IconPickerPrefs
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberSegmentedButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -59,7 +98,12 @@ fun IconPicker(
     onDismiss: () -> Unit,
     isChecklist: Boolean = false,
 ) {
-    val resources = LocalContext.current.resources
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    val configuration = LocalConfiguration.current
+    val iconPickerPrefs = remember(context.applicationContext) { IconPickerPrefs(context.applicationContext) }
+    val favoriteState by iconPickerPrefs.favorites.collectAsState(initial = IconPickerFavoritesState())
+    val scope = rememberCoroutineScope()
     val defaultCatalogKey = remember(isChecklist) { defaultIconCatalogKey(isChecklist) }
     val selectionKey =
         remember(current, isChecklist, defaultCatalogKey) {
@@ -72,8 +116,91 @@ fun IconPicker(
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
-    var emojiDialogOpen by rememberSaveable { mutableStateOf(false) }
-    var emojiDraft by rememberSaveable { mutableStateOf("") }
+    var selectedTab by rememberSaveable { mutableStateOf(defaultIconPickerTab(current)) }
+    var favoriteSelectionTab by rememberSaveable { mutableStateOf<IconPickerTab?>(null) }
+    var pendingFavoriteIconKeys by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var pendingFavoriteEmojis by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    val iconSheetContentHeight = 644.dp
+    val emojis =
+        remember(configuration) {
+            loadBundledEmojis(resources)
+        }
+    val iconKeywords =
+        remember(configuration) {
+            loadIconKeywords(resources)
+        }
+    // Build the skin-tone group index once; rebuilding it on every sub-tab
+    // switch was the main culprit behind the laggy category change.
+    val emojiSkinToneIndex =
+        remember(emojis) {
+            buildEmojiSkinToneIndex(emojis)
+        }
+    val selectedEmoji = current?.takeIf { it.startsWith(ICON_EMOJI_PREFIX) }?.removePrefix(ICON_EMOJI_PREFIX)
+    var selectedEmojiCategoryKey by rememberSaveable {
+        mutableStateOf(selectedEmojiCategoryKey(emojis, selectedEmoji))
+    }
+    val favoriteModeActive = favoriteSelectionTab != null
+    val titleRes =
+        if (favoriteModeActive) {
+            R.string.icon_picker_favorite_selection_title
+        } else {
+            R.string.icon_picker_title
+        }
+    val pendingFavoriteCount =
+        when (favoriteSelectionTab) {
+            IconPickerTab.ICONS -> pendingFavoriteIconKeys.size
+            IconPickerTab.EMOJIS -> pendingFavoriteEmojis.size
+            null -> 0
+        }
+    val maxFavoritesMessage = stringResource(R.string.icon_picker_max_favorites)
+
+    fun beginFavoriteSelection(tab: IconPickerTab) {
+        favoriteSelectionTab = tab
+        pendingFavoriteIconKeys = favoriteState.iconKeys
+        pendingFavoriteEmojis = favoriteState.emojis
+        selectedTab = tab
+    }
+
+    fun cancelFavoriteSelection() {
+        favoriteSelectionTab = null
+        pendingFavoriteIconKeys = emptyList()
+        pendingFavoriteEmojis = emptyList()
+    }
+
+    fun saveFavoriteSelection() {
+        val activeTab = favoriteSelectionTab ?: return
+        scope.launch {
+            when (activeTab) {
+                IconPickerTab.ICONS -> iconPickerPrefs.setFavoriteIconKeys(pendingFavoriteIconKeys)
+                IconPickerTab.EMOJIS -> iconPickerPrefs.setFavoriteEmojis(pendingFavoriteEmojis)
+            }
+            cancelFavoriteSelection()
+        }
+    }
+
+    fun togglePendingFavoriteIcon(iconKey: String) {
+        pendingFavoriteIconKeys =
+            if (iconKey in pendingFavoriteIconKeys) {
+                pendingFavoriteIconKeys - iconKey
+            } else if (pendingFavoriteIconKeys.size >= ICON_PICKER_MAX_FAVORITES) {
+                Toast.makeText(context, maxFavoritesMessage, Toast.LENGTH_SHORT).show()
+                pendingFavoriteIconKeys
+            } else {
+                pendingFavoriteIconKeys + iconKey
+            }
+    }
+
+    fun togglePendingFavoriteEmoji(emoji: String) {
+        pendingFavoriteEmojis =
+            if (emoji in pendingFavoriteEmojis) {
+                pendingFavoriteEmojis - emoji
+            } else if (pendingFavoriteEmojis.size >= ICON_PICKER_MAX_FAVORITES) {
+                Toast.makeText(context, maxFavoritesMessage, Toast.LENGTH_SHORT).show()
+                pendingFavoriteEmojis
+            } else {
+                pendingFavoriteEmojis + emoji
+            }
+    }
 
     LaunchedEffect(searchExpanded) {
         if (searchExpanded) {
@@ -83,12 +210,27 @@ fun IconPicker(
 
     val trimmedQuery = searchQuery.trim()
     val filteredOrdered =
-        remember(trimmedQuery, resources.configuration) {
+        remember(trimmedQuery, configuration, iconKeywords) {
             if (trimmedQuery.isEmpty()) {
                 emptyList()
             } else {
-                iconChoicesRankedForSearch(resources, trimmedQuery)
+                iconChoicesRankedForSearch(resources, iconKeywords, trimmedQuery)
             }
+        }
+    val activeFavoriteEmojis =
+        if (favoriteSelectionTab == IconPickerTab.EMOJIS) {
+            pendingFavoriteEmojis
+        } else {
+            favoriteState.emojis
+        }
+    val filteredEmojis =
+        remember(emojis, activeFavoriteEmojis, selectedEmojiCategoryKey, trimmedQuery) {
+            emojisRankedForSearch(
+                emojis = emojis,
+                favoriteEmojis = activeFavoriteEmojis,
+                selectedCategoryKey = selectedEmojiCategoryKey,
+                rawQuery = trimmedQuery,
+            )
         }
 
     AppBottomSheet(
@@ -96,275 +238,863 @@ fun IconPicker(
         onDismiss = onDismiss,
         showTitleBar = false,
         scrollable = false,
+        contentPadding = PaddingValues(vertical = 8.dp),
         actions = {
-            RememberTextButton(onClick = { emojiDialogOpen = true }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    RememberMaterialRoundedSymbol(
-                        name = "emoji_emotions",
-                        size = 18.dp,
-                        tint = MaterialTheme.colorScheme.primary,
-                        weight = FontWeight.Medium,
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(stringResource(R.string.icon_picker_choose_emoji))
-                }
-            }
-            if (current != null) {
+            if (favoriteModeActive) {
+                RememberTextButton(onClick = ::cancelFavoriteSelection) { Text(stringResource(R.string.common_cancel)) }
+                FavoriteDoneButton(
+                    count = pendingFavoriteCount,
+                    onClick = ::saveFavoriteSelection,
+                )
+            } else if (current != null) {
                 RememberTextButton(onClick = { onPick(null) }) { Text(stringResource(R.string.common_remove)) }
+                RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
+            } else {
+                RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
             }
-            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
         },
     ) {
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (!searchExpanded) {
-                    Text(
-                        text = stringResource(R.string.icon_picker_title),
-                        style = MaterialTheme.typography.titleLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                    )
-                    RememberIconButton(onClick = { searchExpanded = true }) {
-                        RememberMaterialRoundedSymbol(
-                            name = "search",
-                            size = 24.dp,
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            weight = FontWeight.Medium,
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(iconSheetContentHeight),
+        ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (!searchExpanded) {
+                        Text(
+                            text = stringResource(titleRes),
+                            style = MaterialTheme.typography.titleLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f),
                         )
-                    }
-                } else {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .focusRequester(searchFocusRequester),
-                        singleLine = true,
-                        placeholder = { Text(stringResource(R.string.icon_picker_search_hint)) },
-                        leadingIcon = {
+                        RememberIconButton(onClick = { searchExpanded = true }) {
                             RememberMaterialRoundedSymbol(
                                 name = "search",
                                 size = 24.dp,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                tint = MaterialTheme.colorScheme.onSurface,
                                 weight = FontWeight.Medium,
                             )
-                        },
-                        trailingIcon = {
-                            RememberIconButton(
-                                onClick = {
-                                    searchExpanded = false
-                                    searchQuery = ""
-                                },
-                            ) {
+                        }
+                    } else {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier =
+                                Modifier
+                                    .weight(1f)
+                                    .focusRequester(searchFocusRequester),
+                            singleLine = true,
+                            shape = CircleShape,
+                            placeholder = { Text(stringResource(R.string.icon_picker_search_hint)) },
+                            leadingIcon = {
                                 RememberMaterialRoundedSymbol(
-                                    name = "close",
-                                    size = 22.dp,
+                                    name = "search",
+                                    size = 24.dp,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     weight = FontWeight.Medium,
                                 )
-                            }
-                        },
-                    )
-                }
-            }
-
-            Box(modifier = Modifier.heightIn(min = 240.dp, max = 520.dp)) {
-                when {
-                    trimmedQuery.isEmpty() ->
-                        IconPickerGrid {
-                            iconCatalog.forEach { category ->
-                                iconHeader(category.nameRes, topPadding = 8.dp)
-                                // Keys must be unique in the whole grid: the same [IconChoice.key] can repeat
-                                // across categories (e.g. airplane_ticket in Maps and Social).
-                                itemsIndexed(
-                                    category.icons,
-                                    key = { index, _ -> "${category.nameRes}_$index" },
-                                ) { _, choice ->
-                                    IconTile(
-                                        choice = choice,
-                                        selected = choice.key == selectionKey,
-                                        onClick = {
-                                            if (choice.key == defaultCatalogKey) {
-                                                onPick(null)
-                                            } else {
-                                                onPick(choice.key)
-                                            }
-                                        },
+                            },
+                            trailingIcon = {
+                                RememberIconButton(
+                                    onClick = {
+                                        searchExpanded = false
+                                        searchQuery = ""
+                                    },
+                                ) {
+                                    RememberMaterialRoundedSymbol(
+                                        name = "close",
+                                        size = 22.dp,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        weight = FontWeight.Medium,
                                     )
                                 }
-                            }
-                        }
-                    filteredOrdered.isEmpty() ->
-                        Text(
-                            text = stringResource(R.string.icon_picker_no_results),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = 24.dp),
+                            },
+                            colors =
+                                OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
+                                ),
                         )
-                    else ->
-                        IconPickerGrid {
-                            iconHeader(R.string.icon_picker_results_heading, topPadding = 4.dp)
-                            itemsIndexed(
-                                filteredOrdered,
-                                key = { index, choice -> "icon_picker_search_${index}_${choice.key}" },
-                            ) { _, choice ->
-                                IconTile(
-                                    choice = choice,
-                                    selected = choice.key == selectionKey,
-                                    onClick = {
-                                        if (choice.key == defaultCatalogKey) {
-                                            onPick(null)
-                                        } else {
-                                            onPick(choice.key)
-                                        }
-                                    },
-                                )
-                            }
-                        }
+                    }
                 }
-            }
-        }
-    }
 
-    if (emojiDialogOpen) {
-        AlertDialog(
-            onDismissRequest = {
-                emojiDialogOpen = false
-                emojiDraft = ""
-            },
-            title = { Text(stringResource(R.string.icon_picker_emoji_dialog_title)) },
-            text = {
-                OutlinedTextField(
-                    value = emojiDraft,
-                    onValueChange = { entered ->
-                        emojiDraft =
-                            when {
-                                entered.isEmpty() -> ""
-                                else -> {
-                                    val boundary = java.text.BreakIterator.getCharacterInstance()
-                                    boundary.setText(entered)
-                                    val start = boundary.first()
-                                    val end = boundary.next()
-                                    entered.substring(start, end)
-                                }
-                            }
+                IconPickerTabRow(
+                    selectedTab = selectedTab,
+                    onTabSelected = { tab ->
+                        if (!favoriteModeActive) {
+                            selectedTab = tab
+                        }
+                    },
+                    enabled = !favoriteModeActive,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+
+                // Slide horizontally in the natural reading direction of the tab order +
+                // a soft fade. Specs come from M3 Expressive's MotionScheme so the curve
+                // matches every other transition in the app (NoteActionBottomBar etc.).
+                val tabSpatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
+                val tabEffectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                AnimatedContent(
+                    targetState = selectedTab,
+                    label = "iconPickerTabContent",
+                    transitionSpec = {
+                        val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                        (
+                            slideInHorizontally(animationSpec = tabSpatialSpec) { fullWidth ->
+                                direction * fullWidth / 6
+                            } + fadeIn(animationSpec = tabEffectsSpec)
+                        ).togetherWith(
+                            slideOutHorizontally(animationSpec = tabSpatialSpec) { fullWidth ->
+                                -direction * fullWidth / 6
+                            } + fadeOut(animationSpec = tabEffectsSpec),
+                        )
                     },
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 52.dp),
-                    singleLine = true,
-                    maxLines = 1,
-                    placeholder = { Text(stringResource(R.string.icon_picker_emoji_dialog_hint)) },
-                )
-            },
-            confirmButton = {
-                RememberTextButton(
-                    onClick = {
-                        val trimmed = emojiDraft.trim()
-                        if (trimmed.isNotEmpty()) {
-                            val boundary = java.text.BreakIterator.getCharacterInstance()
-                            boundary.setText(trimmed)
-                            val start = boundary.first()
-                            val end = boundary.next()
-                            val single = trimmed.substring(start, end)
-                            if (single.isNotEmpty()) {
-                                onPick("$ICON_EMOJI_PREFIX$single")
-                            }
-                            emojiDialogOpen = false
-                            emojiDraft = ""
-                        }
-                    },
-                    enabled = emojiDraft.trim().isNotEmpty(),
-                ) {
-                    Text(stringResource(R.string.icon_picker_emoji_dialog_confirm))
+                            .weight(1f),
+                ) { tab ->
+                    when (tab) {
+                        IconPickerTab.ICONS ->
+                            IconPickerIconsContent(
+                                trimmedQuery = trimmedQuery,
+                                filteredOrdered = filteredOrdered,
+                                defaultCatalogKey = defaultCatalogKey,
+                                selectionKey = selectionKey,
+                                favoriteIconKeys = favoriteState.iconKeys,
+                                pendingFavoriteIconKeys = pendingFavoriteIconKeys,
+                                favoriteSelectionActive = favoriteSelectionTab == IconPickerTab.ICONS,
+                                selectedGridIndex = selectedIconGridIndex(selectionKey, favoriteState.iconKeys),
+                                onStartFavoriteSelection = { beginFavoriteSelection(IconPickerTab.ICONS) },
+                                onToggleFavoriteIcon = ::togglePendingFavoriteIcon,
+                                onPick = onPick,
+                            )
+                        IconPickerTab.EMOJIS ->
+                            IconPickerEmojiContent(
+                                trimmedQuery = trimmedQuery,
+                                filteredEmojis = filteredEmojis,
+                                emojiSkinToneIndex = emojiSkinToneIndex,
+                                selectedCategoryKey = selectedEmojiCategoryKey,
+                                selectedEmoji = selectedEmoji,
+                                pendingFavoriteEmojis = pendingFavoriteEmojis,
+                                favoriteSelectionActive = favoriteSelectionTab == IconPickerTab.EMOJIS,
+                                onCategorySelected = { selectedEmojiCategoryKey = it },
+                                onStartFavoriteSelection = { beginFavoriteSelection(IconPickerTab.EMOJIS) },
+                                onToggleFavoriteEmoji = ::togglePendingFavoriteEmoji,
+                                onEmojiSelected = { emoji -> onPick("$ICON_EMOJI_PREFIX$emoji") },
+                            )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun IconPickerTabRow(
+    selectedTab: IconPickerTab,
+    onTabSelected: (IconPickerTab) -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    SingleChoiceSegmentedButtonRow(modifier = modifier) {
+        val tabs = IconPickerTab.entries
+        tabs.forEachIndexed { index, tab ->
+            RememberSegmentedButton(
+                selected = selectedTab == tab,
+                onClick = { onTabSelected(tab) },
+                shape = SegmentedButtonDefaults.itemShape(index, tabs.size),
+                enabled = enabled,
+                label = { Text(stringResource(tab.labelRes)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun FavoriteDoneButton(
+    count: Int,
+    onClick: () -> Unit,
+) {
+    RememberTextButton(onClick = onClick) {
+        BadgedBox(
+            badge = {
+                Badge {
+                    Text(count.toString())
                 }
             },
-            dismissButton = {
-                RememberTextButton(
-                    onClick = {
-                        emojiDialogOpen = false
-                        emojiDraft = ""
-                    },
+        ) {
+            Text(
+                text = stringResource(R.string.common_save),
+                modifier = Modifier.padding(top = 4.dp, end = 16.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun IconPickerIconsContent(
+    trimmedQuery: String,
+    filteredOrdered: List<IconChoice>,
+    defaultCatalogKey: String,
+    selectionKey: String,
+    favoriteIconKeys: List<String>,
+    pendingFavoriteIconKeys: List<String>,
+    favoriteSelectionActive: Boolean,
+    selectedGridIndex: Int,
+    onStartFavoriteSelection: () -> Unit,
+    onToggleFavoriteIcon: (String) -> Unit,
+    onPick: (String?) -> Unit,
+) {
+    val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = selectedGridIndex)
+    val displayedFavoriteKeys =
+        if (favoriteSelectionActive) {
+            pendingFavoriteIconKeys
+        } else {
+            favoriteIconKeys
+        }
+    val favoriteChoices = favoriteIconChoices(displayedFavoriteKeys)
+    when {
+        trimmedQuery.isEmpty() ->
+            IconPickerGrid(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                state = gridState,
+            ) {
+                iconFavoritesSection(
+                    favoriteChoices = favoriteChoices,
+                    defaultCatalogKey = defaultCatalogKey,
+                    selectedKey = if (favoriteSelectionActive) null else selectionKey,
+                    pendingFavoriteIconKeys = pendingFavoriteIconKeys,
+                    favoriteSelectionActive = favoriteSelectionActive,
+                    onStartFavoriteSelection = onStartFavoriteSelection,
+                    onToggleFavoriteIcon = onToggleFavoriteIcon,
+                    onPick = onPick,
+                )
+                iconCatalog.forEach { category ->
+                    iconHeader(category.nameRes, topPadding = 8.dp)
+                    // Keys must be unique in the whole grid: the same [IconChoice.key] can repeat
+                    // across categories (e.g. airplane_ticket in Maps and Social).
+                    itemsIndexed(
+                        category.icons,
+                        key = { index, _ -> "${category.nameRes}_$index" },
+                    ) { _, choice ->
+                        val pendingFavorite = choice.key in pendingFavoriteIconKeys
+                        IconTile(
+                            choice = choice,
+                            selected =
+                                if (favoriteSelectionActive) {
+                                    pendingFavorite
+                                } else {
+                                    choice.key == selectionKey
+                                },
+                            onClick = {
+                                if (favoriteSelectionActive) {
+                                    onToggleFavoriteIcon(choice.key)
+                                } else {
+                                    if (choice.key == defaultCatalogKey) {
+                                        onPick(null)
+                                    } else {
+                                        onPick(choice.key)
+                                    }
+                                }
+                            },
+                        )
+                    }
+                }
+            }
+        filteredOrdered.isEmpty() ->
+            IconPickerGrid(modifier = Modifier.padding(horizontal = 20.dp)) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text = stringResource(R.string.icon_picker_no_results),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(vertical = 20.dp),
+                    )
+                }
+            }
+        else ->
+            IconPickerGrid(modifier = Modifier.padding(horizontal = 20.dp)) {
+                iconHeader(R.string.icon_picker_results_heading, topPadding = 4.dp)
+                itemsIndexed(
+                    filteredOrdered,
+                    key = { index, choice -> "icon_picker_search_${index}_${choice.key}" },
+                ) { _, choice ->
+                    val pendingFavorite = choice.key in pendingFavoriteIconKeys
+                    IconTile(
+                        choice = choice,
+                        selected =
+                            if (favoriteSelectionActive) {
+                                pendingFavorite
+                            } else {
+                                choice.key == selectionKey
+                            },
+                        onClick = {
+                            if (favoriteSelectionActive) {
+                                onToggleFavoriteIcon(choice.key)
+                            } else {
+                                if (choice.key == defaultCatalogKey) {
+                                    onPick(null)
+                                } else {
+                                    onPick(choice.key)
+                                }
+                            }
+                        },
+                    )
+                }
+            }
+    }
+}
+
+@Composable
+private fun IconPickerEmojiContent(
+    trimmedQuery: String,
+    filteredEmojis: List<BundledEmoji>,
+    emojiSkinToneIndex: EmojiSkinToneIndex,
+    selectedCategoryKey: String,
+    selectedEmoji: String?,
+    pendingFavoriteEmojis: List<String>,
+    favoriteSelectionActive: Boolean,
+    onCategorySelected: (String) -> Unit,
+    onStartFavoriteSelection: () -> Unit,
+    onToggleFavoriteEmoji: (String) -> Unit,
+    onEmojiSelected: (String) -> Unit,
+) {
+    val displayEmojis =
+        remember(filteredEmojis, emojiSkinToneIndex) {
+            collapseEmojiSkinToneVariants(filteredEmojis, emojiSkinToneIndex)
+        }
+    val categoryFadeSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val playTap = rememberPlayTapSound()
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (trimmedQuery.isEmpty()) {
+            LazyRow(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                item(key = EMOJI_FAVORITES_CATEGORY_KEY) {
+                    FilterChip(
+                        selected = selectedCategoryKey == EMOJI_FAVORITES_CATEGORY_KEY,
+                        onClick = {
+                            playTap()
+                            onCategorySelected(EMOJI_FAVORITES_CATEGORY_KEY)
+                        },
+                        label = { Text(stringResource(R.string.icon_picker_favorites)) },
+                        colors =
+                            FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
+                    )
+                }
+                items(emojiPickerCategories, key = { it.key }) { category ->
+                    FilterChip(
+                        selected = category.key == selectedCategoryKey,
+                        onClick = {
+                            playTap()
+                            onCategorySelected(category.key)
+                        },
+                        label = { Text(stringResource(category.labelRes)) },
+                        colors =
+                            FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                            ),
+                    )
+                }
+            }
+        }
+        // Sub-tab transition is intentionally a Crossfade (not the heavier slide+
+        // fade used by the main Icons<->Emojis tabs). Users hop between emoji
+        // categories more often, and AnimatedContent keeping two LazyVerticalGrid
+        // subcompositions alive at once was adding noticeable lag on phones.
+        Crossfade(
+            targetState = selectedCategoryKey,
+            label = "iconPickerEmojiCategory",
+            animationSpec = categoryFadeSpec,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+        ) { categoryKey ->
+            val showingFavoriteCategory = categoryKey == EMOJI_FAVORITES_CATEGORY_KEY && trimmedQuery.isEmpty()
+            // Per-category grid state so scroll position from one category doesn't
+            // leak into the next.
+            val gridState =
+                rememberLazyGridState(
+                    initialFirstVisibleItemIndex =
+                        if (trimmedQuery.isEmpty()) {
+                            displayEmojis.indexOfFirst { entry -> entry.variants.any { it.emoji == selectedEmoji } }.coerceAtLeast(0)
+                        } else {
+                            0
+                        },
+                )
+            if (displayEmojis.isEmpty()) {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(56.dp),
+                    state = gridState,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text(stringResource(R.string.common_cancel))
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = stringResource(R.string.icon_picker_emoji_no_results),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 20.dp),
+                        )
+                    }
+                    if (showingFavoriteCategory && !favoriteSelectionActive) {
+                        item(key = "favorite_emoji_edit") {
+                            EditFavoritesTile(
+                                onClick = onStartFavoriteSelection,
+                                cellSize = 56.dp,
+                            )
+                        }
+                    }
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(56.dp),
+                    state = gridState,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    itemsIndexed(
+                        displayEmojis,
+                        key = { index, entry -> "emoji_${index}_${entry.emoji.key}" },
+                    ) { _, entry ->
+                        val variantValues = entry.variants.map { it.emoji }
+                        val pendingFavorite = variantValues.any { it in pendingFavoriteEmojis }
+                        val selectedVariant = variantValues.firstOrNull { it == selectedEmoji }
+                        val pendingVariant = variantValues.firstOrNull { it in pendingFavoriteEmojis }
+                        EmojiTile(
+                            emoji = selectedVariant ?: pendingVariant ?: entry.displayEmoji,
+                            variants = variantValues,
+                            selected =
+                                if (favoriteSelectionActive) {
+                                    pendingFavorite
+                                } else {
+                                    selectedVariant != null
+                                },
+                            onClick = { selectedEmojiValue ->
+                                if (favoriteSelectionActive) {
+                                    onToggleFavoriteEmoji(selectedEmojiValue)
+                                } else {
+                                    onEmojiSelected(selectedEmojiValue)
+                                }
+                            },
+                        )
+                    }
+                    if (showingFavoriteCategory && !favoriteSelectionActive) {
+                        item(key = "favorite_emoji_edit") {
+                            EditFavoritesTile(
+                                onClick = onStartFavoriteSelection,
+                                cellSize = 56.dp,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private enum class IconPickerTab(
+    @param:StringRes val labelRes: Int,
+) {
+    ICONS(R.string.icon_picker_tab_icons),
+    EMOJIS(R.string.icon_picker_tab_emojis),
+}
+
+private fun defaultIconPickerTab(current: String?): IconPickerTab =
+    if (current?.startsWith(ICON_EMOJI_PREFIX) == true) {
+        IconPickerTab.EMOJIS
+    } else {
+        IconPickerTab.ICONS
+    }
+
+private fun selectedIconGridIndex(
+    selectionKey: String,
+    favoriteIconKeys: List<String>,
+): Int {
+    val favoriteChoices = favoriteIconChoices(favoriteIconKeys)
+    if (favoriteChoices.any { it.key == selectionKey }) {
+        return 0
+    }
+    var gridIndex = 1 + favoriteChoices.size + 1
+    iconCatalog.forEach { category ->
+        if (category.icons.any { it.key == selectionKey }) {
+            return gridIndex
+        }
+        gridIndex += 1 + category.icons.size
+    }
+    return 0
+}
+
+private fun selectedEmojiCategoryKey(
+    emojis: List<BundledEmoji>,
+    selectedEmoji: String?,
+): String = emojis.firstOrNull { it.emoji == selectedEmoji }?.category ?: EmojiPickerCategory.SMILEYS_AND_PEOPLE.key
+
+private const val EMOJI_FAVORITES_CATEGORY_KEY = "favorites"
+
+private fun LazyGridScope.iconFavoritesSection(
+    favoriteChoices: List<IconChoice>,
+    defaultCatalogKey: String,
+    selectedKey: String?,
+    pendingFavoriteIconKeys: List<String>,
+    favoriteSelectionActive: Boolean,
+    onStartFavoriteSelection: () -> Unit,
+    onToggleFavoriteIcon: (String) -> Unit,
+    onPick: (String?) -> Unit,
+) {
+    iconHeader(R.string.icon_picker_favorites, topPadding = 4.dp)
+    itemsIndexed(
+        favoriteChoices,
+        key = { index, choice -> "favorite_icon_${index}_${choice.key}" },
+    ) { _, choice ->
+        IconTile(
+            choice = choice,
+            selected =
+                if (favoriteSelectionActive) {
+                    choice.key in pendingFavoriteIconKeys
+                } else {
+                    choice.key == selectedKey
+                },
+            onClick = {
+                if (favoriteSelectionActive) {
+                    onToggleFavoriteIcon(choice.key)
+                } else if (choice.key == defaultCatalogKey) {
+                    onPick(null)
+                } else {
+                    onPick(choice.key)
                 }
             },
         )
     }
+    if (!favoriteSelectionActive) {
+        item(key = "favorite_icon_add") {
+            EditFavoritesTile(
+                onClick = onStartFavoriteSelection,
+                filled = false,
+            )
+        }
+    }
+}
+
+private enum class EmojiPickerCategory(
+    val key: String,
+    @param:StringRes val labelRes: Int,
+) {
+    SMILEYS_AND_PEOPLE("smileys_and_people", R.string.icon_picker_emoji_category_smileys),
+    ANIMALS_AND_NATURE("animals_and_nature", R.string.icon_picker_emoji_category_animals),
+    FOOD_AND_DRINK("food_and_drink", R.string.icon_picker_emoji_category_food),
+    ACTIVITY("activity", R.string.icon_picker_emoji_category_activity),
+    TRAVEL_AND_PLACES("travel_and_places", R.string.icon_picker_emoji_category_travel),
+    OBJECTS("objects", R.string.icon_picker_emoji_category_objects),
+    SYMBOLS("symbols", R.string.icon_picker_emoji_category_symbols),
+    FLAGS("flags", R.string.icon_picker_emoji_category_flags),
+}
+
+private val emojiPickerCategories = EmojiPickerCategory.entries.toList()
+
+private fun favoriteIconChoices(favoriteIconKeys: List<String>): List<IconChoice> {
+    val choicesByKey = linkedMapOf<String, IconChoice>()
+    iconCatalog.forEach { category ->
+        category.icons.forEach { choice ->
+            choicesByKey.putIfAbsent(choice.key, choice)
+        }
+    }
+    return favoriteIconKeys.mapNotNull { choicesByKey[it] }
+}
+
+private fun favoriteEmojiEntries(
+    favoriteEmojis: List<String>,
+    emojis: List<BundledEmoji>,
+): List<BundledEmoji> {
+    val emojisByValue = emojis.associateBy { it.emoji }
+    return favoriteEmojis.mapNotNull { emojisByValue[it] }
+}
+
+@Serializable
+private data class BundledEmoji(
+    val key: String,
+    val emoji: String,
+    val name: String,
+    val slug: String,
+    val category: String,
+    /** CLDR keywords (e.g. fire -> flame, hot, lit). Empty until the build_emoji_data.py script runs. */
+    val keywords: List<String> = emptyList(),
+)
+
+private data class EmojiDisplayEntry(
+    val emoji: BundledEmoji,
+    val variants: List<BundledEmoji>,
+    val displayEmoji: String,
+)
+
+private data class EmojiSkinToneGroupKey(
+    val category: String,
+    val baseName: String,
+)
+
+private data class EmojiSkinToneGroup(
+    val base: BundledEmoji,
+    val variants: List<BundledEmoji>,
+)
+
+private val emojiSkinToneLabels =
+    listOf(
+        "light skin tone",
+        "medium-light skin tone",
+        "medium skin tone",
+        "medium-dark skin tone",
+        "dark skin tone",
+    )
+
+/**
+ * Pre-baked lookups for skin-tone collapse. Built once via [buildEmojiSkinToneIndex]
+ * when the emoji list loads; per-tab collapse then runs in O(filteredEmojis).
+ *
+ * - [groups] - canonical group descriptor (base + sorted variants) per group key.
+ * - [keyByEmoji] - direct emoji-string -> group-key lookup, so we never re-run the
+ *   relatively expensive [skinToneBaseName] pass during a tab switch.
+ */
+private data class EmojiSkinToneIndex(
+    val groups: Map<EmojiSkinToneGroupKey, EmojiSkinToneGroup>,
+    val keyByEmoji: Map<String, EmojiSkinToneGroupKey>,
+)
+
+private fun buildEmojiSkinToneIndex(allEmojis: List<BundledEmoji>): EmojiSkinToneIndex {
+    val groups = buildEmojiSkinToneGroups(allEmojis)
+    val keyByEmoji = HashMap<String, EmojiSkinToneGroupKey>(allEmojis.size)
+    for (emoji in allEmojis) {
+        emojiSkinToneGroupKey(emoji, groups)?.let { groupKey ->
+            keyByEmoji[emoji.emoji] = groupKey
+        }
+    }
+    return EmojiSkinToneIndex(groups = groups, keyByEmoji = keyByEmoji)
 }
 
 /**
- * Extra stems matched against icon ligature / label text when the user types a **concept**
- * (e.g. "work") that does not literally appear in names like `laptop` or `business_center`.
- * Keys must be lowercase. Values are lowercase substrings that appear in real symbol names
- * or humanized labels in [BundledMaterialSymbolIcons].
+ * Collapse skin-tone variants in [sourceEmojis] using a precomputed [index].
+ * Single linear pass: every source emoji is either a standalone entry, the
+ * first appearance of a group (becomes the display tile), or a subsequent
+ * appearance of an already-seen group (skipped).
+ *
+ * The previous implementation rebuilt the group map on every call AND scanned
+ * `sourceEmojis` again to find each group's display emoji, which made sub-tab
+ * switching feel sluggish on phones.
  */
-private val searchConceptSynonyms: Map<String, List<String>> =
-    mapOf(
-        "work" to listOf("business", "job", "office", "laptop", "desktop", "computer", "corporate", "domain", "engineering", "assignment", "workspace", "meeting", "schedule", "chart"),
-        "job" to listOf("business", "work", "laptop", "corporate", "engineering", "assignment"),
-        "office" to listOf("business", "work", "laptop", "desktop", "corporate", "domain", "building", "apartment", "meeting"),
-        "home" to listOf("house", "door", "family", "pets", "garden", "bed", "chair", "sofa", "kitchen", "home"),
-        "house" to listOf("home", "door", "apartment", "hotel", "cottage", "garage"),
-        "love" to listOf("favorite", "heart", "valentine", "romance", "partner"),
-        "money" to listOf("attach", "currency", "euro", "payment", "card", "wallet", "savings", "paid", "lira"),
-        "try" to listOf("lira", "currency"),
-        "travel" to listOf("flight", "train", "hotel", "map", "luggage", "beach", "car", "vacation", "airplane", "passport"),
-        "trip" to listOf("flight", "train", "hotel", "map", "luggage", "car", "airplane"),
-        "food" to listOf("restaurant", "cafe", "pizza", "cake", "coffee", "bar", "local", "dining", "fastfood", "bakery"),
-        "sport" to listOf("fitness", "pool", "gym", "sports", "football", "basketball", "tennis", "golf", "exercise"),
-        "music" to listOf("mic", "headphones", "album", "library", "audio", "volume", "radio"),
-        "photo" to listOf("camera", "image", "gallery", "picture", "photo", "lens"),
-        "time" to listOf("calendar", "clock", "alarm", "schedule", "hour", "today", "event"),
-        "security" to listOf("lock", "key", "shield", "visibility", "password", "fingerprint", "vpn"),
-        "delete" to listOf("trash", "delete", "remove", "sweep", "close", "clear"),
-        "mail" to listOf("email", "mail", "send", "drafts", "inbox", "reply"),
-        "email" to listOf("mail", "send", "drafts", "inbox", "reply"),
-        "phone" to listOf("call", "phone", "mobile", "contact", "sim", "voicemail"),
-        "people" to listOf("person", "group", "face", "family", "contacts", "public"),
-        "car" to listOf("directions", "traffic", "taxi", "parking", "electric", "suv", "sedan"),
-        "health" to listOf("medical", "medication", "local", "hospital", "fitness", "monitor", "spa"),
-        "game" to listOf("sports", "esports", "casino", "toys", "puzzle", "stadia"),
-        "school" to listOf("school", "book", "menu_book", "science", "calculate", "backpack"),
-        "shop" to listOf("shopping", "cart", "store", "basket", "payment", "sell"),
-        "wifi" to listOf("wifi", "network", "router", "signal", "bluetooth", "cell"),
-        "battery" to listOf("battery", "charging", "power", "bolt"),
-        "location" to listOf("location", "map", "place", "navigation", "gps", "pin", "near"),
-        "weather" to listOf("wb", "sunny", "rain", "snow", "cloud", "storm", "thermostat", "air"),
-        "idea" to listOf("lightbulb", "tips", "emoji", "psychology", "science"),
-        "write" to listOf("edit", "note", "pen", "draw", "post", "sticky"),
-        "todo" to listOf("check", "list", "task", "done", "rule", "assignment"),
-    )
+private fun collapseEmojiSkinToneVariants(
+    sourceEmojis: List<BundledEmoji>,
+    index: EmojiSkinToneIndex,
+): List<EmojiDisplayEntry> {
+    val seenGroups = HashSet<EmojiSkinToneGroupKey>()
+    val ordered = ArrayList<EmojiDisplayEntry>(sourceEmojis.size)
+    for (sourceEmoji in sourceEmojis) {
+        val groupKey = index.keyByEmoji[sourceEmoji.emoji]
+        if (groupKey == null) {
+            ordered +=
+                EmojiDisplayEntry(
+                    emoji = sourceEmoji,
+                    variants = listOf(sourceEmoji),
+                    displayEmoji = sourceEmoji.emoji,
+                )
+        } else if (seenGroups.add(groupKey)) {
+            val skinToneGroup = index.groups[groupKey] ?: continue
+            // First time this group surfaces in the filtered set, so the current
+            // sourceEmoji is by definition the right display tile.
+            ordered +=
+                EmojiDisplayEntry(
+                    emoji = skinToneGroup.base,
+                    variants = skinToneGroup.variants,
+                    displayEmoji = sourceEmoji.emoji,
+                )
+        }
+    }
+    return ordered
+}
+
+private fun buildEmojiSkinToneGroups(allEmojis: List<BundledEmoji>): Map<EmojiSkinToneGroupKey, EmojiSkinToneGroup> {
+    val emojisByGroupKey =
+        allEmojis.associateBy { bundledEmoji ->
+            EmojiSkinToneGroupKey(
+                category = bundledEmoji.category,
+                baseName = bundledEmoji.name,
+            )
+        }
+    val skinToneVariantsByGroupKey = linkedMapOf<EmojiSkinToneGroupKey, MutableList<BundledEmoji>>()
+    allEmojis.forEach { bundledEmoji ->
+        val baseName = skinToneBaseName(bundledEmoji.name) ?: return@forEach
+        val groupKey =
+            EmojiSkinToneGroupKey(
+                category = bundledEmoji.category,
+                baseName = baseName,
+            )
+        skinToneVariantsByGroupKey
+            .getOrPut(groupKey) { mutableListOf() }
+            .add(bundledEmoji)
+    }
+    return skinToneVariantsByGroupKey.mapValues { (groupKey, skinToneVariants) ->
+        val baseEmoji = emojisByGroupKey[groupKey] ?: skinToneVariants.first()
+        val variants =
+            listOf(baseEmoji)
+                .plus(
+                    skinToneVariants.sortedBy { skinToneVariant ->
+                        skinToneSortIndex(skinToneVariant.name)
+                    },
+                ).distinctBy { bundledEmoji -> bundledEmoji.emoji }
+        EmojiSkinToneGroup(
+            base = baseEmoji,
+            variants = variants,
+        )
+    }
+}
+
+private fun emojiSkinToneGroupKey(
+    emoji: BundledEmoji,
+    skinToneGroups: Map<EmojiSkinToneGroupKey, EmojiSkinToneGroup>,
+): EmojiSkinToneGroupKey? {
+    val baseName = skinToneBaseName(emoji.name) ?: emoji.name
+    val groupKey =
+        EmojiSkinToneGroupKey(
+            category = emoji.category,
+            baseName = baseName,
+        )
+    return groupKey.takeIf { it in skinToneGroups }
+}
+
+private fun skinToneBaseName(name: String): String? {
+    // Skip multi-tone emojis (couples/families like "couple kissing: woman, man,
+    // dark skin tone, light skin tone") — those are intentionally kept distinct.
+    // We detect multi-tone by counting label occurrences as ": label" or
+    // ", label" tokens, which avoids the substring overlap that broke the old
+    // `name.contains(label)` check (where "medium-light skin tone" would
+    // simultaneously match "light skin tone").
+    val occurrences =
+        emojiSkinToneLabels.sumOf { label ->
+            countNonOverlapping(name, ": $label") + countNonOverlapping(name, ", $label")
+        }
+    if (occurrences != 1) return null
+    val matchingLabel =
+        emojiSkinToneLabels
+            .filter { label -> name.endsWith(": $label") || name.endsWith(", $label") }
+            .maxByOrNull { it.length }
+            ?: return null
+    return when {
+        name.endsWith(": $matchingLabel") -> name.removeSuffix(": $matchingLabel").trim()
+        name.endsWith(", $matchingLabel") -> name.removeSuffix(", $matchingLabel").trim()
+        else -> null
+    }
+}
+
+private fun countNonOverlapping(
+    haystack: String,
+    needle: String,
+): Int {
+    if (needle.isEmpty()) return 0
+    var count = 0
+    var index = haystack.indexOf(needle)
+    while (index != -1) {
+        count++
+        index = haystack.indexOf(needle, index + needle.length)
+    }
+    return count
+}
+
+private fun skinToneSortIndex(name: String): Int {
+    // Same gotcha as skinToneBaseName: name.endsWith("light skin tone") is true for
+    // "medium-light skin tone", which would put it at index 0 (light) instead of 1
+    // (medium-light). Pick the longest-matching label so sort order matches the
+    // skin-tone ramp in [emojiSkinToneLabels].
+    val matchingIndex =
+        emojiSkinToneLabels
+            .withIndex()
+            .filter { (_, label) -> name.endsWith(label) }
+            .maxByOrNull { (_, label) -> label.length }
+            ?.index
+    return matchingIndex?.coerceAtLeast(0) ?: 0
+}
+
+private val emojiJson = Json { ignoreUnknownKeys = true }
+
+/**
+ * Loads the bundled emoji list. Generated by `python font_subset/build_emoji_data.py`
+ * — until that runs the resource is an empty array and the picker simply shows
+ * the empty state. See font_subset/AGENT_ADD_ICON.md.
+ */
+private fun loadBundledEmojis(resources: Resources): List<BundledEmoji> =
+    resources
+        .openRawResource(R.raw.emojis)
+        .bufferedReader()
+        .use { reader ->
+            emojiJson.decodeFromString<List<BundledEmoji>>(reader.readText())
+        }
+
+/**
+ * Loads supplemental Material Symbols tags keyed by ligature (e.g.
+ * `self_improvement` -> [calm, meditate, mindfulness, yoga, zen]). Generated by
+ * `python font_subset/build_icon_keywords.py`; missing/empty file is treated as
+ * "no extra keywords known" and falls back to label/category text.
+ */
+private fun loadIconKeywords(resources: Resources): Map<String, List<String>> =
+    resources
+        .openRawResource(R.raw.icon_keywords)
+        .bufferedReader()
+        .use { reader ->
+            emojiJson.decodeFromString<Map<String, List<String>>>(reader.readText())
+        }
+
+/**
+ * Field weights for ranking. Names beat slugs beat tags beat category headings.
+ * See [scoreSearchable] in IconPickerSearch.kt for how these compose into a final score.
+ */
+private const val FIELD_WEIGHT_NAME: Float = 3.0f
+private const val FIELD_WEIGHT_SLUG: Float = 2.0f
+private const val FIELD_WEIGHT_KEYWORDS: Float = 1.5f
+private const val FIELD_WEIGHT_CATEGORY: Float = 0.8f
 
 private fun iconChoicesRankedForSearch(
     resources: Resources,
+    iconKeywords: Map<String, List<String>>,
     rawQuery: String,
 ): List<IconChoice> {
-    val query = rawQuery.lowercase(Locale.getDefault())
-    val tokens = query.split(Regex("\\s+")).filter { it.isNotEmpty() }
+    val tokens = tokenizeQuery(rawQuery)
     if (tokens.isEmpty()) return emptyList()
     val scored = ArrayList<Pair<IconChoice, Float>>(iconCatalog.sumOf { it.icons.size })
     iconCatalog.forEach { category ->
-        val categoryLabel = resources.getString(category.nameRes).lowercase(Locale.getDefault())
+        val categoryLabel = resources.getString(category.nameRes)
         category.icons.forEach { choice ->
-            val iconLabel = humanizeIconKey(choice.key).lowercase(Locale.getDefault())
-            val keyWords = iconKeyToSearchWords(choice.key)
-            val combined = "$iconLabel $keyWords $categoryLabel"
-            val lowestTokenScore =
-                tokens.minOfOrNull { token ->
-                    bestConceptualTokenScore(token, combined, iconLabel, keyWords, categoryLabel)
-                } ?: 0f
-            if (lowestTokenScore > 0f) {
-                scored += choice to (lowestTokenScore + iconLabel.length * 0.001f)
-            }
+            val score = scoreSearchable(tokens, buildIconSearchFields(choice, categoryLabel, iconKeywords))
+            if (score > 0f) scored += choice to score
         }
     }
     // Same persisted [IconChoice.key] can appear in multiple catalog categories; keep the
@@ -372,69 +1102,58 @@ private fun iconChoicesRankedForSearch(
     return scored
         .sortedWith(
             compareByDescending<Pair<IconChoice, Float>> { it.second }
+                .thenBy { entry -> humanizeIconKey(entry.first.key).length }
                 .thenBy { entry -> humanizeIconKey(entry.first.key).lowercase(Locale.getDefault()) },
-        ).distinctBy { scoredEntry -> scoredEntry.first.key }
-        .map { scoredEntry -> scoredEntry.first }
+        ).distinctBy { it.first.key }
+        .map { it.first }
 }
 
-private fun bestConceptualTokenScore(
-    token: String,
-    combinedLower: String,
-    labelLower: String,
-    keyWordsLower: String,
-    categoryLower: String,
-): Float {
-    val tokenLower = token.lowercase(Locale.getDefault())
-    val synonyms = searchConceptSynonyms[tokenLower].orEmpty()
-    val stems =
-        buildList {
-            add(tokenLower)
-            addAll(synonyms)
-        }
-    return stems.maxOfOrNull { stem ->
-        tokenMatchStrength(stem, combinedLower, labelLower, keyWordsLower, categoryLower)
-    } ?: 0f
+private fun buildIconSearchFields(
+    choice: IconChoice,
+    categoryLabel: String,
+    iconKeywords: Map<String, List<String>>,
+): List<SearchableField> {
+    val tags = choice.symbolName?.let { iconKeywords[it] }.orEmpty()
+    return listOf(
+        SearchableField(text = humanizeIconKey(choice.key), weight = FIELD_WEIGHT_NAME),
+        SearchableField(text = iconKeyToSearchWords(choice.key), weight = FIELD_WEIGHT_SLUG),
+        SearchableField(text = tags.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS),
+        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY),
+    )
 }
 
-private fun tokenMatchStrength(
-    token: String,
-    combinedLower: String,
-    labelLower: String,
-    keyWordsLower: String,
-    categoryLower: String,
-): Float {
-    if (token.isEmpty()) return 1f
-    if (combinedLower.contains(token)) return 1f + token.length * 0.04f
-    val bestField =
-        maxOf(
-            subsequenceStrength(token, labelLower),
-            subsequenceStrength(token, keyWordsLower),
-            subsequenceStrength(token, categoryLower),
-        )
-    if (bestField > 0f) return bestField * 0.92f
-    return 0f
-}
-
-private fun subsequenceStrength(
-    token: String,
-    field: String,
-): Float {
-    if (token.isEmpty() || field.isEmpty()) return 0f
-    if (!isSubsequence(token, field)) return 0f
-    return 0.55f + token.length.toFloat() / (field.length + 3).coerceAtLeast(1)
-}
-
-private fun isSubsequence(
-    tokenLower: String,
-    fieldLower: String,
-): Boolean {
-    var tokenIndex = 0
-    fieldLower.forEach { ch ->
-        if (tokenIndex < tokenLower.length && ch == tokenLower[tokenIndex]) {
-            tokenIndex++
+private fun emojisRankedForSearch(
+    emojis: List<BundledEmoji>,
+    favoriteEmojis: List<String>,
+    selectedCategoryKey: String,
+    rawQuery: String,
+): List<BundledEmoji> {
+    val tokens = tokenizeQuery(rawQuery)
+    if (tokens.isEmpty()) {
+        return if (selectedCategoryKey == EMOJI_FAVORITES_CATEGORY_KEY) {
+            favoriteEmojiEntries(favoriteEmojis, emojis)
+        } else {
+            emojis.filter { emoji -> emoji.category == selectedCategoryKey }
         }
     }
-    return tokenIndex == tokenLower.length
+    return emojis
+        .map { emoji -> emoji to scoreSearchable(tokens, buildEmojiSearchFields(emoji)) }
+        .filter { it.second > 0f }
+        .sortedWith(
+            compareByDescending<Pair<BundledEmoji, Float>> { it.second }
+                .thenBy { (emoji, _) -> emoji.name.length }
+                .thenBy { (emoji, _) -> emoji.name.lowercase(Locale.getDefault()) },
+        ).map { (emoji, _) -> emoji }
+}
+
+private fun buildEmojiSearchFields(emoji: BundledEmoji): List<SearchableField> {
+    val categoryLabel = emoji.category.replace('_', ' ')
+    return listOf(
+        SearchableField(text = emoji.name, weight = FIELD_WEIGHT_NAME),
+        SearchableField(text = emoji.slug.replace('_', ' '), weight = FIELD_WEIGHT_SLUG),
+        SearchableField(text = emoji.keywords.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS),
+        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY),
+    )
 }
 
 private fun iconKeyToSearchWords(key: String): String {
@@ -449,9 +1168,13 @@ private fun iconKeyToSearchWords(key: String): String {
 
 @Composable
 private fun IconPickerGrid(
+    modifier: Modifier = Modifier,
+    state: LazyGridState = rememberLazyGridState(),
     content: LazyGridScope.() -> Unit,
 ) {
     LazyVerticalGrid(
+        modifier = modifier,
+        state = state,
         columns = GridCells.Fixed(5),
         contentPadding = PaddingValues(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -464,7 +1187,7 @@ private fun LazyGridScope.iconHeader(
     @StringRes labelRes: Int,
     topPadding: Dp,
 ) {
-    item(span = { GridItemSpan(5) }) {
+    item(span = { GridItemSpan(maxLineSpan) }) {
         Text(
             text = stringResource(labelRes),
             style = MaterialTheme.typography.labelLarge,
@@ -474,6 +1197,60 @@ private fun LazyGridScope.iconHeader(
                     .fillMaxWidth()
                     .padding(top = topPadding, bottom = 2.dp),
         )
+    }
+}
+
+/**
+ * "Edit favorites" affordance shared by both grids. 44 dp circle that matches
+ * [IconTile]'s Surface + CircleShape + clip structure (so the border antialiases
+ * cleanly).
+ *
+ * - Emoji grid passes [cellSize] = 56 dp to centre the circle inside the
+ *   adaptive emoji cell, and keeps the default [filled] = true so the disc
+ *   reads as distinct from the surrounding emoji glyphs.
+ * - Icon grid uses [cellSize] = 44 dp (default) with [filled] = false: the
+ *   icon tiles around it are filled circles, so a transparent outline-only
+ *   button is the visual cue that this one is an action, not another
+ *   selectable icon.
+ */
+@Composable
+private fun EditFavoritesTile(
+    onClick: () -> Unit,
+    cellSize: Dp = 44.dp,
+    filled: Boolean = true,
+) {
+    val contentDescription = stringResource(R.string.icon_picker_add_favorites_cd)
+    val containerColor =
+        if (filled) {
+            MaterialTheme.colorScheme.surfaceContainerHigh
+        } else {
+            Color.Transparent
+        }
+    Box(
+        modifier = Modifier.size(cellSize),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = containerColor,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier =
+                Modifier
+                    .size(44.dp)
+                    .clip(CircleShape)
+                    .tapSoundClickable(onClick = onClick)
+                    .semantics { this.contentDescription = contentDescription },
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                RememberMaterialRoundedSymbol(
+                    name = "edit",
+                    size = 22.dp,
+                    tint = MaterialTheme.colorScheme.primary,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+        }
     }
 }
 
@@ -522,6 +1299,99 @@ private fun IconTile(
                     tint = fg,
                     modifier = Modifier.size(22.dp),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Right-angle triangle in the bottom-right corner used as a "this tile has
+ * variants" affordance, mirroring how Gboard marks skin-tone-capable emojis.
+ */
+private val variantCornerShape =
+    GenericShape { size, _ ->
+        moveTo(size.width, 0f)
+        lineTo(size.width, size.height)
+        lineTo(0f, size.height)
+        close()
+    }
+
+@Composable
+private fun EmojiTile(
+    emoji: String,
+    variants: List<String>,
+    selected: Boolean,
+    onClick: (String) -> Unit,
+) {
+    val uniqueVariants = variants.distinct()
+    val hasVariants = uniqueVariants.size > 1
+    var expanded by rememberSaveable(emoji) { mutableStateOf(false) }
+    Box(
+        modifier =
+            Modifier
+                .size(56.dp)
+                .tapSoundClickable {
+                    if (hasVariants) {
+                        expanded = true
+                    } else {
+                        onClick(emoji)
+                    }
+                },
+        contentAlignment = Alignment.Center,
+    ) {
+        if (selected) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+            ) {}
+        }
+        Text(
+            text = emoji,
+            style = MaterialTheme.typography.headlineLarge.copy(fontSize = 34.sp),
+        )
+        if (hasVariants) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 4.dp, bottom = 4.dp)
+                        .size(6.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            shape = variantCornerShape,
+                        ),
+            )
+        }
+        // Compact horizontal variant popup, like Gboard's skin-tone strip,
+        // instead of the wide vertical DropdownMenu it used to be.
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                uniqueVariants.forEach { variant ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(44.dp)
+                                .clip(CircleShape)
+                                .tapSoundClickable {
+                                    expanded = false
+                                    onClick(variant)
+                                },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = variant,
+                            style = MaterialTheme.typography.headlineLarge.copy(fontSize = 30.sp),
+                        )
+                    }
+                }
             }
         }
     }

@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -26,6 +27,7 @@ import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.SwipeGestureMode
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.semanticSwipeBackground
 import dev.bikram.remember.ui.theme.semanticSwipeIconTint
 
@@ -39,15 +41,50 @@ fun SwipeableRememberNoteCard(
     selected: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     swipeEnabled: Boolean = true,
+    activeRevealKey: Any? = null,
+    onRevealStarted: ((Long) -> Unit)? = null,
+    onRevealClosed: ((Long) -> Unit)? = null,
+) {
+    SwipeableRememberNoteCard(
+        note = note,
+        model = remember(note) { note.toNoteCardUiModel() },
+        interaction = interaction,
+        onOpenNote = onOpenNote,
+        onSwipeAction = onSwipeAction,
+        modifier = modifier,
+        selected = selected,
+        onLongClick = onLongClick,
+        swipeEnabled = swipeEnabled,
+        activeRevealKey = activeRevealKey,
+        onRevealStarted = onRevealStarted,
+        onRevealClosed = onRevealClosed,
+    )
+}
+
+@Composable
+fun SwipeableRememberNoteCard(
+    note: NoteWithItems,
+    model: NoteCardUiModel,
+    interaction: InteractionState,
+    onOpenNote: (NoteWithItems) -> Unit,
+    onSwipeAction: (NoteWithItems, NoteSwipeAction) -> Unit,
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
+    swipeEnabled: Boolean = true,
+    activeRevealKey: Any? = null,
+    onRevealStarted: ((Long) -> Unit)? = null,
+    onRevealClosed: ((Long) -> Unit)? = null,
 ) {
     val swipeStart = interaction.swipeStartToEnd
     val swipeEnd = interaction.swipeEndToStart
-    val noteCompleted = note.note.completedAt != null
-    val noteFavorite = note.note.favorite
+    val noteCompleted = model.completed
+    val noteFavorite = model.favorite
+    val revealKey = note.note.id
     val noteCardShape = MaterialTheme.shapes.medium
     if (!swipeEnabled) {
         NoteCard(
-            note = note,
+            model = model,
             onClick = { onOpenNote(note) },
             selected = selected,
             onLongClick = onLongClick,
@@ -80,9 +117,13 @@ fun SwipeableRememberNoteCard(
                     },
             cardShape = noteCardShape,
             hapticEnabled = interaction.hapticFeedbackEnabled,
+            revealKey = revealKey,
+            activeRevealKey = activeRevealKey,
+            onRevealStarted = { onRevealStarted?.invoke(revealKey) },
+            onRevealClosed = { onRevealClosed?.invoke(revealKey) },
         ) {
             NoteCard(
-                note = note,
+                model = model,
                 onClick = { onOpenNote(note) },
                 selected = selected,
                 onLongClick = onLongClick,
@@ -103,7 +144,7 @@ fun SwipeableRememberNoteCard(
             val action = if (fromStart) swipeStart else swipeEnd
             val backgroundColor by animateColorAsState(
                 targetValue = action.semanticSwipeBackground(),
-                animationSpec = MaterialTheme.motionScheme.fastEffectsSpec(),
+                animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec()),
                 label = "swipeBg",
             )
             val tint = action.semanticSwipeIconTint()
@@ -170,7 +211,7 @@ fun SwipeableRememberNoteCard(
         },
     ) {
         NoteCard(
-            note = note,
+            model = model,
             onClick = { onOpenNote(note) },
             selected = selected,
             onLongClick = onLongClick,

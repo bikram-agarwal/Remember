@@ -170,6 +170,15 @@ class GoogleTasksImportViewModel
             }
         }
 
+        fun cancelTakeoutImport() {
+            _state.update { current ->
+                GoogleTasksImportUiState(
+                    rememberedEmail = current.rememberedEmail,
+                    selectedMethod = ImportMethod.ManualImport,
+                )
+            }
+        }
+
         /**
          * Activity result from a [GoogleTasksImportEffect.LaunchConsent] launch.
          *
@@ -246,6 +255,16 @@ class GoogleTasksImportViewModel
                 cachedToken = null
                 _state.value = GoogleTasksImportUiState()
                 connect()
+            }
+        }
+
+        fun disconnect() {
+            viewModelScope.launch {
+                _state.update { it.copy(isFetching = true, error = null) }
+                auth.forget(appContext, cachedToken)
+                prefs.reset()
+                cachedToken = null
+                _state.value = GoogleTasksImportUiState()
             }
         }
 

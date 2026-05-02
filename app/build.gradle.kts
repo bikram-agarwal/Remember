@@ -7,7 +7,6 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.androidx.room)
-    alias(libs.plugins.androidx.baselineprofile)
     alias(libs.plugins.detekt)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ktlint)
@@ -25,6 +24,18 @@ kotlin {
             "-opt-in=androidx.compose.material3.ExperimentalMaterial3ExpressiveApi",
             "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
         )
+        providers
+            .gradleProperty("kotlin.compiler.metrics.destination")
+            .orNull
+            ?.takeIf { it.isNotBlank() }
+            ?.let { metricsDestination ->
+                freeCompilerArgs.addAll(
+                    "-P",
+                    "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=$metricsDestination",
+                    "-P",
+                    "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=$metricsDestination",
+                )
+            }
     }
 }
 
@@ -44,8 +55,7 @@ val releaseStoreFile =
         ?.takeIf { it.isFile }
 val releaseStorePassword = keystoreProps.getProperty("storePassword")?.takeIf { it.isNotBlank() }
 val releaseKeyAlias = keystoreProps.getProperty("keyAlias")?.takeIf { it.isNotBlank() }
-val releaseKeyPassword =
-    keystoreProps.getProperty("keyPassword")?.takeIf { it.isNotBlank() } ?: releaseStorePassword
+val releaseKeyPassword = keystoreProps.getProperty("keyPassword")?.takeIf { it.isNotBlank() }
 
 val hasReleaseSigning =
     releaseStoreFile != null &&
@@ -110,6 +120,10 @@ extensions.configure<ApplicationExtension>("android") {
         }
     }
 
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+
     flavorDimensions += "distribution"
     productFlavors {
         create("github") {
@@ -148,13 +162,6 @@ extensions.configure<ApplicationExtension>("android") {
 
 room {
     schemaDirectory("$projectDir/schemas")
-}
-
-baselineProfile {
-    automaticGenerationDuringBuild = false
-    warnings {
-        maxAgpVersion = false
-    }
 }
 
 detekt {
@@ -211,7 +218,6 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.androidx.profileinstaller)
     debugImplementation(libs.androidx.ui.tooling)
-    baselineProfile(project(":baselineprofile"))
     testImplementation("junit:junit:4.13.2")
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.room.testing)

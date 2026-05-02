@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -53,7 +54,7 @@ enum class NoteShelfState { ACTIVE, ARCHIVED, TRASHED }
 
 /**
  * Action buttons for the Edit Note / Edit List screens, rendered as a full-width bottom bar
- * pinned to the navigation inset. The button set swaps based on [shelfState]:
+ * anchored to the navigation inset. The button set swaps based on [shelfState]:
  *
  *   ACTIVE   -> Edit/Done, Favorite, Archive, Trash
  *   ARCHIVED -> Unarchive, Trash
@@ -193,16 +194,19 @@ fun NoteActionBottomBarContent(
                         icon = "restore_from_trash",
                         label = stringResource(R.string.edit_bottom_bar_restore),
                         onClick = onRestore,
+                        modifier = Modifier.weight(1f),
                     )
                     ActionItem(
                         icon = "archive",
                         label = stringResource(R.string.edit_bottom_bar_archive),
                         onClick = onArchive,
+                        modifier = Modifier.weight(1f),
                     )
                     ActionItem(
                         icon = "delete_forever",
                         label = stringResource(R.string.edit_bottom_bar_delete_forever),
                         onClick = onDeleteForever,
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
@@ -212,20 +216,21 @@ fun NoteActionBottomBarContent(
 
 /**
  * Standard action item: icon above label, tappable column with rounded-rect ripple.
- * Width is fixed so items align consistently regardless of label length.
+ * Width is fixed by default; callers can pass weighted modifiers when a smaller action
+ * set should share the whole bar.
  */
 @Composable
 private fun ActionItem(
     icon: String,
     label: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier.width(72.dp),
     iconTint: Color = MaterialTheme.colorScheme.onSurface,
     iconScale: Float = 1f,
 ) {
     Column(
         modifier =
-            Modifier
-                .width(72.dp)
+            modifier
                 .clip(MaterialTheme.shapes.large)
                 .clickable(onClick = onClick)
                 .padding(vertical = 8.dp),
@@ -244,6 +249,7 @@ private fun ActionItem(
             text = label,
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
             maxLines = 1,
         )
     }
@@ -306,6 +312,7 @@ private fun EditActionItem(
                     ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
                 maxLines = 1,
             )
         }
@@ -379,6 +386,7 @@ private fun DoneActionItem(
                 ),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
             maxLines = 1,
         )
     }
@@ -444,6 +452,7 @@ private fun FavoriteActionItem(
             text = stringResource(R.string.edit_bottom_bar_favorite),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
             maxLines = 1,
         )
     }

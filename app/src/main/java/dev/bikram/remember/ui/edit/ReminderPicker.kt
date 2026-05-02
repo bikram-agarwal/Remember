@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.text.format.DateFormat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -67,6 +68,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -206,13 +208,15 @@ fun ReminderPickerSheet(
     }
 
     AppBottomSheet(
-        title = stringResource(R.string.reminder_set_title),
+        title = if (notificationsGranted) stringResource(R.string.reminder_set_title) else "",
         onDismiss = onDismiss,
+        showTitleBar = notificationsGranted,
         scrollable = true,
         actions = null,
     ) {
         if (!notificationsGranted) {
-            NotificationPermissionRequiredCard(
+            NotificationPermissionRequiredContent(
+                iconName = "alarm",
                 onEnableNotifications = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
                         ContextCompat.checkSelfPermission(
@@ -278,7 +282,7 @@ fun ReminderPickerSheet(
                         endCount = endCountText.toIntOrNull(),
                     )
                 } else {
-                    "Repeat"
+                    stringResource(R.string.reminder_repeat)
                 },
             hasValue = repeatOn,
             onClick = {
@@ -477,46 +481,101 @@ fun ReminderPickerSheet(
 }
 
 @Composable
-private fun NotificationPermissionRequiredCard(
+internal fun NotificationPermissionRequiredSheet(
+    onDismiss: () -> Unit,
+    @StringRes titleRes: Int = R.string.reminder_notifications_required_title,
+    @StringRes bodyRes: Int = R.string.reminder_notifications_required_body,
+) {
+    val context = LocalContext.current
+    var notificationsGranted by remember {
+        mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
+    }
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission(),
+        ) {
+            notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+            if (notificationsGranted) onDismiss()
+        }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
+                    if (notificationsGranted) onDismiss()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    AppBottomSheet(
+        title = "",
+        onDismiss = onDismiss,
+        showTitleBar = false,
+        scrollable = false,
+        actions = null,
+    ) {
+        NotificationPermissionRequiredContent(
+            titleRes = titleRes,
+            bodyRes = bodyRes,
+            onEnableNotifications = {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(
+                        context,
+                        Manifest.permission.POST_NOTIFICATIONS,
+                    ) != PackageManager.PERMISSION_GRANTED
+                ) {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    context.startActivity(notificationSettingsIntent(context))
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun NotificationPermissionRequiredContent(
+    iconName: String = "notifications",
+    @StringRes titleRes: Int = R.string.reminder_notifications_required_title,
+    @StringRes bodyRes: Int = R.string.reminder_notifications_required_body,
     onEnableNotifications: () -> Unit,
 ) {
-    Surface(
-        shape = MaterialTheme.shapes.extraLarge,
-        color = MaterialTheme.colorScheme.primaryContainer,
-        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        tonalElevation = 4.dp,
-        modifier = Modifier.fillMaxWidth(),
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(20.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        RememberMaterialRoundedSymbol(
+            name = iconName,
+            size = 40.dp,
+            tint = MaterialTheme.colorScheme.primary,
+            weight = FontWeight.Medium,
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            text = stringResource(titleRes),
+            style = MaterialTheme.typography.titleLarge,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(bodyRes),
+            style = MaterialTheme.typography.bodyMedium,
+            textAlign = TextAlign.Center,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(18.dp))
+        RememberButton(
+            onClick = onEnableNotifications,
+            modifier = Modifier.fillMaxWidth(),
         ) {
-            RememberMaterialRoundedSymbol(
-                name = "notifications",
-                size = 40.dp,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                weight = FontWeight.Medium,
-            )
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.reminder_notifications_required_title),
-                style = MaterialTheme.typography.titleLarge,
-                textAlign = TextAlign.Center,
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                text = stringResource(R.string.reminder_notifications_required_body),
-                style = MaterialTheme.typography.bodyMedium,
-                textAlign = TextAlign.Center,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-            Spacer(Modifier.height(18.dp))
-            RememberButton(
-                onClick = onEnableNotifications,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.reminder_notifications_required_action))
-            }
+            Text(stringResource(R.string.reminder_notifications_required_action))
         }
     }
 }
@@ -540,25 +599,18 @@ private const val DEFAULT_END_COUNT = 10
 private fun formatReminderTimePill(
     hour24: Int,
     minute: Int,
-): String =
-    if (DateFormat.is24HourFormat(LocalContext.current)) {
+): String {
+    val context = LocalContext.current
+    return if (DateFormat.is24HourFormat(context)) {
         "%02d:%02d".format(hour24, minute)
     } else {
-        formatTime12h(hour24, minute)
+        val calendar =
+            Calendar.getInstance().apply {
+                set(Calendar.HOUR_OF_DAY, hour24)
+                set(Calendar.MINUTE, minute)
+            }
+        DateFormat.getTimeFormat(context).format(calendar.time)
     }
-
-private fun formatTime12h(
-    hour24: Int,
-    minute: Int,
-): String {
-    val ampm = if (hour24 < 12) "AM" else "PM"
-    val hour12 =
-        when {
-            hour24 == 0 -> 12
-            hour24 > 12 -> hour24 - 12
-            else -> hour24
-        }
-    return "%d:%02d %s".format(hour12, minute, ampm)
 }
 
 /**
@@ -965,7 +1017,7 @@ private fun RepeatConfig(
                                 Modifier
                                     .fillMaxWidth()
                                     .height(RepeatRowHeight),
-                            value = "On day $dayOfMonth",
+                            value = stringResource(R.string.reminder_on_day, dayOfMonth),
                             expanded = dayOfMonthMenuOpen,
                             onExpandedChange = {
                                 if (monthlyKind == MonthlyKind.BY_DAY) onDayOfMonthMenuOpen(it)
@@ -999,11 +1051,11 @@ private fun RepeatConfig(
                                     if (monthlyKind == MonthlyKind.BY_WEEKDAY) onNthOrdinalMenuOpen(it)
                                 },
                             ) {
-                                listOf(1 to "First", 2 to "Second", 3 to "Third", 4 to "Fourth", 5 to "Last").forEach { (n, lbl) ->
+                                listOf(1, 2, 3, 4, 5).forEach { ordinal ->
                                     RememberDropdownMenuItem(
-                                        text = { Text(lbl) },
+                                        text = { Text(ordinalLabel(ordinal)) },
                                         onClick = {
-                                            onNthOrdinal(n)
+                                            onNthOrdinal(ordinal)
                                             onNthOrdinalMenuOpen(false)
                                         },
                                     )
@@ -1046,7 +1098,7 @@ private fun RepeatConfig(
 
             Spacer(Modifier.height(12.dp))
             Text(
-                "Ends",
+                stringResource(R.string.reminder_ends_label),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.primary,
             )
@@ -1061,7 +1113,7 @@ private fun RepeatConfig(
             ) {
                 PillRow(
                     materialSymbolName = "calendar_month",
-                    label = endDate?.let { formatDate(it) } ?: "Pick end date",
+                    label = endDate?.let { formatDate(it) } ?: stringResource(R.string.reminder_pick_end_date),
                     hasValue = endDate != null && endKind == RecurrenceEndKind.ON_DATE,
                     onClick = {
                         onOpenEndDatePicker()
@@ -1234,16 +1286,17 @@ private fun WeekdayRow(
 ) {
     val weekdays =
         listOf(
-            Calendar.SUNDAY to "S",
-            Calendar.MONDAY to "M",
-            Calendar.TUESDAY to "T",
-            Calendar.WEDNESDAY to "W",
-            Calendar.THURSDAY to "T",
-            Calendar.FRIDAY to "F",
-            Calendar.SATURDAY to "S",
+            Calendar.SUNDAY to (stringResource(R.string.reminder_weekday_sunday_narrow) to weekdayFullName(Calendar.SUNDAY)),
+            Calendar.MONDAY to (stringResource(R.string.reminder_weekday_monday_narrow) to weekdayFullName(Calendar.MONDAY)),
+            Calendar.TUESDAY to (stringResource(R.string.reminder_weekday_tuesday_narrow) to weekdayFullName(Calendar.TUESDAY)),
+            Calendar.WEDNESDAY to (stringResource(R.string.reminder_weekday_wednesday_narrow) to weekdayFullName(Calendar.WEDNESDAY)),
+            Calendar.THURSDAY to (stringResource(R.string.reminder_weekday_thursday_narrow) to weekdayFullName(Calendar.THURSDAY)),
+            Calendar.FRIDAY to (stringResource(R.string.reminder_weekday_friday_narrow) to weekdayFullName(Calendar.FRIDAY)),
+            Calendar.SATURDAY to (stringResource(R.string.reminder_weekday_saturday_narrow) to weekdayFullName(Calendar.SATURDAY)),
         )
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        weekdays.forEach { (day, label) ->
+        weekdays.forEach { (day, labels) ->
+            val (label, contentDescription) = labels
             val isSel = day in selected
             Box(
                 modifier =
@@ -1265,7 +1318,9 @@ private fun WeekdayRow(
                                     MaterialTheme.colorScheme.outlineVariant
                                 },
                             shape = CircleShape,
-                        ).tapSoundClickable { onToggle(day) },
+                        ).semantics {
+                            this.contentDescription = contentDescription
+                        }.tapSoundClickable { onToggle(day) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -1284,55 +1339,60 @@ private fun WeekdayRow(
     }
 }
 
-private fun unitLabel(u: RecurrenceUnit): String =
-    when (u) {
-        RecurrenceUnit.DAY -> "Day"
-        RecurrenceUnit.WEEK -> "Week"
-        RecurrenceUnit.MONTH -> "Month"
-        RecurrenceUnit.YEAR -> "Year"
+@Composable
+private fun unitLabel(unit: RecurrenceUnit): String =
+    when (unit) {
+        RecurrenceUnit.DAY -> stringResource(R.string.reminder_unit_day)
+        RecurrenceUnit.WEEK -> stringResource(R.string.reminder_unit_week)
+        RecurrenceUnit.MONTH -> stringResource(R.string.reminder_unit_month)
+        RecurrenceUnit.YEAR -> stringResource(R.string.reminder_unit_year)
     }
 
-private fun ordinalLabel(n: Int): String =
-    when (n) {
-        1 -> "First"
-        2 -> "Second"
-        3 -> "Third"
-        4 -> "Fourth"
-        5 -> "Last"
-        else -> "First"
+@Composable
+private fun ordinalLabel(ordinal: Int): String =
+    when (ordinal) {
+        1 -> stringResource(R.string.reminder_ordinal_first)
+        2 -> stringResource(R.string.reminder_ordinal_second)
+        3 -> stringResource(R.string.reminder_ordinal_third)
+        4 -> stringResource(R.string.reminder_ordinal_fourth)
+        5 -> stringResource(R.string.reminder_ordinal_last)
+        else -> stringResource(R.string.reminder_ordinal_first)
     }
 
-private fun ordinalWord(n: Int): String =
-    when (n) {
-        1 -> "first"
-        2 -> "second"
-        3 -> "third"
-        4 -> "fourth"
-        5 -> "last"
-        else -> "first"
+@Composable
+private fun ordinalWord(ordinal: Int): String =
+    when (ordinal) {
+        1 -> stringResource(R.string.reminder_ordinal_first_lower)
+        2 -> stringResource(R.string.reminder_ordinal_second_lower)
+        3 -> stringResource(R.string.reminder_ordinal_third_lower)
+        4 -> stringResource(R.string.reminder_ordinal_fourth_lower)
+        5 -> stringResource(R.string.reminder_ordinal_last_lower)
+        else -> stringResource(R.string.reminder_ordinal_first_lower)
     }
 
+@Composable
 private fun weekdayFullName(weekday: Int): String =
     when (weekday) {
-        Calendar.SUNDAY -> "Sunday"
-        Calendar.MONDAY -> "Monday"
-        Calendar.TUESDAY -> "Tuesday"
-        Calendar.WEDNESDAY -> "Wednesday"
-        Calendar.THURSDAY -> "Thursday"
-        Calendar.FRIDAY -> "Friday"
-        Calendar.SATURDAY -> "Saturday"
+        Calendar.SUNDAY -> stringResource(R.string.reminder_weekday_sunday)
+        Calendar.MONDAY -> stringResource(R.string.reminder_weekday_monday)
+        Calendar.TUESDAY -> stringResource(R.string.reminder_weekday_tuesday)
+        Calendar.WEDNESDAY -> stringResource(R.string.reminder_weekday_wednesday)
+        Calendar.THURSDAY -> stringResource(R.string.reminder_weekday_thursday)
+        Calendar.FRIDAY -> stringResource(R.string.reminder_weekday_friday)
+        Calendar.SATURDAY -> stringResource(R.string.reminder_weekday_saturday)
         else -> ""
     }
 
+@Composable
 private fun weekdayShort(weekday: Int): String =
     when (weekday) {
-        Calendar.SUNDAY -> "Sun"
-        Calendar.MONDAY -> "Mon"
-        Calendar.TUESDAY -> "Tue"
-        Calendar.WEDNESDAY -> "Wed"
-        Calendar.THURSDAY -> "Thu"
-        Calendar.FRIDAY -> "Fri"
-        Calendar.SATURDAY -> "Sat"
+        Calendar.SUNDAY -> stringResource(R.string.reminder_weekday_sunday_short)
+        Calendar.MONDAY -> stringResource(R.string.reminder_weekday_monday_short)
+        Calendar.TUESDAY -> stringResource(R.string.reminder_weekday_tuesday_short)
+        Calendar.WEDNESDAY -> stringResource(R.string.reminder_weekday_wednesday_short)
+        Calendar.THURSDAY -> stringResource(R.string.reminder_weekday_thursday_short)
+        Calendar.FRIDAY -> stringResource(R.string.reminder_weekday_friday_short)
+        Calendar.SATURDAY -> stringResource(R.string.reminder_weekday_saturday_short)
         else -> ""
     }
 
@@ -1370,6 +1430,7 @@ private fun formatDate(millis: Long): String {
     return LocalDatePillFormatterCache.get(Locale.getDefault()).format(localDate)
 }
 
+@Composable
 private fun repeatSummary(
     unit: RecurrenceUnit,
     interval: Int,
@@ -1385,34 +1446,63 @@ private fun repeatSummary(
     val every =
         if (interval == 1) {
             when (unit) {
-                RecurrenceUnit.DAY -> "Daily"
-                RecurrenceUnit.WEEK -> "Weekly"
-                RecurrenceUnit.MONTH -> "Monthly"
-                RecurrenceUnit.YEAR -> "Yearly"
+                RecurrenceUnit.DAY -> stringResource(R.string.reminder_recurrence_daily)
+                RecurrenceUnit.WEEK -> stringResource(R.string.reminder_recurrence_weekly)
+                RecurrenceUnit.MONTH -> stringResource(R.string.reminder_recurrence_monthly)
+                RecurrenceUnit.YEAR -> stringResource(R.string.reminder_recurrence_yearly)
             }
         } else {
-            "Every $interval ${unitLabel(unit).lowercase()}s"
+            pluralStringResource(
+                when (unit) {
+                    RecurrenceUnit.DAY -> R.plurals.reminder_recurrence_every_days
+                    RecurrenceUnit.WEEK -> R.plurals.reminder_recurrence_every_weeks
+                    RecurrenceUnit.MONTH -> R.plurals.reminder_recurrence_every_months
+                    RecurrenceUnit.YEAR -> R.plurals.reminder_recurrence_every_years
+                },
+                interval,
+                interval,
+            )
         }
     val detail =
         when (unit) {
             RecurrenceUnit.WEEK ->
                 if (daysOfWeek.size in 1..6) {
-                    " on " + daysOfWeek.sorted().joinToString(", ") { weekdayShort(it) }
+                    val weekdayNames = StringBuilder()
+                    daysOfWeek.sorted().forEach { weekday ->
+                        if (weekdayNames.isNotEmpty()) {
+                            weekdayNames.append(", ")
+                        }
+                        weekdayNames.append(weekdayShort(weekday))
+                    }
+                    stringResource(
+                        R.string.reminder_recurrence_on_weekdays,
+                        weekdayNames.toString(),
+                    )
                 } else {
                     ""
                 }
             RecurrenceUnit.MONTH ->
                 when (monthlyKind) {
-                    MonthlyKind.BY_DAY -> " on day $dayOfMonth"
-                    MonthlyKind.BY_WEEKDAY -> " on the ${ordinalWord(nthOrdinal)} ${weekdayShort(nthWeekday)}"
+                    MonthlyKind.BY_DAY -> stringResource(R.string.reminder_recurrence_on_day, dayOfMonth)
+                    MonthlyKind.BY_WEEKDAY ->
+                        stringResource(
+                            R.string.reminder_recurrence_on_ordinal_weekday,
+                            ordinalWord(nthOrdinal),
+                            weekdayShort(nthWeekday),
+                        )
                 }
             else -> ""
         }
     val ending =
         when (endKind) {
             RecurrenceEndKind.NEVER -> ""
-            RecurrenceEndKind.ON_DATE -> endDate?.let { " until ${formatDate(it)}" }.orEmpty()
-            RecurrenceEndKind.AFTER_COUNT -> endCount?.let { " for $it times" }.orEmpty()
+            RecurrenceEndKind.ON_DATE ->
+                endDate?.let { date -> stringResource(R.string.reminder_recurrence_until, formatDate(date)) }.orEmpty()
+            RecurrenceEndKind.AFTER_COUNT ->
+                endCount
+                    ?.let { count ->
+                        pluralStringResource(R.plurals.reminder_recurrence_for_times, count, count)
+                    }.orEmpty()
         }
-    return every + detail + ending
+    return listOf(every, detail, ending).filter { part -> part.isNotEmpty() }.joinToString(" ")
 }

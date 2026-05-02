@@ -1,6 +1,15 @@
 package dev.bikram.remember.ui.home
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,6 +46,7 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
@@ -44,8 +54,95 @@ import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.NoteCardUiModel
+import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+
+/**
+ * Top-bar title that doubles as the search entry point. Renders a single Row of:
+ *
+ *   [animated content area (weight 1)] [search/close icon button]
+ *
+ * The animated content area swaps between the app-name title and [InlineSearchField]
+ * with `expandHorizontally(expandFrom = Alignment.End)`, so the search bar emerges
+ * from the right edge of the slot - which sits immediately to the left of the toggle
+ * button. Visually the bar appears to grow out of the button's left edge, instead of
+ * sliding in from the title's start (the previous setup placed the toggle button in
+ * the LargeTopAppBar's `actions` slot, which made the expansion anchor sit in the
+ * middle of the row, disconnected from where the user just tapped).
+ *
+ * Intended call site: the LargeTopAppBar's `title` slot. The `actions` slot is left
+ * for selection-mode chrome only.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun SearchableTopBarTitle(
+    searchOpen: Boolean,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onToggleSearch: () -> Unit,
+) {
+    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
+    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val scaleIconSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AnimatedContent(
+            targetState = searchOpen,
+            modifier = Modifier.weight(1f),
+            transitionSpec = {
+                val enter =
+                    fadeIn(fadeInSpec) +
+                        expandHorizontally(spatialSpec, expandFrom = Alignment.End)
+                val exit =
+                    fadeOut(fadeOutSpec) +
+                        shrinkHorizontally(spatialSpec, shrinkTowards = Alignment.End)
+                (enter togetherWith exit).using(SizeTransform(clip = false))
+            },
+            label = "topBarTitleSearchExpand",
+        ) { open ->
+            if (open) {
+                InlineSearchField(query = query, onQueryChange = onQueryChange)
+            } else {
+                Text(
+                    text = stringResource(R.string.app_name),
+                    style = MaterialTheme.typography.headlineLargeEmphasized,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
+        }
+        // Toggle button stays in place at the End. The icon morphs between search and
+        // close, scoped inside its own AnimatedContent so the rest of the row's
+        // expansion animation isn't gated on the icon swap.
+        val cdCloseSearch = stringResource(R.string.cd_close_search)
+        val cdSearch = stringResource(R.string.cd_search)
+        RememberFilledTonalIconButton(onClick = onToggleSearch) {
+            AnimatedContent(
+                targetState = searchOpen,
+                transitionSpec = {
+                    (scaleIn(scaleIconSpec) + fadeIn(fadeInSpec)) togetherWith
+                        (scaleOut(scaleIconSpec) + fadeOut(fadeOutSpec))
+                },
+                label = "searchIconSwap",
+            ) { open ->
+                RememberMaterialRoundedSymbol(
+                    name = if (open) "close" else "search",
+                    weight = FontWeight.Medium,
+                    modifier =
+                        Modifier.semantics {
+                            contentDescription = if (open) cdCloseSearch else cdSearch
+                        },
+                )
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+    }
+}
 
 @Composable
 internal fun InlineSearchField(
@@ -66,6 +163,7 @@ internal fun InlineSearchField(
         focusRequester.requestFocus()
         keyboardController?.show()
     }
+    val searchContentDescription = stringResource(R.string.cd_search)
     Row(
         modifier =
             Modifier
@@ -99,7 +197,10 @@ internal fun InlineSearchField(
             modifier =
                 Modifier
                     .weight(1f)
-                    .focusRequester(focusRequester),
+                    .focusRequester(focusRequester)
+                    .semantics {
+                        contentDescription = searchContentDescription
+                    },
             decorationBox = { innerTextField ->
                 if (searchFieldValue.text.isEmpty()) {
                     Text(
@@ -219,6 +320,7 @@ internal fun SearchSectionPillDivider(
 @Composable
 internal fun StateBadgedNoteCard(
     note: NoteWithItems,
+    model: NoteCardUiModel,
     interaction: InteractionState,
     onOpen: (NoteWithItems) -> Unit,
     onSwipeAction: (NoteWithItems, NoteSwipeAction) -> Unit,
@@ -240,6 +342,7 @@ internal fun StateBadgedNoteCard(
         Box(modifier = Modifier.graphicsLayer { alpha = 0.88f }) {
             SwipeableRememberNoteCard(
                 note = note,
+                model = model,
                 interaction = interaction,
                 onOpenNote = onOpen,
                 onSwipeAction = onSwipeAction,

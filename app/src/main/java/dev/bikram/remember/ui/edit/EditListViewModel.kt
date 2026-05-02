@@ -664,6 +664,7 @@ class EditListViewModel
                 val id = loadedId ?: return@withLock
                 repository.unarchiveNote(id)
                 _archived.value = false
+                _trashed.value = false
                 dirty = false
             }
         }
@@ -673,6 +674,7 @@ class EditListViewModel
                 val id = loadedId ?: return@withLock
                 repository.restoreFromTrash(id)
                 _trashed.value = false
+                _archived.value = false
                 dirty = false
             }
         }

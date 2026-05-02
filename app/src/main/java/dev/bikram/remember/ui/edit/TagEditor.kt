@@ -1,4 +1,6 @@
 package dev.bikram.remember.ui.edit
+
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -20,12 +22,17 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -38,11 +45,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.data.normalizeHex
+import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
@@ -56,7 +65,7 @@ import dev.bikram.remember.ui.tags.LocalTagColors
 private val FieldHeight = 40.dp
 private val SwatchGap = 8.dp
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun TagEditorSheet(
     initial: List<String>,
@@ -66,11 +75,15 @@ fun TagEditorSheet(
     onDismiss: () -> Unit,
 ) {
     var tags by rememberSaveable { mutableStateOf(initial) }
+    var knownTagOptions by rememberSaveable { mutableStateOf((availableTags + initial).distinctByNormalizedName()) }
+    var pendingAddTags by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var pendingRemoveTags by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    var showUnsavedChangesDialog by rememberSaveable { mutableStateOf(false) }
     var draftName by rememberSaveable { mutableStateOf("") }
     val firstHex = paletteHex(TagPalette.presets[0])
     var hexInput by rememberSaveable { mutableStateOf(firstHex) }
     var lastValidHex by rememberSaveable { mutableStateOf(firstHex) }
-    val newColors by rememberSaveable { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var localColors by rememberSaveable { mutableStateOf<Map<String, String>>(emptyMap()) }
     var editMode by rememberSaveable { mutableStateOf(false) }
     var editingTag by rememberSaveable { mutableStateOf<String?>(null) }
     val tagColorMap = LocalTagColors.current
@@ -81,14 +94,46 @@ fun TagEditorSheet(
     val hexSwatchShape = MaterialTheme.shapes.extraSmall
 
     fun hexForTag(tag: String): String {
-        val key = tag.trim().lowercase()
-        return tagColorMap[key] ?: paletteHex(TagPalette.defaultFor(key))
+        val key = normalizeTagName(tag)
+        val localHex =
+            localColors.entries
+                .firstOrNull { colorEntry ->
+                    normalizeTagName(colorEntry.key) == key
+                }?.value
+        return localHex ?: tagColorMap[key] ?: paletteHex(TagPalette.defaultFor(key))
     }
 
-    fun toggleByDisplay(displayTag: String) {
-        val trim = displayTag.trim()
-        val existing = tags.firstOrNull { it.equals(trim, ignoreCase = true) }
-        tags = if (existing != null) tags - existing else tags + trim
+    fun removeTagByName(
+        sourceTags: List<String>,
+        tag: String,
+    ): List<String> = sourceTags.filterNot { sourceTag -> sourceTag.equals(tag, ignoreCase = true) }
+
+    fun addTagByName(
+        sourceTags: List<String>,
+        tag: String,
+    ): List<String> {
+        if (sourceTags.any { sourceTag -> sourceTag.equals(tag, ignoreCase = true) }) {
+            return sourceTags
+        }
+        return sourceTags + tag
+    }
+
+    fun togglePendingAdd(tag: String) {
+        pendingAddTags =
+            if (pendingAddTags.any { pendingTag -> pendingTag.equals(tag, ignoreCase = true) }) {
+                removeTagByName(pendingAddTags, tag)
+            } else {
+                addTagByName(pendingAddTags, tag)
+            }
+    }
+
+    fun togglePendingRemoval(tag: String) {
+        pendingRemoveTags =
+            if (pendingRemoveTags.any { pendingTag -> pendingTag.equals(tag, ignoreCase = true) }) {
+                removeTagByName(pendingRemoveTags, tag)
+            } else {
+                addTagByName(pendingRemoveTags, tag)
+            }
     }
 
     fun clearEditSelection() {
@@ -111,32 +156,76 @@ fun TagEditorSheet(
     fun commitOnSave() {
         val trimmed = trimmedDraft
         val tagBeingEdited = editingTag
-        if (editMode && tagBeingEdited != null && trimmed.isNotBlank()) {
-            onEditExistingTag(tagBeingEdited, trimmed, chosenHex, false)
+        val editDirty =
+            editMode &&
+                tagBeingEdited != null &&
+                trimmed.isNotBlank() &&
+                (
+                    !tagBeingEdited.equals(trimmed, ignoreCase = true) ||
+                        !hexForTag(tagBeingEdited).equals(chosenHex, ignoreCase = true)
+                )
+        val draftTagMatch = knownTagOptions.firstOrNull { tag -> tag.equals(trimmed, ignoreCase = true) }
+        val colorsToSave = mutableMapOf<String, String>()
+
+        if (editDirty) {
+            val editedTag = tagBeingEdited
+            onEditExistingTag(editedTag, trimmed, chosenHex, false)
+            localColors =
+                localColors
+                    .filterKeys { tagName -> !tagName.equals(editedTag, ignoreCase = true) }
+                    .plus(trimmed to chosenHex)
             tags =
                 tags
                     .map { tag ->
-                        if (tag.equals(tagBeingEdited, ignoreCase = true)) trimmed else tag
+                        if (tag.equals(editedTag, ignoreCase = true)) trimmed else tag
                     }.distinctBy { tag -> tag.lowercase() }
-            clearEditSelection()
-            return
+            knownTagOptions =
+                knownTagOptions
+                    .map { tag ->
+                        if (tag.equals(editedTag, ignoreCase = true)) trimmed else tag
+                    }.distinctByNormalizedName()
+            pendingAddTags =
+                pendingAddTags
+                    .map { tag ->
+                        if (tag.equals(editedTag, ignoreCase = true)) trimmed else tag
+                    }.distinctByNormalizedName()
+            pendingRemoveTags =
+                pendingRemoveTags
+                    .map { tag ->
+                        if (tag.equals(editedTag, ignoreCase = true)) trimmed else tag
+                    }.distinctByNormalizedName()
         }
-        val finalTags: List<String>
-        val finalColors: Map<String, String>
-        if (trimmed.isNotBlank() && tags.none { it.equals(trimmed, ignoreCase = true) }) {
-            finalTags = tags + trimmed
-            finalColors = newColors + (trimmed to chosenHex)
-        } else {
-            finalTags = tags
-            finalColors = newColors
+
+        var finalTags =
+            tags.filterNot { tag ->
+                pendingRemoveTags.any { pendingTag -> pendingTag.equals(tag, ignoreCase = true) }
+            }
+        pendingAddTags.forEach { tag ->
+            finalTags = addTagByName(finalTags, tag)
         }
-        onConfirm(finalTags, finalColors)
+
+        if (!editMode && trimmed.isNotBlank()) {
+            val tagToAssign = draftTagMatch ?: trimmed
+            finalTags = addTagByName(finalTags, tagToAssign)
+            if (draftTagMatch == null) {
+                colorsToSave[tagToAssign] = chosenHex
+                localColors = localColors + (tagToAssign to chosenHex)
+                knownTagOptions = addTagByName(knownTagOptions, tagToAssign)
+            }
+        }
+        finalTags = finalTags.distinctByNormalizedName()
+        tags = finalTags
+        knownTagOptions = (knownTagOptions + finalTags).distinctByNormalizedName()
+        pendingAddTags = emptyList()
+        pendingRemoveTags = emptyList()
+        clearEditSelection()
+        onConfirm(finalTags, colorsToSave)
     }
 
-    val suggestions: List<String> =
+    val allTags: List<String> =
         run {
             val seen = LinkedHashMap<String, String>()
-            (availableTags + tags + newColors.keys).forEach { raw ->
+            (knownTagOptions + availableTags + tags + localColors.keys).forEach { raw ->
                 val trim = raw.trim()
                 if (trim.isBlank()) return@forEach
                 val key = trim.lowercase()
@@ -144,23 +233,67 @@ fun TagEditorSheet(
             }
             seen.values.sortedBy { it.lowercase() }
         }
+    val assignedTags = tags.distinctByNormalizedName()
+    val availableDisplayTags =
+        allTags.filterNot { tag ->
+            assignedTags.any { assignedTag -> assignedTag.equals(tag, ignoreCase = true) }
+        }
+    val pendingTagChanges = pendingAddTags.isNotEmpty() || pendingRemoveTags.isNotEmpty()
+    val editDirty =
+        editMode &&
+            editingTag != null &&
+            trimmedDraft.isNotBlank() &&
+            (
+                !editingTag.equals(trimmedDraft, ignoreCase = true) ||
+                    !hexForTag(editingTag.orEmpty()).equals(chosenHex, ignoreCase = true)
+            )
+    val draftDirty = !editMode && trimmedDraft.isNotBlank()
+    val sheetDirty = pendingTagChanges || editDirty || draftDirty
+    val currentSheetDirty = rememberUpdatedState(sheetDirty)
+    val sheetState =
+        rememberModalBottomSheetState(
+            skipPartiallyExpanded = true,
+            confirmValueChange =
+                remember {
+                    { sheetValue ->
+                        if (sheetValue == SheetValue.Hidden && currentSheetDirty.value) {
+                            showUnsavedChangesDialog = true
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                },
+        )
 
     val draftIsDuplicate =
-        trimmedDraft.isNotBlank() &&
-            suggestions.any { tag ->
+        editMode &&
+            trimmedDraft.isNotBlank() &&
+            allTags.any { tag ->
                 tag.equals(trimmedDraft, ignoreCase = true) &&
                     !tag.equals(editingTag.orEmpty(), ignoreCase = true)
             }
-    val canSave =
-        if (editMode) {
-            editingTag != null && trimmedDraft.isNotBlank() && !draftIsDuplicate
-        } else {
-            true
-        }
+    val primaryIsSave = sheetDirty
+    val canSave = !draftIsDuplicate && (!editMode || !draftDirty || editingTag != null)
 
     AppBottomSheet(
         title = stringResource(R.string.options_tags),
-        onDismiss = onDismiss,
+        subtitle =
+            stringResource(
+                if (editMode) {
+                    R.string.tag_editor_edit_mode_hint
+                } else {
+                    R.string.tag_editor_assign_mode_hint
+                },
+            ),
+        onDismiss = {
+            if (sheetDirty) {
+                showUnsavedChangesDialog = true
+            } else {
+                onDismiss()
+            }
+        },
+        sheetState = sheetState,
         titleActions = {
             val editTagsCd = stringResource(R.string.tag_editor_edit_mode_cd)
             RememberIconButton(
@@ -181,43 +314,80 @@ fun TagEditorSheet(
         actions = null,
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
     ) {
-        if (suggestions.isNotEmpty()) {
-            Text(
-                text =
-                    stringResource(
+        TagEditorSection(
+            heading = stringResource(R.string.tag_editor_assigned_heading),
+            emptyText = stringResource(R.string.tag_editor_no_assigned_tags),
+            tags = assignedTags,
+        ) { tag ->
+            val pendingRemoval = pendingRemoveTags.any { pendingTag -> pendingTag.equals(tag, ignoreCase = true) }
+            val selectedForEditing = editingTag?.equals(tag, ignoreCase = true) == true
+            if (pendingRemoval) {
+                TagSheetIntentChip(
+                    tag = tag,
+                    color = parseHexColor(hexForTag(tag)) ?: TagPalette.defaultFor(tag),
+                    intent = TagSheetChipIntent.REMOVE,
+                    onClick = {
                         if (editMode) {
-                            R.string.tag_editor_edit_mode_hint
+                            selectForEditing(tag)
                         } else {
-                            R.string.tag_editor_suggested_heading
-                        },
-                    ),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 10.dp),
-            )
-            FlowRow(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .wrapContentHeight(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                suggestions.forEach { tag ->
-                    val selected = tags.any { it.equals(tag, ignoreCase = true) }
-                    val selectedForEditing = editingTag?.equals(tag, ignoreCase = true) == true
-                    TagChipFilled(
-                        tag = tag,
-                        faded = !editMode && !selected,
-                        highlighted = editMode && selectedForEditing,
-                        onClick = {
-                            if (editMode) selectForEditing(tag) else toggleByDisplay(tag)
-                        },
-                    )
-                }
+                            togglePendingRemoval(tag)
+                        }
+                    },
+                )
+            } else {
+                TagChipFilled(
+                    tag = tag,
+                    highlighted = editMode && selectedForEditing,
+                    onClick = {
+                        if (editMode) {
+                            selectForEditing(tag)
+                        } else {
+                            togglePendingRemoval(tag)
+                        }
+                    },
+                )
             }
-            Spacer(Modifier.height(20.dp))
         }
+
+        Spacer(Modifier.height(16.dp))
+
+        TagEditorSection(
+            heading = stringResource(R.string.tag_editor_available_heading),
+            emptyText = stringResource(R.string.tag_editor_no_available_tags),
+            tags = availableDisplayTags,
+        ) { tag ->
+            val pendingAdd = pendingAddTags.any { pendingTag -> pendingTag.equals(tag, ignoreCase = true) }
+            val selectedForEditing = editingTag?.equals(tag, ignoreCase = true) == true
+            if (pendingAdd) {
+                TagSheetIntentChip(
+                    tag = tag,
+                    color = parseHexColor(hexForTag(tag)) ?: TagPalette.defaultFor(tag),
+                    intent = TagSheetChipIntent.ADD,
+                    onClick = {
+                        if (editMode) {
+                            selectForEditing(tag)
+                        } else {
+                            togglePendingAdd(tag)
+                        }
+                    },
+                )
+            } else {
+                TagChipFilled(
+                    tag = tag,
+                    faded = !editMode,
+                    highlighted = editMode && selectedForEditing,
+                    onClick = {
+                        if (editMode) {
+                            selectForEditing(tag)
+                        } else {
+                            togglePendingAdd(tag)
+                        }
+                    },
+                )
+            }
+        }
+
+        Spacer(Modifier.height(20.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -227,7 +397,7 @@ fun TagEditorSheet(
             CompactOutlinedField(
                 value = draftName,
                 onValueChange = { draftName = it.filter { ch -> ch != '\n' } },
-                placeholder = stringResource(R.string.tag_editor_field_placeholder),
+                placeholder = stringResource(R.string.tag_editor_create_placeholder),
                 modifier = Modifier.weight(1f),
             )
             Box(
@@ -310,26 +480,184 @@ fun TagEditorSheet(
                 },
             )
             Spacer(Modifier.weight(1f))
-            RememberTextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.common_cancel))
+            if (primaryIsSave) {
+                RememberTextButton(onClick = { showUnsavedChangesDialog = true }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+                Spacer(Modifier.size(8.dp))
             }
-            Spacer(Modifier.size(8.dp))
             RememberButton(
-                onClick = { commitOnSave() },
+                onClick = {
+                    if (primaryIsSave) {
+                        commitOnSave()
+                    } else {
+                        onDismiss()
+                    }
+                },
                 enabled = canSave,
             ) {
                 Text(
                     stringResource(
-                        if (editMode) {
-                            R.string.tag_editor_update_tag
-                        } else {
+                        if (primaryIsSave) {
                             R.string.common_save
+                        } else {
+                            R.string.common_done
                         },
                     ),
                 )
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
+
+    if (showUnsavedChangesDialog) {
+        AlertDialog(
+            onDismissRequest = { showUnsavedChangesDialog = false },
+            title = { Text(stringResource(R.string.tag_editor_unsaved_title)) },
+            text = { Text(stringResource(R.string.tag_editor_unsaved_body)) },
+            confirmButton = {
+                RememberButton(
+                    onClick = {
+                        showUnsavedChangesDialog = false
+                        onDismiss()
+                    },
+                ) {
+                    Text(stringResource(R.string.tag_editor_unsaved_discard))
+                }
+            },
+            dismissButton = {
+                RememberTextButton(onClick = { showUnsavedChangesDialog = false }) {
+                    Text(stringResource(R.string.tag_editor_unsaved_keep_editing))
+                }
+            },
+        )
+    }
+}
+
+private fun List<String>.distinctByNormalizedName(): List<String> {
+    val seenNames = LinkedHashSet<String>()
+    return buildList {
+        this@distinctByNormalizedName.forEach { tag ->
+            val trimmedTag = tag.trim()
+            if (trimmedTag.isBlank()) return@forEach
+            if (seenNames.add(normalizeTagName(trimmedTag))) {
+                add(trimmedTag)
+            }
+        }
+    }
+}
+
+@Composable
+private fun TagEditorSection(
+    heading: String,
+    emptyText: String,
+    tags: List<String>,
+    chip: @Composable (String) -> Unit,
+) {
+    Text(
+        text = heading,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 10.dp),
+    )
+    if (tags.isEmpty()) {
+        Text(
+            text = emptyText,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+            modifier = Modifier.padding(bottom = 2.dp),
+        )
+        return
+    }
+    FlowRow(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        tags.forEach { tag -> chip(tag) }
+    }
+}
+
+private enum class TagSheetChipIntent {
+    ADD,
+    REMOVE,
+}
+
+@Composable
+private fun TagSheetIntentChip(
+    tag: String,
+    color: Color,
+    intent: TagSheetChipIntent,
+    onClick: () -> Unit,
+) {
+    val contentColor = TagPalette.textOn(color)
+    val containerColor: Color
+    val textColor: Color
+    val iconColor: Color
+    val borderStroke: BorderStroke?
+    val textDecoration: TextDecoration
+    val leadingIcon: String
+    val textWeight: FontWeight
+    when (intent) {
+        TagSheetChipIntent.ADD -> {
+            containerColor = color
+            textColor = contentColor
+            iconColor = contentColor
+            borderStroke = null
+            textDecoration = TextDecoration.None
+            leadingIcon = "add"
+            textWeight = FontWeight.SemiBold
+        }
+        TagSheetChipIntent.REMOVE -> {
+            containerColor = Color.Transparent
+            textColor = color
+            iconColor = color
+            borderStroke = BorderStroke(2.dp, color)
+            textDecoration = TextDecoration.LineThrough
+            leadingIcon = "close"
+            textWeight = FontWeight.Medium
+        }
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        modifier =
+            Modifier
+                .clip(CircleShape)
+                .background(containerColor)
+                .let { baseModifier ->
+                    if (borderStroke != null) {
+                        baseModifier.border(
+                            width = borderStroke.width,
+                            brush = borderStroke.brush,
+                            shape = CircleShape,
+                        )
+                    } else {
+                        baseModifier
+                    }
+                }.tapSoundClickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = leadingIcon,
+            size = 14.dp,
+            tint = iconColor,
+            weight = FontWeight.Medium,
+        )
+        Text(
+            text = tag,
+            style =
+                MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = textWeight,
+                    textDecoration = textDecoration,
+                ),
+            color = textColor,
+            maxLines = 1,
+        )
     }
 }
 

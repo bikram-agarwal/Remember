@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.edit
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -20,6 +21,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -34,6 +38,7 @@ import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
+import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberTextButton
@@ -65,6 +70,10 @@ fun OptionsPanel(
     // suppressed. Every OTHER row already no-ops through its caller-provided `onOpen*` lambda
     // when read-only, but Importance owns its own sheet so the gate has to live here.
     readOnly: Boolean = false,
+    // Mirrors the favorited-card visual treatment from the Home/History grid: a subtle pink
+    // wash on the panel surface plus a tilted watermark heart at the top-end. Keeps the
+    // "loved" cue consistent when the user opens a favorited note or list into the editor.
+    favorite: Boolean = false,
 ) {
     var importanceOpen by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
@@ -84,100 +93,130 @@ fun OptionsPanel(
             )
         }
 
+    val baseContainerColor = MaterialTheme.colorScheme.surfaceContainer
+    // Same recipe as NoteCard: blend ~7% of the favorite-pink swatch into the panel's
+    // surface tint when the open note/list is favorited. Non-favorite is a no-op.
+    val tintedContainerColor =
+        if (favorite) {
+            lerp(baseContainerColor, Color(0xFFFF9EBC), 0.07f)
+        } else {
+            baseContainerColor
+        }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.largeIncreased,
-        color = MaterialTheme.colorScheme.surfaceContainer,
+        color = tintedContainerColor,
         tonalElevation = 1.dp,
         shadowElevation = 0.dp,
     ) {
-        Column(
-            modifier = Modifier.padding(vertical = 8.dp),
-        ) {
-            OptionRow(
-                symbolName = "emoji_symbols",
-                title = stringResource(R.string.options_icon),
-                summary =
-                    iconLabelFor(iconKey)
-                        ?: stringResource(
-                            if (isChecklist) {
-                                R.string.options_icon_default_checklist
-                            } else {
-                                R.string.options_icon_default_note
+        Box(modifier = Modifier.fillMaxWidth()) {
+            // Watermark heart for favorited cards, mirrored from NoteCard. Tilted ~-15deg
+            // and very low alpha so it reads as a soft "loved" cue without competing with
+            // the option rows. Sits behind the Column so taps still land on rows.
+            if (favorite) {
+                RememberMaterialRoundedSymbol(
+                    name = "favorite",
+                    filled = true,
+                    size = 96.dp,
+                    tint = Color(0xFFFF9EBC),
+                    weight = FontWeight.Bold,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .graphicsLayer {
+                                rotationZ = -15f
+                                alpha = 0.13f
                             },
-                        ),
-                onClick = onOpenIcon,
-            )
-            OptionRow(
-                symbolName = "label",
-                title = stringResource(R.string.options_tags),
-                summary = if (tags.isEmpty()) "None" else "",
-                onClick = onOpenTags,
-                summaryContent =
-                    if (tags.isEmpty()) {
-                        null
-                    } else {
-                        { TagPillsRow(tags = tags) }
-                    },
-            )
-            OptionRow(
-                symbolName = "alarm",
-                title = stringResource(R.string.options_reminder),
-                summary = reminderSummary(reminderAt, recurrence),
-                onClick = onOpenReminder,
-            )
-            OptionRow(
-                symbolName = actions.firstOrNull()?.type?.materialSymbolName() ?: "bolt",
-                title = stringResource(R.string.options_actions),
-                summary = actionsSummary(actions),
-                onClick = onOpenActions,
-            )
-            OptionRow(
-                symbolName = "priority_high",
-                title = stringResource(R.string.options_importance),
-                summary = importance.label(),
-                // On archived / trashed shelves we keep the row visible (users should still
-                // see "this note was High importance") but make it inert. Passing null to
-                // OptionRow drops the clickable modifier entirely so there's no ripple.
-                onClick = if (readOnly) null else ({ importanceOpen = true }),
-            )
-            OptionRow(
-                symbolName = "add_a_photo",
-                title = stringResource(R.string.options_picture),
-                summary =
-                    if (pictureUri == null) {
-                        stringResource(R.string.options_picture_none)
-                    } else {
-                        stringResource(R.string.options_picture_attached)
-                    },
-                onClick = onOpenPicture,
-                summaryContent =
-                    if (pictureUri == null) {
-                        null
-                    } else {
-                        {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(
-                                    stringResource(R.string.options_picture_attached),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                MediaStorageChip(
-                                    storedInApp = AppMediaStorage.isAppStoredMediaUri(context, pictureUri),
-                                )
+                )
+            }
+            Column(
+                modifier = Modifier.padding(vertical = 8.dp),
+            ) {
+                OptionRow(
+                    symbolName = "emoji_symbols",
+                    title = stringResource(R.string.options_icon),
+                    summary =
+                        iconLabelFor(iconKey)
+                            ?: stringResource(
+                                if (isChecklist) {
+                                    R.string.options_icon_default_checklist
+                                } else {
+                                    R.string.options_icon_default_note
+                                },
+                            ),
+                    onClick = onOpenIcon,
+                )
+                OptionRow(
+                    symbolName = "label",
+                    title = stringResource(R.string.options_tags),
+                    summary = if (tags.isEmpty()) stringResource(R.string.common_none) else "",
+                    onClick = onOpenTags,
+                    summaryContent =
+                        if (tags.isEmpty()) {
+                            null
+                        } else {
+                            { TagPillsRow(tags = tags) }
+                        },
+                )
+                OptionRow(
+                    symbolName = "alarm",
+                    title = stringResource(R.string.options_reminder),
+                    summary = reminderSummary(reminderAt, recurrence),
+                    onClick = onOpenReminder,
+                )
+                OptionRow(
+                    symbolName = actions.firstOrNull()?.type?.materialSymbolName() ?: "bolt",
+                    title = stringResource(R.string.options_actions),
+                    summary = actionsSummary(actions),
+                    onClick = onOpenActions,
+                )
+                OptionRow(
+                    symbolName = "priority_high",
+                    title = stringResource(R.string.options_importance),
+                    summary = importance.label(),
+                    // On archived / trashed shelves we keep the row visible (users should still
+                    // see "this note was High importance") but make it inert. Passing null to
+                    // OptionRow drops the clickable modifier entirely so there's no ripple.
+                    onClick = if (readOnly) null else ({ importanceOpen = true }),
+                )
+                OptionRow(
+                    symbolName = "add_a_photo",
+                    title = stringResource(R.string.options_picture),
+                    summary =
+                        if (pictureUri == null) {
+                            stringResource(R.string.options_picture_none)
+                        } else {
+                            stringResource(R.string.options_picture_attached)
+                        },
+                    onClick = onOpenPicture,
+                    summaryContent =
+                        if (pictureUri == null) {
+                            null
+                        } else {
+                            {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        stringResource(R.string.options_picture_attached),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    MediaStorageChip(
+                                        storedInApp = AppMediaStorage.isAppStoredMediaUri(context, pictureUri),
+                                    )
+                                }
                             }
-                        }
-                    },
-            )
-            OptionRow(
-                symbolName = "attach_file",
-                title = stringResource(R.string.options_attachments),
-                summary = attachmentSummary,
-                onClick = onOpenAttachments,
-            )
+                        },
+                )
+                OptionRow(
+                    symbolName = "attach_file",
+                    title = stringResource(R.string.options_attachments),
+                    summary = attachmentSummary,
+                    onClick = onOpenAttachments,
+                )
+            }
         }
     }
 
@@ -335,20 +374,16 @@ private fun <T> ChoiceSheet(
     }
 }
 
-private fun Importance.label(): String =
-    when (this) {
-        Importance.LOW -> "Low"
-        Importance.DEFAULT -> "Default"
-        Importance.HIGH -> "High"
-    }
+@Composable
+private fun Importance.label(): String = stringResource(labelRes())
 
+@Composable
 private fun reminderSummary(
     reminderAt: Long?,
     recurrence: RecurrenceRule?,
 ): String {
-    if (reminderAt == null) return "None"
-    val fmt = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
-    val datePart = fmt.format(Date(reminderAt))
+    if (reminderAt == null) return stringResource(R.string.common_none)
+    val datePart = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(reminderAt))
     val rule = recurrence?.sanitized() ?: return datePart
     val recurrenceLabel = compactRecurrenceLabel(rule)
     return if (recurrenceLabel.isEmpty()) datePart else "$datePart  |  $recurrenceLabel"
@@ -359,32 +394,39 @@ private fun reminderSummary(
  * the long-form summary the picker emits but keeps it to one or two words ("Daily",
  * "Every 3 weeks", "Monthly") so the pill stays compact.
  */
+@Composable
 private fun compactRecurrenceLabel(rule: RecurrenceRule): String {
     val interval = rule.interval.coerceAtLeast(1)
     return if (interval == 1) {
         when (rule.unit) {
-            RecurrenceUnit.DAY -> "Daily"
-            RecurrenceUnit.WEEK -> "Weekly"
-            RecurrenceUnit.MONTH -> "Monthly"
-            RecurrenceUnit.YEAR -> "Yearly"
+            RecurrenceUnit.DAY -> stringResource(R.string.reminder_recurrence_daily)
+            RecurrenceUnit.WEEK -> stringResource(R.string.reminder_recurrence_weekly)
+            RecurrenceUnit.MONTH -> stringResource(R.string.reminder_recurrence_monthly)
+            RecurrenceUnit.YEAR -> stringResource(R.string.reminder_recurrence_yearly)
         }
     } else {
-        val unitLower =
+        pluralStringResource(
             when (rule.unit) {
-                RecurrenceUnit.DAY -> "days"
-                RecurrenceUnit.WEEK -> "weeks"
-                RecurrenceUnit.MONTH -> "months"
-                RecurrenceUnit.YEAR -> "years"
-            }
-        "Every $interval $unitLower"
+                RecurrenceUnit.DAY -> R.plurals.reminder_recurrence_every_days
+                RecurrenceUnit.WEEK -> R.plurals.reminder_recurrence_every_weeks
+                RecurrenceUnit.MONTH -> R.plurals.reminder_recurrence_every_months
+                RecurrenceUnit.YEAR -> R.plurals.reminder_recurrence_every_years
+            },
+            interval,
+            interval,
+        )
     }
 }
 
+@Composable
 private fun actionsSummary(actions: List<NoteAction>): String =
     when (actions.size) {
-        0 -> "None"
-        1 -> actions[0].title.ifBlank { "1 action" }
-        else -> "${actions.size} actions"
+        0 -> stringResource(R.string.common_none)
+        1 ->
+            actions[0].title.ifBlank {
+                pluralStringResource(R.plurals.options_actions_count, 1, 1)
+            }
+        else -> pluralStringResource(R.plurals.options_actions_count, actions.size, actions.size)
     }
 
 @Composable
@@ -413,9 +455,9 @@ private fun attachmentStorageSummary(
     )
 }
 
+@Composable
 private fun attachmentsSummary(count: Int): String =
     when (count) {
-        0 -> "None"
-        1 -> "1 file"
-        else -> "$count files"
+        0 -> stringResource(R.string.common_none)
+        else -> pluralStringResource(R.plurals.options_attachments_file_count, count, count)
     }

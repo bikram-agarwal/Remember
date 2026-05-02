@@ -124,6 +124,22 @@ class InteractionPrefs(
         }
     }
 
+    suspend fun setSwipeRevealActions(
+        startToEndActions: List<NoteSwipeAction?>,
+        endToStartActions: List<NoteSwipeAction?>,
+    ) {
+        context.interactionDataStore.edit { mutable ->
+            val startToEnd = normalizedRevealSlots(startToEndActions)
+            val endToStart = normalizedRevealSlots(endToStartActions)
+            mutable[Keys.SWIPE_START_TO_END_REVEAL_1] = startToEnd[0]?.name.orEmpty()
+            mutable[Keys.SWIPE_START_TO_END_REVEAL_2] = startToEnd[1]?.name.orEmpty()
+            mutable[Keys.SWIPE_START_TO_END_REVEAL_3] = startToEnd[2]?.name.orEmpty()
+            mutable[Keys.SWIPE_END_TO_START_REVEAL_1] = endToStart[0]?.name.orEmpty()
+            mutable[Keys.SWIPE_END_TO_START_REVEAL_2] = endToStart[1]?.name.orEmpty()
+            mutable[Keys.SWIPE_END_TO_START_REVEAL_3] = endToStart[2]?.name.orEmpty()
+        }
+    }
+
     suspend fun exportForBackup(): JSONObject {
         val prefs = context.interactionDataStore.data.first()
         return JSONObject().apply {

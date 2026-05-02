@@ -288,6 +288,20 @@ class EditNoteViewModel
             markDirty()
         }
 
+        fun addTag(
+            value: String,
+            colorHex: String,
+        ) {
+            val cleaned = value.trim()
+            if (cleaned.isBlank() || cleaned == RememberReservedTags.FAVORITE) return
+            if (_tags.value.any { tag -> tag.equals(cleaned, ignoreCase = true) }) return
+            _tags.value = _tags.value + cleaned
+            markDirty()
+            viewModelScope.launch {
+                repository.tagRepository?.setTagColor(cleaned, colorHex)
+            }
+        }
+
         fun saveTagsWithColors(
             tags: List<String>,
             newColors: Map<String, String>,
@@ -530,11 +544,7 @@ class EditNoteViewModel
             }
         }
 
-        /**
-         * Flip the note to the archive shelf. Unlike [trashCurrent] this is not a destructive
-         * operation, so the edit screen stays open and drops into read-only mode via the
-         * [archived] state flow.
-         */
+        /** Flip the note to the archive shelf after saving any in-flight edits. */
         suspend fun archiveCurrent(untitledName: String) {
             // Persist any in-flight edits first so the archive snapshot matches what the user sees.
             saveIfNeeded(untitledName)
@@ -552,6 +562,7 @@ class EditNoteViewModel
                 val id = loadedId ?: return@withLock
                 repository.unarchiveNote(id)
                 _archived.value = false
+                _trashed.value = false
                 dirty = false
             }
         }
@@ -561,6 +572,21 @@ class EditNoteViewModel
                 val id = loadedId ?: return@withLock
                 repository.restoreFromTrash(id)
                 _trashed.value = false
+                _archived.value = false
+                dirty = false
+            }
+        }
+
+        /**
+         * Permanent delete of the current note. Called from the trashed-state action bar
+         * after the user confirms the AlertDialog in [EditNoteScreen]. Mirrors
+         * [EditListViewModel.deleteForeverCurrent]; without this method the call site
+         * was unresolved.
+         */
+        suspend fun deleteForeverCurrent() {
+            persistMutex.withLock {
+                val id = loadedId ?: return@withLock
+                repository.deleteForever(id)
                 dirty = false
             }
         }
@@ -580,13 +606,5 @@ class EditNoteViewModel
                     context.getString(dev.bikram.remember.R.string.notification_created),
                     android.widget.Toast.LENGTH_SHORT,
                 ).show()
-        }
-
-        suspend fun deleteForeverCurrent() {
-            persistMutex.withLock {
-                val id = loadedId ?: return@withLock
-                repository.deleteForever(id)
-                dirty = false
-            }
         }
     }

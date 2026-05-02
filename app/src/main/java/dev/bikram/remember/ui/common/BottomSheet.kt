@@ -33,6 +33,7 @@ fun AppBottomSheet(
     subtitle: String? = null,
     showTitleBar: Boolean = true,
     sheetState: SheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+    sheetGesturesEnabled: Boolean = true,
     scrollable: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
     subtitleSpacing: Dp = 6.dp,
@@ -43,6 +44,7 @@ fun AppBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
+        sheetGesturesEnabled = sheetGesturesEnabled,
     ) {
         RememberPredictiveBackHandler(onBack = onDismiss)
         Column(modifier = Modifier.navigationBarsPadding()) {

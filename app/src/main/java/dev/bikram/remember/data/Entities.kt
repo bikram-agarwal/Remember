@@ -1,7 +1,6 @@
 package dev.bikram.remember.data
 
 import androidx.annotation.StringRes
-import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Fts4
@@ -90,7 +89,7 @@ data class NoteEntity(
     val title: String,
     val body: String,
     val colorIndex: Int,
-    @ColumnInfo(name = "pinned") val favorite: Boolean,
+    val favorite: Boolean,
     val trashed: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
@@ -106,9 +105,9 @@ data class NoteEntity(
     val tags: List<String> = emptyList(),
     val recurrence: RecurrenceRule? = null,
     /**
-     * Distinct from [trashed]: archived notes are hidden from Home but remain searchable,
-     * never auto-deleted, and have no favorite state. Mutually exclusive with [trashed]:
-     * trashing an archived note clears its archive state, and vice versa.
+     * Distinct from [trashed]: archived notes are hidden from Home but remain searchable
+     * and never auto-deleted. State-changing actions keep archive and trash mutually
+     * exclusive; snackbar undo carries the previous shelf separately.
      */
     val archived: Boolean = false,
     /** Timestamp (epoch ms) when the row transitioned to [trashed] = true. Used for the 30-day auto-sweep. */

@@ -2,6 +2,8 @@ package dev.bikram.remember.ui.edit
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.runtime.Immutable
+import dev.bikram.remember.data.NoteKind
 import java.util.Locale
 
 /** Stored in note `iconKey`; payload is one emoji grapheme (keyboard / picker). */
@@ -43,6 +45,25 @@ data class IconCategory(
     @param:StringRes val nameRes: Int,
     val icons: List<IconChoice>,
 )
+
+@Immutable
+sealed class NoteIcon {
+    data class Symbol(
+        val name: String,
+    ) : NoteIcon()
+
+    data class Drawable(
+        @param:DrawableRes val resId: Int,
+    ) : NoteIcon()
+
+    data class Emoji(
+        val text: String,
+    ) : NoteIcon()
+
+    data object NotePlaceholder : NoteIcon()
+
+    data object ListPlaceholder : NoteIcon()
+}
 
 /** Deduplicate by [IconChoice.key] so the icon grid never sees duplicate lazy keys (scroll crash). */
 val iconCatalog: List<IconCategory> =
@@ -107,6 +128,32 @@ fun iconEmojiPayload(iconKey: String?): String? {
     val start = boundary.first()
     val end = boundary.next()
     return raw.substring(start, end).takeIf { it.isNotBlank() }
+}
+
+fun resolveNoteIcon(
+    iconKey: String?,
+    kind: NoteKind,
+): NoteIcon {
+    val normalized = normalizeIconKey(iconKey)
+    val emoji = iconEmojiPayload(normalized)
+    if (emoji != null) return NoteIcon.Emoji(emoji)
+
+    if (normalized?.startsWith(ICON_SYMBOL_PREFIX) == true) {
+        symbolNameByKey[normalized]?.let { symbolName ->
+            return NoteIcon.Symbol(symbolName)
+        }
+    }
+
+    normalized?.let { key ->
+        drawableResByKey[key]?.let { drawableRes ->
+            return NoteIcon.Drawable(drawableRes)
+        }
+    }
+
+    return when (kind) {
+        NoteKind.LIST -> NoteIcon.ListPlaceholder
+        NoteKind.NOTE -> NoteIcon.NotePlaceholder
+    }
 }
 
 fun humanizeIconKey(iconKey: String): String {
