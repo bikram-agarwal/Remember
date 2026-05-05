@@ -5,7 +5,6 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.os.Build
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -164,9 +163,7 @@ suspend fun copyUriIntoDownloads(
         ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, safeName)
             put(MediaStore.Downloads.MIME_TYPE, mimeType?.takeUnless { it.isBlank() } ?: "application/octet-stream")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                put(MediaStore.Downloads.IS_PENDING, 1)
-            }
+            put(MediaStore.Downloads.IS_PENDING, 1)
         }
 
     val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -204,12 +201,10 @@ suspend fun copyUriIntoDownloads(
         return
     }
 
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            values.clear()
-            values.put(MediaStore.Downloads.IS_PENDING, 0)
-            resolver.update(itemUri, values, null, null)
-        }
+    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+        values.clear()
+        values.put(MediaStore.Downloads.IS_PENDING, 0)
+        resolver.update(itemUri, values, null, null)
     }
 
     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {

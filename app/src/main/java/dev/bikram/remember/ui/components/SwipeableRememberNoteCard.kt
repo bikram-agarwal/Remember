@@ -82,20 +82,15 @@ fun SwipeableRememberNoteCard(
     val noteFavorite = model.favorite
     val revealKey = note.note.id
     val noteCardShape = MaterialTheme.shapes.medium
-    if (!swipeEnabled) {
-        NoteCard(
-            model = model,
-            onClick = { onOpenNote(note) },
-            selected = selected,
-            onLongClick = onLongClick,
-            modifier = modifier,
-        )
-        return
-    }
+    // Always route through one of the two swipe wrappers below so the inner
+    // [NoteCard] stays in the same composable slot regardless of selection mode.
+    // Previously we had an `if (!swipeEnabled) return NoteCard(...)` shortcut that
+    // moved NoteCard into a different parent slot, causing remount on the
+    // selection-mode boundary; that destroyed the badge bloom Animatable mid-
+    // animation, leading to visible "instant disappear" on the last deselect.
     if (interaction.swipeGestureMode == SwipeGestureMode.REVEAL_ACTIONS) {
-        MultiActionSwipeRevealCard(
-            modifier = modifier.fillMaxWidth(),
-            startActions =
+        val startTiles =
+            if (swipeEnabled) {
                 interaction.swipeStartToEndRevealActions
                     .filterNotNull()
                     .map { action ->
@@ -104,8 +99,12 @@ fun SwipeableRememberNoteCard(
                             noteFavorite = noteFavorite,
                             onClick = { onSwipeAction(note, action) },
                         )
-                    },
-            endActions =
+                    }
+            } else {
+                emptyList()
+            }
+        val endTiles =
+            if (swipeEnabled) {
                 interaction.swipeEndToStartRevealActions
                     .filterNotNull()
                     .map { action ->
@@ -114,7 +113,14 @@ fun SwipeableRememberNoteCard(
                             noteFavorite = noteFavorite,
                             onClick = { onSwipeAction(note, action) },
                         )
-                    },
+                    }
+            } else {
+                emptyList()
+            }
+        MultiActionSwipeRevealCard(
+            modifier = modifier.fillMaxWidth(),
+            startActions = startTiles,
+            endActions = endTiles,
             cardShape = noteCardShape,
             hapticEnabled = interaction.hapticFeedbackEnabled,
             revealKey = revealKey,

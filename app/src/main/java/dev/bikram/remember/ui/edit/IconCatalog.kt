@@ -33,6 +33,7 @@ data class IconChoice(
     val key: String,
     val symbolName: String?,
     @param:DrawableRes val drawableRes: Int?,
+    val label: String? = null,
 ) {
     init {
         require((symbolName != null) xor (drawableRes != null)) {
@@ -86,6 +87,13 @@ private val drawableResByKey: Map<String, Int> =
         .flatMap { it.icons }
         .mapNotNull { choice ->
             choice.drawableRes?.let { resId -> choice.key to resId }
+        }.toMap()
+
+private val labelByKey: Map<String, String> =
+    iconCatalog
+        .flatMap { it.icons }
+        .mapNotNull { choice ->
+            choice.label?.let { label -> choice.key to label }
         }.toMap()
 
 private val legacySymbolIconKeyNormalizations: Map<String, String> =
@@ -157,6 +165,7 @@ fun resolveNoteIcon(
 }
 
 fun humanizeIconKey(iconKey: String): String {
+    labelByKey[iconKey]?.let { label -> return label }
     val base =
         when {
             iconKey.startsWith(ICON_SYMBOL_PREFIX) ->
@@ -165,6 +174,7 @@ fun humanizeIconKey(iconKey: String): String {
                 iconKey
                     .removePrefix(ICON_DRAWABLE_PREFIX)
                     .removePrefix("ic_")
+                    .removePrefix("brand_")
                     .removePrefix("action_")
                     .removePrefix("stat_")
             else -> iconKey

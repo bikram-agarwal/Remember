@@ -66,6 +66,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -592,7 +593,12 @@ private fun LoadedPanel(
             item(key = "search") {
                 SearchPill(
                     query = state.searchQuery,
-                    placeholder = stringResource(R.string.google_tasks_import_search_hint, state.tasks.size),
+                    placeholder =
+                        pluralStringResource(
+                            R.plurals.google_tasks_import_search_hint,
+                            state.tasks.size,
+                            state.tasks.size,
+                        ),
                     onQueryChange = onSearchQueryChange,
                 )
             }
@@ -1563,7 +1569,11 @@ private fun ImportProgressInline(
                 Text(
                     text =
                         if (outcome != null) {
-                            stringResource(R.string.google_tasks_import_done_snack, outcome.writtenCount)
+                            pluralStringResource(
+                                R.plurals.google_tasks_import_done_snack,
+                                outcome.writtenCount,
+                                outcome.writtenCount,
+                            )
                         } else if (totalCount > 0) {
                             stringResource(
                                 R.string.google_tasks_import_importing_progress,
@@ -1614,7 +1624,12 @@ private fun SourceSwitchConfirmation(
                     PendingSourceSwitch.SwitchToGoogle,
                     PendingSourceSwitch.CancelTakeout,
                     -> stringResource(R.string.google_tasks_import_cancel_takeout_confirm_title)
-                    else -> stringResource(R.string.google_tasks_import_source_switch_confirm_title, selectedCount)
+                    else ->
+                        pluralStringResource(
+                            R.plurals.google_tasks_import_source_switch_confirm_title,
+                            selectedCount,
+                            selectedCount,
+                        )
                 },
             )
         },

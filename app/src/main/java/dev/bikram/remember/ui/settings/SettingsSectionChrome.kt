@@ -2,11 +2,14 @@ package dev.bikram.remember.ui.settings
 
 import android.os.Build
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwitchDefaults
@@ -29,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -97,6 +102,7 @@ internal fun SettingsExpandableSection(
 internal fun SettingsStaticSectionHeader(
     materialSymbolName: String,
     title: String,
+    trailingContent: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -113,7 +119,9 @@ internal fun SettingsStaticSectionHeader(
             text = title,
             style = MaterialTheme.typography.titleSmall,
             color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.weight(1f),
         )
+        trailingContent?.invoke()
     }
 }
 
@@ -134,47 +142,132 @@ internal fun SettingsSectionHeader(
     val contentDescriptionCollapse = stringResource(R.string.section_collapse_cd, title)
     val headerInteractionSource = remember { MutableInteractionSource() }
     val playTap = rememberPlayTapSound()
+    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>()
+    val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
+    val headerCorner by animateDpAsState(
+        targetValue = if (collapsed) 28.dp else 4.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_header_corner",
+    )
+    val headerColor by animateColorAsState(
+        targetValue = if (collapsed) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+        animationSpec = colorSpec,
+        label = "settings_section_header_color",
+    )
+    val horizontalPadding by animateDpAsState(
+        targetValue = if (collapsed) 12.dp else 0.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_header_horizontal_padding",
+    )
+    val verticalPadding by animateDpAsState(
+        targetValue = if (collapsed) 8.dp else 4.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_header_vertical_padding",
+    )
+    val iconContainerSize by animateDpAsState(
+        targetValue = if (collapsed) 36.dp else 20.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_icon_container_size",
+    )
+    val iconSize by animateDpAsState(
+        targetValue = if (collapsed) 21.dp else 19.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_icon_size",
+    )
+    val iconContainerColor by animateColorAsState(
+        targetValue =
+            if (collapsed) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
+            } else {
+                Color.Transparent
+            },
+        animationSpec = colorSpec,
+        label = "settings_section_icon_container_color",
+    )
+    val chevronContainerSize by animateDpAsState(
+        targetValue = if (collapsed) 32.dp else 20.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_chevron_container_size",
+    )
+    val chevronSize by animateDpAsState(
+        targetValue = if (collapsed) 20.dp else 18.dp,
+        animationSpec = spatialSpec,
+        label = "settings_section_chevron_size",
+    )
+    val chevronContainerColor by animateColorAsState(
+        targetValue = if (collapsed) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
+        animationSpec = colorSpec,
+        label = "settings_section_chevron_container_color",
+    )
+    val safeHorizontalPadding = horizontalPadding.coerceAtLeast(0.dp)
+    val safeVerticalPadding = verticalPadding.coerceAtLeast(0.dp)
+    val headerModifier =
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(headerCorner))
+            .background(headerColor)
+            .semantics {
+                contentDescription =
+                    if (collapsed) {
+                        contentDescriptionExpand
+                    } else {
+                        contentDescriptionCollapse
+                    }
+            }.clickable(
+                interactionSource = headerInteractionSource,
+                indication = LocalIndication.current,
+            ) {
+                playTap()
+                onToggle()
+            }.padding(
+                horizontal = safeHorizontalPadding,
+                vertical = safeVerticalPadding,
+            )
+
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(MaterialTheme.shapes.small)
-                .semantics {
-                    contentDescription =
-                        if (collapsed) {
-                            contentDescriptionExpand
-                        } else {
-                            contentDescriptionCollapse
-                        }
-                }.clickable(
-                    interactionSource = headerInteractionSource,
-                    indication = LocalIndication.current,
-                ) {
-                    playTap()
-                    onToggle()
-                }.padding(vertical = 4.dp),
+        modifier = headerModifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        RememberMaterialRoundedSymbol(
-            name = materialSymbolName,
-            size = 18.dp,
-            tint = MaterialTheme.colorScheme.primary,
-            weight = FontWeight.Medium,
-        )
+        Box(
+            modifier =
+                Modifier
+                    .size(iconContainerSize)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(iconContainerColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = materialSymbolName,
+                size = iconSize,
+                tint = MaterialTheme.colorScheme.primary,
+                weight = FontWeight.Medium,
+            )
+        }
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
+            style = if (collapsed) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
         )
-        Spacer(Modifier.weight(1f))
-        RememberMaterialRoundedSymbol(
-            name = "chevron_right",
-            size = 18.dp,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            weight = FontWeight.Medium,
-            modifier = Modifier.graphicsLayer { rotationZ = rotation },
-        )
+        Box(
+            modifier =
+                Modifier
+                    .size(chevronContainerSize)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(chevronContainerColor),
+            contentAlignment = Alignment.Center,
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = "chevron_right",
+                size = chevronSize,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
+                modifier = Modifier.graphicsLayer { rotationZ = rotation },
+            )
+        }
     }
 }
 

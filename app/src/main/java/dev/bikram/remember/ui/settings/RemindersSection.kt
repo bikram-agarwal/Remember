@@ -1,10 +1,10 @@
 package dev.bikram.remember.ui.settings
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.result.ActivityResultLauncher
@@ -28,6 +28,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.QuickCapturePrefs
@@ -154,16 +155,17 @@ internal fun RemindersSection(
                     subtitle = stringResource(R.string.settings_reliable_reminders_desc),
                     checked = canScheduleExactAlarms && isIgnoringBatteryOptimizations,
                     onCheckedChange = { wantEnabled ->
-                        if (wantEnabled && !isIgnoringBatteryOptimizations) {
-                            val intent =
-                                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                                    data = Uri.parse("package:${context.packageName}")
+                        val intent =
+                            if (wantEnabled && !canScheduleExactAlarms) {
+                                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
+                                    data = "package:${context.packageName}".toUri()
                                 }
-                            context.startActivity(intent)
-                        } else {
-                            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                            context.startActivity(intent)
-                        }
+                            } else if (wantEnabled && !isIgnoringBatteryOptimizations) {
+                                batteryOptimizationIntent(context)
+                            } else {
+                                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            }
+                        context.startActivity(intent)
                     },
                 )
             }
@@ -177,7 +179,7 @@ internal fun RemindersSection(
                     onCheckedChange = {
                         val intent =
                             Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                data = Uri.parse("package:${context.packageName}")
+                                data = "package:${context.packageName}".toUri()
                             }
                         context.startActivity(intent)
                     },
@@ -190,16 +192,13 @@ internal fun RemindersSection(
                     subtitle = stringResource(R.string.settings_run_in_background_desc),
                     checked = isIgnoringBatteryOptimizations,
                     onCheckedChange = { wantEnabled ->
-                        if (wantEnabled && !isIgnoringBatteryOptimizations) {
-                            val intent =
-                                Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                                    data = Uri.parse("package:${context.packageName}")
-                                }
-                            context.startActivity(intent)
-                        } else {
-                            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                            context.startActivity(intent)
-                        }
+                        val intent =
+                            if (wantEnabled && !isIgnoringBatteryOptimizations) {
+                                batteryOptimizationIntent(context)
+                            } else {
+                                Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            }
+                        context.startActivity(intent)
                     },
                 )
             }
@@ -255,4 +254,10 @@ internal fun RemindersSection(
 private fun notificationsAppSettingsIntent(context: Context): Intent =
     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+    }
+
+@SuppressLint("BatteryLife")
+private fun batteryOptimizationIntent(context: Context): Intent =
+    Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+        data = "package:${context.packageName}".toUri()
     }

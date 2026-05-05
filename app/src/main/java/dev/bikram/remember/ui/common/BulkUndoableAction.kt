@@ -1,7 +1,9 @@
 package dev.bikram.remember.ui.common
 
 import android.content.Context
+import androidx.annotation.PluralsRes
 import dev.bikram.remember.R
+import dev.bikram.remember.data.NoteCompletionSnapshot
 
 /**
  * Records the most recent bulk action so the user-facing snackbar can offer Undo and so
@@ -12,7 +14,7 @@ import dev.bikram.remember.R
  * actions themselves are absolute; these variants choose the inverse for Undo:
  *   - [Archived] (active -> archive)            -> unarchive these ids
  *   - [Trashed] (active -> trash)               -> restoreFromTrash
- *   - [MarkedDone]                              -> markIncomplete
+ *   - [MarkedDone]                              -> restoreCompletionStates (or markIncomplete fallback)
  *   - [Restored] (trash -> active)              -> moveToTrash
  *   - [Unarchived] (archive -> active)          -> archiveNotes
  *   - [ArchivedFromTrash] (trash -> archive)    -> moveToTrash
@@ -33,8 +35,17 @@ sealed interface BulkUndoableAction {
         override val ids: Set<Long>,
     ) : BulkUndoableAction
 
+    /**
+     * @param snapshots pre-completion state captured before [NoteRepository.markCompleted]
+     *     ran. Carrying these lets undo restore the exact prior reminderAt + recurrence
+     *     rule even for recurring notes whose rule was advanced or consumed by the
+     *     mark-done. Defaulted to empty for callers that don't capture (notification
+     *     action path, importer); the undo handler falls back to [markIncomplete] in
+     *     that case, which works correctly for non-recurring notes only.
+     */
     data class MarkedDone(
         override val ids: Set<Long>,
+        val snapshots: Map<Long, NoteCompletionSnapshot> = emptyMap(),
     ) : BulkUndoableAction
 
     data class Restored(
@@ -64,15 +75,16 @@ fun bulkActionSnackbarMessage(
     context: Context,
     action: BulkUndoableAction,
 ): String {
+    @PluralsRes
     val resId =
         when (action) {
-            is BulkUndoableAction.Archived -> R.string.bulk_action_archived
-            is BulkUndoableAction.Trashed -> R.string.bulk_action_trashed
-            is BulkUndoableAction.MarkedDone -> R.string.bulk_action_marked_done
-            is BulkUndoableAction.Restored -> R.string.bulk_action_restored
-            is BulkUndoableAction.Unarchived -> R.string.bulk_action_unarchived
-            is BulkUndoableAction.ArchivedFromTrash -> R.string.bulk_action_archived_from_trash
-            is BulkUndoableAction.MovedArchiveToTrash -> R.string.bulk_action_moved_to_trash_from_archive
+            is BulkUndoableAction.Archived -> R.plurals.bulk_action_archived
+            is BulkUndoableAction.Trashed -> R.plurals.bulk_action_trashed
+            is BulkUndoableAction.MarkedDone -> R.plurals.bulk_action_marked_done
+            is BulkUndoableAction.Restored -> R.plurals.bulk_action_restored
+            is BulkUndoableAction.Unarchived -> R.plurals.bulk_action_unarchived
+            is BulkUndoableAction.ArchivedFromTrash -> R.plurals.bulk_action_archived_from_trash
+            is BulkUndoableAction.MovedArchiveToTrash -> R.plurals.bulk_action_moved_to_trash_from_archive
         }
-    return context.getString(resId, action.count)
+    return context.resources.getQuantityString(resId, action.count, action.count)
 }

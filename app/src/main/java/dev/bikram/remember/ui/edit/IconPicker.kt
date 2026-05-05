@@ -85,6 +85,7 @@ import dev.bikram.remember.ui.components.RememberSegmentedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -208,7 +209,20 @@ fun IconPicker(
         }
     }
 
-    val trimmedQuery = searchQuery.trim()
+    // Debounced trimmed query. Without this, every keystroke re-runs the linear scan
+    // over ~510 icons + ~3.7k emojis with per-item stem / Levenshtein scoring; on
+    // burst typing that's wasted work + visible churn. We propagate clears (empty
+    // text) immediately so tapping the X snaps back without lag.
+    var trimmedQuery by rememberSaveable { mutableStateOf(searchQuery.trim()) }
+    LaunchedEffect(searchQuery) {
+        val nextTrimmed = searchQuery.trim()
+        if (nextTrimmed.isEmpty()) {
+            trimmedQuery = ""
+        } else {
+            delay(ICON_PICKER_SEARCH_DEBOUNCE_MILLIS)
+            trimmedQuery = nextTrimmed
+        }
+    }
     val filteredOrdered =
         remember(trimmedQuery, configuration, iconKeywords) {
             if (trimmedQuery.isEmpty()) {
@@ -486,6 +500,9 @@ private fun IconPickerIconsContent(
                     onPick = onPick,
                 )
                 iconCatalog.forEach { category ->
+                    if (category.nameRes == R.string.icon_section_brand_google) {
+                        iconBrandDivider()
+                    }
                     iconHeader(category.nameRes, topPadding = 8.dp)
                     // Keys must be unique in the whole grid: the same [IconChoice.key] can repeat
                     // across categories (e.g. airplane_ticket in Maps and Social).
@@ -750,6 +767,9 @@ private fun selectedIconGridIndex(
     }
     var gridIndex = 1 + favoriteChoices.size + 1
     iconCatalog.forEach { category ->
+        if (category.nameRes == R.string.icon_section_brand_google) {
+            gridIndex += 1
+        }
         if (category.icons.any { it.key == selectionKey }) {
             return gridIndex
         }
@@ -1074,6 +1094,12 @@ private fun loadIconKeywords(resources: Resources): Map<String, List<String>> =
         }
 
 /**
+ * Wait this long after the last keystroke before re-running the in-memory icon /
+ * emoji filter. Matches the home search debounce so typing feel is consistent.
+ */
+private const val ICON_PICKER_SEARCH_DEBOUNCE_MILLIS = 300L
+
+/**
  * Field weights for ranking. Names beat slugs beat tags beat category headings.
  * See [scoreSearchable] in IconPickerSearch.kt for how these compose into a final score.
  */
@@ -1200,6 +1226,39 @@ private fun LazyGridScope.iconHeader(
     }
 }
 
+private fun LazyGridScope.iconBrandDivider() {
+    item(key = "icon_brand_divider", span = { GridItemSpan(maxLineSpan) }) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 18.dp, bottom = 4.dp),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+            Text(
+                text = stringResource(R.string.icon_picker_brand_separator),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant),
+            )
+        }
+    }
+}
+
 /**
  * "Edit favorites" affordance shared by both grids. 44 dp circle that matches
  * [IconTile]'s Surface + CircleShape + clip structure (so the border antialiases
@@ -1287,14 +1346,15 @@ private fun IconTile(
             if (symbolName != null) {
                 RememberMaterialRoundedSymbol(
                     name = symbolName,
-                    size = 22.dp,
+                    size = 21.dp,
                     tint = fg,
                     weight = FontWeight.Medium,
-                    modifier = Modifier.size(22.dp),
+                    modifier = Modifier.size(24.dp),
                 )
             } else {
+                val drawableRes = choice.drawableRes!!
                 Icon(
-                    painterResource(choice.drawableRes!!),
+                    painterResource(drawableRes),
                     contentDescription = label,
                     tint = fg,
                     modifier = Modifier.size(22.dp),

@@ -18,6 +18,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -139,7 +140,7 @@ fun FullScreenHeroImageOverlay(
     onDelete: (() -> Unit)? = null,
 ) {
     var retainedImageUri by remember { mutableStateOf(imageUri) }
-    var retainedCacheRevision by remember { mutableStateOf(imageCacheRevision) }
+    var retainedCacheRevision by remember { mutableLongStateOf(imageCacheRevision) }
     var retainedSharedKey by remember { mutableStateOf(sharedElementKey) }
     LaunchedEffect(imageUri, imageCacheRevision, sharedElementKey) {
         if (imageUri != null) {

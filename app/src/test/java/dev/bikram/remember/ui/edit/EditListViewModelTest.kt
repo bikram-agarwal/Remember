@@ -106,6 +106,44 @@ class EditListViewModelTest {
             assertEquals(1, store.deleteForNoteCount)
         }
 
+    @Test
+    fun import_legacy_zero_id_child_preserves_parent_link() =
+        runTest {
+            val store = FakeRepositoryStore()
+            val repository = store.repository()
+
+            val noteId =
+                repository.importNoteWithChildren(
+                    note = noteEntity(id = 0L, title = "Imported list"),
+                    items =
+                        listOf(
+                            ChecklistItemEntity(
+                                id = 42L,
+                                noteId = 0L,
+                                text = "Parent",
+                                checked = false,
+                                sortOrder = 10.0,
+                            ),
+                            ChecklistItemEntity(
+                                id = 0L,
+                                noteId = 0L,
+                                text = "Child",
+                                checked = false,
+                                sortOrder = 20.0,
+                                parentId = 42L,
+                                depth = 1,
+                            ),
+                        ),
+                    attachments = emptyList(),
+                )
+
+            val savedItems = store.itemsByNote.getValue(noteId)
+            val parent = savedItems.first { item -> item.text == "Parent" }
+            val child = savedItems.first { item -> item.text == "Child" }
+            assertEquals(parent.id, child.parentId)
+            assertEquals(1, child.depth)
+        }
+
     private fun editListViewModel(
         store: FakeRepositoryStore,
         noteId: Long? = null,
@@ -175,6 +213,16 @@ private class FakeNoteDao(
     override suspend fun get(id: Long): NoteWithItems? = store.noteWithItems(id)
 
     override suspend fun activeRemindersUntil(untilMillis: Long): List<NoteWithItems> = emptyList()
+
+    override suspend fun activeFavorites(): List<NoteWithItems> =
+        store.notes.keys
+            .mapNotNull { noteId -> store.noteWithItems(noteId) }
+            .filter { noteWithItems ->
+                !noteWithItems.note.trashed &&
+                    !noteWithItems.note.archived &&
+                    noteWithItems.note.favorite &&
+                    noteWithItems.note.completedAt == null
+            }.sortedByDescending { noteWithItems -> noteWithItems.note.updatedAt }
 
     override fun searchNotes(ftsQuery: String): Flow<List<NoteWithItems>> = flowOf(emptyList())
 

@@ -35,6 +35,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import dev.bikram.remember.R
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.NoteAttachmentEntity
@@ -106,7 +107,7 @@ private fun AttachmentRow(
     onRemove: () -> Unit,
 ) {
     val context = LocalContext.current
-    val sourceUri = remember(attachment.uri) { Uri.parse(attachment.uri) }
+    val sourceUri = remember(attachment.uri) { attachment.uri.toUri() }
     val rowShape = MaterialTheme.shapes.medium
     val rowInteractionSource = remember { MutableInteractionSource() }
     val pressed by rowInteractionSource.collectIsPressedAsState()

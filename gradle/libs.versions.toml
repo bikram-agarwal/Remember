@@ -1,6 +1,6 @@
 [versions]
 java = "21"
-agp = "9.2.0"
+agp = "9.2.1"
 kotlin = "2.3.21"
 ksp = "2.3.7"
 composeBom = "2026.04.01"
@@ -10,7 +10,7 @@ lifecycle = "2.10.0"
 activityCompose = "1.13.0"
 navigation = "2.9.8"
 room = "2.8.4"
-hilt = "2.59"
+hilt = "2.59.2"
 androidxHilt = "1.3.0"
 coroutines = "1.10.2"
 serialization = "1.11.0"
@@ -29,6 +29,9 @@ androidxTestRunner = "1.7.0"
 detekt = "2.0.0-alpha.3"
 ktlintGradle = "14.2.0"
 profileInstaller = "1.4.1"
+reorderable = "3.1.0"
+junit4 = "4.13.2"
+gradleVersionsPlugin = "0.54.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -76,6 +79,8 @@ androidx-room-testing = { group = "androidx.room", name = "room-testing", versio
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutines" }
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
+junit4 = { group = "junit", name = "junit", version.ref = "junit4" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -86,3 +91,4 @@ androidx-room = { id = "androidx.room", version.ref = "room" }
 detekt = { id = "dev.detekt", version.ref = "detekt" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
+versions = { id = "com.github.ben-manes.versions", version.ref = "gradleVersionsPlugin" }

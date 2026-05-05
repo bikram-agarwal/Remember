@@ -1,12 +1,22 @@
 package dev.bikram.remember.diagnostics
 
+import android.Manifest
+import android.app.AlarmManager
+import android.app.NotificationManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
+import android.os.PowerManager
+import android.os.SystemClock
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import dev.bikram.remember.BuildConfig
 import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.time.Instant
+import java.util.Locale
+import java.util.TimeZone
 import kotlin.system.exitProcess
 
 object DiagnosticLog {
@@ -72,6 +82,8 @@ object DiagnosticLog {
                 appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
                 appendLine("Android: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
                 appendLine()
+                appendSystemSnapshot(context)
+                appendLine()
                 appendLine("App log")
                 appendLine("=======")
                 append(logText.ifBlank { "No app log entries captured yet.\n" })
@@ -81,6 +93,92 @@ object DiagnosticLog {
     }
 
     private fun logFile(context: Context): File = File(File(context.filesDir, DIAGNOSTICS_DIR), LOG_FILE_NAME)
+
+    private fun StringBuilder.appendSystemSnapshot(context: Context) {
+        val packageManager = context.packageManager
+        val packageInfo =
+            runCatching {
+                packageManager.getPackageInfo(context.packageName, 0)
+            }.getOrNull()
+        val appInfo = packageInfo?.applicationInfo
+        val notificationManagerCompat = NotificationManagerCompat.from(context)
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+
+        appendLine("Environment")
+        appendLine("===========")
+        appendLine("Locale: ${Locale.getDefault()}")
+        appendLine("Timezone: ${TimeZone.getDefault().id}")
+        appendLine("Uptime: ${SystemClock.uptimeMillis()} ms")
+        appendLine("Elapsed realtime: ${SystemClock.elapsedRealtime()} ms")
+        appendLine("Target SDK: ${appInfo?.targetSdkVersion ?: "unknown"}")
+        appendLine("First install: ${packageInfo?.firstInstallTime?.let(Instant::ofEpochMilli) ?: "unknown"}")
+        appendLine("Last update: ${packageInfo?.lastUpdateTime?.let(Instant::ofEpochMilli) ?: "unknown"}")
+        appendLine("Installer: ${installerPackageName(context)}")
+        appendLine()
+        appendLine("Permissions and scheduling")
+        appendLine("==========================")
+        appendLine("Notifications enabled: ${notificationManagerCompat.areNotificationsEnabled()}")
+        appendLine("POST_NOTIFICATIONS granted: ${postNotificationsGranted(context)}")
+        appendLine("Can schedule exact alarms: ${runCatching { alarmManager.canScheduleExactAlarms() }.getOrNull() ?: "unknown"}")
+        appendLine("Ignoring battery optimizations: ${powerManager.isIgnoringBatteryOptimizations(context.packageName)}")
+        appendLine()
+        appendNotificationChannels(context)
+    }
+
+    private fun StringBuilder.appendNotificationChannels(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channels =
+            runCatching {
+                notificationManager.notificationChannels.sortedBy { channel -> channel.id }
+            }.getOrDefault(emptyList())
+        appendLine("Notification channels")
+        appendLine("=====================")
+        if (channels.isEmpty()) {
+            appendLine("No channels registered.")
+            return
+        }
+        channels.forEach { channel ->
+            appendLine(
+                buildString {
+                    append(channel.id)
+                    append(": importance=")
+                    append(channel.importance)
+                    append(", sound=")
+                    append(channel.sound != null)
+                    append(", vibrate=")
+                    append(channel.shouldVibrate())
+                    append(", lights=")
+                    append(channel.shouldShowLights())
+                    append(", bypassDnd=")
+                    append(channel.canBypassDnd())
+                    append(", lockscreenVisibility=")
+                    append(channel.lockscreenVisibility)
+                },
+            )
+        }
+    }
+
+    private fun postNotificationsGranted(context: Context): String =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            (
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+            ).toString()
+        } else {
+            "not required"
+        }
+
+    @Suppress("DEPRECATION")
+    private fun installerPackageName(context: Context): String =
+        runCatching {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
+            } else {
+                context.packageManager.getInstallerPackageName(context.packageName)
+            }.orEmpty().ifBlank { "unknown" }
+        }.getOrDefault("unknown")
 
     private fun trimIfNeeded(logFile: File) {
         if (!logFile.exists() || logFile.length() <= MAX_LOG_BYTES) return

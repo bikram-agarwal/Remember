@@ -10,8 +10,9 @@ import android.graphics.Canvas
 import android.graphics.ImageDecoder
 import android.graphics.Rect
 import android.net.Uri
-import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.createBitmap
+import androidx.core.net.toUri
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.MainActivity
 import dev.bikram.remember.R
@@ -129,9 +130,7 @@ class ReminderReceiver : BroadcastReceiver() {
                         .bigPicture(heroBitmap)
                         .setBigContentTitle(notificationTitle(context, note))
                         .setSummaryText(summary(context, note, items, expanded = true))
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    bigPictureStyle.showBigPictureWhenCollapsed(true)
-                }
+                bigPictureStyle.showBigPictureWhenCollapsed(true)
                 builder
                     .setStyle(
                         bigPictureStyle,
@@ -181,7 +180,7 @@ class ReminderReceiver : BroadcastReceiver() {
             val pictureUri = note.pictureUri?.takeIf { it.isNotBlank() } ?: return null
             val source =
                 runCatching {
-                    ImageDecoder.createSource(context.contentResolver, Uri.parse(pictureUri))
+                    ImageDecoder.createSource(context.contentResolver, pictureUri.toUri())
                 }.getOrNull() ?: return null
             val decodedBitmap =
                 runCatching {
@@ -261,7 +260,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     (destinationLeftPx + scaledWidthPx).roundToInt(),
                     (destinationTopPx + scaledHeightPx).roundToInt(),
                 )
-            val outputBitmap = Bitmap.createBitmap(targetWidthPx, targetHeightPx, Bitmap.Config.ARGB_8888)
+            val outputBitmap = createBitmap(targetWidthPx, targetHeightPx)
             Canvas(outputBitmap).drawBitmap(sourceBitmap, null, destinationRect, null)
             return outputBitmap
         }
@@ -416,8 +415,16 @@ class ReminderReceiver : BroadcastReceiver() {
         ): PendingIntent {
             val open =
                 Intent(context, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    putExtra("open_note_id", noteId)
+                    action = Intent.ACTION_VIEW
+                    data = "remember://notification/open/$noteId".toUri()
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TASK or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP,
+                    )
+                    putExtra(MainActivity.EXTRA_OPEN_NOTE_ID, noteId)
+                    putExtra(MainActivity.EXTRA_OPEN_NOTE_EXIT_ON_BACK, true)
                 }
             return PendingIntent.getActivity(
                 context,
@@ -517,11 +524,11 @@ class ReminderReceiver : BroadcastReceiver() {
                     // PendingIntent is fragile (some OEMs deny it without an active activity)
                     // and dropping the user into the dialer with the number pre-filled is the
                     // more predictable behavior anyway.
-                    ActionType.CALL_NUMBER -> Intent(Intent.ACTION_DIAL, Uri.parse("tel:${action.details}"))
-                    ActionType.SEND_MESSAGE -> Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${action.details}"))
-                    ActionType.SEND_EMAIL -> Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${action.details}"))
-                    ActionType.GET_DIRECTIONS -> Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(action.details)}"))
-                    ActionType.OPEN_LINK -> Intent(Intent.ACTION_VIEW, Uri.parse(normalizeUrl(action.details)))
+                    ActionType.CALL_NUMBER -> Intent(Intent.ACTION_DIAL, "tel:${action.details}".toUri())
+                    ActionType.SEND_MESSAGE -> Intent(Intent.ACTION_SENDTO, "smsto:${action.details}".toUri())
+                    ActionType.SEND_EMAIL -> Intent(Intent.ACTION_SENDTO, "mailto:${action.details}".toUri())
+                    ActionType.GET_DIRECTIONS -> Intent(Intent.ACTION_VIEW, "geo:0,0?q=${Uri.encode(action.details)}".toUri())
+                    ActionType.OPEN_LINK -> Intent(Intent.ACTION_VIEW, normalizeUrl(action.details).toUri())
                     ActionType.OPEN_APP -> {
                         // Resolve at notification time. If the app is uninstalled return null
                         // so the receiver can Toast a useful error instead of silently no-oping.

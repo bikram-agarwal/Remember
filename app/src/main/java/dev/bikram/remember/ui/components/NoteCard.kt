@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.components
 
 import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -30,9 +32,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.asAndroidColorFilter
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -41,6 +49,7 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.graphics.shapes.Morph
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
@@ -54,8 +63,9 @@ import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
-import dev.bikram.remember.ui.theme.RoundedPolygonShape
+import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.elevatedCardColors
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -197,6 +207,62 @@ fun NoteCard(
             Modifier
         }
 
+    // Selection and Completed progresses are both Animatables (initialized at 0 +
+    // LaunchedEffect that animates to the current target) instead of
+    // animateFloatAsState. animateFloatAsState's initial value equals its first
+    // targetValue, which would skip the bloom whenever a card mounts already-selected
+    // or already-completed -- typical when LazyColumn briefly evicts a row at the
+    // visible boundary as the bottom selection action bar slides in or the Done
+    // section header reflows the list. The pattern below tweens from 0 in those
+    // remount cases and survives same-key recomposition normally.
+    val animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
+    val selectionAnimatable = remember { Animatable(0f) }
+    LaunchedEffect(selected) {
+        selectionAnimatable.animateTo(
+            targetValue = if (selected) 1f else 0f,
+            animationSpec = animationSpec,
+        )
+    }
+    val selectionProgress = selectionAnimatable.value
+
+    val completedAnimatable = remember { Animatable(0f) }
+    LaunchedEffect(model.completed) {
+        completedAnimatable.animateTo(
+            targetValue = if (model.completed) 1f else 0f,
+            animationSpec = animationSpec,
+        )
+    }
+    val completedProgress = completedAnimatable.value
+    // 1.0 when active -> 0.65 when fully completed; tweens with completedProgress.
+    val completedCardAlpha = 1f - 0.35f * completedProgress
+
+    // 1.0 when active -> 0.70 when fully completed; tweens with completedProgress.
+    val completedSaturation = 1f - 0.30f * completedProgress
+
+    /**
+     * Done-badge progress factors out the selection bloom: when a completed card is
+     * selected, the selection badge owns the TopEnd corner and the inline done badge
+     * fades out so the two indicators don't visually overlap. Outside selection mode
+     * (selectionProgress = 0), this just equals completedProgress.
+     */
+    val doneBadgeProgress = completedProgress * (1f - selectionProgress)
+
+    // Done-state saturation reduction is applied as a RenderEffect on the card layer.
+    // The dim alpha itself is kept inside the opaque Surface (see content below), so
+    // swipe action backgrounds cannot bleed through completed cards while dragging.
+    val completedRenderEffect =
+        remember(completedSaturation) {
+            if (completedSaturation >= 0.999f) {
+                null
+            } else {
+                val matrix = ColorMatrix().apply { setToSaturation(completedSaturation) }
+                val androidFilter = ColorFilter.colorMatrix(matrix).asAndroidColorFilter()
+                android.graphics.RenderEffect
+                    .createColorFilterEffect(androidFilter)
+                    .asComposeRenderEffect()
+            }
+        }
+
     val selectionBorderColor = MaterialTheme.colorScheme.primary
     val selectionBorder =
         if (selected) {
@@ -212,7 +278,11 @@ fun NoteCard(
         }
     val clickableModifier =
         if (onLongClick != null) {
-            Modifier.tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
+            Modifier.tapSoundCombinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick,
+                indication = null,
+            )
         } else {
             Modifier.tapSoundClickable(onClick = onClick)
         }
@@ -225,11 +295,17 @@ fun NoteCard(
         } else {
             cardColors.containerColor
         }
+    val completedContainerColor =
+        tintedContainerColor
+            .copy(alpha = completedCardAlpha)
+            .compositeOver(MaterialTheme.colorScheme.background)
     Surface(
         modifier =
             modifier
                 .fillMaxWidth()
-                .then(sharedModifier)
+                .graphicsLayer {
+                    renderEffect = completedRenderEffect
+                }.then(sharedModifier)
                 .clip(cardShape)
                 .then(favoriteBorder)
                 .then(selectionBorder)
@@ -238,12 +314,19 @@ fun NoteCard(
                     contentDescription = noteCardAnnouncement
                 },
         shape = cardShape,
-        color = tintedContainerColor,
+        color = completedContainerColor,
         contentColor = cardColors.contentColor,
         tonalElevation = 1.dp,
         shadowElevation = 0.dp,
     ) {
-        Box(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = completedCardAlpha
+                    },
+        ) {
             if (showHero) {
                 HeroBackground(
                     uri = heroPictureUri,
@@ -350,10 +433,44 @@ fun NoteCard(
                                     },
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
+                                textDecoration =
+                                    if (model.completed) TextDecoration.LineThrough else TextDecoration.None,
                                 modifier = Modifier.fillMaxWidth(),
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis,
                             )
+                        }
+                        if (doneBadgeProgress > 0f) {
+                            Spacer(Modifier.width(6.dp))
+                            // Cookie4Sided -> Sunny morph mirrors the selection badge's
+                            // visual language (small polygon + check) but uses a distinct
+                            // shape pair and the tertiary color so the two states read
+                            // as different. Driven by [doneBadgeProgress] -- not raw
+                            // [completedProgress] -- so the badge fades out when the
+                            // card is selected, ceding the corner to the selection check.
+                            val completedMorph =
+                                remember { Morph(MaterialShapes.Cookie4Sided, MaterialShapes.Clover4Leaf) }
+                            val completedBadgeShape = MorphPolygonShape(completedMorph, doneBadgeProgress)
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(20.dp)
+                                        .graphicsLayer {
+                                            val s = 0.5f + 0.5f * doneBadgeProgress
+                                            scaleX = s
+                                            scaleY = s
+                                            alpha = doneBadgeProgress
+                                        }.clip(completedBadgeShape)
+                                        .background(MaterialTheme.colorScheme.tertiary),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "check",
+                                    size = 12.dp,
+                                    tint = MaterialTheme.colorScheme.onTertiary,
+                                    weight = FontWeight.Medium,
+                                )
+                            }
                         }
                         // Favorite was previously a small inline heart at the title's
                         // trailing edge. It overlapped with the top-end selection
@@ -391,15 +508,26 @@ fun NoteCard(
                     MetadataRow(model = model, visibleTags = visibleTags)
                 }
             }
-            if (selected) {
-                val selectionBadgeShape = remember { RoundedPolygonShape(MaterialShapes.Cookie7Sided) }
+            // Selection badge: shape morph + bloom. [selectionProgress] is hoisted to
+            // the top of NoteCard (alongside [completedProgress]) so the same value
+            // drives both the rendering here and the [doneBadgeProgress] computation
+            // that fades the inline done badge out when this badge fades in.
+            if (selectionProgress > 0f) {
+                val selectionMorph =
+                    remember { Morph(MaterialShapes.Cookie4Sided, MaterialShapes.Cookie7Sided) }
+                val selectionBadgeShape = MorphPolygonShape(selectionMorph, selectionProgress)
                 Box(
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
                             .padding(9.dp)
                             .size(26.dp)
-                            .clip(selectionBadgeShape)
+                            .graphicsLayer {
+                                val s = 0.5f + 0.5f * selectionProgress
+                                scaleX = s
+                                scaleY = s
+                                alpha = selectionProgress
+                            }.clip(selectionBadgeShape)
                             .background(MaterialTheme.colorScheme.primary),
                     contentAlignment = Alignment.Center,
                 ) {
@@ -602,7 +730,7 @@ private fun ChecklistPreview(
         if (hiddenCount > 0) {
             Spacer(Modifier.height(2.dp))
             Text(
-                text = stringResource(R.string.notecard_extra_items, hiddenCount),
+                text = pluralStringResource(R.plurals.notecard_extra_items, hiddenCount, hiddenCount),
                 style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.alpha(0.6f),
             )

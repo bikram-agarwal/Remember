@@ -9,5 +9,6 @@ sealed interface LaunchAction {
 
     data class OpenNote(
         val id: Long,
+        val exitOnBack: Boolean = false,
     ) : LaunchAction
 }

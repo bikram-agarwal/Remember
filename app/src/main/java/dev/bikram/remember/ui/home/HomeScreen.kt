@@ -2,7 +2,6 @@ package dev.bikram.remember.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -169,6 +168,7 @@ fun HomeScreen(
     // remembers its own expansion state when the user switches away and comes back.
     var archiveSectionExpanded by rememberSaveable { mutableStateOf(false) }
     var trashSectionExpanded by rememberSaveable { mutableStateOf(false) }
+    var expandedFilterDropdown by rememberSaveable { mutableStateOf<ActiveFilterDropdown?>(null) }
     var initialListLiftApplied by rememberSaveable { mutableStateOf(false) }
     var revealedNoteCardId by rememberSaveable { mutableStateOf<Long?>(null) }
     var revealedNoteCardBounds by remember { mutableStateOf<Rect?>(null) }
@@ -225,6 +225,24 @@ fun HomeScreen(
                     .mapNotNull { item ->
                         (item as? HomeListItem.NoteRow)?.card?.id
                     }.toSet()
+            }
+        }
+    // Note ids that appear in more than one row of [displayedItems]. Only multi-tag
+    // notes under the by-tag grouping land here; everything else is mutually exclusive
+    // (a note is either active or done, either overdue or upcoming). For unique ids we
+    // key the LazyColumn row by [note.id] alone so transitions across sections (e.g.
+    // active -> Done bucket) stay the same key and animateItem can slide the card
+    // instead of fading it out and back in.
+    val duplicatedRowNoteIds by
+        remember(displayedItems) {
+            derivedStateOf {
+                val counts = HashMap<Long, Int>()
+                displayedItems.forEach { item ->
+                    if (item is HomeListItem.NoteRow) {
+                        counts[item.card.id] = (counts[item.card.id] ?: 0) + 1
+                    }
+                }
+                counts.asSequence().filter { it.value > 1 }.map { it.key }.toSet()
             }
         }
 
@@ -377,16 +395,21 @@ fun HomeScreen(
                 listState.scrollToItem(0, scrollOffset = -initialListLiftPx)
             }
         }
-        if (showEmptyState) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .then(blurMod)
-                        .padding(listContentPadding),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                if (showFilterControls) {
+        val itemFadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+        val itemFadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+        val itemPlacementSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntOffset>()
+        LazyColumn(
+            state = listState,
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .then(blurMod),
+            contentPadding = listContentPadding,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            userScrollEnabled = listScrollEnabled,
+        ) {
+            if (showFilterControls) {
+                item(key = "__chips__", contentType = "chips") {
                     ActiveFilterChips(
                         filter = state.filter,
                         onChange = onFilterChange,
@@ -394,72 +417,56 @@ fun HomeScreen(
                         onViewOptionsChange = onViewOptionsChange,
                         availableTags = state.availableTags,
                         scrollState = filterControlScrollState,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    NotesEmptyState(
-                        filter = state.filter,
-                        totalUnfilteredNotes = state.totalActive,
-                        onCreateNote = onCreateNote,
-                        onCreateList = onCreateList,
+                        expandedDropdown = expandedFilterDropdown,
+                        onExpandedDropdownChange = { dropdown -> expandedFilterDropdown = dropdown },
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 8.dp, vertical = 24.dp),
+                                .animateItem(
+                                    fadeInSpec = itemFadeInSpec,
+                                    placementSpec = itemPlacementSpec,
+                                    fadeOutSpec = itemFadeOutSpec,
+                                ),
                     )
                 }
             }
-        } else {
-            val itemFadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-            val itemFadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-            val itemPlacementSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntOffset>()
-            LazyColumn(
-                state = listState,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .then(blurMod),
-                contentPadding = listContentPadding,
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-                userScrollEnabled = listScrollEnabled,
-            ) {
-                if (showFilterControls) {
-                    item(key = "__chips__", contentType = "chips") {
-                        ActiveFilterChips(
+            if (showEmptyState) {
+                item(key = "__empty_state__", contentType = "emptyState") {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillParentMaxHeight()
+                                .fillMaxWidth(),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        NotesEmptyState(
                             filter = state.filter,
-                            onChange = onFilterChange,
-                            viewOptions = state.viewOptions,
-                            onViewOptionsChange = onViewOptionsChange,
-                            availableTags = state.availableTags,
-                            scrollState = filterControlScrollState,
+                            totalUnfilteredNotes = state.totalActive,
+                            onCreateNote = onCreateNote,
+                            onCreateList = onCreateList,
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .animateItem(
-                                        fadeInSpec = itemFadeInSpec,
-                                        placementSpec = itemPlacementSpec,
-                                        fadeOutSpec = itemFadeOutSpec,
-                                    ),
+                                    .padding(horizontal = 8.dp, vertical = 24.dp),
                         )
                     }
                 }
+            } else {
                 items(
                     items = displayedItems,
                     key = { item ->
                         when (item) {
                             is HomeListItem.Header -> item.stableKey.hashCode()
                             is HomeListItem.NoteRow ->
-                                if (item.groupKey.isEmpty()) {
-                                    item.card.id
-                                } else {
+                                if (item.card.id in duplicatedRowNoteIds) {
+                                    // Multi-tag note appearing under more than one tag
+                                    // group: the prefix disambiguates so LazyColumn does
+                                    // not see a duplicate-key crash.
                                     "n:${item.groupKey}:${item.card.id}"
+                                } else {
+                                    // Stable across cross-section transitions so
+                                    // animateItem slides the card to its new spot.
+                                    item.card.id
                                 }
                         }
                     },

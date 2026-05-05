@@ -1,10 +1,7 @@
 package dev.bikram.remember.reminders
 
 import android.content.Context
-import android.graphics.drawable.ColorDrawable
-import android.os.Build
 import android.os.Bundle
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -42,6 +39,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -87,20 +85,12 @@ class SnoozeActivity : ComponentActivity() {
 
         // Stack the snooze dialog OVER the lock screen / home screen rather than waking
         // the user back into the app.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-            setShowWhenLocked(true)
-            setTurnScreenOn(true)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                    WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON,
-            )
-        }
+        setShowWhenLocked(true)
+        setTurnScreenOn(true)
         // Theme.Remember.Translucent declares the transparent system bars; we just
         // need to lay out edge-to-edge so Compose draws into that area.
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        window.setBackgroundDrawable(ColorDrawable(AndroidColor.TRANSPARENT))
+        window.setBackgroundDrawable(AndroidColor.TRANSPARENT.toDrawable())
 
         val noteId = intent.getLongExtra(EXTRA_NOTE_ID, -1L)
         if (noteId == -1L) {

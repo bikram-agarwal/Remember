@@ -6,12 +6,15 @@ import dev.bikram.remember.di.IoDispatcher
 import dev.bikram.remember.reminders.ReminderScheduler
 import dev.bikram.remember.widget.NotesWidgetUpdater
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 data class NoteOptions(
     val reminderAt: Long? = null,
@@ -41,6 +44,17 @@ data class PersistableChecklistItem(
     val depth: Int = 0,
 )
 
+/**
+ * Pre-completion snapshot used by Undo to fully reverse a mark-done — including for
+ * recurring notes whose [reminderAt]/[recurrence] would otherwise be advanced or
+ * consumed by [NoteRepository.markCompleted]. Stored in the snackbar's pending-action
+ * record so a subsequent tap on Undo restores the row's exact prior state.
+ */
+data class NoteCompletionSnapshot(
+    val reminderAt: Long?,
+    val recurrence: RecurrenceRule?,
+)
+
 class NoteRepository(
     private val noteDao: NoteDao,
     private val itemDao: ChecklistItemDao,
@@ -53,7 +67,39 @@ class NoteRepository(
     private val appMediaStorage: AppMediaStorage? = null,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
+    /**
+     * Long-lived scope used for fire-and-forget post-write bookkeeping (summary
+     * notification rebuild, widget refresh). Decoupling these from the calling
+     * coroutine lets the UI's StateFlow recompose immediately after the DB write
+     * commits, instead of waiting on ~250ms of widget debounce + ~30-60ms of
+     * notification builder work that previously blocked Main. Default is provided
+     * so unit tests that construct the repository directly don't need to wire
+     * Hilt's @ApplicationScope -- production binding always overrides it.
+     */
+    private val applicationScope: CoroutineScope =
+        CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
 ) {
+    /**
+     * Fires the heavy post-write bookkeeping (summary notification rebuild + widget
+     * refresh) on [applicationScope] so the calling coroutine can return immediately
+     * and the UI's StateFlow can pick up the DB change without queueing behind these
+     * launches. Lighter-weight side effects -- alarm cancel/schedule via
+     * [ReminderScheduler], and individual DB writes -- stay synchronous on the
+     * caller's coroutine because they're cheap and need ordering guarantees with
+     * paired operations (e.g. cancel-then-schedule for undo).
+     *
+     * @param includeSummary set false for write paths that don't change reminder
+     *     state (favorite toggle, attachment add/remove, picture URI, list item
+     *     check toggle) -- the summary notification only reflects pending reminders
+     *     so re-querying for those changes is wasted work.
+     */
+    private fun postWriteBookkeeping(includeSummary: Boolean = true) {
+        applicationScope.launch {
+            if (includeSummary) refreshReminderSummaryNotification()
+            notesWidgetUpdater?.refreshAll()
+        }
+    }
+
     fun observeActive(): Flow<List<NoteWithItems>> = noteDao.observeActive().flowOn(ioDispatcher)
 
     /** Distinct tag names from non-trashed notes; for suggestion UIs (sheet-scoped collection preferred). */
@@ -177,9 +223,8 @@ class NoteRepository(
                 ),
             )
         tagRepository?.replaceTagsForNote(noteId, options.tags)
-        options.reminderAt?.let { scheduler?.schedule(noteId, it) }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        options.reminderAt?.let { scheduler?.schedule(noteId, it, options.importance) }
+        postWriteBookkeeping()
         return noteId
     }
 
@@ -229,9 +274,8 @@ class NoteRepository(
                 },
             )
         }
-        options.reminderAt?.let { scheduler?.schedule(id, it) }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        options.reminderAt?.let { scheduler?.schedule(id, it, options.importance) }
+        postWriteBookkeeping()
         return id
     }
 
@@ -268,9 +312,8 @@ class NoteRepository(
             ),
         )
         tagRepository?.replaceTagsForNote(id, options.tags)
-        rescheduleReminder(id, options.reminderAt)
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        rescheduleReminder(id, options.reminderAt, options.importance)
+        postWriteBookkeeping()
     }
 
     suspend fun updateList(
@@ -320,10 +363,9 @@ class NoteRepository(
                 applyUpdates()
             }
         if (didUpdate) tagRepository?.replaceTagsForNote(id, options.tags)
-        if (didUpdate) rescheduleReminder(id, options.reminderAt)
+        if (didUpdate) rescheduleReminder(id, options.reminderAt, options.importance)
         if (didUpdate) refreshNotificationIfActive(id)
-        if (didUpdate) refreshReminderSummaryNotification()
-        if (didUpdate) notesWidgetUpdater?.refreshAll()
+        if (didUpdate) postWriteBookkeeping()
     }
 
     suspend fun setFavorite(
@@ -335,15 +377,14 @@ class NoteRepository(
         val newTags = if (favorite) (baseTags + RememberReservedTags.FAVORITE).distinct() else baseTags
         if (row.note.favorite == favorite && row.note.tags == newTags) return
         noteDao.update(row.note.copy(favorite = favorite, tags = newTags, updatedAt = clock()))
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping(includeSummary = false)
     }
 
     suspend fun moveToTrash(id: Long) {
         noteDao.setTrashed(id, true, clock())
         scheduler?.cancel(id)
         scheduler?.cancelNotification(id)
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     suspend fun moveAllArchivedToTrash() {
@@ -355,16 +396,14 @@ class NoteRepository(
             scheduler?.cancel(archivedId)
             scheduler?.cancelNotification(archivedId)
         }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     suspend fun restoreFromTrash(id: Long) {
         noteDao.setTrashed(id, false, clock())
         val n = noteDao.get(id)?.note
-        n?.reminderAt?.let { scheduler?.schedule(id, it) }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        n?.reminderAt?.let { at -> scheduler?.schedule(id, at, n.importance) }
+        postWriteBookkeeping()
     }
 
     /**
@@ -375,16 +414,14 @@ class NoteRepository(
         noteDao.setArchived(id, true, clock())
         scheduler?.cancel(id)
         scheduler?.cancelNotification(id)
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     suspend fun unarchiveNote(id: Long) {
         noteDao.setArchived(id, false, clock())
         val n = noteDao.get(id)?.note
-        n?.reminderAt?.let { scheduler?.schedule(id, it) }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        n?.reminderAt?.let { at -> scheduler?.schedule(id, at, n.importance) }
+        postWriteBookkeeping()
     }
 
     suspend fun deleteForever(id: Long) {
@@ -393,8 +430,7 @@ class NoteRepository(
         scheduler?.cancelNotification(id)
         noteDao.deleteById(id)
         cleanupUnreferencedMedia(deletedNote?.mediaUris().orEmpty())
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     suspend fun emptyTrash() {
@@ -406,8 +442,7 @@ class NoteRepository(
         }
         noteDao.emptyTrash()
         cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     // ---------------------------------------------------------------------------
@@ -435,8 +470,7 @@ class NoteRepository(
             scheduler?.cancel(id)
             scheduler?.cancelNotification(id)
         }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     suspend fun unarchiveNotes(ids: Collection<Long>) {
@@ -450,10 +484,9 @@ class NoteRepository(
         // alarm-free.
         ids.forEach { id ->
             val note = noteDao.get(id)?.note ?: return@forEach
-            note.reminderAt?.let { at -> scheduler?.schedule(id, at) }
+            note.reminderAt?.let { at -> scheduler?.schedule(id, at, note.importance) }
         }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     suspend fun moveToTrash(ids: Collection<Long>) {
@@ -466,8 +499,7 @@ class NoteRepository(
             scheduler?.cancel(id)
             scheduler?.cancelNotification(id)
         }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     suspend fun restoreFromTrash(ids: Collection<Long>) {
@@ -478,10 +510,9 @@ class NoteRepository(
         }
         ids.forEach { id ->
             val note = noteDao.get(id)?.note ?: return@forEach
-            note.reminderAt?.let { at -> scheduler?.schedule(id, at) }
+            note.reminderAt?.let { at -> scheduler?.schedule(id, at, note.importance) }
         }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     /**
@@ -500,8 +531,7 @@ class NoteRepository(
             ids.forEach { id -> noteDao.deleteById(id) }
         }
         cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     /**
@@ -510,11 +540,19 @@ class NoteRepository(
      * transaction so all row writes coalesce into one observer emission. The per-id
      * side-effect helpers fire N times but are idempotent.
      */
-    suspend fun markCompleted(ids: Collection<Long>) {
-        if (ids.isEmpty()) return
+    /**
+     * Bulk mark-completed. Returns a per-id snapshot of each row's pre-completion
+     * state so the snackbar Undo can fully restore recurring rules without an extra
+     * read. Returned map has an entry for every id whose row existed at call time;
+     * missing-row ids are silently skipped (consistent with the single-id overload).
+     */
+    suspend fun markCompleted(ids: Collection<Long>): Map<Long, NoteCompletionSnapshot> {
+        if (ids.isEmpty()) return emptyMap()
+        val snapshots = mutableMapOf<Long, NoteCompletionSnapshot>()
         runInTransaction {
-            ids.forEach { id -> markCompleted(id) }
+            ids.forEach { id -> markCompleted(id)?.let { snapshots[id] = it } }
         }
+        return snapshots
     }
 
     suspend fun markIncomplete(ids: Collection<Long>) {
@@ -539,8 +577,7 @@ class NoteRepository(
         }
         noteDao.deleteTrashedOlderThan(cutoffMillis)
         cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
         return deletedNotes.size
     }
 
@@ -557,8 +594,7 @@ class NoteRepository(
         }
         noteDao.deleteAllNotes()
         cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
     }
 
     /**
@@ -586,8 +622,7 @@ class NoteRepository(
             }
         cleanupUnreferencedMedia(replacedNotes.flatMap { replacedNote -> replacedNote.mediaUris() })
         resyncRemindersAfterMassReplace(oldIds)
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
         return count
     }
 
@@ -598,7 +633,7 @@ class NoteRepository(
         newIds.forEach { noteId ->
             val note = noteDao.get(noteId)?.note ?: return@forEach
             if (!note.trashed && note.reminderAt != null) {
-                schedulerNonNull.schedule(noteId, note.reminderAt)
+                schedulerNonNull.schedule(noteId, note.reminderAt, note.importance)
             }
         }
     }
@@ -675,7 +710,7 @@ class NoteRepository(
                     mimeType = mimeType,
                 ),
             )
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping(includeSummary = false)
         return attachmentId
     }
 
@@ -717,7 +752,7 @@ class NoteRepository(
             )
         }
         if (!suppressReminderSchedule && !note.trashed) {
-            note.reminderAt?.let { scheduler?.schedule(noteId, it) }
+            note.reminderAt?.let { scheduler?.schedule(noteId, it, note.importance) }
         }
         return noteId
     }
@@ -738,6 +773,7 @@ class NoteRepository(
     ) {
         if (items.isEmpty()) return
         val keyToRealId = mutableMapOf<Long, Long>()
+        val insertedIds = mutableListOf<Long>()
         // First pass: insert every row flat.
         items.forEach { draft ->
             val newId =
@@ -754,12 +790,13 @@ class NoteRepository(
                 )
             // localKey 0 means "no stable key"; skip so it does not collide with other drafts.
             if (draft.localKey != 0L) keyToRealId[draft.localKey] = newId
+            insertedIds += newId
         }
         // Second pass: patch parentId / depth on children.
-        items.forEach { draft ->
-            val parentKey = draft.parentLocalKey ?: return@forEach
-            val realParentId = keyToRealId[parentKey] ?: return@forEach
-            val realId = keyToRealId[draft.localKey] ?: return@forEach
+        items.forEachIndexed { index, draft ->
+            val parentKey = draft.parentLocalKey ?: return@forEachIndexed
+            val realParentId = keyToRealId[parentKey] ?: return@forEachIndexed
+            val realId = insertedIds[index]
             itemDao.update(
                 ChecklistItemEntity(
                     id = realId,
@@ -786,14 +823,14 @@ class NoteRepository(
                 updatedAt = clock(),
             ),
         )
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping(includeSummary = false)
     }
 
     suspend fun removeAttachment(id: Long) {
         val removedAttachment = attachmentDao.getById(id)
         attachmentDao.deleteById(id)
         cleanupUnreferencedMedia(listOfNotNull(removedAttachment?.uri))
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping(includeSummary = false)
     }
 
     private suspend fun cleanupUnreferencedMedia(mediaUris: List<String>) {
@@ -818,9 +855,10 @@ class NoteRepository(
     private fun rescheduleReminder(
         id: Long,
         at: Long?,
+        importance: Importance,
     ) {
         scheduler?.cancel(id)
-        if (at != null) scheduler?.schedule(id, at)
+        if (at != null) scheduler?.schedule(id, at, importance)
     }
 
     private suspend fun refreshNotificationIfActive(id: Long) {
@@ -845,6 +883,8 @@ class NoteRepository(
 
     suspend fun reminderSummaryItems(now: Long = clock()): List<NoteWithItems> = noteDao.activeRemindersUntil(now + REMINDER_SUMMARY_WINDOW_MILLIS)
 
+    suspend fun favoriteWidgetItems(): List<NoteWithItems> = noteDao.activeFavorites()
+
     /**
      * Consume the currently due recurring occurrence after the user marks it done. Merely
      * firing the notification must not call this: until completion, the card should keep
@@ -868,19 +908,20 @@ class NoteRepository(
                 updatedAt = clock(),
             ),
         )
-        if (nextTime != null) scheduler?.schedule(id, nextTime)
+        if (nextTime != null) scheduler?.schedule(id, nextTime, note.importance)
     }
 
     suspend fun toggleItemChecked(item: ChecklistItemEntity) {
         itemDao.update(item.copy(checked = !item.checked))
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping(includeSummary = false)
     }
 
     /**
      * Used when the user taps "Mark as done" on a reminder notification action.
      * Recurring notes advance to their next occurrence; one-shot notes enter Done.
      */
-    suspend fun clearReminderFromNotificationAction(noteId: Long): Boolean = markCompleted(noteId)
+    suspend fun clearReminderFromNotificationAction(noteId: Long): Boolean =
+        markCompleted(noteId) != null
 
     /**
      * Mark a note done. Behavior depends on whether the note has a live recurrence rule:
@@ -894,23 +935,32 @@ class NoteRepository(
      *   route the note into the Done bucket.
      * - **Non-recurring**: set [completedAt] = now and cancel any pending alarm.
      *
-     * Returns true when a row was written.
+     * Returns the pre-completion [NoteCompletionSnapshot] when the row was written
+     * (or null when the note id no longer exists). The snackbar Undo path uses this
+     * snapshot to restore the original reminderAt + recurrence -- including for
+     * recurring rows whose rule was advanced or consumed in place. Captured from the
+     * single [noteDao.get] this method already does, so undo support is free of any
+     * extra DB read.
      */
-    suspend fun markCompleted(noteId: Long): Boolean {
-        val existing = noteDao.get(noteId)?.note ?: return false
+    suspend fun markCompleted(noteId: Long): NoteCompletionSnapshot? {
+        val existing = noteDao.get(noteId)?.note ?: return null
+        val snapshot =
+            NoteCompletionSnapshot(
+                reminderAt = existing.reminderAt,
+                recurrence = existing.recurrence,
+            )
         val sanitized = existing.recurrence?.sanitized()
         if (sanitized != null) {
             // Advance only after explicit completion. The notification fire path leaves
             // the old reminder time in place so the task remains Overdue until handled.
             advanceRecurringReminderAfterCompletion(noteId)
-            val after = noteDao.get(noteId)?.note ?: return true
+            val after = noteDao.get(noteId)?.note ?: return snapshot
             if (after.reminderAt == null && after.recurrence == null) {
                 noteDao.update(after.copy(completedAt = clock(), updatedAt = clock()))
             }
             scheduler?.cancelNotification(noteId)
-            refreshReminderSummaryNotification()
-            notesWidgetUpdater?.refreshAll()
-            return true
+            postWriteBookkeeping()
+            return snapshot
         }
         // Non-recurring: a single completion stamp is the whole transition.
         noteDao.update(
@@ -921,9 +971,8 @@ class NoteRepository(
         )
         scheduler?.cancel(noteId)
         scheduler?.cancelNotification(noteId)
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
-        return true
+        postWriteBookkeeping()
+        return snapshot
     }
 
     /**
@@ -943,11 +992,50 @@ class NoteRepository(
         // reminder time stays past (the note will land in Overdue next sync) - we
         // intentionally don't bump it forward since the user was undoing, not snoozing.
         existing.reminderAt?.let { at ->
-            if (at > clock()) scheduler?.schedule(noteId, at)
+            if (at > clock()) scheduler?.schedule(noteId, at, existing.importance)
         }
-        refreshReminderSummaryNotification()
-        notesWidgetUpdater?.refreshAll()
+        postWriteBookkeeping()
         return true
+    }
+
+    /**
+     * Reverse a previous [markCompleted] for the given note ids using the snapshots
+     * captured before that call. For each id, clears [NoteEntity.completedAt],
+     * restores the original [NoteEntity.reminderAt] and [NoteEntity.recurrence],
+     * cancels any alarm scheduled by the meanwhile-advanced state, and re-arms
+     * the original alarm if its time is still in the future. All DB writes share
+     * one Room transaction so the home list reflows once. Bookkeeping (summary,
+     * widgets) fires once at the end.
+     *
+     * Idempotent on missing rows; non-recurring snapshots collapse to the same
+     * behavior the previous [markIncomplete] provided, so this method is the
+     * preferred restore path for the snackbar Undo regardless of recurrence.
+     */
+    suspend fun restoreCompletionStates(snapshots: Map<Long, NoteCompletionSnapshot>) {
+        if (snapshots.isEmpty()) return
+        val applyAll: suspend () -> Unit = {
+            snapshots.forEach { (id, snapshot) ->
+                val existing = noteDao.get(id)?.note ?: return@forEach
+                noteDao.update(
+                    existing.copy(
+                        completedAt = null,
+                        reminderAt = snapshot.reminderAt,
+                        recurrence = snapshot.recurrence?.sanitized(),
+                        updatedAt = clock(),
+                    ),
+                )
+                // Drop any alarm that may have been armed for the advanced
+                // (now-superseded) reminderAt, then re-arm the original if it's
+                // still in the future. Past reminders stay past -- they just
+                // fall back into Overdue on next sync.
+                scheduler?.cancel(id)
+                snapshot.reminderAt?.let { at ->
+                    if (at > clock()) scheduler?.schedule(id, at, existing.importance)
+                }
+            }
+        }
+        if (database != null) database.withTransaction { applyAll() } else applyAll()
+        postWriteBookkeeping()
     }
 
     companion object {

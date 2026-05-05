@@ -38,6 +38,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -55,6 +56,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -100,6 +102,7 @@ fun EditListRoute(
     noteId: Long?,
     forceEdit: Boolean = false,
     onBack: () -> Unit,
+    onNavigateUp: () -> Unit = onBack,
 ) {
     val vm: EditListViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
@@ -132,19 +135,19 @@ fun EditListRoute(
         androidx.compose.ui.res
             .stringResource(dev.bikram.remember.R.string.edit_list_title_new)
     // Snackbar templates for the bottom-bar actions. Reused from the bulk-action
-    // strings since the count placeholder reads naturally with 1.
+    // plurals since the count placeholder reads naturally with 1.
     val msgArchived =
         androidx.compose.ui.res
-            .stringResource(dev.bikram.remember.R.string.bulk_action_archived, 1)
+            .pluralStringResource(dev.bikram.remember.R.plurals.bulk_action_archived, 1, 1)
     val msgTrashed =
         androidx.compose.ui.res
-            .stringResource(dev.bikram.remember.R.string.bulk_action_trashed, 1)
+            .pluralStringResource(dev.bikram.remember.R.plurals.bulk_action_trashed, 1, 1)
     val msgUnarchived =
         androidx.compose.ui.res
-            .stringResource(dev.bikram.remember.R.string.bulk_action_unarchived, 1)
+            .pluralStringResource(dev.bikram.remember.R.plurals.bulk_action_unarchived, 1, 1)
     val msgRestored =
         androidx.compose.ui.res
-            .stringResource(dev.bikram.remember.R.string.bulk_action_restored, 1)
+            .pluralStringResource(dev.bikram.remember.R.plurals.bulk_action_restored, 1, 1)
     val context = androidx.compose.ui.platform.LocalContext.current
     var notificationPermissionSheetOpen by rememberSaveable { mutableStateOf(false) }
     // BackHandler fires synchronously on back commit, where PredictiveBackHandler
@@ -341,6 +344,7 @@ fun EditListRoute(
                 onBack()
             },
             onBack = onBack,
+            onNavigateUp = onNavigateUp,
             onSave = onExplicitSave,
         )
     }
@@ -581,6 +585,7 @@ fun EditListScreen(
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,
     onBack: () -> Unit,
+    onNavigateUp: () -> Unit = onBack,
     onSave: () -> Unit = {},
 ) {
     val topBarState = rememberTopAppBarState()
@@ -705,7 +710,7 @@ fun EditListScreen(
                 sharedTransitionActive = sharedTransitionActive,
                 titleFocusRequester = newListTitleFocus,
                 onTitleChange = onTitleChange,
-                onBack = onBack,
+                onBack = onNavigateUp,
                 onSave = saveAndExitEditMode,
             )
         },
@@ -732,8 +737,8 @@ fun EditListScreen(
         },
     ) { padding ->
         val blurMod = blurStyle?.applyToFullBleedLayer() ?: Modifier
-        val focusRequesters = remember { mutableMapOf<Long, androidx.compose.ui.focus.FocusRequester>() }
-        var previousItemCount by remember { mutableStateOf(items.size) }
+        val focusRequesters = remember { mutableMapOf<Long, FocusRequester>() }
+        var previousItemCount by remember { mutableIntStateOf(items.size) }
         var expectingNewItem by remember { mutableStateOf(false) }
 
         LaunchedEffect(items) {
@@ -921,15 +926,19 @@ fun EditListScreen(
                                     placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
                                 ),
                         ) { isDragging ->
-                            val fr =
-                                focusRequesters.getOrPut(item.localId) {
-                                    androidx.compose.ui.focus
-                                        .FocusRequester()
+                            val focusRequester = remember(item.localId) { FocusRequester() }
+                            DisposableEffect(item.localId, focusRequester) {
+                                focusRequesters[item.localId] = focusRequester
+                                onDispose {
+                                    if (focusRequesters[item.localId] === focusRequester) {
+                                        focusRequesters.remove(item.localId)
+                                    }
                                 }
+                            }
                             ChecklistRow(
                                 item = item,
                                 isEditMode = isEditMode && !readOnly,
-                                focusRequester = fr,
+                                focusRequester = focusRequester,
                                 isDragging = isDragging,
                                 dragHandleModifier = if (readOnly) Modifier else Modifier.draggableHandle(),
                                 onTextChange = if (readOnly) ({ _ -> }) else ({ onItemTextChange(item.localId, it) }),
@@ -1025,7 +1034,7 @@ fun EditListScreen(
                         )
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            stringResource(R.string.checked_items_count, completedItems.size),
+                            pluralStringResource(R.plurals.checked_items_count, completedItems.size, completedItems.size),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -1061,15 +1070,19 @@ fun EditListScreen(
                                 // item sort order in completed is implicit (most-recently
                                 // checked last, siblings grouped under their ghost parent).
                                 val item = entry.item
-                                val fr =
-                                    focusRequesters.getOrPut(item.localId) {
-                                        androidx.compose.ui.focus
-                                            .FocusRequester()
+                                val focusRequester = remember(item.localId) { FocusRequester() }
+                                DisposableEffect(item.localId, focusRequester) {
+                                    focusRequesters[item.localId] = focusRequester
+                                    onDispose {
+                                        if (focusRequesters[item.localId] === focusRequester) {
+                                            focusRequesters.remove(item.localId)
+                                        }
                                     }
+                                }
                                 ChecklistRow(
                                     item = item,
                                     isEditMode = isEditMode && !readOnly,
-                                    focusRequester = fr,
+                                    focusRequester = focusRequester,
                                     isDragging = false,
                                     dragHandleModifier = Modifier,
                                     showDragHandle = false,

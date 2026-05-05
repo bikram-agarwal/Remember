@@ -1,13 +1,13 @@
 package dev.bikram.remember.ui.theme
 
 import android.content.Context
-import android.os.Build
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
 import com.materialkolor.rememberDynamicColorScheme
 import dev.bikram.remember.data.ColorSource
+import dev.bikram.remember.data.PaletteStyleOpt
 import dev.bikram.remember.data.ThemeState
 
 internal data class RememberColorResolution(
@@ -23,8 +23,7 @@ internal fun rememberResolvedColorScheme(
     black: Boolean,
 ): RememberColorResolution {
     val spec = colorSourceSpecFor(themeState.colorSource)
-    val materialYouAvailable =
-        spec.source == ColorSource.MATERIAL_YOU && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    val materialYouAvailable = spec.source == ColorSource.MATERIAL_YOU
     val base =
         when {
             materialYouAvailable -> {
@@ -66,36 +65,16 @@ private fun rememberCuratedColorScheme(
     black: Boolean,
 ): ColorScheme {
     val style = themeState.paletteStyle.toLib()
-    val primaryScheme =
-        rememberDynamicColorScheme(
-            seedColor = curated.primary,
-            isDark = darkTheme,
-            style = style,
-            isAmoled = black,
-        )
-    val secondaryScheme =
-        rememberDynamicColorScheme(
-            seedColor = curated.secondary,
-            isDark = darkTheme,
-            style = style,
-            isAmoled = black,
-        )
-    val tertiaryScheme =
-        rememberDynamicColorScheme(
-            seedColor = curated.tertiary,
-            isDark = darkTheme,
-            style = style,
-            isAmoled = black,
-        )
-    return primaryScheme.copy(
-        secondary = secondaryScheme.primary,
-        onSecondary = secondaryScheme.onPrimary,
-        secondaryContainer = secondaryScheme.primaryContainer,
-        onSecondaryContainer = secondaryScheme.onPrimaryContainer,
-        tertiary = tertiaryScheme.primary,
-        onTertiary = tertiaryScheme.onPrimary,
-        tertiaryContainer = tertiaryScheme.primaryContainer,
-        onTertiaryContainer = tertiaryScheme.onPrimaryContainer,
+    val tripletOverrides =
+        curated.takeIf { themeState.paletteStyle == PaletteStyleOpt.TONAL_SPOT }
+    return rememberDynamicColorScheme(
+        seedColor = curated.primary,
+        isDark = darkTheme,
+        primary = tripletOverrides?.primary,
+        secondary = tripletOverrides?.secondary,
+        tertiary = tripletOverrides?.tertiary,
+        style = style,
+        isAmoled = black,
     )
 }
 

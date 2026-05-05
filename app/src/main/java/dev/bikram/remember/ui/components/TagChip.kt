@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import dev.bikram.remember.R
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -38,7 +39,7 @@ import dev.bikram.remember.ui.tags.LocalTagColors
 /** Parse "#RRGGBB" into a Compose Color. Returns null if invalid. */
 fun parseHexColor(hex: String): Color? =
     runCatching {
-        Color(android.graphics.Color.parseColor(hex))
+        Color(hex.toColorInt())
     }.getOrNull()
 
 /** Lookup the stored color for [tag], or derive a stable default from its hash. */

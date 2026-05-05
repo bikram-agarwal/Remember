@@ -38,6 +38,8 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
@@ -194,6 +196,7 @@ internal fun MarkdownTextEditor(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 140.dp)
+                    .semantics { contentDescription = bodyPlaceholder }
                     .onGloballyPositioned { editorCoordinates = it }
                     .focusRequester(focusRequester)
                     .onFocusChanged { focused = it.isFocused }

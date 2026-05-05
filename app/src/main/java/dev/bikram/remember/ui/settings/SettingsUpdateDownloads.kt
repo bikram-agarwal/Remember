@@ -3,10 +3,10 @@ package dev.bikram.remember.ui.settings
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.DocumentsContract
 import android.provider.MediaStore
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import dev.bikram.remember.R
 import dev.bikram.remember.update.RememberUpdateInfo
@@ -77,9 +77,7 @@ internal fun copyUpdateApkToMediaStoreDownloads(
                 put(MediaStore.MediaColumns.DISPLAY_NAME, safeName)
                 put(MediaStore.MediaColumns.MIME_TYPE, "application/vnd.android.package-archive")
                 put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    put(MediaStore.MediaColumns.IS_PENDING, 1)
-                }
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
         val itemUri =
             resolver.insert(
@@ -92,13 +90,11 @@ internal fun copyUpdateApkToMediaStoreDownloads(
                     input.copyTo(output)
                 }
             } ?: error("openOutputStream returned null")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val publish =
-                    ContentValues().apply {
-                        put(MediaStore.MediaColumns.IS_PENDING, 0)
-                    }
-                resolver.update(itemUri, publish, null, null)
-            }
+            val publish =
+                ContentValues().apply {
+                    put(MediaStore.MediaColumns.IS_PENDING, 0)
+                }
+            resolver.update(itemUri, publish, null, null)
         } catch (throwable: Throwable) {
             runCatching { resolver.delete(itemUri, null, null) }
             throw throwable
@@ -111,7 +107,7 @@ internal fun exportFolderDisplayLabel(
     internalStorageFallback: String,
 ): String {
     if (uriString.isBlank()) return ""
-    val uri = Uri.parse(uriString)
+    val uri = uriString.toUri()
     if (!DocumentsContract.isTreeUri(uri)) {
         providerDisplayName(context, uri.authority)?.let { return it }
     }

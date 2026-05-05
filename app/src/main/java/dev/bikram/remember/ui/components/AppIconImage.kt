@@ -1,6 +1,5 @@
 package dev.bikram.remember.ui.components
 
-import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -11,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.createBitmap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -32,7 +32,7 @@ fun AppIconImage(modifier: Modifier = Modifier) {
                 val drawable = packageManager.getApplicationIcon(packageName)
                 val size = 256
                 val bitmap =
-                    Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888).also { bmp ->
+                    createBitmap(size, size).also { bmp ->
                         val canvas = Canvas(bmp)
                         drawable.setBounds(0, 0, size, size)
                         drawable.draw(canvas)

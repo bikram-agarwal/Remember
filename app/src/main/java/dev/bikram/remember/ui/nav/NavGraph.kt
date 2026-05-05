@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.nav
 
+import android.app.Activity
 import android.net.Uri
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -13,8 +14,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -40,6 +43,7 @@ import kotlinx.coroutines.launch
 object Routes {
     const val ONBOARDING_TITLE = "onboardingTitle"
     const val ONBOARDING_PERMISSIONS = "onboardingPermissions"
+    const val EXTERNAL_LAUNCH = "externalLaunch"
     const val MAIN = "main"
     const val EDIT_NOTE = "editNote"
     const val EDIT_LIST = "editList"
@@ -47,23 +51,28 @@ object Routes {
     const val ARG_ID = "id"
     const val ARG_PREFILL = "prefill"
     const val ARG_FORCE_EDIT = "forceEdit"
+    const val ARG_EXIT_ON_BACK = "exitOnBack"
 
     fun editNote(
         id: Long?,
         prefill: String = "",
         forceEdit: Boolean = false,
+        exitOnBack: Boolean = false,
     ): String {
         val p = if (prefill.isNotEmpty()) "&$ARG_PREFILL=${Uri.encode(prefill)}" else ""
         val f = if (forceEdit) "&$ARG_FORCE_EDIT=true" else ""
-        return "$EDIT_NOTE?${ARG_ID}=${id ?: -1L}$p$f"
+        val e = if (exitOnBack) "&$ARG_EXIT_ON_BACK=true" else ""
+        return "$EDIT_NOTE?${ARG_ID}=${id ?: -1L}$p$f$e"
     }
 
     fun editList(
         id: Long?,
         forceEdit: Boolean = false,
+        exitOnBack: Boolean = false,
     ): String {
         val f = if (forceEdit) "&${ARG_FORCE_EDIT}=true" else ""
-        return "$EDIT_LIST?${ARG_ID}=${id ?: -1L}$f"
+        val e = if (exitOnBack) "&$ARG_EXIT_ON_BACK=true" else ""
+        return "$EDIT_LIST?${ARG_ID}=${id ?: -1L}$f$e"
     }
 }
 
@@ -87,12 +96,19 @@ fun RememberNavGraph(
         return
     }
 
+    val initialExternalLaunch =
+        remember(launchFlow, currentOnboardingState.hasSeenIntro) {
+            currentOnboardingState.hasSeenIntro &&
+                launchFlow?.value?.let { action ->
+                    action is LaunchAction.OpenNote && action.exitOnBack
+                } == true
+        }
     val lockedStartDestination =
-        remember(currentOnboardingState.hasSeenIntro) {
-            if (currentOnboardingState.hasSeenIntro) {
-                Routes.MAIN
-            } else {
-                Routes.ONBOARDING_TITLE
+        remember(currentOnboardingState.hasSeenIntro, initialExternalLaunch) {
+            when {
+                !currentOnboardingState.hasSeenIntro -> Routes.ONBOARDING_TITLE
+                initialExternalLaunch -> Routes.EXTERNAL_LAUNCH
+                else -> Routes.MAIN
             }
         }
 
@@ -105,8 +121,19 @@ fun RememberNavGraph(
                     is LaunchAction.NewNote -> navController.navigate(Routes.editNote(null, action.prefill))
                     LaunchAction.NewList -> navController.navigate(Routes.editList(null))
                     is LaunchAction.OpenNote -> {
-                        val note = repository.get(action.id) ?: return@collectLatest
-                        navController.openEditRouteFor(note)
+                        val note = repository.get(action.id)
+                        if (note == null) {
+                            if (action.exitOnBack) {
+                                navController.navigate(Routes.MAIN) {
+                                    popUpTo(navController.graph.findStartDestination().id) {
+                                        inclusive = true
+                                    }
+                                    launchSingleTop = true
+                                }
+                            }
+                            return@collectLatest
+                        }
+                        navController.openEditRouteFor(note, exitOnBack = action.exitOnBack)
                     }
                 }
             } finally {
@@ -191,6 +218,10 @@ fun RememberNavGraph(
                 )
             }
 
+            composable(Routes.EXTERNAL_LAUNCH) {
+                Box(modifier = Modifier.fillMaxSize())
+            }
+
             composable(Routes.MAIN) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
@@ -211,7 +242,7 @@ fun RememberNavGraph(
             }
 
             composable(
-                route = "${Routes.EDIT_NOTE}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
+                route = "${Routes.EDIT_NOTE}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
                 arguments =
                     listOf(
                         navArgument(Routes.ARG_ID) {
@@ -226,10 +257,43 @@ fun RememberNavGraph(
                             type = NavType.BoolType
                             defaultValue = false
                         },
+                        navArgument(Routes.ARG_EXIT_ON_BACK) {
+                            type = NavType.BoolType
+                            defaultValue = false
+                        },
                     ),
             ) { entry ->
+                val context = LocalContext.current
                 val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
                 val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
+                val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
+                val onBack = {
+                    if (exitOnBack) {
+                        val activity = context as? Activity
+                        if (activity != null) {
+                            activity.finish()
+                        } else {
+                            navController.popBackStack()
+                            Unit
+                        }
+                    } else {
+                        navController.popBackStack()
+                        Unit
+                    }
+                }
+                val onNavigateUp = {
+                    if (exitOnBack) {
+                        navController.navigate(Routes.MAIN) {
+                            popUpTo(navController.graph.id) {
+                                inclusive = true
+                            }
+                            launchSingleTop = true
+                        }
+                    } else {
+                        navController.popBackStack()
+                        Unit
+                    }
+                }
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
                     LocalNavAnimatedVisibilityScope provides this@composable,
@@ -238,7 +302,8 @@ fun RememberNavGraph(
                         appScope = appScope,
                         noteId = id.takeIf { it > 0 },
                         forceEdit = forceEdit,
-                        onBack = { navController.popBackStack() },
+                        onBack = onBack,
+                        onNavigateUp = onNavigateUp,
                     )
                 }
             }
@@ -253,7 +318,7 @@ fun RememberNavGraph(
             }
 
             composable(
-                route = "${Routes.EDIT_LIST}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
+                route = "${Routes.EDIT_LIST}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
                 arguments =
                     listOf(
                         navArgument(Routes.ARG_ID) {
@@ -264,10 +329,43 @@ fun RememberNavGraph(
                             type = NavType.BoolType
                             defaultValue = false
                         },
+                        navArgument(Routes.ARG_EXIT_ON_BACK) {
+                            type = NavType.BoolType
+                            defaultValue = false
+                        },
                     ),
             ) { entry ->
+                val context = LocalContext.current
                 val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
                 val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
+                val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
+                val onBack = {
+                    if (exitOnBack) {
+                        val activity = context as? Activity
+                        if (activity != null) {
+                            activity.finish()
+                        } else {
+                            navController.popBackStack()
+                            Unit
+                        }
+                    } else {
+                        navController.popBackStack()
+                        Unit
+                    }
+                }
+                val onNavigateUp = {
+                    if (exitOnBack) {
+                        navController.navigate(Routes.MAIN) {
+                            popUpTo(navController.graph.id) {
+                                inclusive = true
+                            }
+                            launchSingleTop = true
+                        }
+                    } else {
+                        navController.popBackStack()
+                        Unit
+                    }
+                }
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
                     LocalNavAnimatedVisibilityScope provides this@composable,
@@ -276,7 +374,8 @@ fun RememberNavGraph(
                         appScope = appScope,
                         noteId = id.takeIf { it > 0 },
                         forceEdit = forceEdit,
-                        onBack = { navController.popBackStack() },
+                        onBack = onBack,
+                        onNavigateUp = onNavigateUp,
                     )
                 }
             }
@@ -287,11 +386,19 @@ fun RememberNavGraph(
 private fun NavController.openEditRouteFor(
     note: NoteWithItems,
     forceEdit: Boolean = false,
+    exitOnBack: Boolean = false,
 ) {
     val route =
         when (note.note.kind) {
-            NoteKind.NOTE -> Routes.editNote(note.note.id, forceEdit = forceEdit)
-            NoteKind.LIST -> Routes.editList(note.note.id, forceEdit = forceEdit)
+            NoteKind.NOTE -> Routes.editNote(note.note.id, forceEdit = forceEdit, exitOnBack = exitOnBack)
+            NoteKind.LIST -> Routes.editList(note.note.id, forceEdit = forceEdit, exitOnBack = exitOnBack)
         }
-    navigate(route)
+    navigate(route) {
+        if (exitOnBack) {
+            popUpTo(graph.id) {
+                inclusive = true
+            }
+        }
+        launchSingleTop = true
+    }
 }

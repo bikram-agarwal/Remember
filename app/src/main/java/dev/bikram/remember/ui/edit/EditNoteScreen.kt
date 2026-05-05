@@ -37,6 +37,7 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -69,6 +70,7 @@ fun EditNoteRoute(
     noteId: Long?,
     forceEdit: Boolean = false,
     onBack: () -> Unit,
+    onNavigateUp: () -> Unit = onBack,
 ) {
     val vm: EditNoteViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
@@ -102,6 +104,7 @@ fun EditNoteRoute(
             sharedNoteId = noteId,
             forceEdit = forceEdit,
             onBack = onBack,
+            onNavigateUp = onNavigateUp,
         )
     }
 }
@@ -121,6 +124,7 @@ fun EditNoteScreen(
     sharedNoteId: Long?,
     forceEdit: Boolean = false,
     onBack: () -> Unit,
+    onNavigateUp: () -> Unit = onBack,
 ) {
     val topBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
@@ -194,11 +198,11 @@ fun EditNoteScreen(
 
     val undoMsg = stringResource(R.string.common_undo)
     // Snackbar templates for the bottom-bar actions. Reused from the bulk-action
-    // strings since the count placeholder ("%1$d archived") reads naturally with 1.
-    val msgArchived = stringResource(R.string.bulk_action_archived, 1)
-    val msgTrashed = stringResource(R.string.bulk_action_trashed, 1)
-    val msgUnarchived = stringResource(R.string.bulk_action_unarchived, 1)
-    val msgRestored = stringResource(R.string.bulk_action_restored, 1)
+    // plurals since the count placeholder ("%1$d archived") reads naturally with 1.
+    val msgArchived = pluralStringResource(R.plurals.bulk_action_archived, 1, 1)
+    val msgTrashed = pluralStringResource(R.plurals.bulk_action_trashed, 1, 1)
+    val msgUnarchived = pluralStringResource(R.plurals.bulk_action_unarchived, 1, 1)
+    val msgRestored = pluralStringResource(R.plurals.bulk_action_restored, 1, 1)
 
     val handleBack = {
         appScope.launch {
@@ -217,6 +221,24 @@ fun EditNoteScreen(
             }
         }
         onBack()
+    }
+    val handleNavigateUp = {
+        appScope.launch {
+            val undoAction = vm.saveIfNeeded(untitledName)
+            if (undoAction != null) {
+                val result =
+                    snackbarHostState.showSnackbar(
+                        message = changesSavedMsg,
+                        actionLabel = undoMsg,
+                        withDismissAction = true,
+                        duration = androidx.compose.material3.SnackbarDuration.Short,
+                    )
+                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                    undoAction()
+                }
+            }
+        }
+        onNavigateUp()
     }
     // Use the regular BackHandler instead of PredictiveBackHandler. The predictive
     // version suspends on `progress.collect { }` until the gesture's flow completes,
@@ -317,7 +339,7 @@ fun EditNoteScreen(
                 isEditMode = isEditMode,
                 readOnly = readOnly,
                 markdownDisplayMode = markdownDisplayMode,
-                onBack = handleBack,
+                onBack = handleNavigateUp,
                 onToggleMarkdownDisplayMode = {
                     markdownDisplayMode =
                         if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
@@ -515,6 +537,7 @@ fun EditNoteScreen(
 
         EditNoteScrollableContent(
             vm = vm,
+            modifier = blurMod,
             horizontalPadding = 20.dp,
             padding = padding,
             markdownEditorState = markdownEditorState,
@@ -533,7 +556,6 @@ fun EditNoteScreen(
             onOpenActions = { actionsPickerOpen = true },
             onOpenTags = { tagsPickerOpen = true },
             onOpenAttachments = { attachmentsPickerOpen = true },
-            blurModifier = blurMod,
             scrollState = contentScrollState,
             scrollEnabled = !markdownSelectionActive,
         )

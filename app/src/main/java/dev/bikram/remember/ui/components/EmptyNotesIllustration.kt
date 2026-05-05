@@ -1,5 +1,11 @@
 package dev.bikram.remember.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -10,6 +16,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,7 +34,11 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Shape
+import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
+import dev.bikram.remember.ui.theme.LocalReducedMotion
+import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.RememberTheme
 import dev.bikram.remember.ui.theme.RoundedPolygonShape
 
@@ -55,6 +66,7 @@ fun EmptyNotesIllustration(modifier: Modifier = Modifier) {
                     .padding(start = 4.dp, top = 12.dp)
                     .size(72.dp),
             polygon = MaterialShapes.Clover4Leaf,
+            morphTo = MaterialShapes.Cookie9Sided,
             color = scheme.tertiaryContainer.copy(alpha = 0.42f),
         )
         ExpressiveEmptyBackdrop(
@@ -64,6 +76,7 @@ fun EmptyNotesIllustration(modifier: Modifier = Modifier) {
                     .padding(end = 6.dp, bottom = 10.dp)
                     .size(58.dp),
             polygon = MaterialShapes.Cookie9Sided,
+            morphTo = MaterialShapes.Clover4Leaf,
             color = scheme.primaryContainer.copy(alpha = 0.46f),
         )
         Canvas(Modifier.matchParentSize()) {
@@ -216,13 +229,38 @@ fun EmptyNotesIllustration(modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * Decorative backdrop that slowly morphs between [polygon] and [morphTo] on a 5-second
+ * loop. Each empty illustration pairs its two backdrops so they trade silhouettes — the
+ * page feels alive without distracting from the foreground artwork. Honors
+ * [LocalReducedMotion]: when the user opts out, the shape stays fixed at [polygon].
+ */
 @Composable
 private fun ExpressiveEmptyBackdrop(
     modifier: Modifier,
     polygon: RoundedPolygon,
+    morphTo: RoundedPolygon,
     color: Color,
 ) {
-    val shape = remember(polygon) { RoundedPolygonShape(polygon) }
+    val reducedMotion = LocalReducedMotion.current
+    val shape: Shape =
+        if (reducedMotion) {
+            remember(polygon) { RoundedPolygonShape(polygon) }
+        } else {
+            val morph = remember(polygon, morphTo) { Morph(polygon, morphTo) }
+            val transition = rememberInfiniteTransition(label = "emptyBackdropMorph")
+            val progress by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec =
+                    infiniteRepeatable(
+                        animation = tween(durationMillis = 2_500, easing = LinearEasing),
+                        repeatMode = RepeatMode.Reverse,
+                    ),
+                label = "emptyBackdropMorphProgress",
+            )
+            MorphPolygonShape(morph, progress)
+        }
     Box(
         modifier =
             modifier
@@ -247,6 +285,7 @@ fun EmptyArchiveIllustration(modifier: Modifier = Modifier) {
                     .align(Alignment.TopStart)
                     .size(58.dp),
             polygon = MaterialShapes.Cookie6Sided,
+            morphTo = MaterialShapes.Clover4Leaf,
             color = scheme.primaryContainer.copy(alpha = 0.50f),
         )
         ExpressiveEmptyBackdrop(
@@ -255,6 +294,7 @@ fun EmptyArchiveIllustration(modifier: Modifier = Modifier) {
                     .align(Alignment.BottomEnd)
                     .size(48.dp),
             polygon = MaterialShapes.Clover4Leaf,
+            morphTo = MaterialShapes.Cookie6Sided,
             color = scheme.secondaryContainer.copy(alpha = 0.56f),
         )
         Canvas(Modifier.matchParentSize()) {
@@ -385,6 +425,7 @@ fun EmptyTrashIllustration(modifier: Modifier = Modifier) {
                     .align(Alignment.TopEnd)
                     .size(56.dp),
             polygon = MaterialShapes.Sunny,
+            morphTo = MaterialShapes.Cookie9Sided,
             color = scheme.errorContainer.copy(alpha = 0.42f),
         )
         ExpressiveEmptyBackdrop(
@@ -393,6 +434,7 @@ fun EmptyTrashIllustration(modifier: Modifier = Modifier) {
                     .align(Alignment.BottomStart)
                     .size(46.dp),
             polygon = MaterialShapes.Cookie9Sided,
+            morphTo = MaterialShapes.Sunny,
             color = scheme.tertiaryContainer.copy(alpha = 0.52f),
         )
         Canvas(Modifier.matchParentSize()) {
@@ -512,6 +554,7 @@ fun EmptyFilterIllustration(modifier: Modifier = Modifier) {
                     .align(Alignment.TopStart)
                     .size(56.dp),
             polygon = MaterialShapes.Clover4Leaf,
+            morphTo = MaterialShapes.Cookie9Sided,
             color = scheme.tertiaryContainer.copy(alpha = 0.56f),
         )
         ExpressiveEmptyBackdrop(
@@ -520,6 +563,7 @@ fun EmptyFilterIllustration(modifier: Modifier = Modifier) {
                     .align(Alignment.BottomEnd)
                     .size(44.dp),
             polygon = MaterialShapes.Cookie9Sided,
+            morphTo = MaterialShapes.Clover4Leaf,
             color = scheme.primaryContainer.copy(alpha = 0.58f),
         )
         Canvas(Modifier.matchParentSize()) {

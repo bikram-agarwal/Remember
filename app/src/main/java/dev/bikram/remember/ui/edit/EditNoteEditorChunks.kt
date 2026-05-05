@@ -534,10 +534,10 @@ internal fun EditNoteBottomBarSection(
 internal fun EditNoteFormatBarContent(
     markdownEditorState: MarkdownEditorState,
     undoController: UndoRedoController,
+    modifier: Modifier = Modifier,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
     imeVisible: Boolean = false,
-    modifier: Modifier = Modifier,
 ) {
     Surface(
         color = MaterialTheme.colorScheme.surfaceVariant,
@@ -733,6 +733,7 @@ private fun String.withChecklistLineToggled(
 @Composable
 internal fun EditNoteScrollableContent(
     vm: EditNoteViewModel,
+    modifier: Modifier,
     horizontalPadding: Dp,
     padding: PaddingValues,
     markdownEditorState: MarkdownEditorState,
@@ -749,7 +750,6 @@ internal fun EditNoteScrollableContent(
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
-    blurModifier: Modifier,
     scrollState: ScrollState = rememberScrollState(),
     scrollEnabled: Boolean = true,
 ) {
@@ -776,7 +776,7 @@ internal fun EditNoteScrollableContent(
         modifier =
             Modifier
                 .fillMaxSize()
-                .then(blurModifier)
+                .then(modifier)
                 // Clip BEFORE the overscroll translation so the translated content doesn't bleed
                 // into the top-app-bar / bottom-bar zones during the bounce. Foundation 1.8+
                 // deprecated `OverscrollEffect.effectModifier`; the replacement is the

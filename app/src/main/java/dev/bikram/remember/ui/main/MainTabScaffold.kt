@@ -49,6 +49,7 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -126,9 +127,9 @@ fun MainTabScaffold(
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
     var clearTrashOpen by rememberSaveable { mutableStateOf(false) }
     var moveArchiveToTrashOpen by rememberSaveable { mutableStateOf(false) }
-    var closeNotesRevealRequest by rememberSaveable { mutableStateOf(0) }
+    var closeNotesRevealRequest by rememberSaveable { mutableIntStateOf(0) }
     var historySection by rememberSaveable { mutableStateOf(HistorySection.ARCHIVE) }
-    var historyVisibleItemCount by rememberSaveable { mutableStateOf(0) }
+    var historyVisibleItemCount by rememberSaveable { mutableIntStateOf(0) }
     val tabStateHolder = rememberSaveableStateHolder()
     val context = LocalContext.current
     val shareText = stringResource(R.string.main_share_text)

@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -331,7 +332,12 @@ class HistoryViewModel
                 when (action) {
                     is BulkUndoableAction.Archived -> repository.unarchiveNotes(action.ids)
                     is BulkUndoableAction.Trashed -> repository.restoreFromTrash(action.ids)
-                    is BulkUndoableAction.MarkedDone -> repository.markIncomplete(action.ids)
+                    is BulkUndoableAction.MarkedDone ->
+                        if (action.snapshots.isNotEmpty()) {
+                            repository.restoreCompletionStates(action.snapshots)
+                        } else {
+                            repository.markIncomplete(action.ids)
+                        }
                     is BulkUndoableAction.Restored -> repository.moveToTrash(action.ids)
                     is BulkUndoableAction.Unarchived -> repository.archiveNotes(action.ids)
                     is BulkUndoableAction.ArchivedFromTrash -> repository.moveToTrash(action.ids)
@@ -982,7 +988,7 @@ private fun TrashDaysLeftBadge(
         if (daysLeft <= 0) {
             stringResource(R.string.history_expires_today)
         } else {
-            stringResource(R.string.history_days_left, daysLeft)
+            pluralStringResource(R.plurals.history_days_left, daysLeft, daysLeft)
         }
     Text(
         text = label,

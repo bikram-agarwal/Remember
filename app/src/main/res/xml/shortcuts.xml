@@ -3,19 +3,17 @@
     <shortcut
         android:shortcutId="new_note"
         android:enabled="true"
-        android:icon="@drawable/ic_stat_note"
+        android:icon="@mipmap/ic_shortcut_new_note"
         android:shortcutShortLabel="@string/shortcut_new_note_short"
         android:shortcutLongLabel="@string/shortcut_new_note_long">
         <intent android:action="dev.bikram.remember.action.SHORTCUT_NEW_NOTE" />
-        <categories android:name="android.shortcut.conversation" />
     </shortcut>
     <shortcut
         android:shortcutId="new_list"
         android:enabled="true"
-        android:icon="@drawable/ic_stat_note"
+        android:icon="@mipmap/ic_shortcut_new_list"
         android:shortcutShortLabel="@string/shortcut_new_list_short"
         android:shortcutLongLabel="@string/shortcut_new_list_long">
         <intent android:action="dev.bikram.remember.action.SHORTCUT_NEW_LIST" />
-        <categories android:name="android.shortcut.conversation" />
     </shortcut>
 </shortcuts>

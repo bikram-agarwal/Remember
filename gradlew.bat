@@ -70,14 +70,10 @@ goto fail
 :execute
 @rem Setup the command line
 
-set CLASSPATH=
 
-@rem Align Gradle with the same JDK as this script (overrides stale org.gradle.java.home in user gradle.properties).
-set "GRADLE_JAVA_HOME_ARG="
-if defined JAVA_HOME set "GRADLE_JAVA_HOME_ARG=-Dorg.gradle.java.home=%JAVA_HOME%"
 
 @rem Execute Gradle
-"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% %GRADLE_JAVA_HOME_ARG% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*
+"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*
 
 :end
 @rem End local scope for the variables with windows NT shell

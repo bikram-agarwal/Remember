@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools">
 
     <!-- App -->
     <string name="app_name">Remember</string>
@@ -50,7 +50,6 @@
     <string name="app_picker_nothing_available">Nothing available</string>
     <string name="edit_note_title_existing">Untitled</string>
     <string name="edit_note_body_placeholder">Type your note…</string>
-    <string name="edit_note_empty_view_title">No content yet</string>
     <string name="edit_note_empty_view_hint">Tap Edit to start writing</string>
     <string name="edit_list_empty_view_title">Empty list</string>
     <string name="edit_list_empty_view_hint">Tap Edit to start writing</string>
@@ -64,12 +63,18 @@
 
     <!-- Toasts and transient feedback -->
     <string name="toast_export_failed">Export failed</string>
-    <string name="toast_exported_notes">Exported %1$d notes</string>
+    <plurals name="toast_exported_notes">
+        <item quantity="one">Exported %1$d note</item>
+        <item quantity="other">Exported %1$d notes</item>
+    </plurals>
     <plurals name="toast_exported_to_destinations">
         <item quantity="one">Backup exported to %1$d folder</item>
         <item quantity="other">Backup exported to %1$d folders</item>
     </plurals>
-    <string name="toast_imported_notes">Imported %1$d notes</string>
+    <plurals name="toast_imported_notes">
+        <item quantity="one">Imported %1$d note</item>
+        <item quantity="other">Imported %1$d notes</item>
+    </plurals>
     <string name="toast_copied">Copied</string>
     <string name="changes_saved">Changes saved</string>
     <string name="toast_about_link_copied">Link copied</string>
@@ -80,7 +85,12 @@
     <string name="shortcut_new_note_long">New note</string>
     <string name="shortcut_new_list_short">List</string>
     <string name="shortcut_new_list_long">New list</string>
-    <string name="widget_description">Favorite notes and next reminder</string>
+    <string name="widget_agenda_label">Due &amp; upcoming</string>
+    <string name="widget_quick_capture_label">Quick capture</string>
+    <string name="widget_favorites_label">Favorites</string>
+    <string name="widget_agenda_description">Track overdue reminders and what is coming up in the next 7 days.</string>
+    <string name="widget_quick_capture_description">Create a new note or list from your home screen, with a tiny due-today status.</string>
+    <string name="widget_favorites_description">Keep favorite notes and lists close, even after they are marked done.</string>
     <string name="widget_header_title">Remember</string>
 
     <!-- Lock and PIN -->
@@ -89,7 +99,7 @@
     <string name="lock_use_device_unlock">Use your device unlock method</string>
     <string name="lock_wrong_pin">Wrong PIN</string>
     <string name="pin_setup_title">Set up PIN</string>
-    <string name="pin_setup_subtitle">Choose a 4-6 digit PIN to unlock Remember</string>
+    <string name="pin_setup_subtitle" tools:ignore="TypographyDashes">Choose a 4-6 digit PIN to unlock Remember</string>
     <string name="pin_label">PIN</string>
     <string name="pin_confirm_label">Confirm</string>
 
@@ -151,19 +161,16 @@
     <string name="notecard_picture_cd">Has picture</string>
     <string name="notecard_attachment_cd">Has attachment</string>
     <string name="notecard_extra_tags">+%1$d</string>
-    <string name="notecard_extra_items">+ %1$d more</string>
+    <plurals name="notecard_extra_items">
+        <item quantity="one">+ %1$d more</item>
+        <item quantity="other">+ %1$d more</item>
+    </plurals>
     <string name="notecard_cd_note">Note: %1$s</string>
     <string name="notecard_cd_list">List: %1$s</string>
     <string name="notecard_cd_separator">. </string>
     <string name="notecard_cd_tags">Tags: %1$s</string>
-    <string name="notecard_cd_due">Due %1$s</string>
-    <string name="notecard_cd_list_items">Items: %1$s</string>
     <string name="notecard_cd_completed">Completed</string>
     <string name="notecard_cd_selected">Selected</string>
-    <plurals name="notecard_cd_more_items">
-        <item quantity="one">%1$d more item</item>
-        <item quantity="other">%1$d more items</item>
-    </plurals>
     <string name="hero_framing_title">Position cover</string>
     <string name="viewer_cover_image_cd">Cover image</string>
     <string name="toast_saved_to_downloads">Saved to Downloads</string>
@@ -171,11 +178,14 @@
     <string name="toast_open_attachment_failed">No app can open this file</string>
 
     <!-- Note editor toolbar -->
-    <string name="checked_items_count">%1$d Checked items</string>
+    <plurals name="checked_items_count">
+        <item quantity="one">%1$d Checked item</item>
+        <item quantity="other">%1$d Checked items</item>
+    </plurals>
     <string name="edit_list_add_item">Add item</string>
     <string name="edit_list_new_item_placeholder">New item</string>
     <string name="rt_text_to_display">Text to display</string>
-    <string name="rt_url_hint">URL (e.g. https://...)</string>
+    <string name="rt_url_hint" tools:ignore="TypographyEllipsis">URL (e.g. https://...)</string>
     <string name="rt_h1">H1</string>
     <string name="rt_h2">H2</string>
     <string name="rt_h3">H3</string>
@@ -184,8 +194,6 @@
     <string name="rt_h3_cd">Heading 3</string>
     <string name="rt_add_link">Add link</string>
     <string name="rt_edit_link">Edit link</string>
-    <string name="rt_link_confirm_add">Add</string>
-    <string name="rt_link_confirm_save">Save</string>
     <string name="cd_redo">Redo</string>
     <string name="cd_bold">Bold</string>
     <string name="cd_italic">Italic</string>
@@ -206,7 +214,6 @@
     <string name="edit_bottom_bar_edit">Edit</string>
     <string name="edit_bottom_bar_done">Done</string>
     <string name="edit_bottom_bar_favorite">Favorite</string>
-    <string name="edit_bottom_bar_unfavorite">Unfavorite</string>
     <string name="edit_bottom_bar_archive">Archive</string>
     <string name="edit_bottom_bar_notification">Notification</string>
     <string name="edit_bottom_bar_unarchive">Unarchive</string>
@@ -237,7 +244,10 @@
     <string name="history_trash_empty_subtitle">Deleted items land here first and stick around for 30 days</string>
     <string name="history_trash_retention_notice">Items in the trash are permanently deleted after 30 days</string>
     <string name="history_archive_move_to_trash_cd">Move to trash</string>
-    <string name="history_days_left">%1$d days left</string>
+    <plurals name="history_days_left">
+        <item quantity="one">%1$d day left</item>
+        <item quantity="other">%1$d days left</item>
+    </plurals>
     <string name="history_expires_today">Expires today</string>
 
     <!-- Home: full-text search + bulk select -->
@@ -253,7 +263,6 @@
     <string name="home_no_results_filters_title">Nothing matches these filters</string>
     <string name="home_no_results_filters_hint">Try adjusting search or filters</string>
     <string name="home_nothing_here">Nothing to show here</string>
-    <string name="home_select_count">%1$d selected</string>
     <string name="home_select_exit_cd">Exit selection</string>
     <string name="home_select_all">Select all</string>
     <string name="home_unselect_all">Unselect all</string>
@@ -281,15 +290,35 @@
     <string name="home_bulk_tag_cd">Tag selected notes</string>
 
     <!-- Snackbar messages shown after a bulk action completes. The single Undo button
-         on the snackbar reverses the action by calling the inverse repository method.
-         "%1$d" is the count of affected notes. -->
-    <string name="bulk_action_archived">%1$d archived</string>
-    <string name="bulk_action_trashed">%1$d moved to Trash</string>
-    <string name="bulk_action_marked_done">%1$d marked done</string>
-    <string name="bulk_action_restored">%1$d restored</string>
-    <string name="bulk_action_unarchived">%1$d back to Notes</string>
-    <string name="bulk_action_moved_to_trash_from_archive">%1$d moved to Trash</string>
-    <string name="bulk_action_archived_from_trash">%1$d archived</string>
+         on the snackbar reverses the action by calling the inverse repository method. -->
+    <plurals name="bulk_action_archived">
+        <item quantity="one">%1$d archived</item>
+        <item quantity="other">%1$d archived</item>
+    </plurals>
+    <plurals name="bulk_action_trashed">
+        <item quantity="one">%1$d moved to Trash</item>
+        <item quantity="other">%1$d moved to Trash</item>
+    </plurals>
+    <plurals name="bulk_action_marked_done">
+        <item quantity="one">%1$d marked done</item>
+        <item quantity="other">%1$d marked done</item>
+    </plurals>
+    <plurals name="bulk_action_restored">
+        <item quantity="one">%1$d restored</item>
+        <item quantity="other">%1$d restored</item>
+    </plurals>
+    <plurals name="bulk_action_unarchived">
+        <item quantity="one">%1$d back to Notes</item>
+        <item quantity="other">%1$d back to Notes</item>
+    </plurals>
+    <plurals name="bulk_action_moved_to_trash_from_archive">
+        <item quantity="one">%1$d moved to Trash</item>
+        <item quantity="other">%1$d moved to Trash</item>
+    </plurals>
+    <plurals name="bulk_action_archived_from_trash">
+        <item quantity="one">%1$d archived</item>
+        <item quantity="other">%1$d archived</item>
+    </plurals>
     <string name="bulk_action_undo">Undo</string>
 
     <!-- Confirmation sheet shown before bulk delete-forever from the History selection
@@ -306,12 +335,27 @@
     <string name="settings_quick_capture_subtitle">Persistent shortcut to create a new note</string>
 
     <!-- Widget additions -->
-    <string name="widget_section_pinned">Favorites</string>
-    <string name="widget_section_reminders">Reminder summary</string>
-    <string name="widget_section_empty_pinned">No favorites yet</string>
-    <string name="widget_section_empty_reminders">No reminders due soon</string>
+    <string name="widget_section_overdue">Overdue</string>
+    <string name="widget_section_upcoming">Upcoming</string>
+    <string name="widget_favorites_title">Favorites</string>
+    <string name="widget_empty_nothing_overdue">Nothing overdue</string>
+    <string name="widget_empty_nothing_upcoming">Nothing in next 7 days</string>
+    <string name="widget_empty_nothing_due">Nothing due</string>
+    <string name="widget_empty_watermark">🎉</string>
+    <string name="widget_empty_favorites">It\'s lonely in here</string>
+    <string name="widget_empty_favorites_watermark">✨</string>
+    <string name="widget_refresh_cd">Refresh widget</string>
+    <string name="widget_mark_done_cd">Mark done</string>
     <string name="widget_create_new_note">Create new note</string>
     <string name="widget_create_new_list">Create new list</string>
+    <plurals name="widget_status_due_today">
+        <item quantity="one">%1$d due today</item>
+        <item quantity="other">%1$d due today</item>
+    </plurals>
+    <plurals name="widget_status_overdue">
+        <item quantity="one">%1$d overdue</item>
+        <item quantity="other">%1$d overdue</item>
+    </plurals>
 
     <!-- Chips and tags on cards -->
     <string name="remove_tag_cd">Remove %1$s</string>
@@ -350,6 +394,7 @@
     <string name="reminder_notifications_required_action">Enable notifications</string>
     <string name="notification_permission_required_title">Post to Notifications</string>
     <string name="notification_permission_required_body">Remember doesn\'t have permission to create notifications yet</string>
+    <string name="reminder_date_picker_today">Today</string>
     <string name="reminder_every_label">Every</string>
     <string name="reminder_on_day">On day %1$d</string>
     <string name="reminder_ends_label">Ends</string>
@@ -423,8 +468,14 @@
     <string name="reminder_notification_fallback">Tap to open</string>
     <string name="reminder_notification_all_items_checked">All items checked</string>
     <string name="reminder_summary_title">Reminders</string>
-    <string name="reminder_summary_count">%1$d due or upcoming</string>
-    <string name="reminder_summary_more">+%1$d more</string>
+    <plurals name="reminder_summary_count">
+        <item quantity="one">%1$d due or upcoming</item>
+        <item quantity="other">%1$d due or upcoming</item>
+    </plurals>
+    <plurals name="reminder_summary_more">
+        <item quantity="one">+%1$d more</item>
+        <item quantity="other">+%1$d more</item>
+    </plurals>
     <string name="reminder_summary_line">%1$s - %2$s</string>
     <string name="reminder_summary_due_today">Due today</string>
     <plurals name="reminder_summary_overdue_days">
@@ -443,7 +494,6 @@
     <!-- Tags editor -->
     <string name="tags_hex_label">Hex</string>
     <string name="tags_hex_placeholder">Enter hex</string>
-    <string name="tag_editor_suggested_heading">Suggested tags</string>
     <string name="tag_editor_assigned_heading">Assigned</string>
     <string name="tag_editor_available_heading">Available</string>
     <string name="tag_editor_no_assigned_tags">No tags assigned</string>
@@ -457,7 +507,6 @@
     <string name="tag_editor_edit_mode_cd">Edit tags</string>
     <string name="tag_editor_edit_mode_hint">Edit mode: tap a tag to change its name and color</string>
     <string name="tag_editor_assign_mode_hint">Tap a tag to change its state: (+) Assign, (x) Remove</string>
-    <string name="tag_editor_update_tag">Update tag</string>
     <string name="tag_editor_unsaved_title">Unsaved tag changes</string>
     <string name="tag_editor_unsaved_body">Tag changes are not saved yet. Discard them?</string>
     <string name="tag_editor_unsaved_discard">Discard</string>
@@ -544,8 +593,6 @@
     <string name="icon_picker_no_results">No icons match that search</string>
     <string name="icon_picker_tab_icons">Icons</string>
     <string name="icon_picker_tab_emojis">Emojis</string>
-    <string name="icon_picker_choose_emoji">Emoji</string>
-    <string name="icon_picker_emoji_search_hint">Search emojis</string>
     <string name="icon_picker_emoji_no_results">No emojis match that search</string>
     <string name="icon_picker_emoji_category_smileys">Smileys</string>
     <string name="icon_picker_emoji_category_animals">Animals</string>
@@ -568,7 +615,6 @@
     <string name="appearance_theme_dark">Dark</string>
     <string name="appearance_theme_black">Black</string>
     <string name="appearance_palette_style">Palette style</string>
-    <string name="appearance_preview_title">Preview</string>
     <string name="appearance_preview_title_named">Preview · %1$s</string>
     <string name="color_source_material_you">Material You</string>
     <string name="color_source_forest">Forest</string>
@@ -582,8 +628,6 @@
     <string name="color_source_custom">Custom</string>
     <string name="appearance_preview_surface_ladder">Surface ladder</string>
     <string name="appearance_preview_accent_containers">Accent containers</string>
-    <string name="appearance_preview_recessed">recessed</string>
-    <string name="appearance_preview_raised">raised</string>
     <string name="appearance_preview_label_lowest">lowest</string>
     <string name="appearance_preview_label_low">low</string>
     <string name="appearance_preview_label_surface">surface</string>
@@ -593,8 +637,6 @@
     <string name="appearance_preview_label_primary">primary</string>
     <string name="appearance_preview_label_secondary">secondary</string>
     <string name="appearance_preview_label_tertiary">tertiary</string>
-    <string name="appearance_preview_status_good">Good differentiation</string>
-    <string name="appearance_preview_status_low">Try Vibrant or Expressive</string>
     <string name="appearance_preview_sample_text" translatable="false">Aa</string>
     <string name="appearance_gradient_title">Gradient background</string>
     <string name="appearance_gradient_subtitle">Show a subtle accent gradient behind the app</string>
@@ -634,9 +676,6 @@
     <string name="settings_updates_section">Updates</string>
     <string name="settings_section_about">About</string>
 
-    <!-- Settings: appearance summary row -->
-    <string name="settings_theme_colors_hint">Accent and dynamic color source</string>
-
     <!-- Settings: haptics, notifications, swipe -->
     <string name="settings_haptics_section">Haptics</string>
     <string name="settings_notifications_section">Notifications</string>
@@ -657,12 +696,9 @@
     <string name="settings_swipe_gesture">Swipe actions</string>
     <string name="settings_swipe_mode_execute_one">Swipe to execute one action</string>
     <string name="settings_swipe_mode_reveal_actions">Swipe to reveal three actions</string>
-    <string name="settings_swipe_right">Swipe right →</string>
-    <string name="settings_swipe_left">← Swipe left</string>
     <string name="settings_swipe_right_actions">Right swipe actions</string>
     <string name="settings_swipe_left_actions">Left swipe actions</string>
     <string name="settings_swipe_none">None</string>
-    <string name="settings_swipe_preview_note">Note</string>
     <string name="swipe_action_open">Edit</string>
     <string name="swipe_action_duplicate">Duplicate</string>
     <string name="swipe_action_toggle_favorite">Favorite</string>
@@ -683,66 +719,59 @@
     <string name="google_tasks_import_takeout_step_3">3. Come back here and tap \"Choose Tasks.json\"</string>
     <string name="google_tasks_import_takeout_pick_json">Choose Tasks.json</string>
     <string name="google_tasks_import_takeout_open_takeout">Open Google Takeout</string>
-    <string name="google_tasks_import_takeout_loaded">Loaded from Google Takeout Tasks.json</string>
-    <string name="google_tasks_import_takeout_collapse_summary">Collapsed %1$d recurring task instances into %2$d tasks</string>
+    <string name="google_tasks_import_takeout_collapse_summary" tools:ignore="PluralsCandidate">Collapsed %1$d recurring task instances into %2$d tasks</string>
     <string name="google_tasks_import_pick_account">Choose Google account</string>
     <string name="google_tasks_import_pick_other_account">Use a different account</string>
     <string name="google_tasks_import_continue_as">Continue as %1$s</string>
     <string name="google_tasks_import_switch_account">Switch account</string>
-    <string name="google_tasks_import_signed_in_as">Connected as</string>
     <string name="google_tasks_import_signed_in_unknown_email">your Google account</string>
     <string name="google_tasks_import_loading">Loading your Google Tasks…</string>
     <string name="google_tasks_import_empty_title">No tasks under %1$s</string>
     <string name="google_tasks_import_empty_title_no_email">No tasks in your Google account</string>
     <string name="google_tasks_import_empty_body">When you add tasks in Google Tasks they will show up here</string>
-    <string name="google_tasks_import_filter_all_lists">All lists</string>
-    <string name="google_tasks_import_filter_label">List</string>
     <string name="google_tasks_import_due_label">Due %1$s</string>
     <string name="google_tasks_import_completed_chip">Completed</string>
     <string name="google_tasks_import_already_imported_chip">Already imported</string>
     <string name="google_tasks_import_untitled_task">Untitled task</string>
-    <string name="google_tasks_import_time_caveat">Google Tasks does not expose reminder times to apps; due dates land at 9:00 AM and can be edited after import</string>
-    <string name="google_tasks_import_select_all">Select all</string>
-    <string name="google_tasks_import_clear_selection">Clear selection</string>
-    <string name="google_tasks_import_selection_count">%1$d / %2$d</string>
     <string name="google_tasks_import_run">Import %1$d</string>
     <string name="google_tasks_import_importing">Importing tasks…</string>
-    <string name="google_tasks_import_importing_progress">Importing %1$d / %2$d tasks</string>
-    <string name="google_tasks_import_overwrite">Overwrite tasks I have already imported</string>
+    <string name="google_tasks_import_importing_progress" tools:ignore="PluralsCandidate">Importing %1$d / %2$d tasks</string>
     <string name="google_tasks_import_mode_one_note_per_task">One note per task</string>
     <string name="google_tasks_import_mode_group_by_list">One note per list</string>
     <string name="google_tasks_import_mode_list_as_checklist">List as checklist</string>
-    <string name="google_tasks_import_done_snack">Imported %1$d tasks</string>
+    <plurals name="google_tasks_import_done_snack">
+        <item quantity="one">Imported %1$d task</item>
+        <item quantity="other">Imported %1$d tasks</item>
+    </plurals>
     <string name="google_tasks_import_error_network">Could not reach Google Tasks. Check your connection and try again.</string>
     <string name="google_tasks_import_error_consent">Consent is required to import Google Tasks</string>
     <string name="google_tasks_import_error_takeout_parse">Could not read this file. Choose the Google Tasks Tasks.json file from Takeout.</string>
     <string name="google_tasks_import_error_auth_default">Could not sign in to Google. Try a different account.</string>
     <string name="google_tasks_import_error_unknown_default">Something went wrong while talking to Google Tasks</string>
-    <string name="google_tasks_import_search_hint">Search %1$d tasks</string>
+    <plurals name="google_tasks_import_search_hint">
+        <item quantity="one">Search %1$d task</item>
+        <item quantity="other">Search %1$d tasks</item>
+    </plurals>
     <string name="google_tasks_import_skip_imported_pill">Skip imported</string>
     <string name="google_tasks_import_overwrite_imported_pill">Overwrite imported</string>
     <string name="google_tasks_import_skip_imported_menu_label">Skip already-imported</string>
     <string name="google_tasks_import_overwrite_imported_menu_label">Overwrite already-imported</string>
-    <string name="google_tasks_import_select_all_n">Select all %1$d</string>
-    <string name="google_tasks_import_deselect_all">Deselect all</string>
     <string name="google_tasks_import_hero_selected_of_total">selected of %1$d</string>
     <string name="google_tasks_import_hero_caveat_compact">Times default to 9 AM, edit after import</string>
-    <string name="google_tasks_import_imported_inline_label">imported</string>
-    <string name="google_tasks_import_group_selection_count">%1$d of %2$d selected</string>
     <string name="google_tasks_import_group_count_chip">%1$d / %2$d</string>
     <string name="google_tasks_import_source_label">Source</string>
-    <string name="google_tasks_import_source_google_subtitle">%1$d tasks · %2$d lists</string>
+    <string name="google_tasks_import_source_google_subtitle" tools:ignore="PluralsCandidate">%1$d tasks · %2$d lists</string>
     <string name="google_tasks_import_source_takeout_title">Takeout JSON</string>
-    <string name="google_tasks_import_source_takeout_subtitle">%1$d tasks · %2$d lists</string>
-    <string name="google_tasks_import_source_chip_google_title">Google · %1$s</string>
-    <string name="google_tasks_import_source_chip_takeout_title">Takeout · loaded file</string>
     <string name="google_tasks_import_source_action_refresh">Refresh from Google</string>
     <string name="google_tasks_import_source_action_switch_account">Switch Google account</string>
     <string name="google_tasks_import_source_action_use_takeout">Use Takeout JSON instead</string>
     <string name="google_tasks_import_source_action_connect_google">Connect Google account instead</string>
     <string name="google_tasks_import_source_action_disconnect">Disconnect</string>
     <string name="google_tasks_import_source_action_cancel_takeout">Cancel</string>
-    <string name="google_tasks_import_source_switch_confirm_title">Discard %1$d selected?</string>
+    <plurals name="google_tasks_import_source_switch_confirm_title">
+        <item quantity="one">Discard %1$d selected?</item>
+        <item quantity="other">Discard %1$d selected?</item>
+    </plurals>
     <string name="google_tasks_import_source_switch_confirm_body">None of these tasks are saved to Remember yet. Cancel and switch source?</string>
     <string name="google_tasks_import_source_switch_confirm_continue">Switch source</string>
     <string name="google_tasks_import_cancel_takeout_confirm_title">Cancel import?</string>
@@ -752,12 +781,10 @@
     <string name="google_tasks_import_group_collapse_cd">Collapse %1$s</string>
     <string name="google_tasks_import_group_expand_cd">Expand %1$s</string>
     <string name="google_tasks_import_no_search_match">No matches for \"%1$s\"</string>
-    <string name="google_tasks_import_hide_source_options">Hide source options</string>
 
     <!-- Settings: backup and restore -->
     <string name="settings_backup_section">Backup &amp; restore</string>
     <string name="filesystem_folder_picker_internal_storage">Internal storage</string>
-    <string name="settings_choose_export_folder">Choose export folder</string>
     <string name="settings_choose_local_backup_folder">Choose local backup folder</string>
     <string name="settings_choose_cloud_backup_file">Choose cloud backup file</string>
     <string name="settings_local_backup_folder_hint">Folder for exporting backups (notes, lists, settings)</string>
@@ -816,7 +843,6 @@
     <string name="settings_update_current_version">Current version: %1$s</string>
     <string name="settings_up_to_date">You\'re up to date</string>
     <string name="settings_download_install">Download update (v%1$s)</string>
-    <string name="settings_open_play_store">Open Play Store</string>
     <string name="settings_downloading">Downloading…</string>
     <string name="settings_downloading_percent">Downloading %1$d%%</string>
     <string name="settings_installing">Installing…</string>

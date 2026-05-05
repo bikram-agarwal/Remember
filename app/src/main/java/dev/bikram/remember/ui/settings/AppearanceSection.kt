@@ -1,7 +1,5 @@
 package dev.bikram.remember.ui.settings
 
-import android.os.Build
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -16,15 +14,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -43,23 +44,24 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ColorSource
+import dev.bikram.remember.data.PaletteStyleOpt
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.theme.PaletteDifferentiationStatus
 import dev.bikram.remember.ui.theme.contrastingTextColor
-import dev.bikram.remember.ui.theme.paletteDifferentiationStatus
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -76,79 +78,19 @@ fun AppearanceSection(
     val blackThemeEffectsDisabledMessage = stringResource(R.string.appearance_black_theme_effect_disabled)
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-        ) {
-            themePickerOrder.forEachIndexed { index, mode ->
-                RememberToggleButton(
-                    checked = state.themeMode == mode,
-                    onCheckedChange = { checked ->
-                        if (checked) scope.launch { prefs.setThemeMode(mode) }
-                    },
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .semantics { role = Role.RadioButton },
-                    shapes =
-                        when (index) {
-                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                            themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                        },
-                ) {
-                    Text(
-                        text = themeModeLabel(mode),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.settings_theme_colors_hint),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
-        ThemeAccentRow(
-            colorSource = state.colorSource,
-            activeCustomSeedHex = state.activeCustomSeed,
-            savedCustomSeedHexes = state.customSeeds,
-            onSelectPreset = { source -> scope.launch { prefs.setColorSource(source) } },
-            onSelectCustomHex = { hex -> scope.launch { prefs.setActiveCustomSeed(hex) } },
-            onCustomHexLongPress = { hex -> pendingDelete = hex },
-            onAddCustomHexClick = { customHexOpen = true },
-        )
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = stringResource(R.string.appearance_palette_style),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        ThemePaletteStyleRow(
-            selected = state.paletteStyle,
-            enabled = colorSourcePaletteChipsEnabled(state.colorSource),
-            onSelect = { style -> scope.launch { prefs.setPaletteStyle(style) } },
-        )
-
-        if (state.colorSource == ColorSource.MATERIAL_YOU && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.appearance_material_you_requires_s),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-
-        Spacer(Modifier.height(14.dp))
-        ThemePreviewCard(colorSource = state.colorSource)
-
-        Spacer(Modifier.height(12.dp))
         GroupedListColumn {
             GroupedListItem(position = GroupPosition.FIRST) {
+                AppearanceStudioControls(
+                    state = state,
+                    onThemeModeChange = { mode -> scope.launch { prefs.setThemeMode(mode) } },
+                    onSelectPreset = { source -> scope.launch { prefs.setColorSource(source) } },
+                    onSelectCustomHex = { hex -> scope.launch { prefs.setActiveCustomSeed(hex) } },
+                    onCustomHexLongPress = { hex -> pendingDelete = hex },
+                    onAddCustomHexClick = { customHexOpen = true },
+                    onPaletteStyleChange = { style -> scope.launch { prefs.setPaletteStyle(style) } },
+                )
+            }
+            GroupedListItem(position = GroupPosition.MIDDLE) {
                 AppearanceSettingsToggleItem(
                     title = stringResource(R.string.appearance_gradient_title),
                     subtitle = stringResource(R.string.appearance_gradient_subtitle),
@@ -221,6 +163,132 @@ fun AppearanceSection(
                 }) { Text(stringResource(R.string.common_remove)) }
             },
         ) { }
+    }
+}
+
+@Composable
+private fun AppearanceStudioControls(
+    state: ThemeState,
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onSelectPreset: (ColorSource) -> Unit,
+    onSelectCustomHex: (String) -> Unit,
+    onCustomHexLongPress: (String) -> Unit,
+    onAddCustomHexClick: () -> Unit,
+    onPaletteStyleChange: (PaletteStyleOpt) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        ThemeModeSegmentedRow(
+            selected = state.themeMode,
+            onSelect = onThemeModeChange,
+        )
+        ThemeAccentRow(
+            colorSource = state.colorSource,
+            activeCustomSeedHex = state.activeCustomSeed,
+            savedCustomSeedHexes = state.customSeeds,
+            onSelectPreset = onSelectPreset,
+            onSelectCustomHex = onSelectCustomHex,
+            onCustomHexLongPress = onCustomHexLongPress,
+            onAddCustomHexClick = onAddCustomHexClick,
+        )
+        AppearanceStudioSection(
+            title = stringResource(R.string.appearance_palette_style),
+        ) {
+            ThemePaletteStyleRow(
+                selected = state.paletteStyle,
+                enabled = colorSourcePaletteChipsEnabled(state.colorSource),
+                onSelect = onPaletteStyleChange,
+            )
+        }
+        HorizontalDivider(
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
+        )
+        ThemePreviewPanel(colorSource = state.colorSource)
+    }
+}
+
+@Composable
+private fun ThemeModeSegmentedRow(
+    selected: ThemeMode,
+    onSelect: (ThemeMode) -> Unit,
+) {
+    val colors =
+        ToggleButtonDefaults.toggleButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    val labels = themePickerOrder.map { mode -> themeModeLabel(mode) }
+    val shapes =
+        themePickerOrder.mapIndexed { index, _ ->
+            when (index) {
+                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            }
+        }
+    ButtonGroup(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
+    ) {
+        themePickerOrder.forEachIndexed { index, mode ->
+            val label = labels[index]
+            val itemModifier = Modifier.weight(1f).semantics { role = Role.RadioButton }
+            customItem(
+                buttonGroupContent = {
+                    RememberToggleButton(
+                        checked = selected == mode,
+                        onCheckedChange = { checked ->
+                            if (checked) onSelect(mode)
+                        },
+                        modifier = itemModifier,
+                        shapes = shapes[index],
+                        colors = colors,
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                        )
+                    }
+                },
+                menuContent = { menuState ->
+                    RememberDropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onSelect(mode)
+                            menuState.dismiss()
+                        },
+                    )
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppearanceStudioSection(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        content()
     }
 }
 
@@ -303,7 +371,7 @@ private fun CustomHexSheet(
     val normalized = normalizeHex(draftHex.trim())
     val previewColor =
         normalized?.let {
-            runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull()
+            runCatching { Color(it.toColorInt()) }.getOrNull()
         }
     val previewShape = MaterialTheme.shapes.medium
     val outlineColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)
@@ -428,93 +496,54 @@ private fun themeModeLabel(mode: ThemeMode): String =
  *  2. Accent containers: primaryContainer, secondaryContainer, tertiaryContainer with
  *     "Aa" rendered in the corresponding onContainer color so users can spot-check both
  *     hue separation and text contrast in one glance.
- *
- * The status pill in the header uses [paletteDifferentiationStatus] to nudge users toward
- * a different palette style when the active combo is too flat.
  */
 @Composable
-private fun ThemePreviewCard(colorSource: ColorSource) {
+private fun ThemePreviewPanel(colorSource: ColorSource) {
     val scheme = MaterialTheme.colorScheme
-    val status = remember(scheme) { paletteDifferentiationStatus(scheme) }
     val title =
         stringResource(
             R.string.appearance_preview_title_named,
             colorSourceDisplayName(colorSource),
         )
 
-    Surface(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.largeIncreased,
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                )
-                ThemePreviewStatusPill(status = status)
-            }
+            Text(
+                text = title,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                modifier = Modifier.weight(1f),
+            )
+        }
+        PreviewSubsection(title = stringResource(R.string.appearance_preview_surface_ladder)) {
             SurfaceLadderStrip(scheme = scheme)
+        }
+        PreviewSubsection(title = stringResource(R.string.appearance_preview_accent_containers)) {
             AccentContainersStrip(scheme = scheme)
         }
     }
 }
 
 @Composable
-private fun ThemePreviewStatusPill(status: PaletteDifferentiationStatus) {
-    val good = status == PaletteDifferentiationStatus.GOOD
-    val container =
-        if (good) {
-            MaterialTheme.colorScheme.tertiaryContainer
-        } else {
-            MaterialTheme.colorScheme.errorContainer
-        }
-    val onContainer =
-        if (good) {
-            MaterialTheme.colorScheme.onTertiaryContainer
-        } else {
-            MaterialTheme.colorScheme.onErrorContainer
-        }
-    val label =
-        if (good) {
-            stringResource(R.string.appearance_preview_status_good)
-        } else {
-            stringResource(R.string.appearance_preview_status_low)
-        }
-    Surface(
-        shape = MaterialTheme.shapes.extraExtraLarge,
-        color = container,
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(8.dp)
-                        .clip(MaterialTheme.shapes.extraExtraLarge)
-                        .background(onContainer.copy(alpha = 0.7f)),
-            )
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelSmall,
-                color = onContainer,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+private fun PreviewSubsection(
+    title: String,
+    content: @Composable () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.64f),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        content()
     }
 }
 
@@ -530,11 +559,6 @@ private fun SurfaceLadderStrip(scheme: ColorScheme) {
             scheme.surfaceContainerHighest to stringResource(R.string.appearance_preview_label_highest),
         )
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = stringResource(R.string.appearance_preview_surface_ladder),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
         Row(
             modifier =
                 Modifier
@@ -561,55 +585,33 @@ private fun SurfaceLadderStrip(scheme: ColorScheme) {
                 }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(
-                text = stringResource(R.string.appearance_preview_recessed),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            )
-            Text(
-                text = stringResource(R.string.appearance_preview_raised),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-            )
-        }
     }
 }
 
 @Composable
 private fun AccentContainersStrip(scheme: ColorScheme) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(
-            text = stringResource(R.string.appearance_preview_accent_containers),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        AccentChip(
+            modifier = Modifier.weight(1f),
+            container = scheme.primaryContainer,
+            onContainer = scheme.onPrimaryContainer,
+            label = stringResource(R.string.appearance_preview_label_primary),
         )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            AccentChip(
-                modifier = Modifier.weight(1f),
-                container = scheme.primaryContainer,
-                onContainer = scheme.onPrimaryContainer,
-                label = stringResource(R.string.appearance_preview_label_primary),
-            )
-            AccentChip(
-                modifier = Modifier.weight(1f),
-                container = scheme.secondaryContainer,
-                onContainer = scheme.onSecondaryContainer,
-                label = stringResource(R.string.appearance_preview_label_secondary),
-            )
-            AccentChip(
-                modifier = Modifier.weight(1f),
-                container = scheme.tertiaryContainer,
-                onContainer = scheme.onTertiaryContainer,
-                label = stringResource(R.string.appearance_preview_label_tertiary),
-            )
-        }
+        AccentChip(
+            modifier = Modifier.weight(1f),
+            container = scheme.secondaryContainer,
+            onContainer = scheme.onSecondaryContainer,
+            label = stringResource(R.string.appearance_preview_label_secondary),
+        )
+        AccentChip(
+            modifier = Modifier.weight(1f),
+            container = scheme.tertiaryContainer,
+            onContainer = scheme.onTertiaryContainer,
+            label = stringResource(R.string.appearance_preview_label_tertiary),
+        )
     }
 }
 

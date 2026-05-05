@@ -16,6 +16,7 @@ import dev.bikram.remember.ui.common.BulkUndoableAction
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
@@ -49,7 +51,7 @@ sealed interface HomeEvent {
     ) : HomeEvent
 }
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class, FlowPreview::class)
 @HiltViewModel
 class HomeViewModel
     @Inject
@@ -63,41 +65,44 @@ class HomeViewModel
         private val _events = MutableSharedFlow<HomeEvent>()
         val events: SharedFlow<HomeEvent> = _events.asSharedFlow()
 
-        private val notesSource: Flow<List<NoteWithItems>> =
+        /**
+         * Trimmed, deduplicated, debounced search text shared by the three search sources
+         * below. Without the debounce each keystroke fans out to three FTS queries (active,
+         * archived, trashed); with it, burst typing collapses into a single query. Clearing
+         * the field (blank text) skips the wait so the list snaps back to active immediately.
+         */
+        private val queryText: Flow<String> =
             filter
                 .map { it.text.trim() }
                 .distinctUntilChanged()
-                .flatMapLatest { text ->
-                    if (text.isBlank()) {
-                        repository.observeActive()
-                    } else {
-                        repository.searchNotes(text)
-                    }
+                .debounce { text -> if (text.isBlank()) 0L else SEARCH_DEBOUNCE_MILLIS }
+
+        private val notesSource: Flow<List<NoteWithItems>> =
+            queryText.flatMapLatest { text ->
+                if (text.isBlank()) {
+                    repository.observeActive()
+                } else {
+                    repository.searchNotes(text)
                 }
+            }
 
         private val archivedSearchSource: Flow<List<NoteWithItems>> =
-            filter
-                .map { it.text.trim() }
-                .distinctUntilChanged()
-                .flatMapLatest { text ->
-                    if (text.isBlank()) {
-                        flowOf(emptyList())
-                    } else {
-                        repository.searchArchivedNotes(text)
-                    }
+            queryText.flatMapLatest { text ->
+                if (text.isBlank()) {
+                    flowOf(emptyList())
+                } else {
+                    repository.searchArchivedNotes(text)
                 }
+            }
 
         private val trashedSearchSource: Flow<List<NoteWithItems>> =
-            filter
-                .map { it.text.trim() }
-                .distinctUntilChanged()
-                .flatMapLatest { text ->
-                    if (text.isBlank()) {
-                        flowOf(emptyList())
-                    } else {
-                        repository.searchTrashedNotes(text)
-                    }
+            queryText.flatMapLatest { text ->
+                if (text.isBlank()) {
+                    flowOf(emptyList())
+                } else {
+                    repository.searchTrashedNotes(text)
                 }
+            }
 
         private val allActiveNotes: Flow<List<NoteWithItems>> = repository.observeActive()
 
@@ -245,8 +250,15 @@ class HomeViewModel
                         if (note.note.completedAt != null) {
                             repository.markIncomplete(id)
                         } else {
-                            repository.markCompleted(id)
-                            emitSingleSwipeAction(BulkUndoableAction.MarkedDone(setOf(id)))
+                            // markCompleted now returns the pre-completion snapshot
+                            // straight from its single DB read, so the Undo path can
+                            // restore recurring-rule state without an extra round-trip.
+                            val snapshot = repository.markCompleted(id)
+                            val snapshots =
+                                if (snapshot != null) mapOf(id to snapshot) else emptyMap()
+                            emitSingleSwipeAction(
+                                BulkUndoableAction.MarkedDone(setOf(id), snapshots),
+                            )
                         }
                     }
                 }
@@ -286,9 +298,12 @@ class HomeViewModel
                     selectedIds.value = persistentSetOf()
                     return@launch
                 }
-                repository.markCompleted(toComplete)
+                // markCompleted's bulk overload returns the per-id pre-completion
+                // snapshots straight from its existing reads, so we don't pay an
+                // extra DB round-trip per id just to enable Undo.
+                val snapshots = repository.markCompleted(toComplete)
                 selectedIds.value = persistentSetOf()
-                val action = BulkUndoableAction.MarkedDone(toComplete)
+                val action = BulkUndoableAction.MarkedDone(toComplete, snapshots)
                 lastBulkAction = action
                 _events.emit(HomeEvent.BulkActionPerformed(action))
             }
@@ -333,7 +348,17 @@ class HomeViewModel
                 when (action) {
                     is BulkUndoableAction.Archived -> repository.unarchiveNotes(action.ids)
                     is BulkUndoableAction.Trashed -> repository.restoreFromTrash(action.ids)
-                    is BulkUndoableAction.MarkedDone -> repository.markIncomplete(action.ids)
+                    is BulkUndoableAction.MarkedDone ->
+                        // Prefer snapshot-based restore so recurring notes get their
+                        // pre-advancement rule + reminderAt back. Fall back to the old
+                        // markIncomplete path only when snapshots weren't captured (older
+                        // call sites or notification-action paths) -- correct for non-
+                        // recurring notes, partial for recurring.
+                        if (action.snapshots.isNotEmpty()) {
+                            repository.restoreCompletionStates(action.snapshots)
+                        } else {
+                            repository.markIncomplete(action.ids)
+                        }
                     // The rest aren't produced by HomeViewModel, but exhaustiveness keeps
                     // the inverse mapping correct if a new variant is ever added.
                     is BulkUndoableAction.Restored -> repository.moveToTrash(action.ids)
@@ -383,5 +408,11 @@ class HomeViewModel
                 }
                 selectedIds.value = persistentSetOf()
             }
+        }
+
+        private companion object {
+            /** Wait this long after the last keystroke before re-running FTS. Tuned to feel instant
+             *  to a human reader (under ~200 ms) while collapsing burst typing into a single query. */
+            const val SEARCH_DEBOUNCE_MILLIS = 300L
         }
     }

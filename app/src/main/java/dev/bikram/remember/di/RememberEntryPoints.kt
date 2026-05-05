@@ -18,6 +18,7 @@ import dev.bikram.remember.update.PlayStoreUpdateChecker
 import dev.bikram.remember.update.RememberUpdateChecker
 import dev.bikram.remember.update.RememberUpdateState
 import dev.bikram.remember.update.UpdateCheckWorkScheduler
+import dev.bikram.remember.widget.NotesWidgetUpdater
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
@@ -57,4 +58,6 @@ interface SettingsDependenciesEntryPoint {
 @InstallIn(SingletonComponent::class)
 interface NotesWidgetEntryPoint {
     fun noteRepository(): NoteRepository
+
+    fun notesWidgetUpdater(): NotesWidgetUpdater
 }

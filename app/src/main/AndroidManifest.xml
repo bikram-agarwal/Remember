@@ -62,6 +62,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:enableOnBackInvokedCallback="true"
+        tools:targetApi="tiramisu"
         android:theme="@style/Theme.Remember">
 
         <activity
@@ -125,6 +126,7 @@
 
         <receiver
             android:name=".widget.NotesWidgetReceiver"
+            android:label="@string/widget_agenda_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -134,9 +136,34 @@
                 android:resource="@xml/notes_widget_info" />
         </receiver>
 
+        <receiver
+            android:name=".widget.QuickCaptureWidgetReceiver"
+            android:label="@string/widget_quick_capture_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/quick_capture_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.FavoritesWidgetReceiver"
+            android:label="@string/widget_favorites_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/favorites_widget_info" />
+        </receiver>
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
             tools:node="merge">
             <meta-data
                 android:name="androidx.work.WorkManagerInitializer"

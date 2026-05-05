@@ -164,16 +164,19 @@ fun NoteActionBottomBarContent(
                             icon = "notifications",
                             label = stringResource(R.string.edit_bottom_bar_notification),
                             onClick = onNotification,
+                            modifier = Modifier.width(72.dp),
                         )
                         ActionItem(
                             icon = "archive",
                             label = stringResource(R.string.edit_bottom_bar_archive),
                             onClick = onArchive,
+                            modifier = Modifier.width(72.dp),
                         )
                         ActionItem(
                             icon = "delete_outline",
                             label = stringResource(R.string.edit_bottom_bar_trash),
                             onClick = onTrash,
+                            modifier = Modifier.width(72.dp),
                         )
                     }
                 }
@@ -182,11 +185,13 @@ fun NoteActionBottomBarContent(
                         icon = "unarchive",
                         label = stringResource(R.string.edit_bottom_bar_unarchive),
                         onClick = onUnarchive,
+                        modifier = Modifier.width(72.dp),
                     )
                     ActionItem(
                         icon = "delete_outline",
                         label = stringResource(R.string.edit_bottom_bar_trash),
                         onClick = onTrash,
+                        modifier = Modifier.width(72.dp),
                     )
                 }
                 NoteShelfState.TRASHED -> {
@@ -224,7 +229,7 @@ private fun ActionItem(
     icon: String,
     label: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier.width(72.dp),
+    modifier: Modifier = Modifier,
     iconTint: Color = MaterialTheme.colorScheme.onSurface,
     iconScale: Float = 1f,
 ) {

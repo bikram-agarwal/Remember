@@ -56,6 +56,19 @@ interface NoteDao {
     )
     suspend fun activeRemindersUntil(untilMillis: Long): List<NoteWithItems>
 
+    @Transaction
+    @Query(
+        """
+        SELECT * FROM notes
+        WHERE trashed = 0
+          AND archived = 0
+          AND favorite = 1
+          AND completedAt IS NULL
+        ORDER BY updatedAt DESC
+        """,
+    )
+    suspend fun activeFavorites(): List<NoteWithItems>
+
     /**
      * Full-text search over active notes (no trashed, no archived). Uses an inner join against
      * the FTS4 virtual table `notes_fts` via the `MATCH` operator. The query is passed straight

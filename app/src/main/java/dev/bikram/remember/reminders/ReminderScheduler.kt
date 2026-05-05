@@ -1,19 +1,21 @@
 package dev.bikram.remember.reminders
 
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import dev.bikram.remember.MainActivity
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ChecklistItemEntity
+import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.ReminderPrefs
+import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.edit.iconEmojiPayload
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
@@ -22,20 +24,33 @@ class ReminderScheduler(
     private val context: Context,
     private val reminderPrefs: ReminderPrefs? = null,
 ) {
+    @SuppressLint("MissingPermission")
     fun schedule(
         noteId: Long,
         whenMillis: Long,
+        importance: Importance = Importance.DEFAULT,
     ) {
         if (whenMillis <= System.currentTimeMillis()) return
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pi = pendingIntent(noteId)
-        val canExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
+        if (importance == Importance.HIGH) {
+            // HIGH-importance reminders use setAlarmClock: it is exempt from Doze and
+            // the per-app exact-alarm rate limit, needs no SCHEDULE_EXACT_ALARM
+            // (playstore flavor) or USE_EXACT_ALARM (github) grant, and surfaces the
+            // system's next-alarm indicator in the status bar. The show intent is what
+            // fires when the user taps that indicator.
+            am.setAlarmClock(AlarmManager.AlarmClockInfo(whenMillis, openAppPendingIntent()), pi)
+            return
+        }
+        val canExact = am.canScheduleExactAlarms()
         if (canExact) {
+            // Guarded by canScheduleExactAlarms(); inexact scheduling remains the fallback.
             am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMillis, pi)
         } else {
             am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMillis, pi)
             val fallbackCount = inexactFallbackScheduleCounter.incrementAndGet()
             Log.w(TAG, "Scheduled reminder with inexact alarm fallback. fallbackCount=$fallbackCount")
+            DiagnosticLog.record(context, "Scheduled reminder with inexact alarm fallback. fallbackCount=$fallbackCount")
         }
     }
 
@@ -108,19 +123,26 @@ class ReminderScheduler(
         }
         if (sortedNotes.size > SUMMARY_MAX_LINES) {
             inboxStyle.setSummaryText(
-                context.getString(
-                    R.string.reminder_summary_more,
+                context.resources.getQuantityString(
+                    R.plurals.reminder_summary_more,
+                    sortedNotes.size - SUMMARY_MAX_LINES,
                     sortedNotes.size - SUMMARY_MAX_LINES,
                 ),
             )
         }
 
+        val summaryText =
+            context.resources.getQuantityString(
+                R.plurals.reminder_summary_count,
+                sortedNotes.size,
+                sortedNotes.size,
+            )
         val notification =
             NotificationCompat
                 .Builder(context, CHANNEL_ID_SUMMARY)
                 .setSmallIcon(R.drawable.ic_stat_remember)
                 .setContentTitle(context.getString(R.string.reminder_summary_title))
-                .setContentText(context.getString(R.string.reminder_summary_count, sortedNotes.size))
+                .setContentText(summaryText)
                 .setStyle(inboxStyle)
                 .setContentIntent(openAppPendingIntent())
                 .setCategory(NotificationCompat.CATEGORY_STATUS)

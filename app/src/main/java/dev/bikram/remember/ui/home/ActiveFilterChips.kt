@@ -16,10 +16,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,14 +39,16 @@ import kotlinx.collections.immutable.toPersistentSet
 private val ActiveChipHeight = 32.dp
 
 @Composable
-fun ActiveFilterChips(
+internal fun ActiveFilterChips(
     filter: NotesFilter,
     onChange: (NotesFilter) -> Unit,
+    modifier: Modifier = Modifier,
     viewOptions: ViewOptions = ViewOptions(),
     onViewOptionsChange: ((ViewOptions) -> Unit)? = null,
-    modifier: Modifier = Modifier,
     availableTags: List<String> = emptyList(),
     scrollState: ScrollState = rememberScrollState(),
+    expandedDropdown: ActiveFilterDropdown? = null,
+    onExpandedDropdownChange: (ActiveFilterDropdown?) -> Unit = {},
 ) {
     val defaultFilter = NotesFilter()
     val defaultViewOptions = ViewOptions()
@@ -66,6 +64,10 @@ fun ActiveFilterChips(
         FilterDropdownChip(
             label = stringResource(R.string.filter_dropdown_type, typeLabel(filter.type)),
             selected = filter.type != FilterType.ALL,
+            expanded = expandedDropdown == ActiveFilterDropdown.TYPE,
+            onExpandedChange = { expanded ->
+                onExpandedDropdownChange(if (expanded) ActiveFilterDropdown.TYPE else null)
+            },
         ) {
             FilterType.entries.forEach { type ->
                 RadioMenuItem(
@@ -80,6 +82,10 @@ fun ActiveFilterChips(
         FilterDropdownChip(
             label = stringResource(R.string.filter_dropdown_group, groupLabel(viewOptions.groupBy)),
             selected = viewOptions.groupBy != defaultViewOptions.groupBy,
+            expanded = expandedDropdown == ActiveFilterDropdown.GROUP,
+            onExpandedChange = { expanded ->
+                onExpandedDropdownChange(if (expanded) ActiveFilterDropdown.GROUP else null)
+            },
         ) {
             groupOptions().forEach { (groupBy, label) ->
                 RadioMenuItem(
@@ -94,6 +100,10 @@ fun ActiveFilterChips(
         FilterDropdownChip(
             label = stringResource(R.string.filter_dropdown_sort, sortLabel(viewOptions.sortKey, viewOptions.sortDir)),
             selected = viewOptions.sortKey != defaultViewOptions.sortKey || viewOptions.sortDir != defaultViewOptions.sortDir,
+            expanded = expandedDropdown == ActiveFilterDropdown.SORT,
+            onExpandedChange = { expanded ->
+                onExpandedDropdownChange(if (expanded) ActiveFilterDropdown.SORT else null)
+            },
         ) {
             sortOptions().forEach { sortOption ->
                 RadioMenuItem(
@@ -117,6 +127,10 @@ fun ActiveFilterChips(
             label = tagLabel,
             selected = filter.tags.isNotEmpty(),
             enabled = availableTags.isNotEmpty(),
+            expanded = expandedDropdown == ActiveFilterDropdown.TAGS,
+            onExpandedChange = { expanded ->
+                onExpandedDropdownChange(if (expanded) ActiveFilterDropdown.TAGS else null)
+            },
             avatar =
                 filter.tags.singleOrNull()?.let { selectedTag ->
                     {
@@ -156,6 +170,10 @@ fun ActiveFilterChips(
                     stringResource(R.string.filter_dropdown_others_count, otherFilterCount)
                 },
             selected = otherFilterCount > 0,
+            expanded = expandedDropdown == ActiveFilterDropdown.OTHERS,
+            onExpandedChange = { expanded ->
+                onExpandedDropdownChange(if (expanded) ActiveFilterDropdown.OTHERS else null)
+            },
         ) {
             CheckableMenuItem(
                 label = stringResource(R.string.filter_has_reminder),
@@ -198,19 +216,28 @@ fun ActiveFilterChips(
     }
 }
 
+internal enum class ActiveFilterDropdown {
+    TYPE,
+    GROUP,
+    SORT,
+    TAGS,
+    OTHERS,
+}
+
 @Composable
 private fun FilterDropdownChip(
     label: String,
     selected: Boolean,
     enabled: Boolean = true,
+    expanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
     avatar: @Composable (() -> Unit)? = null,
     menuContent: @Composable () -> Unit,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
     Box {
         RememberInputChip(
             selected = selected,
-            onClick = { expanded = true },
+            onClick = { onExpandedChange(true) },
             enabled = enabled,
             label = { Text(label) },
             modifier = Modifier.height(ActiveChipHeight),
@@ -225,7 +252,7 @@ private fun FilterDropdownChip(
         )
         DropdownMenu(
             expanded = expanded,
-            onDismissRequest = { expanded = false },
+            onDismissRequest = { onExpandedChange(false) },
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
         ) {
             menuContent()

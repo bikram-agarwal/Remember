@@ -70,10 +70,10 @@ extensions.configure<ApplicationExtension>("android") {
 
     defaultConfig {
         applicationId = rememberApplicationId
-        minSdk = 30
+        minSdk = 31
         targetSdk = 36
-        versionCode = 70
-        versionName = "0.7.0"
+        versionCode = 80
+        versionName = "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -174,7 +174,7 @@ ktlint {
 }
 
 dependencies {
-    implementation("sh.calvin.reorderable:reorderable:3.1.0")
+    implementation(libs.reorderable)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.process)
@@ -218,7 +218,7 @@ dependencies {
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.androidx.profileinstaller)
     debugImplementation(libs.androidx.ui.tooling)
-    testImplementation("junit:junit:4.13.2")
+    testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.test.ext.junit)

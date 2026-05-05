@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.edit
 
+import android.annotation.SuppressLint
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -88,6 +89,7 @@ internal sealed interface ActiveEntry {
 }
 
 @Composable
+@SuppressLint("ModifierParameter")
 internal fun ChecklistRow(
     item: EditableItem,
     isEditMode: Boolean,

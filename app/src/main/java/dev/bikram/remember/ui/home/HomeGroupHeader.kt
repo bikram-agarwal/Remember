@@ -18,21 +18,25 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun GroupHeader(
     label: String,
+    modifier: Modifier = Modifier,
     count: Int? = null,
     collapsible: Boolean = false,
     collapsed: Boolean = false,
     onToggle: (() -> Unit)? = null,
     pinned: Boolean = false,
-    modifier: Modifier = Modifier,
 ) {
     val headerInteractionSource = remember { MutableInteractionSource() }
     val playTap = rememberPlayTapSound()
@@ -41,7 +45,7 @@ internal fun GroupHeader(
             .fillMaxWidth()
             .padding(top = 12.dp, bottom = 2.dp)
     val rowModifier =
-        if (collapsible && onToggle != null) {
+        (if (collapsible && onToggle != null) {
             outerSpacing
                 .clip(MaterialTheme.shapes.small)
                 .clickable(
@@ -53,6 +57,9 @@ internal fun GroupHeader(
                 }.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
         } else {
             outerSpacing.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
+        }).semantics {
+            heading()
+            if (collapsible) stateDescription = if (collapsed) "Collapsed" else "Expanded"
         }
     Row(
         modifier = rowModifier,
@@ -90,7 +97,7 @@ internal fun GroupHeader(
             Spacer(Modifier.weight(1f))
             val rotation by androidx.compose.animation.core.animateFloatAsState(
                 targetValue = if (collapsed) 0f else 90f,
-                animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
+                animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
                 label = "section_chevron_rotation",
             )
             RememberMaterialRoundedSymbol(

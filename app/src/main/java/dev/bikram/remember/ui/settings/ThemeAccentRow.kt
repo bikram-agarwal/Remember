@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.toColorInt
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
@@ -48,9 +49,10 @@ import dev.bikram.remember.ui.theme.colorSourceSpecsInPickerOrder
 
 // Material You leads the row when available so the wallpaper-driven option is what users
 // see first. DEFAULT (Forest - the green/teal/lime triplet baked into the app) sits next as
-// the factory default, followed by the named curated triplets ordered Ember → Grove → Honey
-// → Ocean → Iris → Dusk → Berry so the row reads red → orange → gold → blue → indigo →
-// violet → pink. Custom hexes and the +Add affordance follow inside ThemeAccentRow itself.
+// the factory default, followed by named curated triplets whose primary seeds are spread
+// across distinct identities: flame orange, olive, gold, ocean blue, violet, slate dusk,
+// and fuchsia berry. Custom hexes and the +Add affordance follow inside ThemeAccentRow
+// itself.
 private val accentPresetSpecs: List<ColorSourceSpec> = colorSourceSpecsInPickerOrder
 
 private val paletteStyleOrder: List<PaletteStyleOpt> = PaletteStyleOpt.entries.toList()
@@ -127,7 +129,7 @@ fun ThemeAccentRow(
                 }
             val fillColor =
                 runCatching {
-                    Color(android.graphics.Color.parseColor(normalizeHex(storedHex) ?: storedHex))
+                    Color((normalizeHex(storedHex) ?: storedHex).toColorInt())
                 }.getOrDefault(MaterialTheme.colorScheme.surfaceVariant)
             Box(
                 modifier =

@@ -83,6 +83,8 @@ class MainActivity : FragmentActivity() {
     companion object {
         const val ACTION_SHORTCUT_NEW_NOTE = "dev.bikram.remember.action.SHORTCUT_NEW_NOTE"
         const val ACTION_SHORTCUT_NEW_LIST = "dev.bikram.remember.action.SHORTCUT_NEW_LIST"
+        const val EXTRA_OPEN_NOTE_ID = "open_note_id"
+        const val EXTRA_OPEN_NOTE_EXIT_ON_BACK = "open_note_exit_on_back"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -159,16 +161,18 @@ class MainActivity : FragmentActivity() {
             }
             Intent.ACTION_VIEW -> {
                 val shortcut = intent.getStringExtra("action")
-                val openId = intent.getLongExtra("open_note_id", -1L)
+                val openId = intent.getLongExtra(EXTRA_OPEN_NOTE_ID, -1L)
+                val exitOnBack = intent.getBooleanExtra(EXTRA_OPEN_NOTE_EXIT_ON_BACK, false)
                 when {
                     shortcut == "new_note" -> pendingLaunch.value = LaunchAction.NewNote()
                     shortcut == "new_list" -> pendingLaunch.value = LaunchAction.NewList
-                    openId > 0L -> pendingLaunch.value = LaunchAction.OpenNote(openId)
+                    openId > 0L -> pendingLaunch.value = LaunchAction.OpenNote(openId, exitOnBack)
                 }
             }
             else -> {
-                val openId = intent.getLongExtra("open_note_id", -1L)
-                if (openId > 0L) pendingLaunch.value = LaunchAction.OpenNote(openId)
+                val openId = intent.getLongExtra(EXTRA_OPEN_NOTE_ID, -1L)
+                val exitOnBack = intent.getBooleanExtra(EXTRA_OPEN_NOTE_EXIT_ON_BACK, false)
+                if (openId > 0L) pendingLaunch.value = LaunchAction.OpenNote(openId, exitOnBack)
             }
         }
     }

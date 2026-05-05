@@ -1,10 +1,10 @@
 package dev.bikram.remember.ui.edit
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.text.format.DateFormat
@@ -59,6 +59,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -81,6 +83,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -121,15 +124,13 @@ fun ReminderPickerSheet(
     // output). [initial] is a wall-clock reminder instant on reopen; normalizing avoids the pill
     // jumping to the next calendar day when that instant falls on the next day in UTC.
     var selectedDate by rememberSaveable {
-        mutableStateOf(pickerDayMillisForLocalWallClock(initial))
+        mutableLongStateOf(pickerDayMillisForLocalWallClock(initial))
     }
     var dateDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val am = remember { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
-    var canScheduleExact by remember {
-        mutableStateOf(Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms())
-    }
+    var canScheduleExact by remember { mutableStateOf(am.canScheduleExactAlarms()) }
     var notificationsGranted by remember {
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
@@ -145,7 +146,7 @@ fun ReminderPickerSheet(
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_RESUME) {
-                    canScheduleExact = Build.VERSION.SDK_INT < Build.VERSION_CODES.S || am.canScheduleExactAlarms()
+                    canScheduleExact = am.canScheduleExactAlarms()
                     notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
                 }
             }
@@ -154,8 +155,8 @@ fun ReminderPickerSheet(
     }
 
     var reminderTimeExplicit by rememberSaveable { mutableStateOf(initialMillis != null) }
-    var reminderHour by rememberSaveable { mutableStateOf(initialCal.get(Calendar.HOUR_OF_DAY)) }
-    var reminderMinute by rememberSaveable { mutableStateOf(initialCal.get(Calendar.MINUTE)) }
+    var reminderHour by rememberSaveable { mutableIntStateOf(initialCal.get(Calendar.HOUR_OF_DAY)) }
+    var reminderMinute by rememberSaveable { mutableIntStateOf(initialCal.get(Calendar.MINUTE)) }
     var timePickerOpen by rememberSaveable { mutableStateOf(false) }
 
     // Repeat
@@ -180,20 +181,20 @@ fun ReminderPickerSheet(
     }
     val defaultDayOfMonth = initialCal.get(Calendar.DAY_OF_MONTH)
     var dayOfMonth by rememberSaveable {
-        mutableStateOf(
+        mutableIntStateOf(
             (initialRule?.monthlyMode as? MonthlyMode.ByDayOfMonth)?.day ?: defaultDayOfMonth,
         )
     }
     var dayOfMonthMenuOpen by rememberSaveable { mutableStateOf(false) }
     val defaultWeekOrdinal = ((defaultDayOfMonth - 1) / 7) + 1
     var nthOrdinal by rememberSaveable {
-        mutableStateOf(
+        mutableIntStateOf(
             (initialRule?.monthlyMode as? MonthlyMode.ByNthWeekday)?.ordinal ?: defaultWeekOrdinal,
         )
     }
     var nthOrdinalMenuOpen by rememberSaveable { mutableStateOf(false) }
     var nthWeekday by rememberSaveable {
-        mutableStateOf(
+        mutableIntStateOf(
             (initialRule?.monthlyMode as? MonthlyMode.ByNthWeekday)?.weekday ?: defaultDayOfWeek,
         )
     }
@@ -348,9 +349,11 @@ fun ReminderPickerSheet(
                         .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.errorContainer)
                         .tapSoundClickable {
+                            // This branch is unreachable below API 31 because exact alarms are always allowed there.
+                            @SuppressLint("InlinedApi")
                             val intent =
                                 Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                    data = Uri.parse("package:${context.packageName}")
+                                    data = "package:${context.packageName}".toUri()
                                 }
                             context.startActivity(intent)
                         }.padding(16.dp),
@@ -706,8 +709,19 @@ internal fun CalendarPickerDialog(
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(horizontal = 8.dp),
-                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            RememberTextButton(
+                                onClick = {
+                                    val today = pickerDayMillisForLocalWallClock(System.currentTimeMillis())
+                                    state.selectedDateMillis = today
+                                    state.displayedMonthMillis = today
+                                    state.displayMode = DisplayMode.Picker
+                                },
+                            ) {
+                                Text(stringResource(R.string.reminder_date_picker_today))
+                            }
+                            Spacer(Modifier.weight(1f))
                             RememberTextButton(onClick = onDismiss) {
                                 Text(stringResource(R.string.common_cancel))
                             }
@@ -975,7 +989,7 @@ private fun RepeatConfig(
                 )
                 Spacer(Modifier.width(10.dp))
                 SheetDropdown(
-                    boxModifier =
+                    modifier =
                         Modifier
                             .weight(1f)
                             .height(RepeatRowHeight),
@@ -1013,7 +1027,7 @@ private fun RepeatConfig(
                         onSelect = { onMonthlyKind(MonthlyKind.BY_DAY) },
                     ) {
                         SheetDropdown(
-                            boxModifier =
+                            modifier =
                                 Modifier
                                     .fillMaxWidth()
                                     .height(RepeatRowHeight),
@@ -1041,7 +1055,7 @@ private fun RepeatConfig(
                     ) {
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             SheetDropdown(
-                                boxModifier =
+                                modifier =
                                     Modifier
                                         .weight(1f)
                                         .height(RepeatRowHeight),
@@ -1062,7 +1076,7 @@ private fun RepeatConfig(
                                 }
                             }
                             SheetDropdown(
-                                boxModifier =
+                                modifier =
                                     Modifier
                                         .weight(1f)
                                         .height(RepeatRowHeight),
@@ -1216,11 +1230,11 @@ private fun SheetDropdown(
     value: String,
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    boxModifier: Modifier = Modifier,
+    modifier: Modifier = Modifier,
     content: @Composable () -> Unit,
 ) {
     Box(
-        modifier = boxModifier,
+        modifier = modifier,
         contentAlignment = Alignment.CenterStart,
     ) {
         Row(

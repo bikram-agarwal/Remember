@@ -97,6 +97,7 @@ object RememberModule {
         appMediaStorage: AppMediaStorage,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
         @DefaultDispatcher defaultDispatcher: CoroutineDispatcher,
+        @ApplicationScope applicationScope: CoroutineScope,
     ): NoteRepository =
         NoteRepository(
             noteDao = database.noteDao(),
@@ -109,6 +110,7 @@ object RememberModule {
             appMediaStorage = appMediaStorage,
             ioDispatcher = ioDispatcher,
             defaultDispatcher = defaultDispatcher,
+            applicationScope = applicationScope,
         )
 
     @Provides

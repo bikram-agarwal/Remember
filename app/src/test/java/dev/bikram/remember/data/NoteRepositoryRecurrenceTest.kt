@@ -220,6 +220,18 @@ class NoteRepositoryRecurrenceTest {
             }
         }
 
+        override suspend fun activeFavorites(): List<NoteWithItems> =
+            if (
+                !stored.note.trashed &&
+                !stored.note.archived &&
+                stored.note.favorite &&
+                stored.note.completedAt == null
+            ) {
+                listOf(stored)
+            } else {
+                emptyList()
+            }
+
         override fun searchNotes(ftsQuery: String): Flow<List<NoteWithItems>> = flowOf(emptyList())
 
         override fun searchArchived(ftsQuery: String): Flow<List<NoteWithItems>> = flowOf(emptyList())

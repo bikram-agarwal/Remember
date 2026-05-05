@@ -79,6 +79,7 @@ import dev.bikram.remember.data.SwipeGestureMode
 import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.data.UpdatePreferencesState
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
+import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
@@ -244,7 +245,7 @@ fun SettingsRoute(
                     val message =
                         when {
                             exportedCount < 0 -> resources.getString(R.string.toast_export_failed)
-                            else -> resources.getString(R.string.toast_exported_notes, exportedCount)
+                            else -> resources.getQuantityString(R.plurals.toast_exported_notes, exportedCount, exportedCount)
                         }
                     Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
@@ -258,7 +259,12 @@ fun SettingsRoute(
             if (uri != null) {
                 scope.launch {
                     val count = backupIo.importFrom(uri, preserveIdsForNotes = false)
-                    Toast.makeText(context, resources.getString(R.string.toast_imported_notes, count), Toast.LENGTH_SHORT).show()
+                    Toast
+                        .makeText(
+                            context,
+                            resources.getQuantityString(R.plurals.toast_imported_notes, count, count),
+                            Toast.LENGTH_SHORT,
+                        ).show()
                 }
             }
         }
@@ -315,9 +321,7 @@ fun SettingsRoute(
     val powerManager = remember { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
     val permissionLinked = remember { isPermissionLinked() }
     var canScheduleExactAlarms by remember {
-        mutableStateOf(
-            Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms(),
-        )
+        mutableStateOf(alarmManager.canScheduleExactAlarms())
     }
     var isIgnoringBatteryOptimizations by remember {
         mutableStateOf(powerManager.isIgnoringBatteryOptimizations(context.packageName))
@@ -329,9 +333,7 @@ fun SettingsRoute(
             androidx.lifecycle.LifecycleEventObserver { _, event ->
                 if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                     notificationsGranted = NotificationManagerCompat.from(context).areNotificationsEnabled()
-                    canScheduleExactAlarms =
-                        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
-                        alarmManager.canScheduleExactAlarms()
+                    canScheduleExactAlarms = alarmManager.canScheduleExactAlarms()
                     isIgnoringBatteryOptimizations = powerManager.isIgnoringBatteryOptimizations(context.packageName)
                 }
             }
@@ -372,7 +374,8 @@ fun SettingsRoute(
                         }
                         updateCheckFinishedWithoutResult = availableUpdate == null
                     },
-                    onFailure = {
+                    onFailure = { throwable ->
+                        DiagnosticLog.record(context, "Play Store update check failed from Settings", throwable)
                         updateInfo = null
                         updateCheckFinishedWithoutResult = true
                         Toast
@@ -402,7 +405,8 @@ fun SettingsRoute(
                         rememberUpdateState.showUpdate(availableUpdate)
                         updateCheckFinishedWithoutResult = availableUpdate == null
                     },
-                    onFailure = {
+                    onFailure = { throwable ->
+                        DiagnosticLog.record(context, "GitHub update check failed from Settings", throwable)
                         updateInfo = null
                         updateCheckFinishedWithoutResult = true
                         Toast
@@ -461,7 +465,8 @@ fun SettingsRoute(
                                 cacheApkFile = apkFile,
                                 displayName = "Remember-${availableUpdate.versionName}.apk",
                             )
-                        }.onFailure {
+                        }.onFailure { throwable ->
+                            DiagnosticLog.record(context, "Saving update APK to Downloads failed", throwable)
                             Toast
                                 .makeText(
                                     context,
@@ -483,7 +488,8 @@ fun SettingsRoute(
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
                         }
                     runCatching { context.startActivity(installIntent) }
-                        .onFailure {
+                        .onFailure { throwable ->
+                            DiagnosticLog.record(context, "Launching update APK installer failed", throwable)
                             Toast
                                 .makeText(
                                     context,
@@ -493,7 +499,8 @@ fun SettingsRoute(
                         }
                     downloadProgress = null
                 },
-                onFailure = {
+                onFailure = { throwable ->
+                    DiagnosticLog.record(context, "Update APK download failed", throwable)
                     downloadProgress = null
                     Toast
                         .makeText(
@@ -982,7 +989,7 @@ fun SettingsRoute(
                             Toast
                                 .makeText(
                                     context,
-                                    resources.getString(R.string.toast_imported_notes, count),
+                                    resources.getQuantityString(R.plurals.toast_imported_notes, count, count),
                                     Toast.LENGTH_SHORT,
                                 ).show()
                         }

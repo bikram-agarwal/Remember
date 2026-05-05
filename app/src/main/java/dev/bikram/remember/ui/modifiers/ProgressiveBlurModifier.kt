@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.modifiers
 
+import android.annotation.SuppressLint
 import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import android.os.Build
@@ -185,6 +186,7 @@ fun rememberProgressiveBlurStyle(
     }
 }
 
+@SuppressLint("ModifierFactoryExtensionFunction")
 fun ProgressiveBlurStyle.applyToScrollableList(): Modifier =
     Modifier.progressiveBlur(
         blurRadius = blurRadius,
@@ -195,6 +197,7 @@ fun ProgressiveBlurStyle.applyToScrollableList(): Modifier =
         overlayAlphaBottom = overlayAlphaBottom,
     )
 
+@SuppressLint("ModifierFactoryExtensionFunction")
 fun ProgressiveBlurStyle.applyToFullBleedLayer(): Modifier =
     Modifier.progressiveBlur(
         blurRadius = blurRadius,

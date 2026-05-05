@@ -3,6 +3,7 @@ package dev.bikram.remember.data
 import android.content.Context
 import android.net.Uri
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -140,7 +141,7 @@ class AppMediaStorage
                 uriString: String?,
             ): File? {
                 if (uriString.isNullOrBlank()) return null
-                val uri = runCatching { Uri.parse(uriString) }.getOrNull() ?: return null
+                val uri = runCatching { uriString.toUri() }.getOrNull() ?: return null
                 if (uri.authority != "${context.packageName}.fileprovider") return null
                 val pathSegments = uri.pathSegments
                 if (pathSegments.isEmpty()) return null

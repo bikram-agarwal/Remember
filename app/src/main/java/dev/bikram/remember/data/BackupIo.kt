@@ -5,7 +5,9 @@ import android.net.Uri
 import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import dev.bikram.remember.backup.SettingsBackup
+import dev.bikram.remember.diagnostics.DiagnosticLog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -218,7 +220,7 @@ class BackupIo(
             if (!pictureUri.isNullOrBlank()) {
                 mediaStats.mediaReferenceCount++
                 val entryPath = "media/$noteId/picture${guessExtension(pictureUri, null)}"
-                if (copyUriIntoZip(zip, entryPath, Uri.parse(pictureUri))) {
+                if (copyUriIntoZip(zip, entryPath, pictureUri.toUri())) {
                     noteJson.put("pictureUri", "$REL_PREFIX$entryPath")
                     mediaStats.mediaEmbeddedCount++
                 } else {
@@ -234,7 +236,7 @@ class BackupIo(
                 mediaStats.mediaReferenceCount++
                 val extension = guessExtension(attachmentUriString, attachmentJson.optStringOrNull("mimeType"))
                 val entryPath = "media/$noteId/att_$attachmentIndex$extension"
-                if (copyUriIntoZip(zip, entryPath, Uri.parse(attachmentUriString))) {
+                if (copyUriIntoZip(zip, entryPath, attachmentUriString.toUri())) {
                     attachmentJson.put("uri", "$REL_PREFIX$entryPath")
                     mediaStats.mediaEmbeddedCount++
                 } else {
@@ -309,12 +311,18 @@ class BackupIo(
     /** @return note count on success, or -1 if the output stream could not be opened. */
     suspend fun exportTo(uri: Uri): Int =
         withContext(Dispatchers.IO) {
-            val includeMedia = backupPrefs.snapshot().includeMediaInBackup
-            val snapshot = snapshotNotes()
-            val bytes = writeZipArchive(snapshot.root, includeMedia)
-            val outputStream = context.contentResolver.openOutputStream(uri) ?: return@withContext -1
-            outputStream.use { stream -> stream.write(bytes) }
-            snapshot.noteCount
+            runCatching {
+                val includeMedia = backupPrefs.snapshot().includeMediaInBackup
+                val snapshot = snapshotNotes()
+                val bytes = writeZipArchive(snapshot.root, includeMedia)
+                val outputStream =
+                    context.contentResolver.openOutputStream(uri)
+                        ?: error("openOutputStream returned null")
+                outputStream.use { stream -> stream.write(bytes) }
+                snapshot.noteCount
+            }.onFailure { throwable ->
+                DiagnosticLog.record(context, "Manual backup export failed", throwable)
+            }.getOrDefault(-1)
         }
 
     suspend fun exportToTreeFolder(treeUriString: String): Result<String> =
@@ -323,6 +331,8 @@ class BackupIo(
                 if (!treeUriString.startsWith("content://")) error("Invalid export folder")
                 val exportedFileNames = exportToTreeFolders(listOf(treeUriString)).getOrThrow()
                 exportedFileNames.first()
+            }.onFailure { throwable ->
+                DiagnosticLog.record(context, "Scheduled backup export failed", throwable)
             }
         }
 
@@ -338,7 +348,7 @@ class BackupIo(
                 val fileName = "remember_backup_$stamp.zip"
                 destinations.forEach { destinationUriString ->
                     if (!destinationUriString.startsWith("content://")) error("Invalid export folder")
-                    val destinationUri = Uri.parse(destinationUriString)
+                    val destinationUri = destinationUriString.toUri()
                     if (DocumentsContract.isTreeUri(destinationUri)) {
                         val docTreeUri =
                             DocumentsContract.buildDocumentUriUsingTree(
@@ -390,14 +400,18 @@ class BackupIo(
         preserveIdsForNotes: Boolean = false,
     ): Int =
         withContext(Dispatchers.IO) {
-            if (isZipUri(uri)) {
-                importFromZip(uri, preserveIdsForNotes)
-            } else {
-                val text =
-                    context.contentResolver.openInputStream(uri)?.use { it.reader().readText() }
-                        ?: return@withContext 0
-                importFromJsonText(text, extractDir = null, preserveIdsForNotes)
-            }
+            runCatching {
+                if (isZipUri(uri)) {
+                    importFromZip(uri, preserveIdsForNotes)
+                } else {
+                    val text =
+                        context.contentResolver.openInputStream(uri)?.use { it.reader().readText() }
+                            ?: return@runCatching 0
+                    importFromJsonText(text, extractDir = null, preserveIdsForNotes)
+                }
+            }.onFailure { throwable ->
+                DiagnosticLog.record(context, "Backup import failed", throwable)
+            }.getOrDefault(0)
         }
 
     suspend fun inspectRestoreMedia(uri: Uri): RestoreMediaSummary =

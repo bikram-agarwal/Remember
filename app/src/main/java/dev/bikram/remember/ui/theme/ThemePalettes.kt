@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import androidx.core.graphics.toColorInt
 import com.materialkolor.PaletteStyle
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
@@ -55,53 +56,53 @@ val colorSourceSpecsInPickerOrder: List<ColorSourceSpec> =
             triplet =
                 CuratedPalette(
                     primary = DefaultSeed,
-                    secondary = Color(0xFF059669),
-                    tertiary = Color(0xFF65A30D),
+                    secondary = Color(0xFF0F766E),
+                    tertiary = Color(0xFF84CC16),
                 ),
             supportsPaletteStyle = true,
             swatchType = ColorSourceSwatchType.TRIPLET,
         ),
         curatedColorSourceSpec(
             source = ColorSource.CURATED_EMBER,
-            primary = Color(0xFFDC2626),
-            secondary = Color(0xFF92400E),
-            tertiary = Color(0xFF9F1239),
+            primary = Color(0xFFF97316),
+            secondary = Color(0xFFDC2626),
+            tertiary = Color(0xFFF59E0B),
         ),
         curatedColorSourceSpec(
             source = ColorSource.CURATED_GROVE,
-            primary = Color(0xFFEA580C),
-            secondary = Color(0xFFF59E0B),
-            tertiary = Color(0xFFA3A847),
+            primary = Color(0xFF6B8E23),
+            secondary = Color(0xFF0F766E),
+            tertiary = Color(0xFFA16207),
         ),
         curatedColorSourceSpec(
             source = ColorSource.CURATED_HONEY,
-            primary = Color(0xFFFBBF24),
-            secondary = Color(0xFF854D0E),
-            tertiary = Color(0xFFFDE68A),
+            primary = Color(0xFFFACC15),
+            secondary = Color(0xFFD97706),
+            tertiary = Color(0xFF7C2D12),
         ),
         curatedColorSourceSpec(
             source = ColorSource.CURATED_OCEAN,
-            primary = Color(0xFF0891B2),
-            secondary = Color(0xFF3B82F6),
-            tertiary = Color(0xFF4F46E5),
+            primary = Color(0xFF0284C7),
+            secondary = Color(0xFF0D9488),
+            tertiary = Color(0xFF2563EB),
         ),
         curatedColorSourceSpec(
             source = ColorSource.CURATED_IRIS,
-            primary = Color(0xFF485CC7),
-            secondary = Color(0xFF775A30),
-            tertiary = Color(0xFF8C4A63),
+            primary = Color(0xFF7C3AED),
+            secondary = Color(0xFF4F46E5),
+            tertiary = Color(0xFFC084FC),
         ),
         curatedColorSourceSpec(
             source = ColorSource.CURATED_DUSK,
-            primary = Color(0xFF7C3AED),
-            secondary = Color(0xFFA855F7),
-            tertiary = Color(0xFF6366F1),
+            primary = Color(0xFF6B7280),
+            secondary = Color(0xFFA78BFA),
+            tertiary = Color(0xFFF97316),
         ),
         curatedColorSourceSpec(
             source = ColorSource.CURATED_BERRY,
-            primary = Color(0xFFDB2777),
-            secondary = Color(0xFF831843),
-            tertiary = Color(0xFFA21CAF),
+            primary = Color(0xFFD946EF),
+            secondary = Color(0xFFBE185D),
+            tertiary = Color(0xFF7C3AED),
         ),
     )
 
@@ -152,7 +153,7 @@ internal fun colorSourceSeedFor(
 ): Color =
     when (spec.source) {
         ColorSource.CUSTOM ->
-            runCatching { Color(android.graphics.Color.parseColor(activeCustomHex)) }
+            runCatching { Color(activeCustomHex.toColorInt()) }
                 .getOrElse { spec.representativeColor }
         else -> spec.representativeColor
     }

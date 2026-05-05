@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="360dp"
+    android:layout_height="180dp"
+    android:background="@drawable/widget_preview_background"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="20dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:fontFamily="sans"
+            android:singleLine="true"
+            android:text="@string/widget_header_title"
+            android:textColor="@color/widget_preview_primary"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:background="@drawable/widget_preview_small_action"
+            android:contentDescription="@string/widget_refresh_cd"
+            android:padding="4dp"
+            android:src="@drawable/ic_widget_refresh"
+            android:tint="@color/widget_preview_on_surface" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="5dp"
+            android:background="@drawable/widget_preview_small_action"
+            android:contentDescription="@string/widget_create_new_note"
+            android:padding="4dp"
+            android:src="@drawable/ic_widget_note_add"
+            android:tint="@color/widget_preview_on_surface" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="5dp"
+            android:background="@drawable/widget_preview_small_action"
+            android:contentDescription="@string/widget_create_new_list"
+            android:padding="4dp"
+            android:src="@drawable/ic_widget_list_add"
+            android:tint="@color/widget_preview_on_surface" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="14dp"
+        android:gravity="center_vertical"
+        android:text="Overdue"
+        android:textColor="@color/widget_preview_error"
+        android:textSize="9sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="@drawable/widget_preview_card_overdue"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp">
+
+        <TextView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="@drawable/widget_preview_icon_circle_error"
+            android:gravity="center"
+            android:text="!"
+            android:textColor="@color/widget_preview_on_error"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="14dp"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="Pay electricity bill"
+                android:textColor="@color/widget_preview_on_error"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="11dp"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="2 days overdue"
+                android:textColor="@color/widget_preview_error_muted"
+                android:textSize="8sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="11dp"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="Autopay failed; review checking account before late fee and confirm payment"
+                android:textColor="@color/widget_preview_on_error"
+                android:textSize="8sp" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:background="@drawable/widget_preview_small_action"
+            android:contentDescription="@string/widget_mark_done_cd"
+            android:padding="3dp"
+            android:src="@drawable/ic_widget_done"
+            android:tint="@color/widget_preview_on_surface" />
+    </LinearLayout>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="14dp"
+        android:layout_marginTop="6dp"
+        android:gravity="center_vertical"
+        android:text="Upcoming"
+        android:textColor="@color/widget_preview_primary"
+        android:textSize="9sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="52dp"
+        android:background="@drawable/widget_preview_card"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="10dp">
+
+        <TextView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:background="@drawable/widget_preview_icon_circle"
+            android:gravity="center"
+            android:text="N"
+            android:textColor="@color/widget_preview_on_surface"
+            android:textSize="10sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="14dp"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="Pack for the trip"
+                android:textColor="@color/widget_preview_on_surface"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="11dp"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="Tomorrow"
+                android:textColor="@color/widget_preview_primary"
+                android:textSize="8sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="11dp"
+                android:ellipsize="end"
+                android:singleLine="true"
+                android:text="Passport, charger, headphones, camera, hotel details, and boarding passes"
+                android:textColor="@color/widget_preview_on_surface"
+                android:textSize="8sp" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:background="@drawable/widget_preview_small_action"
+            android:contentDescription="@string/widget_mark_done_cd"
+            android:padding="3dp"
+            android:src="@drawable/ic_widget_done"
+            android:tint="@color/widget_preview_on_surface" />
+    </LinearLayout>
+</LinearLayout>

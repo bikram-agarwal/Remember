@@ -10,12 +10,14 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.di.ApplicationScope
+import dev.bikram.remember.diagnostics.DiagnosticLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -54,6 +56,7 @@ class ActionReceiver : BroadcastReceiver() {
                 try {
                     fire(context, repository, noteWithItems, action)
                 } catch (t: Throwable) {
+                    DiagnosticLog.record(context, "Notification action failed: ${action.type}", t)
                     val message = t.message.orEmpty().ifBlank { context.getString(R.string.common_empty) }
                     Toast
                         .makeText(
@@ -98,10 +101,10 @@ class ActionReceiver : BroadcastReceiver() {
         val intent: Intent =
             when (action.type) {
                 ActionType.CALL_NUMBER -> callIntent(context, action.details)
-                ActionType.SEND_MESSAGE -> Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${action.details}"))
-                ActionType.SEND_EMAIL -> Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${action.details}"))
-                ActionType.GET_DIRECTIONS -> Intent(Intent.ACTION_VIEW, Uri.parse("geo:0,0?q=${Uri.encode(action.details)}"))
-                ActionType.OPEN_LINK -> Intent(Intent.ACTION_VIEW, Uri.parse(normalizeUrl(action.details)))
+                ActionType.SEND_MESSAGE -> Intent(Intent.ACTION_SENDTO, "smsto:${action.details}".toUri())
+                ActionType.SEND_EMAIL -> Intent(Intent.ACTION_SENDTO, "mailto:${action.details}".toUri())
+                ActionType.GET_DIRECTIONS -> Intent(Intent.ACTION_VIEW, "geo:0,0?q=${Uri.encode(action.details)}".toUri())
+                ActionType.OPEN_LINK -> Intent(Intent.ACTION_VIEW, normalizeUrl(action.details).toUri())
                 ActionType.OPEN_APP -> context.packageManager.getLaunchIntentForPackage(action.details) ?: return false
                 ActionType.OPEN_SHORTCUT ->
                     runCatching { Intent.parseUri(action.details, Intent.URI_INTENT_SCHEME) }
@@ -140,7 +143,7 @@ class ActionReceiver : BroadcastReceiver() {
             ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) ==
                 PackageManager.PERMISSION_GRANTED
         val action = if (granted) Intent.ACTION_CALL else Intent.ACTION_DIAL
-        return Intent(action, Uri.parse("tel:$number"))
+        return Intent(action, "tel:$number".toUri())
     }
 
     private fun normalizeUrl(s: String): String = if (s.startsWith("http://") || s.startsWith("https://")) s else "https://$s"
