@@ -46,8 +46,8 @@ class EditListViewModel
         private val _title = MutableStateFlow("")
         val title: StateFlow<String> = _title.asStateFlow()
 
-        private val _favorite = MutableStateFlow(false)
-        val favorite: StateFlow<Boolean> = _favorite.asStateFlow()
+        private val _starred = MutableStateFlow(false)
+        val starred: StateFlow<Boolean> = _starred.asStateFlow()
 
         /** Bool projection of NoteEntity.completedAt; same semantics as EditNoteViewModel.completed. */
         private val _completed = MutableStateFlow(false)
@@ -65,7 +65,7 @@ class EditListViewModel
         private val _importance = MutableStateFlow(Importance.DEFAULT)
         val importance: StateFlow<Importance> = _importance.asStateFlow()
 
-        private val _visibility = MutableStateFlow(NoteVisibility.PRIVATE)
+        private val _visibility = MutableStateFlow(NoteVisibility.DEFAULT)
         val visibility: StateFlow<NoteVisibility> = _visibility.asStateFlow()
 
         private val _locked = MutableStateFlow(false)
@@ -114,8 +114,15 @@ class EditListViewModel
         private val _hasPersistedRow = MutableStateFlow(noteId != null)
         val hasPersistedRow: StateFlow<Boolean> = _hasPersistedRow.asStateFlow()
 
+        private val _hasUnsavedChanges = MutableStateFlow(false)
+        val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
+
         private var loadedId: Long? = noteId
         private var dirty: Boolean = false
+            set(value) {
+                field = value
+                _hasUnsavedChanges.value = value
+            }
         private var nextLocalId: Long = -1L
         private val persistMutex = Mutex()
         private var originalNote: dev.bikram.remember.data.NoteEntity? = null
@@ -133,7 +140,7 @@ class EditListViewModel
                     originalNote = n
                     originalItems = existing.items
                     _title.value = n.title
-                    _favorite.value = n.favorite || n.tags.contains(RememberReservedTags.FAVORITE)
+                    _starred.value = n.starred || n.tags.contains(RememberReservedTags.STARRED)
                     _reminderAt.value = n.reminderAt
                     _recurrence.value = n.recurrence?.sanitized()
                     _importance.value = n.importance
@@ -143,7 +150,7 @@ class EditListViewModel
                     _pictureHeroFraming.value = n.pictureHeroFraming
                     _iconKey.value = n.iconKey
                     _actions.value = n.actions
-                    _tags.value = n.tags.filterNot { it == RememberReservedTags.FAVORITE }
+                    _tags.value = n.tags.filterNot { it == RememberReservedTags.STARRED }
                     _attachments.value = existing.attachments
                     _archived.value = n.archived
                     _trashed.value = n.trashed
@@ -198,8 +205,8 @@ class EditListViewModel
             dirty = true
         }
 
-        fun toggleFavorite() {
-            _favorite.value = !_favorite.value
+        fun toggleStar() {
+            _starred.value = !_starred.value
             dirty = true
         }
 
@@ -218,8 +225,17 @@ class EditListViewModel
         }
 
         fun setVisibility(v: NoteVisibility) {
+            if (_visibility.value == v) return
             _visibility.value = v
             dirty = true
+            refreshActiveNotificationVisibility(v)
+        }
+
+        private fun refreshActiveNotificationVisibility(value: NoteVisibility) {
+            val id = loadedId ?: return
+            viewModelScope.launch {
+                repository.refreshNotificationVisibilityPreview(id, value)
+            }
         }
 
         fun toggleLock() {
@@ -257,7 +273,7 @@ class EditListViewModel
         }
 
         fun setTags(v: List<String>) {
-            _tags.value = v.filterNot { it == RememberReservedTags.FAVORITE }
+            _tags.value = v.filterNot { it == RememberReservedTags.STARRED }
             dirty = true
         }
 
@@ -265,7 +281,7 @@ class EditListViewModel
             tags: List<String>,
             newColors: Map<String, String>,
         ) {
-            _tags.value = tags.filterNot { it == RememberReservedTags.FAVORITE }
+            _tags.value = tags.filterNot { it == RememberReservedTags.STARRED }
             dirty = true
             if (newColors.isNotEmpty()) {
                 viewModelScope.launch {
@@ -443,9 +459,9 @@ class EditListViewModel
         }
 
         private fun tagsForPersistence(): List<String> {
-            val base = _tags.value.filterNot { it == RememberReservedTags.FAVORITE }
-            return if (_favorite.value) {
-                (base + RememberReservedTags.FAVORITE).distinct()
+            val base = _tags.value.filterNot { it == RememberReservedTags.STARRED }
+            return if (_starred.value) {
+                (base + RememberReservedTags.STARRED).distinct()
             } else {
                 base
             }
@@ -505,14 +521,14 @@ class EditListViewModel
             val t = _title.value
             val nonEmpty = _items.value.filter { it.text.isNotBlank() }
             val opts = currentOptions()
-            val favorite = _favorite.value
+            val starred = _starred.value
             if (id == null) {
                 return t.isNotBlank() || nonEmpty.isNotEmpty() || _attachments.value.isNotEmpty() || opts.pictureUri != null || opts.tags.isNotEmpty() || opts.reminderAt != null || opts.actions.isNotEmpty() || opts.iconKey != null
             } else {
                 val old = originalNote ?: return true
                 val oldItems = originalItems
                 if (t != old.title) return true
-                if (favorite != old.favorite) return true
+                if (starred != old.starred) return true
                 if (opts.reminderAt != old.reminderAt) return true
                 if (opts.importance != old.importance) return true
                 if (opts.visibility != old.visibility) return true
@@ -570,7 +586,7 @@ class EditListViewModel
                     if (persistable.any { it.checked || it.parentLocalKey != null || it.depth > 0 }) {
                         repository.updateList(newId, finalTitle, 0, persistable, currentOptions())
                     }
-                    if (_favorite.value) repository.setFavorite(newId, true)
+                    if (_starred.value) repository.setStarred(newId, true)
                     dirty = false
 
                     val savedList = repository.get(newId)
@@ -585,8 +601,8 @@ class EditListViewModel
                     repository.updateList(id, finalTitle, 0, persistable, currentOptions())
                     if (t.isBlank()) _title.value = finalTitle
                     val cur = repository.get(id)?.note
-                    if (cur != null && cur.favorite != _favorite.value) {
-                        repository.setFavorite(id, _favorite.value)
+                    if (cur != null && cur.starred != _starred.value) {
+                        repository.setStarred(id, _starred.value)
                     }
                     dirty = false
 
@@ -628,7 +644,7 @@ class EditListViewModel
                                         recurrence = old.recurrence,
                                     ),
                             )
-                            repository.setFavorite(id, old.favorite)
+                            repository.setStarred(id, old.starred)
                         }
                     } else {
                         return@withLock null

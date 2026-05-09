@@ -162,7 +162,7 @@ val TopAppBarHeight = 56.dp
 @Composable
 fun rememberProgressiveBlurStyle(
     bottomExtra: androidx.compose.ui.unit.Dp = PillBottomBarHeight + PillBottomScrimExtra,
-    topExtra: androidx.compose.ui.unit.Dp = TopAppBarHeight,
+    topExtra: androidx.compose.ui.unit.Dp = TopAppBarHeight * 2,
     blurRadius: Float = 90f,
     overlayAlpha: Float = 0.36f,
     overlayAlphaBottom: Float = 0.48f,

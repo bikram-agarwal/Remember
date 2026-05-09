@@ -5,17 +5,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import dev.bikram.remember.data.NoteSwipeAction
 
+private val DoneSwipeBackground = Color(0xFF2E7D32)
+private val DoneSwipeContent = Color.White
+private val StarSwipeBackground = Color(0xFF6A561F)
+
 @Composable
 fun NoteSwipeAction.semanticSwipeBackground(): Color =
     when (this) {
         NoteSwipeAction.EDIT -> MaterialTheme.colorScheme.primaryContainer
         NoteSwipeAction.TRASH -> MaterialTheme.colorScheme.errorContainer
         NoteSwipeAction.DUPLICATE -> MaterialTheme.colorScheme.secondaryContainer
-        NoteSwipeAction.TOGGLE_FAVORITE -> MaterialTheme.colorScheme.tertiaryContainer
+        NoteSwipeAction.TOGGLE_STAR -> StarSwipeBackground
         NoteSwipeAction.ARCHIVE -> MaterialTheme.colorScheme.secondaryContainer
-        // Mark-done uses primaryContainer like edit - the visual signal is "task progress",
-        // a positive primary action.
-        NoteSwipeAction.MARK_DONE -> MaterialTheme.colorScheme.primaryContainer
+        NoteSwipeAction.MARK_DONE -> DoneSwipeBackground
     }
 
 @Composable
@@ -24,7 +26,7 @@ fun NoteSwipeAction.semanticSwipeIconTint(): Color =
         NoteSwipeAction.EDIT -> MaterialTheme.colorScheme.onPrimaryContainer
         NoteSwipeAction.TRASH -> MaterialTheme.colorScheme.onErrorContainer
         NoteSwipeAction.DUPLICATE -> MaterialTheme.colorScheme.onSecondaryContainer
-        NoteSwipeAction.TOGGLE_FAVORITE -> MaterialTheme.colorScheme.onTertiaryContainer
+        NoteSwipeAction.TOGGLE_STAR -> MaterialTheme.colorScheme.onSecondaryContainer
         NoteSwipeAction.ARCHIVE -> MaterialTheme.colorScheme.onSecondaryContainer
-        NoteSwipeAction.MARK_DONE -> MaterialTheme.colorScheme.onPrimaryContainer
+        NoteSwipeAction.MARK_DONE -> DoneSwipeContent
     }

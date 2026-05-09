@@ -111,11 +111,11 @@ fun NoteCard(
     val showHero = heroPictureUri != null
     val surface = MaterialTheme.colorScheme.surface
     val cardShape = MaterialTheme.shapes.medium
-    val favoriteIconDescription = stringResource(R.string.notecard_favorite_cd)
+    val starredIconDescription = stringResource(R.string.notecard_starred_cd)
 
     // Pre-resolve every fragment of the merged TalkBack announcement so the body of
     // [remember] below can stay context-free. The five child icon contentDescriptions
-    // (favorite, picture, attachment, reminder, recurring) further down the tree stay
+    // (starred, picture, attachment, reminder, recurring) further down the tree stay
     // in place; with [Modifier.semantics(mergeDescendants = true)] + an explicit parent
     // contentDescription the parent's string is what TalkBack reads, so the children
     // become harmless ornaments instead of getting announced one-by-one.
@@ -135,7 +135,7 @@ fun NoteCard(
             model.title,
             model.body,
             model.completed,
-            model.favorite,
+            model.starred,
             model.reminderAt,
             model.recurring,
             model.pictureUri,
@@ -160,7 +160,7 @@ fun NoteCard(
                 }
                 if (model.reminderAt != null) add(cdReminderForAnnouncement)
                 if (model.recurring) add(cdRecurringForAnnouncement)
-                if (model.favorite) add(favoriteIconDescription)
+                if (model.starred) add(starredIconDescription)
                 if (model.pictureUri != null) add(cdPictureForAnnouncement)
                 if (model.hasAttachment) add(cdAttachmentForAnnouncement)
             }.joinToString(cdSeparator)
@@ -270,9 +270,9 @@ fun NoteCard(
         } else {
             Modifier
         }
-    val favoriteBorder =
-        if (model.favorite && !selected) {
-            Modifier.border(BorderStroke(1.dp, Color(0xFFFF9EBC).copy(alpha = 0.70f)), cardShape)
+    val starredBorder =
+        if (model.starred && !selected) {
+            Modifier.border(BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.70f)), cardShape)
         } else {
             Modifier
         }
@@ -286,12 +286,12 @@ fun NoteCard(
         } else {
             Modifier.tapSoundClickable(onClick = onClick)
         }
-    // Subtle pink wash on favorited cards: blend ~7% of the favorite-pink swatch into
-    // the card's base container color so the card reads as "loved" at a glance without
+    // Subtle yellow wash on starred cards: blend ~7% of the star-yellow swatch into
+    // the card's base container color so the card reads as starred at a glance without
     // competing with selection highlight, picture hero, or tag accents.
     val tintedContainerColor =
-        if (model.favorite) {
-            lerp(cardColors.containerColor, Color(0xFFFF9EBC), 0.07f)
+        if (model.starred) {
+            lerp(cardColors.containerColor, Color(0xFFFFD54F), 0.07f)
         } else {
             cardColors.containerColor
         }
@@ -307,7 +307,7 @@ fun NoteCard(
                     renderEffect = completedRenderEffect
                 }.then(sharedModifier)
                 .clip(cardShape)
-                .then(favoriteBorder)
+                .then(starredBorder)
                 .then(selectionBorder)
                 .then(clickableModifier)
                 .semantics(mergeDescendants = true) {
@@ -339,18 +339,18 @@ fun NoteCard(
                     scrimBottom = surface.copy(alpha = 0.48f),
                 )
             }
-            // Watermark heart for favorited cards. Tilted ~-15deg, low alpha, parked at
+            // Watermark star for starred cards. Tilted ~-15deg, low alpha, parked at
             // the top-end. It deliberately sits *behind* the selection check overlay
             // and the trash "30 days left" chip (both painted later in this Box / by
-            // the call site), so those affordances always win the corner. The heart is
+            // the call site), so those affordances always win the corner. The star is
             // ornament-only -- TalkBack ignores it because the parent Surface already
-            // declares mergeDescendants and contentDescription includes "Favorite".
-            if (model.favorite) {
+            // declares mergeDescendants and contentDescription includes "Starred".
+            if (model.starred) {
                 RememberMaterialRoundedSymbol(
-                    name = "favorite",
+                    name = "star",
                     filled = true,
                     size = 96.dp,
-                    tint = Color(0xFFFF9EBC),
+                    tint = Color(0xFFFFD54F),
                     weight = FontWeight.Bold,
                     modifier =
                         Modifier
@@ -472,13 +472,13 @@ fun NoteCard(
                                 )
                             }
                         }
-                        // Favorite was previously a small inline heart at the title's
+                        // Starred was previously a small inline star at the title's
                         // trailing edge. It overlapped with the top-end selection
-                        // check and trash days-left chip. The favorite cue now lives
+                        // check and trash days-left chip. The starred cue now lives
                         // as a low-alpha tilted watermark in the card's top-right
                         // corner (rendered on the outer Box below) plus a subtle
-                        // pink tint on the card surface; the announcement still
-                        // includes "Favorite" via the parent contentDescription.
+                        // yellow tint on the card surface; the announcement still
+                        // includes "Starred" via the parent contentDescription.
                     }
                     Spacer(Modifier.height(6.dp))
                     when (model.kind) {

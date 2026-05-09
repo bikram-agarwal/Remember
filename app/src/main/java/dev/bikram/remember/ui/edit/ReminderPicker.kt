@@ -1034,7 +1034,10 @@ private fun RepeatConfig(
                             value = stringResource(R.string.reminder_on_day, dayOfMonth),
                             expanded = dayOfMonthMenuOpen,
                             onExpandedChange = {
-                                if (monthlyKind == MonthlyKind.BY_DAY) onDayOfMonthMenuOpen(it)
+                                if (it) {
+                                    onMonthlyKind(MonthlyKind.BY_DAY)
+                                }
+                                onDayOfMonthMenuOpen(it)
                             },
                         ) {
                             for (dayOfMonthOption in 1..31) {
@@ -1062,7 +1065,10 @@ private fun RepeatConfig(
                                 value = ordinalLabel(nthOrdinal),
                                 expanded = nthOrdinalMenuOpen,
                                 onExpandedChange = {
-                                    if (monthlyKind == MonthlyKind.BY_WEEKDAY) onNthOrdinalMenuOpen(it)
+                                    if (it) {
+                                        onMonthlyKind(MonthlyKind.BY_WEEKDAY)
+                                    }
+                                    onNthOrdinalMenuOpen(it)
                                 },
                             ) {
                                 listOf(1, 2, 3, 4, 5).forEach { ordinal ->
@@ -1083,7 +1089,10 @@ private fun RepeatConfig(
                                 value = weekdayFullName(nthWeekday),
                                 expanded = nthWeekdayMenuOpen,
                                 onExpandedChange = {
-                                    if (monthlyKind == MonthlyKind.BY_WEEKDAY) onNthWeekdayMenuOpen(it)
+                                    if (it) {
+                                        onMonthlyKind(MonthlyKind.BY_WEEKDAY)
+                                    }
+                                    onNthWeekdayMenuOpen(it)
                                 },
                             ) {
                                 listOf(

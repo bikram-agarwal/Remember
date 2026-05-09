@@ -62,12 +62,12 @@ interface NoteDao {
         SELECT * FROM notes
         WHERE trashed = 0
           AND archived = 0
-          AND favorite = 1
+          AND starred = 1
           AND completedAt IS NULL
         ORDER BY updatedAt DESC
         """,
     )
-    suspend fun activeFavorites(): List<NoteWithItems>
+    suspend fun activeStarred(): List<NoteWithItems>
 
     /**
      * Full-text search over active notes (no trashed, no archived). Uses an inner join against
@@ -127,10 +127,10 @@ interface NoteDao {
     @Update
     suspend fun update(note: NoteEntity)
 
-    @Query("UPDATE notes SET favorite = :favorite, updatedAt = :updatedAt WHERE id = :id")
-    suspend fun setFavorite(
+    @Query("UPDATE notes SET starred = :starred, updatedAt = :updatedAt WHERE id = :id")
+    suspend fun setStarred(
         id: Long,
-        favorite: Boolean,
+        starred: Boolean,
         updatedAt: Long,
     )
 
@@ -156,7 +156,7 @@ interface NoteDao {
 
     /**
      * Archive is just another shelf: it cannot coexist with trash, but user intent
-     * like Favorite must survive archive and undo.
+     * like Starred must survive archive and undo.
      */
     @Query(
         "UPDATE notes " +

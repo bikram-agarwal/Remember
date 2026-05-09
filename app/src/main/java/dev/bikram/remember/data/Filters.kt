@@ -14,7 +14,7 @@ data class NotesFilter(
     val hasReminder: Boolean? = null,
     val hasPicture: Boolean? = null,
     val hasAttachment: Boolean? = null,
-    val favorite: Boolean? = null,
+    val starred: Boolean? = null,
 ) {
     /** True if any non-text facet is narrowing the results. */
     val facetActive: Boolean
@@ -24,7 +24,7 @@ data class NotesFilter(
                 hasReminder != null ||
                 hasPicture != null ||
                 hasAttachment != null ||
-                favorite != null
+                starred != null
 
     val active: Boolean
         get() = text.isNotBlank() || facetActive
@@ -50,7 +50,7 @@ fun NotesFilter.matches(n: NoteWithItems): Boolean {
     hasReminder?.let { if ((note.reminderAt != null) != it) return false }
     hasPicture?.let { if ((!note.pictureUri.isNullOrBlank()) != it) return false }
     hasAttachment?.let { if (n.attachments.isNotEmpty() != it) return false }
-    favorite?.let { if (note.favorite != it) return false }
+    starred?.let { if (note.starred != it) return false }
     if (text.isBlank()) return true
     val needle = text.trim().lowercase()
     if (note.title.lowercase().contains(needle)) return true

@@ -51,7 +51,7 @@ class TagRepository(
         colorHex: String?,
     ) {
         val cleanedName = tagName.trim()
-        if (cleanedName.isBlank() || cleanedName == RememberReservedTags.FAVORITE) return
+        if (cleanedName.isBlank() || cleanedName == RememberReservedTags.STARRED) return
         val normalizedColor = colorHex?.let { normalizeHex(it) }
         if (colorHex != null && normalizedColor == null) return
         if (database != null) {
@@ -75,7 +75,7 @@ class TagRepository(
         val cleanedNewName = newName.trim()
         val newNormalizedName = normalizeTagName(cleanedNewName)
         if (oldNormalizedName.isBlank() || newNormalizedName.isBlank()) return null
-        if (oldName.trim() == RememberReservedTags.FAVORITE || cleanedNewName == RememberReservedTags.FAVORITE) {
+        if (oldName.trim() == RememberReservedTags.STARRED || cleanedNewName == RememberReservedTags.STARRED) {
             return null
         }
         val normalizedColor = if (resetColor) null else colorHex?.let { normalizeHex(it) }
@@ -191,7 +191,7 @@ class TagRepository(
     private suspend fun syncNoteTagCache(noteId: Long) {
         val note = noteDao.get(noteId)?.note ?: return
         val visibleTags = tagDao.tagsForNote(noteId).map { tag -> tag.name }
-        val reservedTags = note.tags.filter { tagName -> tagName == RememberReservedTags.FAVORITE }
+        val reservedTags = note.tags.filter { tagName -> tagName == RememberReservedTags.STARRED }
         noteDao.updateTagCache(noteId, visibleTags + reservedTags)
     }
 }
@@ -203,7 +203,7 @@ internal fun cleanUserVisibleTagNames(tagNames: List<String>): List<String> {
     return buildList {
         tagNames.forEach { rawName ->
             val cleanedName = rawName.trim()
-            if (cleanedName.isBlank() || cleanedName == RememberReservedTags.FAVORITE) {
+            if (cleanedName.isBlank() || cleanedName == RememberReservedTags.STARRED) {
                 return@forEach
             }
             val normalizedName = normalizeTagName(cleanedName)

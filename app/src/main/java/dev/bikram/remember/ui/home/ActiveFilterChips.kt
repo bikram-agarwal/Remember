@@ -160,7 +160,7 @@ internal fun ActiveFilterChips(
                 filter.hasReminder,
                 filter.hasPicture,
                 filter.hasAttachment,
-                filter.favorite,
+                filter.starred,
             ).count { active -> active == true }
         FilterDropdownChip(
             label =
@@ -191,9 +191,9 @@ internal fun ActiveFilterChips(
                 onClick = { onChange(filter.copy(hasAttachment = if (filter.hasAttachment == true) null else true)) },
             )
             CheckableMenuItem(
-                label = stringResource(R.string.filter_favorites),
-                checked = filter.favorite == true,
-                onClick = { onChange(filter.copy(favorite = if (filter.favorite == true) null else true)) },
+                label = stringResource(R.string.filter_starred),
+                checked = filter.starred == true,
+                onClick = { onChange(filter.copy(starred = if (filter.starred == true) null else true)) },
             )
         }
         RememberInputChip(

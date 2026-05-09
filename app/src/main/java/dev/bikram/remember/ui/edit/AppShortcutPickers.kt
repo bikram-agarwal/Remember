@@ -1,8 +1,11 @@
 package dev.bikram.remember.ui.edit
+
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ResolveInfo
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -34,6 +37,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.IntentCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.drawable.toBitmap
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.AppBottomSheet
@@ -45,6 +49,8 @@ import kotlinx.coroutines.withContext
 // Intent.EXTRA_SHORTCUT_* constants are deprecated on the SDK; keys are stable for CREATE_SHORTCUT results.
 private const val EXTRA_LEGACY_SHORTCUT_INTENT = "android.intent.extra.shortcut.INTENT"
 private const val EXTRA_LEGACY_SHORTCUT_NAME = "android.intent.extra.shortcut.NAME"
+private const val EXTRA_LEGACY_SHORTCUT_ICON = "android.intent.extra.shortcut.ICON"
+private const val EXTRA_LEGACY_SHORTCUT_ICON_RESOURCE = "android.intent.extra.shortcut.ICON_RESOURCE"
 
 data class AppChoice(
     val packageName: String,
@@ -53,12 +59,39 @@ data class AppChoice(
     val icon: Drawable,
 )
 
+data class ShortcutPick(
+    val intentUri: String,
+    val label: String,
+    val icon: Drawable?,
+)
+
 @Composable
 fun AppPickerDialog(
     title: String,
     queryIntent: Intent,
     onPick: (AppChoice) -> Unit,
     onDismiss: () -> Unit,
+) {
+    AppBottomSheet(
+        title = title,
+        onDismiss = onDismiss,
+        scrollable = false,
+        actions = {
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
+    ) {
+        AppPickerContent(
+            queryIntent = queryIntent,
+            onPick = onPick,
+        )
+    }
+}
+
+@Composable
+fun AppPickerContent(
+    queryIntent: Intent,
+    onPick: (AppChoice) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val pm = context.packageManager
@@ -81,39 +114,30 @@ fun AppPickerDialog(
             }
     }
 
-    AppBottomSheet(
-        title = title,
-        onDismiss = onDismiss,
-        scrollable = false,
-        actions = {
-            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-        },
+    Box(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .heightIn(min = 200.dp, max = 520.dp),
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 200.dp, max = 520.dp),
-        ) {
-            val current = items
-            when {
-                current == null -> {
-                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+        val current = items
+        when {
+            current == null -> {
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
                 }
-                current.isEmpty() -> {
-                    Text(
-                        stringResource(R.string.app_picker_nothing_available),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                else -> {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        items(current, key = { it.componentName.flattenToShortString() }) { app ->
-                            AppRow(app = app, onClick = { onPick(app) })
-                        }
+            }
+            current.isEmpty() -> {
+                Text(
+                    stringResource(R.string.app_picker_nothing_available),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            else -> {
+                LazyColumn(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    items(current, key = { it.componentName.flattenToShortString() }) { app ->
+                        AppRow(app = app, onClick = { onPick(app) })
                     }
                 }
             }
@@ -166,8 +190,9 @@ private fun AppRow(
 
 @Composable
 fun rememberShortcutPickLauncher(
-    onPicked: (intentUri: String, label: String) -> Unit,
+    onPicked: (ShortcutPick) -> Unit,
 ): (ComponentName) -> Unit {
+    val context = LocalContext.current
     val launcher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartActivityForResult(),
@@ -177,13 +202,22 @@ fun rememberShortcutPickLauncher(
             val intent = IntentCompat.getParcelableExtra(data, EXTRA_LEGACY_SHORTCUT_INTENT, Intent::class.java)
             intent ?: return@rememberLauncherForActivityResult
             val label = data.getStringExtra(EXTRA_LEGACY_SHORTCUT_NAME).orEmpty()
+            val icon = shortcutIcon(data, context.resources, context.packageManager)
             val uri =
                 try {
                     intent.toUri(Intent.URI_INTENT_SCHEME)
                 } catch (_: Throwable) {
                     ""
                 }
-            if (uri.isNotBlank()) onPicked(uri, label)
+            if (uri.isNotBlank()) {
+                onPicked(
+                    ShortcutPick(
+                        intentUri = uri,
+                        label = label,
+                        icon = icon,
+                    ),
+                )
+            }
         }
     return { cn ->
         val launch =
@@ -192,4 +226,29 @@ fun rememberShortcutPickLauncher(
             }
         launcher.launch(launch)
     }
+}
+
+private fun shortcutIcon(
+    data: Intent,
+    resources: android.content.res.Resources,
+    packageManager: android.content.pm.PackageManager,
+): Drawable? {
+    val bitmapIcon = IntentCompat.getParcelableExtra(data, EXTRA_LEGACY_SHORTCUT_ICON, Bitmap::class.java)
+    if (bitmapIcon != null) return BitmapDrawable(resources, bitmapIcon)
+
+    val iconResource =
+        IntentCompat.getParcelableExtra(
+            data,
+            EXTRA_LEGACY_SHORTCUT_ICON_RESOURCE,
+            Intent.ShortcutIconResource::class.java,
+        ) ?: return null
+    return runCatching {
+        val appResources = packageManager.getResourcesForApplication(iconResource.packageName)
+        val iconId = appResources.getIdentifier(iconResource.resourceName, null, null)
+        if (iconId == 0) {
+            null
+        } else {
+            ResourcesCompat.getDrawable(appResources, iconId, null)
+        }
+    }.getOrNull()
 }

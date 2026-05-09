@@ -18,7 +18,7 @@ class TagRepositoryTest {
                     " Work ",
                     "work",
                     "",
-                    RememberReservedTags.FAVORITE,
+                    RememberReservedTags.STARRED,
                     "Personal",
                     " personal ",
                 ),

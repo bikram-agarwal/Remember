@@ -19,7 +19,7 @@ import kotlinx.coroutines.launch
 data class NoteOptions(
     val reminderAt: Long? = null,
     val importance: Importance = Importance.DEFAULT,
-    val visibility: Visibility = Visibility.PRIVATE,
+    val visibility: Visibility = Visibility.DEFAULT,
     val pictureUri: String? = null,
     val pictureHeroFraming: String? = null,
     val locked: Boolean = false,
@@ -89,7 +89,7 @@ class NoteRepository(
      * paired operations (e.g. cancel-then-schedule for undo).
      *
      * @param includeSummary set false for write paths that don't change reminder
-     *     state (favorite toggle, attachment add/remove, picture URI, list item
+     *     state (starred toggle, attachment add/remove, picture URI, list item
      *     check toggle) -- the summary notification only reflects pending reminders
      *     so re-querying for those changes is wasted work.
      */
@@ -109,7 +109,7 @@ class NoteRepository(
                 .map { notes ->
                     notes
                         .flatMap { it.note.tags }
-                        .filterNot { it == RememberReservedTags.FAVORITE }
+                        .filterNot { it == RememberReservedTags.STARRED }
                         .distinct()
                         .sorted()
                 }.flowOn(defaultDispatcher)
@@ -206,7 +206,7 @@ class NoteRepository(
                     title = title,
                     body = body,
                     colorIndex = colorIndex,
-                    favorite = false,
+                    starred = false,
                     trashed = false,
                     createdAt = now,
                     updatedAt = now,
@@ -242,7 +242,7 @@ class NoteRepository(
                     title = title,
                     body = "",
                     colorIndex = colorIndex,
-                    favorite = false,
+                    starred = false,
                     trashed = false,
                     createdAt = now,
                     updatedAt = now,
@@ -313,6 +313,7 @@ class NoteRepository(
         )
         tagRepository?.replaceTagsForNote(id, options.tags)
         rescheduleReminder(id, options.reminderAt, options.importance)
+        refreshNotificationIfActive(id)
         postWriteBookkeeping()
     }
 
@@ -368,15 +369,15 @@ class NoteRepository(
         if (didUpdate) postWriteBookkeeping()
     }
 
-    suspend fun setFavorite(
+    suspend fun setStarred(
         id: Long,
-        favorite: Boolean,
+        starred: Boolean,
     ) {
         val row = noteDao.get(id) ?: return
-        val baseTags = row.note.tags.filterNot { it == RememberReservedTags.FAVORITE }
-        val newTags = if (favorite) (baseTags + RememberReservedTags.FAVORITE).distinct() else baseTags
-        if (row.note.favorite == favorite && row.note.tags == newTags) return
-        noteDao.update(row.note.copy(favorite = favorite, tags = newTags, updatedAt = clock()))
+        val baseTags = row.note.tags.filterNot { it == RememberReservedTags.STARRED }
+        val newTags = if (starred) (baseTags + RememberReservedTags.STARRED).distinct() else baseTags
+        if (row.note.starred == starred && row.note.tags == newTags) return
+        noteDao.update(row.note.copy(starred = starred, tags = newTags, updatedAt = clock()))
         postWriteBookkeeping(includeSummary = false)
     }
 
@@ -534,12 +535,6 @@ class NoteRepository(
         postWriteBookkeeping()
     }
 
-    /**
-     * Bulk mark-completed. Each row's logic (including recurrence advancement) is
-     * non-trivial and lives in [markCompleted]; we delegate to that within a single
-     * transaction so all row writes coalesce into one observer emission. The per-id
-     * side-effect helpers fire N times but are idempotent.
-     */
     /**
      * Bulk mark-completed. Returns a per-id snapshot of each row's pre-completion
      * state so the snackbar Undo can fully restore recurring rules without an extra
@@ -866,6 +861,14 @@ class NoteRepository(
         scheduler?.refreshNotificationIfActive(row.note, row.items)
     }
 
+    suspend fun refreshNotificationVisibilityPreview(
+        id: Long,
+        visibility: Visibility,
+    ) {
+        val row = noteDao.get(id) ?: return
+        scheduler?.refreshNotificationIfActive(row.note.copy(visibility = visibility), row.items)
+    }
+
     suspend fun refreshActiveReminderNotifications() {
         val schedulerNonNull = scheduler ?: return
         val reminders = noteDao.activeRemindersUntil(Long.MAX_VALUE)
@@ -883,7 +886,7 @@ class NoteRepository(
 
     suspend fun reminderSummaryItems(now: Long = clock()): List<NoteWithItems> = noteDao.activeRemindersUntil(now + REMINDER_SUMMARY_WINDOW_MILLIS)
 
-    suspend fun favoriteWidgetItems(): List<NoteWithItems> = noteDao.activeFavorites()
+    suspend fun starredWidgetItems(): List<NoteWithItems> = noteDao.activeStarred()
 
     /**
      * Consume the currently due recurring occurrence after the user marks it done. Merely
@@ -920,8 +923,7 @@ class NoteRepository(
      * Used when the user taps "Mark as done" on a reminder notification action.
      * Recurring notes advance to their next occurrence; one-shot notes enter Done.
      */
-    suspend fun clearReminderFromNotificationAction(noteId: Long): Boolean =
-        markCompleted(noteId) != null
+    suspend fun clearReminderFromNotificationAction(noteId: Long): Boolean = markCompleted(noteId) != null
 
     /**
      * Mark a note done. Behavior depends on whether the note has a live recurrence rule:

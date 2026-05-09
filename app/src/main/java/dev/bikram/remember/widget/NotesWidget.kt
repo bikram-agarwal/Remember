@@ -50,6 +50,7 @@ import dev.bikram.remember.MainActivity
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.data.Visibility
 import dev.bikram.remember.di.NotesWidgetEntryPoint
 import dev.bikram.remember.ui.edit.iconEmojiPayload
 import kotlinx.coroutines.flow.first
@@ -59,7 +60,7 @@ import java.util.Calendar
  * Agenda widget for reminders due now or soon.
  *
  * Existing installed Remember widgets keep this receiver/provider and therefore upgrade
- * from the old mixed Favorites + Reminder Summary surface into the richer daily view.
+ * from the old mixed Starred + Reminder Summary surface into the richer daily view.
  */
 class NotesWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode =
@@ -107,7 +108,7 @@ class QuickCaptureWidget : GlanceAppWidget() {
     }
 }
 
-class FavoritesWidget : GlanceAppWidget() {
+class StarredWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode =
         SizeMode.Responsive(
             setOf(
@@ -126,8 +127,8 @@ class FavoritesWidget : GlanceAppWidget() {
             GlanceTheme {
                 val activeNotesFlow = remember(noteRepository) { noteRepository.observeActive() }
                 val activeNotes by activeNotesFlow.collectAsState(initial = initialNotes)
-                val favorites = favoriteWidgetItems(activeNotes)
-                FavoritesWidgetContent(favorites = favorites)
+                val starred = starredWidgetItems(activeNotes)
+                StarredWidgetContent(starred = starred)
             }
         }
     }
@@ -155,7 +156,7 @@ class WidgetRefreshAction : ActionCallback {
         val widgetKind = parameters[WidgetKindKey] ?: WIDGET_KIND_AGENDA
         when (widgetKind) {
             WIDGET_KIND_QUICK_CAPTURE -> QuickCaptureWidget().update(context, glanceId)
-            WIDGET_KIND_FAVORITES -> FavoritesWidget().update(context, glanceId)
+            WIDGET_KIND_STARRED -> StarredWidget().update(context, glanceId)
             else -> NotesWidget().update(context, glanceId)
         }
     }
@@ -238,7 +239,7 @@ private fun AgendaWidgetContent(
 }
 
 @Composable
-private fun FavoritesWidgetContent(favorites: List<NoteWithItems>) {
+private fun StarredWidgetContent(starred: List<NoteWithItems>) {
     val context = LocalContext.current
     val compact = LocalSize.current.width < 220.dp
     Column(
@@ -250,24 +251,24 @@ private fun FavoritesWidgetContent(favorites: List<NoteWithItems>) {
                 .padding(if (compact) 10.dp else 12.dp),
     ) {
         WidgetHeader(
-            title = context.getString(R.string.widget_favorites_title),
+            title = context.getString(R.string.widget_starred_title),
             compact = compact,
             showActions = true,
-            widgetKind = WIDGET_KIND_FAVORITES,
+            widgetKind = WIDGET_KIND_STARRED,
         )
         Spacer(GlanceModifier.height(if (compact) 6.dp else 8.dp))
-        if (favorites.isEmpty()) {
-            FavoritesEmptyState()
+        if (starred.isEmpty()) {
+            StarredEmptyState()
         } else {
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                items(count = favorites.size) { index ->
+                items(count = starred.size) { index ->
                     Column {
-                        FavoriteCard(
-                            note = favorites[index],
+                        StarredCard(
+                            note = starred[index],
                             context = context,
                             compact = compact,
                         )
-                        if (index != favorites.lastIndex) {
+                        if (index != starred.lastIndex) {
                             Spacer(GlanceModifier.height(6.dp))
                         }
                     }
@@ -543,7 +544,7 @@ private fun AgendaEmptyState() {
 }
 
 @Composable
-private fun FavoritesEmptyState() {
+private fun StarredEmptyState() {
     val context = LocalContext.current
     Box(
         modifier = GlanceModifier.fillMaxSize(),
@@ -551,7 +552,7 @@ private fun FavoritesEmptyState() {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = context.getString(R.string.widget_empty_favorites_watermark),
+                text = context.getString(R.string.widget_empty_starred_watermark),
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.primaryContainer,
@@ -560,7 +561,7 @@ private fun FavoritesEmptyState() {
             )
             Spacer(GlanceModifier.height(6.dp))
             Text(
-                text = context.getString(R.string.widget_empty_favorites),
+                text = context.getString(R.string.widget_empty_starred),
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
@@ -660,7 +661,7 @@ private fun ReminderCard(
 }
 
 @Composable
-private fun FavoriteCard(
+private fun StarredCard(
     note: NoteWithItems,
     context: Context,
     compact: Boolean,
@@ -745,6 +746,7 @@ private fun agendaWidgetItems(
         notes
             .asSequence()
             .filter { it.note.completedAt == null }
+            .filter { it.note.visibility != Visibility.SECRET }
             .filter { it.note.reminderAt != null }
             .filter { noteWithItems ->
                 val reminderAt = noteWithItems.note.reminderAt ?: return@filter false
@@ -769,6 +771,7 @@ private fun quickCaptureWidgetCounts(
         notes
             .asSequence()
             .filter { it.note.completedAt == null }
+            .filter { it.note.visibility != Visibility.SECRET }
             .filter { it.note.reminderAt != null }
             .toList()
     return QuickCaptureWidgetCounts(
@@ -781,9 +784,10 @@ private fun quickCaptureWidgetCounts(
     )
 }
 
-private fun favoriteWidgetItems(notes: List<NoteWithItems>): List<NoteWithItems> =
+private fun starredWidgetItems(notes: List<NoteWithItems>): List<NoteWithItems> =
     notes
-        .filter { it.note.favorite }
+        .filter { it.note.visibility != Visibility.SECRET }
+        .filter { it.note.starred }
         .sortedByDescending { it.note.updatedAt }
 
 private fun openNotesIntent(context: Context): Intent =
@@ -846,11 +850,15 @@ private fun noteWidgetTitle(
     }
 
 private fun noteWidgetSubline(note: NoteWithItems): String =
-    note.note.body.ifBlank {
-        note.items
-            .firstOrNull()
-            ?.text
-            .orEmpty()
+    if (note.note.visibility == Visibility.DEFAULT) {
+        note.note.body.ifBlank {
+            note.items
+                .firstOrNull()
+                ?.text
+                .orEmpty()
+        }
+    } else {
+        ""
     }
 
 private fun quickCaptureStatus(
@@ -947,4 +955,4 @@ private const val DAY_MILLIS = 24L * HOUR_MILLIS
 private const val UPCOMING_WINDOW_MILLIS = 7L * DAY_MILLIS
 private const val WIDGET_KIND_AGENDA = "agenda"
 private const val WIDGET_KIND_QUICK_CAPTURE = "quick_capture"
-private const val WIDGET_KIND_FAVORITES = "favorites"
+private const val WIDGET_KIND_STARRED = "starred"

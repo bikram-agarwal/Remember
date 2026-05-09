@@ -30,7 +30,7 @@ enum class SwipeGestureMode {
 }
 
 val DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS: PersistentList<NoteSwipeAction?> =
-    persistentListOf(NoteSwipeAction.EDIT, NoteSwipeAction.DUPLICATE, NoteSwipeAction.TOGGLE_FAVORITE)
+    persistentListOf(NoteSwipeAction.EDIT, NoteSwipeAction.DUPLICATE, NoteSwipeAction.TOGGLE_STAR)
 
 val DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS: PersistentList<NoteSwipeAction?> =
     persistentListOf(NoteSwipeAction.MARK_DONE, NoteSwipeAction.ARCHIVE, NoteSwipeAction.TRASH)
@@ -214,10 +214,7 @@ class InteractionPrefs(
         ).toPersistentList()
     }
 
-    private fun noteSwipeActionFromStoredName(value: String): NoteSwipeAction? {
-        if (value == "TOGGLE_PIN") return NoteSwipeAction.TOGGLE_FAVORITE
-        return runCatching { NoteSwipeAction.valueOf(value) }.getOrNull()
-    }
+    private fun noteSwipeActionFromStoredName(value: String): NoteSwipeAction? = runCatching { NoteSwipeAction.valueOf(value) }.getOrNull()
 
     private fun normalizedRevealSlots(actions: List<NoteSwipeAction?>): List<NoteSwipeAction?> {
         val used = mutableSetOf<NoteSwipeAction>()

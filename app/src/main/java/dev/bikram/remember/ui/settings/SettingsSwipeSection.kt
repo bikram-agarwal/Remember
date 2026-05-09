@@ -26,6 +26,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
@@ -117,9 +119,13 @@ internal fun SwipeRevealSlotsEditor(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .graphicsLayer { clip = false },
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        val currentDraggingSlot = draggingSlot
+        val startRowDragging = currentDraggingSlot != null && currentDraggingSlot < SWIPE_REVEAL_SLOT_COUNT
+        val endRowDragging = currentDraggingSlot != null && currentDraggingSlot >= SWIPE_REVEAL_SLOT_COUNT
         SwipeRevealDirectionSlotsRow(
             title = startTitle,
             direction = SwipeDirectionCue.RIGHT,
@@ -139,6 +145,7 @@ internal fun SwipeRevealSlotsEditor(
                 dragPointerRoot += delta
             },
             onDragEnd = ::finishDrag,
+            modifier = Modifier.zIndex(if (startRowDragging) 1f else 0f),
         )
         SwipeRevealDirectionSlotsRow(
             title = endTitle,
@@ -159,6 +166,7 @@ internal fun SwipeRevealSlotsEditor(
                 dragPointerRoot += delta
             },
             onDragEnd = ::finishDrag,
+            modifier = Modifier.zIndex(if (endRowDragging) 1f else 0f),
         )
     }
 }
@@ -445,7 +453,7 @@ private fun SwipeActionIcon(action: NoteSwipeAction?) {
             name = action?.materialSymbolName ?: "remove",
             size = 16.dp,
             tint = tint,
-            filled = action == NoteSwipeAction.TOGGLE_FAVORITE,
+            filled = action == NoteSwipeAction.TOGGLE_STAR,
             weight = FontWeight.Medium,
         )
     }
@@ -455,7 +463,7 @@ private val SwipeActionDisplayOrder: List<NoteSwipeAction> =
     listOf(
         NoteSwipeAction.EDIT,
         NoteSwipeAction.DUPLICATE,
-        NoteSwipeAction.TOGGLE_FAVORITE,
+        NoteSwipeAction.TOGGLE_STAR,
         NoteSwipeAction.MARK_DONE,
         NoteSwipeAction.ARCHIVE,
         NoteSwipeAction.TRASH,
@@ -483,7 +491,7 @@ internal fun noteSwipeActionLabel(action: NoteSwipeAction): String =
             NoteSwipeAction.EDIT -> R.string.swipe_action_open
             NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
             NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
-            NoteSwipeAction.TOGGLE_FAVORITE -> R.string.swipe_action_toggle_favorite
+            NoteSwipeAction.TOGGLE_STAR -> R.string.swipe_action_toggle_star
             NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
             NoteSwipeAction.MARK_DONE -> R.string.swipe_action_mark_done
         },

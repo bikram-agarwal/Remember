@@ -244,11 +244,6 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         drawableRes = null,
                     ),
                     IconChoice(
-                        key = "${ICON_SYMBOL_PREFIX}favorite",
-                        symbolName = "favorite",
-                        drawableRes = null,
-                    ),
-                    IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}star",
                         symbolName = "star",
                         drawableRes = null,

@@ -18,7 +18,7 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:singleLine="true"
-            android:text="@string/widget_favorites_label"
+            android:text="@string/widget_starred_label"
             android:textColor="@color/widget_preview_primary"
             android:textSize="11sp"
             android:textStyle="bold" />
@@ -84,7 +84,7 @@
                 android:layout_height="14dp"
                 android:ellipsize="end"
                 android:singleLine="true"
-                android:text="Favorite recipes"
+                android:text="Starred recipes"
                 android:textColor="@color/widget_preview_on_surface"
                 android:textSize="10sp"
                 android:textStyle="bold" />
@@ -142,7 +142,7 @@
                 android:layout_height="11dp"
                 android:ellipsize="end"
                 android:singleLine="true"
-                android:text="Favorite passages, quotes, chapters to revisit, and notes for book club"
+                android:text="Starred passages, quotes, chapters to revisit, and notes for book club"
                 android:textColor="@color/widget_preview_muted"
                 android:textSize="8sp" />
         </LinearLayout>

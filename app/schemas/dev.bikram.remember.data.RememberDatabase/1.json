@@ -6,7 +6,7 @@
     "entities": [
       {
         "tableName": "notes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `title` TEXT NOT NULL, `body` TEXT NOT NULL, `colorIndex` INTEGER NOT NULL, `favorite` INTEGER NOT NULL, `trashed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `reminderAt` INTEGER, `importance` TEXT NOT NULL, `visibility` TEXT NOT NULL, `pictureUri` TEXT, `pictureHeroFraming` TEXT, `locked` INTEGER NOT NULL, `iconKey` TEXT, `actions` TEXT NOT NULL, `tags` TEXT NOT NULL, `recurrence` TEXT, `archived` INTEGER NOT NULL, `trashedAt` INTEGER, `completedAt` INTEGER)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `kind` TEXT NOT NULL, `title` TEXT NOT NULL, `body` TEXT NOT NULL, `colorIndex` INTEGER NOT NULL, `starred` INTEGER NOT NULL, `trashed` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `reminderAt` INTEGER, `importance` TEXT NOT NULL, `visibility` TEXT NOT NULL, `pictureUri` TEXT, `pictureHeroFraming` TEXT, `locked` INTEGER NOT NULL, `iconKey` TEXT, `actions` TEXT NOT NULL, `tags` TEXT NOT NULL, `recurrence` TEXT, `archived` INTEGER NOT NULL, `trashedAt` INTEGER, `completedAt` INTEGER)",
         "fields": [
           {
             "fieldPath": "id",
@@ -39,8 +39,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "favorite",
-            "columnName": "favorite",
+            "fieldPath": "starred",
+            "columnName": "starred",
             "affinity": "INTEGER",
             "notNull": true
           },

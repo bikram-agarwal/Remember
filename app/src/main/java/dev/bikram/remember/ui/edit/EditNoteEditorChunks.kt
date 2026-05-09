@@ -290,6 +290,7 @@ internal fun EditNoteTopBarSection(
     sharedNoteId: Long?,
     isEditMode: Boolean,
     readOnly: Boolean,
+    hasUnsavedChanges: Boolean,
     markdownDisplayMode: MarkdownEditorDisplayMode,
     onBack: () -> Unit,
     onToggleMarkdownDisplayMode: () -> Unit,
@@ -417,9 +418,6 @@ internal fun EditNoteTopBarSection(
                 }
             },
             actions = {
-                // In edit mode the NoteActionBottomBar slides out (the rich-text toolbar owns the
-                // bottom slot), so we surface Save here instead. Outside edit mode this slot is
-                // empty - the action bar handles Edit / Favorite / Archive / Trash.
                 if (isEditMode && !readOnly && onSave != null) {
                     val toggleCd =
                         stringResource(
@@ -445,6 +443,8 @@ internal fun EditNoteTopBarSection(
                             weight = FontWeight.Medium,
                         )
                     }
+                }
+                if ((isEditMode || hasUnsavedChanges) && !readOnly && onSave != null) {
                     val saveCd = stringResource(R.string.edit_save_cd)
                     RememberIconButton(
                         onClick = onSave,
@@ -883,17 +883,19 @@ private fun OptionsPanelSection(
     val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
     val recurrence by vm.recurrence.collectAsStateWithLifecycle()
     val importance by vm.importance.collectAsStateWithLifecycle()
+    val visibility by vm.visibility.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
     val iconKey by vm.iconKey.collectAsStateWithLifecycle()
     val actions by vm.actions.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
     val attachments by vm.attachments.collectAsStateWithLifecycle()
-    val favorite by vm.favorite.collectAsStateWithLifecycle()
+    val starred by vm.starred.collectAsStateWithLifecycle()
 
     OptionsPanel(
         reminderAt = reminderAt,
         recurrence = recurrence,
         importance = importance,
+        visibility = visibility,
         pictureUri = pictureUri,
         iconKey = iconKey,
         isChecklist = false,
@@ -902,13 +904,14 @@ private fun OptionsPanelSection(
         attachments = attachments,
         onOpenReminder = onOpenReminder,
         onSetImportance = if (readOnly) ({ _ -> }) else vm::setImportance,
+        onSetVisibility = if (readOnly) ({ _ -> }) else vm::setVisibility,
         onOpenPicture = onOpenPicture,
         onOpenIcon = onOpenIcon,
         onOpenActions = onOpenActions,
         onOpenTags = onOpenTags,
         onOpenAttachments = onOpenAttachments,
         readOnly = readOnly,
-        favorite = favorite,
+        starred = starred,
     )
 }
 

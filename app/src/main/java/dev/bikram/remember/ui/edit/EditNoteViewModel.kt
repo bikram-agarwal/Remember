@@ -56,8 +56,8 @@ class EditNoteViewModel
         private val _body = MutableStateFlow(if (noteId == null) prefillBody else "")
         val body: StateFlow<String> = _body.asStateFlow()
 
-        private val _favorite = MutableStateFlow(false)
-        val favorite: StateFlow<Boolean> = _favorite.asStateFlow()
+        private val _starred = MutableStateFlow(false)
+        val starred: StateFlow<Boolean> = _starred.asStateFlow()
 
         /**
          * Snapshot of the underlying note's [dev.bikram.remember.data.NoteEntity.completedAt]
@@ -76,7 +76,7 @@ class EditNoteViewModel
         private val _importance = MutableStateFlow(Importance.DEFAULT)
         val importance: StateFlow<Importance> = _importance.asStateFlow()
 
-        private val _visibility = MutableStateFlow(NoteVisibility.PRIVATE)
+        private val _visibility = MutableStateFlow(NoteVisibility.DEFAULT)
         val visibility: StateFlow<NoteVisibility> = _visibility.asStateFlow()
 
         private val _locked = MutableStateFlow(false)
@@ -131,8 +131,15 @@ class EditNoteViewModel
         private val _loaded = MutableStateFlow(noteId == null)
         val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 
+        private val _hasUnsavedChanges = MutableStateFlow(noteId == null && prefillBody.isNotBlank())
+        val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
+
         private var loadedId: Long? = noteId
         private var dirty: Boolean = noteId == null && prefillBody.isNotBlank()
+            set(value) {
+                field = value
+                _hasUnsavedChanges.value = value
+            }
         private val persistMutex = Mutex()
 
         /** Bumped on every user-visible mutation so a save that suspends in the repository cannot clear [dirty] if edits landed mid-flight. */
@@ -160,7 +167,7 @@ class EditNoteViewModel
                             originalNote = n
                             _title.value = n.title
                             _body.value = n.body
-                            _favorite.value = n.favorite || n.tags.contains(RememberReservedTags.FAVORITE)
+                            _starred.value = n.starred || n.tags.contains(RememberReservedTags.STARRED)
                             _reminderAt.value = n.reminderAt
                             _recurrence.value = n.recurrence?.sanitized()
                             _importance.value = n.importance
@@ -170,7 +177,7 @@ class EditNoteViewModel
                             _pictureHeroFraming.value = n.pictureHeroFraming
                             _iconKey.value = n.iconKey
                             _actions.value = n.actions
-                            _tags.value = n.tags.filterNot { it == RememberReservedTags.FAVORITE }
+                            _tags.value = n.tags.filterNot { it == RememberReservedTags.STARRED }
                             _attachments.value = existing.attachments
                             _archived.value = n.archived
                             _trashed.value = n.trashed
@@ -215,8 +222,8 @@ class EditNoteViewModel
             markDirty()
         }
 
-        fun toggleFavorite() {
-            _favorite.value = !_favorite.value
+        fun toggleStar() {
+            _starred.value = !_starred.value
             markDirty()
         }
 
@@ -241,6 +248,14 @@ class EditNoteViewModel
             if (_visibility.value == value) return
             _visibility.value = value
             markDirty()
+            refreshActiveNotificationVisibility(value)
+        }
+
+        private fun refreshActiveNotificationVisibility(value: NoteVisibility) {
+            val id = loadedId ?: return
+            viewModelScope.launch {
+                repository.refreshNotificationVisibilityPreview(id, value)
+            }
         }
 
         fun toggleLock() {
@@ -282,7 +297,7 @@ class EditNoteViewModel
         }
 
         fun setTags(value: List<String>) {
-            val cleaned = value.filterNot { it == RememberReservedTags.FAVORITE }
+            val cleaned = value.filterNot { it == RememberReservedTags.STARRED }
             if (_tags.value == cleaned) return
             _tags.value = cleaned
             markDirty()
@@ -293,7 +308,7 @@ class EditNoteViewModel
             colorHex: String,
         ) {
             val cleaned = value.trim()
-            if (cleaned.isBlank() || cleaned == RememberReservedTags.FAVORITE) return
+            if (cleaned.isBlank() || cleaned == RememberReservedTags.STARRED) return
             if (_tags.value.any { tag -> tag.equals(cleaned, ignoreCase = true) }) return
             _tags.value = _tags.value + cleaned
             markDirty()
@@ -360,7 +375,7 @@ class EditNoteViewModel
                                 )
                             loadedId = newId
                             syncHasPersistedRow()
-                            if (_favorite.value) repository.setFavorite(newId, true)
+                            if (_starred.value) repository.setStarred(newId, true)
                             newId
                         }
                     val attachmentUri =
@@ -395,9 +410,9 @@ class EditNoteViewModel
         }
 
         private fun tagsForPersistence(): List<String> {
-            val base = _tags.value.filterNot { it == RememberReservedTags.FAVORITE }
-            return if (_favorite.value) {
-                (base + RememberReservedTags.FAVORITE).distinct()
+            val base = _tags.value.filterNot { it == RememberReservedTags.STARRED }
+            return if (_starred.value) {
+                (base + RememberReservedTags.STARRED).distinct()
             } else {
                 base
             }
@@ -422,14 +437,14 @@ class EditNoteViewModel
             val t = _title.value
             val b = _body.value
             val opts = currentOptions()
-            val favorite = _favorite.value
+            val starred = _starred.value
             if (id == null) {
                 return t.isNotBlank() || b.isNotBlank() || _attachments.value.isNotEmpty() || opts.pictureUri != null || opts.tags.isNotEmpty() || opts.reminderAt != null || opts.actions.isNotEmpty() || opts.iconKey != null
             } else {
                 val old = originalNote ?: return true
                 if (t != old.title) return true
                 if (b != old.body) return true
-                if (favorite != old.favorite) return true
+                if (starred != old.starred) return true
                 if (opts.reminderAt != old.reminderAt) return true
                 if (opts.importance != old.importance) return true
                 if (opts.visibility != old.visibility) return true
@@ -466,7 +481,7 @@ class EditNoteViewModel
                     loadedId = newId
                     syncHasPersistedRow()
                     if (titleValue.isBlank()) _title.value = finalTitle
-                    if (_favorite.value) repository.setFavorite(newId, true)
+                    if (_starred.value) repository.setStarred(newId, true)
                     if (mutationEpoch.get() == epochAtWrite) dirty = false
 
                     originalNote = repository.get(newId)?.note
@@ -480,8 +495,8 @@ class EditNoteViewModel
                     repository.updateNote(id, finalTitle, bodyValue, 0, currentOptions())
                     if (titleValue.isBlank()) _title.value = finalTitle
                     val cur = repository.get(id)?.note
-                    if (cur != null && cur.favorite != _favorite.value) {
-                        repository.setFavorite(id, _favorite.value)
+                    if (cur != null && cur.starred != _starred.value) {
+                        repository.setStarred(id, _starred.value)
                     }
                     if (mutationEpoch.get() == epochAtWrite) dirty = false
 
@@ -509,7 +524,7 @@ class EditNoteViewModel
                                         recurrence = old.recurrence,
                                     ),
                             )
-                            repository.setFavorite(id, old.favorite)
+                            repository.setStarred(id, old.starred)
                         }
                     } else {
                         return@withLock null

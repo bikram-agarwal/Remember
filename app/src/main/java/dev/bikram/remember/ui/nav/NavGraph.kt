@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -32,6 +34,9 @@ import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.googletasks.GoogleTasksImportRoute
 import dev.bikram.remember.ui.edit.EditListRoute
 import dev.bikram.remember.ui.edit.EditNoteRoute
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import dev.bikram.remember.ui.help.HelpScreen
+import dev.bikram.remember.ui.help.HelpViewModel
 import dev.bikram.remember.ui.main.MainTabScaffold
 import dev.bikram.remember.ui.onboarding.OnboardingPermissionsScreen
 import dev.bikram.remember.ui.onboarding.OnboardingTitleScreen
@@ -48,6 +53,7 @@ object Routes {
     const val EDIT_NOTE = "editNote"
     const val EDIT_LIST = "editList"
     const val GOOGLE_TASKS_IMPORT = "googleTasksImport"
+    const val HELP = "help"
     const val ARG_ID = "id"
     const val ARG_PREFILL = "prefill"
     const val ARG_FORCE_EDIT = "forceEdit"
@@ -87,6 +93,8 @@ fun RememberNavGraph(
     openUpdateSheetRequest: Int = 0,
 ) {
     val navController = rememberNavController()
+    val helpVm: HelpViewModel = hiltViewModel()
+    var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
     val onboardingState by onboardingPrefs.state.collectAsStateWithLifecycle(initialValue = null)
     val currentOnboardingState = onboardingState
     val onboardingScope = rememberCoroutineScope()
@@ -235,6 +243,9 @@ fun RememberNavGraph(
                         onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
                         onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
                         onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                        onOpenHelp = { navController.navigate(Routes.HELP) },
+                        settingsHighlightSection = settingsHighlightSection,
+                        onSettingsHighlightHandled = { settingsHighlightSection = null },
                         openSettingsRequest = openSettingsRequest,
                         openUpdateSheetRequest = openUpdateSheetRequest,
                     )
@@ -315,6 +326,23 @@ fun RememberNavGraph(
                 ) {
                     GoogleTasksImportRoute(onBack = { navController.popBackStack() })
                 }
+            }
+
+            composable(
+                route = Routes.HELP,
+                enterTransition = { slideInHorizontally { it } + fadeIn() },
+                exitTransition = { slideOutHorizontally { it } + fadeOut() },
+                popEnterTransition = { slideInHorizontally { it } + fadeIn() },
+                popExitTransition = { slideOutHorizontally { it } + fadeOut() },
+            ) {
+                HelpScreen(
+                    onBack = { navController.popBackStack() },
+                    onOpenAppSection = { sectionKey ->
+                        settingsHighlightSection = sectionKey
+                        navController.popBackStack()
+                    },
+                    helpVm = helpVm,
+                )
             }
 
             composable(

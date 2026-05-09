@@ -190,7 +190,7 @@ class NoteDaoInstrumentedTest {
             title = title,
             body = "",
             colorIndex = 0,
-            favorite = false,
+            starred = false,
             trashed = trashed,
             createdAt = 1L,
             updatedAt = 1L,

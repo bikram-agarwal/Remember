@@ -5,6 +5,12 @@
     <string name="app_name">Remember</string>
     <string name="app_tagline">Notes, lists, reminders - done right</string>
     <string name="app_version_format">%1$s v%2$s</string>
+    <string name="about_build_variant_format">%1$s, %2$s</string>
+    <string name="build_flavor_github">GitHub</string>
+    <string name="build_flavor_playstore">PlayStore</string>
+    <string name="build_type_debug">Debug</string>
+    <string name="build_type_dev_release">devRelease</string>
+    <string name="build_type_release">Release</string>
     <string name="onboarding_byline">by Bikram Agarwal</string>
     <string name="onboarding_lets_begin">Let\'s begin</string>
 
@@ -87,10 +93,10 @@
     <string name="shortcut_new_list_long">New list</string>
     <string name="widget_agenda_label">Due &amp; upcoming</string>
     <string name="widget_quick_capture_label">Quick capture</string>
-    <string name="widget_favorites_label">Favorites</string>
+    <string name="widget_starred_label">Starred</string>
     <string name="widget_agenda_description">Track overdue reminders and what is coming up in the next 7 days.</string>
     <string name="widget_quick_capture_description">Create a new note or list from your home screen, with a tiny due-today status.</string>
-    <string name="widget_favorites_description">Keep favorite notes and lists close, even after they are marked done.</string>
+    <string name="widget_starred_description">Keep starred notes and lists close, even after they are marked done.</string>
     <string name="widget_header_title">Remember</string>
 
     <!-- Lock and PIN -->
@@ -133,7 +139,7 @@
     <string name="filter_has_reminder">Has reminder</string>
     <string name="filter_has_picture">Has picture</string>
     <string name="filter_has_attachment">Has attachment</string>
-    <string name="filter_favorites">Favorites</string>
+    <string name="filter_starred">Starred</string>
     <string name="filter_dropdown_type">Type: %1$s</string>
     <string name="filter_dropdown_group">Group: %1$s</string>
     <string name="filter_dropdown_sort">Sort: %1$s</string>
@@ -155,7 +161,7 @@
 
     <!-- Note cards -->
     <string name="cd_note_hero_image">Note hero image</string>
-    <string name="notecard_favorite_cd">Favorite</string>
+    <string name="notecard_starred_cd">Starred</string>
     <string name="notecard_reminder_cd">Has reminder</string>
     <string name="notecard_recurring_cd">Repeats</string>
     <string name="notecard_picture_cd">Has picture</string>
@@ -213,7 +219,7 @@
     <!-- Editor bottom bar and archived state -->
     <string name="edit_bottom_bar_edit">Edit</string>
     <string name="edit_bottom_bar_done">Done</string>
-    <string name="edit_bottom_bar_favorite">Favorite</string>
+    <string name="edit_bottom_bar_star">Star</string>
     <string name="edit_bottom_bar_archive">Archive</string>
     <string name="edit_bottom_bar_notification">Notification</string>
     <string name="edit_bottom_bar_unarchive">Unarchive</string>
@@ -337,13 +343,13 @@
     <!-- Widget additions -->
     <string name="widget_section_overdue">Overdue</string>
     <string name="widget_section_upcoming">Upcoming</string>
-    <string name="widget_favorites_title">Favorites</string>
+    <string name="widget_starred_title">Starred</string>
     <string name="widget_empty_nothing_overdue">Nothing overdue</string>
     <string name="widget_empty_nothing_upcoming">Nothing in next 7 days</string>
     <string name="widget_empty_nothing_due">Nothing due</string>
     <string name="widget_empty_watermark">🎉</string>
-    <string name="widget_empty_favorites">It\'s lonely in here</string>
-    <string name="widget_empty_favorites_watermark">✨</string>
+    <string name="widget_empty_starred">It\'s lonely in here</string>
+    <string name="widget_empty_starred_watermark">✨</string>
     <string name="widget_refresh_cd">Refresh widget</string>
     <string name="widget_mark_done_cd">Mark done</string>
     <string name="widget_create_new_note">Create new note</string>
@@ -366,12 +372,14 @@
     <string name="options_icon_default_checklist">Checklist</string>
     <string name="options_tags">Tags</string>
     <string name="options_reminder">Reminder</string>
-    <string name="options_actions">Notification Action</string>
+    <string name="options_actions">Notification action</string>
     <string name="options_importance">Importance</string>
+    <string name="options_visibility">Visibility</string>
     <string name="options_picture">Picture</string>
     <string name="options_picture_none">No picture</string>
     <string name="options_picture_attached">Attached</string>
     <string name="options_attachments">Attachments</string>
+    <string name="options_tags_more_count">+%1$d more</string>
     <plurals name="options_actions_count">
         <item quantity="one">%1$d action</item>
         <item quantity="other">%1$d actions</item>
@@ -383,8 +391,19 @@
 
     <!-- Importance -->
     <string name="importance_low">Low</string>
+    <string name="importance_low_description">Silent. No status bar icon or vibration.</string>
     <string name="importance_default">Default</string>
+    <string name="importance_default_description">Standard sound and vibration.</string>
     <string name="importance_high">High</string>
+    <string name="importance_high_description">Pops up on screen as a heads-up alert. Treated as alarm.</string>
+
+    <!-- Visibility -->
+    <string name="visibility_default">Default</string>
+    <string name="visibility_default_description">Show title and content.</string>
+    <string name="visibility_private">Private</string>
+    <string name="visibility_private_description">Show title; redact content.</string>
+    <string name="visibility_secret">Secret</string>
+    <string name="visibility_secret_description">Redact all info. Don\'t show in widgets.</string>
 
     <!-- Reminders -->
     <string name="reminder_set_title">Set reminder</string>
@@ -467,6 +486,8 @@
     <string name="reminder_weekday_saturday_narrow">S</string>
     <string name="reminder_notification_fallback">Tap to open</string>
     <string name="reminder_notification_all_items_checked">All items checked</string>
+    <string name="reminder_notification_hidden_title">Reminder</string>
+    <string name="reminder_notification_hidden_body">Tap to view</string>
     <string name="reminder_summary_title">Reminders</string>
     <plurals name="reminder_summary_count">
         <item quantity="one">%1$d due or upcoming</item>
@@ -516,11 +537,19 @@
     <string name="actions_sheet_subtitle">Add a quick action to the notification</string>
     <string name="actions_add_sheet_title">Add action</string>
     <string name="actions_pick_contacts">Pick from contacts</string>
+    <string name="actions_contact_input_placeholder">Tap to pick or type</string>
     <string name="actions_pick_app">Pick app</string>
     <string name="actions_pick_app_shortcut">Pick app for shortcut</string>
     <string name="actions_change_app">Change app</string>
     <string name="actions_pick_shortcut">Pick shortcut</string>
     <string name="actions_change_shortcut">Change shortcut</string>
+    <string name="actions_change_type">Change type</string>
+    <string name="actions_field_action_type">Action type</string>
+    <string name="actions_field_button_label">Button label</string>
+    <string name="actions_target_app">App</string>
+    <string name="actions_target_shortcut">Shortcut</string>
+    <string name="actions_error_phone_number">Enter a valid phone number</string>
+    <string name="actions_error_email_address">Enter a valid email address</string>
     <string name="actions_open_app_title">Open %1$s</string>
     <string name="actions_contact_title_format">%1$s %2$s</string>
     <string name="action_contact_verb_call">Call</string>
@@ -584,11 +613,11 @@
         <item quantity="other">%1$d linked</item>
     </plurals>
     <string name="icon_picker_title">Pick an icon</string>
-    <string name="icon_picker_favorite_selection_title">Choose favorites</string>
+    <string name="icon_picker_starred_selection_title">Choose starred</string>
     <string name="icon_picker_search_hint">Search icons and emojis</string>
-    <string name="icon_picker_favorites">Favorites</string>
-    <string name="icon_picker_add_favorites_cd">Edit favorites</string>
-    <string name="icon_picker_max_favorites">Max 30 in Favorites</string>
+    <string name="icon_picker_starred">Starred</string>
+    <string name="icon_picker_add_starred_cd">Edit starred</string>
+    <string name="icon_picker_max_starred">Max 30 in Starred</string>
     <string name="icon_picker_results_heading">Matches</string>
     <string name="icon_picker_no_results">No icons match that search</string>
     <string name="icon_picker_tab_icons">Icons</string>
@@ -675,6 +704,13 @@
     <string name="settings_section_security">Security</string>
     <string name="settings_updates_section">Updates</string>
     <string name="settings_section_about">About</string>
+    <string name="settings_help_guide">Help guide</string>
+    <string name="settings_open_help_cd">Open help</string>
+    <string name="help_title">Help</string>
+    <string name="help_expand_all_cd">Expand all</string>
+    <string name="help_collapse_all_cd">Collapse all</string>
+    <string name="help_search_placeholder">Search</string>
+    <string name="help_no_results">No results</string>
 
     <!-- Settings: haptics, notifications, swipe -->
     <string name="settings_haptics_section">Haptics</string>
@@ -686,7 +722,7 @@
     <string name="settings_keep_reminders_until_done">Keep reminder notifications until done</string>
     <string name="settings_keep_reminders_until_done_desc">Persistent alerts. Re-posts reminders until marked done.</string>
     <string name="settings_reminder_summary_notification">Reminder summary notification</string>
-    <string name="settings_reminder_summary_notification_desc">Silent overview of overdue and upcoming tasks</string>
+    <string name="settings_reminder_summary_notification_desc">Silent overview of overdue and upcoming reminders</string>
     <string name="settings_reliable_reminders">Reliable reminders</string>
     <string name="settings_reliable_reminders_desc">Priority timing. Bypasses battery optimizations for accuracy.</string>
     <string name="settings_reliable_reminders_exact_desc">Triggers reminders at exact scheduled time</string>
@@ -701,8 +737,8 @@
     <string name="settings_swipe_none">None</string>
     <string name="swipe_action_open">Edit</string>
     <string name="swipe_action_duplicate">Duplicate</string>
-    <string name="swipe_action_toggle_favorite">Favorite</string>
-    <string name="swipe_action_unfavorite">Unfavorite</string>
+    <string name="swipe_action_toggle_star">Star</string>
+    <string name="swipe_action_unstar">Unstar</string>
     <string name="swipe_action_mark_done">Mark done</string>
     <string name="swipe_action_mark_not_done">Mark not done</string>
 

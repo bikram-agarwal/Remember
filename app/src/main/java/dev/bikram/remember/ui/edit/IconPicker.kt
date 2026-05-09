@@ -75,9 +75,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
-import dev.bikram.remember.data.ICON_PICKER_MAX_FAVORITES
-import dev.bikram.remember.data.IconPickerFavoritesState
+import dev.bikram.remember.data.ICON_PICKER_MAX_STARRED
 import dev.bikram.remember.data.IconPickerPrefs
+import dev.bikram.remember.data.IconPickerStarredState
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberIconButton
@@ -103,7 +103,7 @@ fun IconPicker(
     val resources = LocalResources.current
     val configuration = LocalConfiguration.current
     val iconPickerPrefs = remember(context.applicationContext) { IconPickerPrefs(context.applicationContext) }
-    val favoriteState by iconPickerPrefs.favorites.collectAsState(initial = IconPickerFavoritesState())
+    val starredState by iconPickerPrefs.starred.collectAsState(initial = IconPickerStarredState())
     val scope = rememberCoroutineScope()
     val defaultCatalogKey = remember(isChecklist) { defaultIconCatalogKey(isChecklist) }
     val selectionKey =
@@ -118,9 +118,9 @@ fun IconPicker(
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
     var selectedTab by rememberSaveable { mutableStateOf(defaultIconPickerTab(current)) }
-    var favoriteSelectionTab by rememberSaveable { mutableStateOf<IconPickerTab?>(null) }
-    var pendingFavoriteIconKeys by rememberSaveable { mutableStateOf(emptyList<String>()) }
-    var pendingFavoriteEmojis by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var starredSelectionTab by rememberSaveable { mutableStateOf<IconPickerTab?>(null) }
+    var pendingStarredIconKeys by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var pendingStarredEmojis by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val iconSheetContentHeight = 644.dp
     val emojis =
         remember(configuration) {
@@ -140,66 +140,66 @@ fun IconPicker(
     var selectedEmojiCategoryKey by rememberSaveable {
         mutableStateOf(selectedEmojiCategoryKey(emojis, selectedEmoji))
     }
-    val favoriteModeActive = favoriteSelectionTab != null
+    val starredModeActive = starredSelectionTab != null
     val titleRes =
-        if (favoriteModeActive) {
-            R.string.icon_picker_favorite_selection_title
+        if (starredModeActive) {
+            R.string.icon_picker_starred_selection_title
         } else {
             R.string.icon_picker_title
         }
-    val pendingFavoriteCount =
-        when (favoriteSelectionTab) {
-            IconPickerTab.ICONS -> pendingFavoriteIconKeys.size
-            IconPickerTab.EMOJIS -> pendingFavoriteEmojis.size
+    val pendingStarredCount =
+        when (starredSelectionTab) {
+            IconPickerTab.ICONS -> pendingStarredIconKeys.size
+            IconPickerTab.EMOJIS -> pendingStarredEmojis.size
             null -> 0
         }
-    val maxFavoritesMessage = stringResource(R.string.icon_picker_max_favorites)
+    val maxStarredMessage = stringResource(R.string.icon_picker_max_starred)
 
-    fun beginFavoriteSelection(tab: IconPickerTab) {
-        favoriteSelectionTab = tab
-        pendingFavoriteIconKeys = favoriteState.iconKeys
-        pendingFavoriteEmojis = favoriteState.emojis
+    fun beginStarredSelection(tab: IconPickerTab) {
+        starredSelectionTab = tab
+        pendingStarredIconKeys = starredState.iconKeys
+        pendingStarredEmojis = starredState.emojis
         selectedTab = tab
     }
 
-    fun cancelFavoriteSelection() {
-        favoriteSelectionTab = null
-        pendingFavoriteIconKeys = emptyList()
-        pendingFavoriteEmojis = emptyList()
+    fun cancelStarredSelection() {
+        starredSelectionTab = null
+        pendingStarredIconKeys = emptyList()
+        pendingStarredEmojis = emptyList()
     }
 
-    fun saveFavoriteSelection() {
-        val activeTab = favoriteSelectionTab ?: return
+    fun saveStarredSelection() {
+        val activeTab = starredSelectionTab ?: return
         scope.launch {
             when (activeTab) {
-                IconPickerTab.ICONS -> iconPickerPrefs.setFavoriteIconKeys(pendingFavoriteIconKeys)
-                IconPickerTab.EMOJIS -> iconPickerPrefs.setFavoriteEmojis(pendingFavoriteEmojis)
+                IconPickerTab.ICONS -> iconPickerPrefs.setStarredIconKeys(pendingStarredIconKeys)
+                IconPickerTab.EMOJIS -> iconPickerPrefs.setStarredEmojis(pendingStarredEmojis)
             }
-            cancelFavoriteSelection()
+            cancelStarredSelection()
         }
     }
 
-    fun togglePendingFavoriteIcon(iconKey: String) {
-        pendingFavoriteIconKeys =
-            if (iconKey in pendingFavoriteIconKeys) {
-                pendingFavoriteIconKeys - iconKey
-            } else if (pendingFavoriteIconKeys.size >= ICON_PICKER_MAX_FAVORITES) {
-                Toast.makeText(context, maxFavoritesMessage, Toast.LENGTH_SHORT).show()
-                pendingFavoriteIconKeys
+    fun togglePendingStarredIcon(iconKey: String) {
+        pendingStarredIconKeys =
+            if (iconKey in pendingStarredIconKeys) {
+                pendingStarredIconKeys - iconKey
+            } else if (pendingStarredIconKeys.size >= ICON_PICKER_MAX_STARRED) {
+                Toast.makeText(context, maxStarredMessage, Toast.LENGTH_SHORT).show()
+                pendingStarredIconKeys
             } else {
-                pendingFavoriteIconKeys + iconKey
+                pendingStarredIconKeys + iconKey
             }
     }
 
-    fun togglePendingFavoriteEmoji(emoji: String) {
-        pendingFavoriteEmojis =
-            if (emoji in pendingFavoriteEmojis) {
-                pendingFavoriteEmojis - emoji
-            } else if (pendingFavoriteEmojis.size >= ICON_PICKER_MAX_FAVORITES) {
-                Toast.makeText(context, maxFavoritesMessage, Toast.LENGTH_SHORT).show()
-                pendingFavoriteEmojis
+    fun togglePendingStarredEmoji(emoji: String) {
+        pendingStarredEmojis =
+            if (emoji in pendingStarredEmojis) {
+                pendingStarredEmojis - emoji
+            } else if (pendingStarredEmojis.size >= ICON_PICKER_MAX_STARRED) {
+                Toast.makeText(context, maxStarredMessage, Toast.LENGTH_SHORT).show()
+                pendingStarredEmojis
             } else {
-                pendingFavoriteEmojis + emoji
+                pendingStarredEmojis + emoji
             }
     }
 
@@ -231,17 +231,17 @@ fun IconPicker(
                 iconChoicesRankedForSearch(resources, iconKeywords, trimmedQuery)
             }
         }
-    val activeFavoriteEmojis =
-        if (favoriteSelectionTab == IconPickerTab.EMOJIS) {
-            pendingFavoriteEmojis
+    val activeStarredEmojis =
+        if (starredSelectionTab == IconPickerTab.EMOJIS) {
+            pendingStarredEmojis
         } else {
-            favoriteState.emojis
+            starredState.emojis
         }
     val filteredEmojis =
-        remember(emojis, activeFavoriteEmojis, selectedEmojiCategoryKey, trimmedQuery) {
+        remember(emojis, activeStarredEmojis, selectedEmojiCategoryKey, trimmedQuery) {
             emojisRankedForSearch(
                 emojis = emojis,
-                favoriteEmojis = activeFavoriteEmojis,
+                starredEmojis = activeStarredEmojis,
                 selectedCategoryKey = selectedEmojiCategoryKey,
                 rawQuery = trimmedQuery,
             )
@@ -254,11 +254,11 @@ fun IconPicker(
         scrollable = false,
         contentPadding = PaddingValues(vertical = 8.dp),
         actions = {
-            if (favoriteModeActive) {
-                RememberTextButton(onClick = ::cancelFavoriteSelection) { Text(stringResource(R.string.common_cancel)) }
-                FavoriteDoneButton(
-                    count = pendingFavoriteCount,
-                    onClick = ::saveFavoriteSelection,
+            if (starredModeActive) {
+                RememberTextButton(onClick = ::cancelStarredSelection) { Text(stringResource(R.string.common_cancel)) }
+                StarredDoneButton(
+                    count = pendingStarredCount,
+                    onClick = ::saveStarredSelection,
                 )
             } else if (current != null) {
                 RememberTextButton(onClick = { onPick(null) }) { Text(stringResource(R.string.common_remove)) }
@@ -347,11 +347,11 @@ fun IconPicker(
                 IconPickerTabRow(
                     selectedTab = selectedTab,
                     onTabSelected = { tab ->
-                        if (!favoriteModeActive) {
+                        if (!starredModeActive) {
                             selectedTab = tab
                         }
                     },
-                    enabled = !favoriteModeActive,
+                    enabled = !starredModeActive,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -390,12 +390,12 @@ fun IconPicker(
                                 filteredOrdered = filteredOrdered,
                                 defaultCatalogKey = defaultCatalogKey,
                                 selectionKey = selectionKey,
-                                favoriteIconKeys = favoriteState.iconKeys,
-                                pendingFavoriteIconKeys = pendingFavoriteIconKeys,
-                                favoriteSelectionActive = favoriteSelectionTab == IconPickerTab.ICONS,
-                                selectedGridIndex = selectedIconGridIndex(selectionKey, favoriteState.iconKeys),
-                                onStartFavoriteSelection = { beginFavoriteSelection(IconPickerTab.ICONS) },
-                                onToggleFavoriteIcon = ::togglePendingFavoriteIcon,
+                                starredIconKeys = starredState.iconKeys,
+                                pendingStarredIconKeys = pendingStarredIconKeys,
+                                starredSelectionActive = starredSelectionTab == IconPickerTab.ICONS,
+                                selectedGridIndex = selectedIconGridIndex(selectionKey, starredState.iconKeys),
+                                onStartStarredSelection = { beginStarredSelection(IconPickerTab.ICONS) },
+                                onToggleStarIcon = ::togglePendingStarredIcon,
                                 onPick = onPick,
                             )
                         IconPickerTab.EMOJIS ->
@@ -405,11 +405,11 @@ fun IconPicker(
                                 emojiSkinToneIndex = emojiSkinToneIndex,
                                 selectedCategoryKey = selectedEmojiCategoryKey,
                                 selectedEmoji = selectedEmoji,
-                                pendingFavoriteEmojis = pendingFavoriteEmojis,
-                                favoriteSelectionActive = favoriteSelectionTab == IconPickerTab.EMOJIS,
+                                pendingStarredEmojis = pendingStarredEmojis,
+                                starredSelectionActive = starredSelectionTab == IconPickerTab.EMOJIS,
                                 onCategorySelected = { selectedEmojiCategoryKey = it },
-                                onStartFavoriteSelection = { beginFavoriteSelection(IconPickerTab.EMOJIS) },
-                                onToggleFavoriteEmoji = ::togglePendingFavoriteEmoji,
+                                onStartStarredSelection = { beginStarredSelection(IconPickerTab.EMOJIS) },
+                                onToggleStarEmoji = ::togglePendingStarredEmoji,
                                 onEmojiSelected = { emoji -> onPick("$ICON_EMOJI_PREFIX$emoji") },
                             )
                     }
@@ -441,7 +441,7 @@ private fun IconPickerTabRow(
 }
 
 @Composable
-private fun FavoriteDoneButton(
+private fun StarredDoneButton(
     count: Int,
     onClick: () -> Unit,
 ) {
@@ -467,36 +467,36 @@ private fun IconPickerIconsContent(
     filteredOrdered: List<IconChoice>,
     defaultCatalogKey: String,
     selectionKey: String,
-    favoriteIconKeys: List<String>,
-    pendingFavoriteIconKeys: List<String>,
-    favoriteSelectionActive: Boolean,
+    starredIconKeys: List<String>,
+    pendingStarredIconKeys: List<String>,
+    starredSelectionActive: Boolean,
     selectedGridIndex: Int,
-    onStartFavoriteSelection: () -> Unit,
-    onToggleFavoriteIcon: (String) -> Unit,
+    onStartStarredSelection: () -> Unit,
+    onToggleStarIcon: (String) -> Unit,
     onPick: (String?) -> Unit,
 ) {
     val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = selectedGridIndex)
-    val displayedFavoriteKeys =
-        if (favoriteSelectionActive) {
-            pendingFavoriteIconKeys
+    val displayedStarredKeys =
+        if (starredSelectionActive) {
+            pendingStarredIconKeys
         } else {
-            favoriteIconKeys
+            starredIconKeys
         }
-    val favoriteChoices = favoriteIconChoices(displayedFavoriteKeys)
+    val starredChoices = starredIconChoices(displayedStarredKeys)
     when {
         trimmedQuery.isEmpty() ->
             IconPickerGrid(
                 modifier = Modifier.padding(horizontal = 20.dp),
                 state = gridState,
             ) {
-                iconFavoritesSection(
-                    favoriteChoices = favoriteChoices,
+                iconStarredSection(
+                    starredChoices = starredChoices,
                     defaultCatalogKey = defaultCatalogKey,
-                    selectedKey = if (favoriteSelectionActive) null else selectionKey,
-                    pendingFavoriteIconKeys = pendingFavoriteIconKeys,
-                    favoriteSelectionActive = favoriteSelectionActive,
-                    onStartFavoriteSelection = onStartFavoriteSelection,
-                    onToggleFavoriteIcon = onToggleFavoriteIcon,
+                    selectedKey = if (starredSelectionActive) null else selectionKey,
+                    pendingStarredIconKeys = pendingStarredIconKeys,
+                    starredSelectionActive = starredSelectionActive,
+                    onStartStarredSelection = onStartStarredSelection,
+                    onToggleStarIcon = onToggleStarIcon,
                     onPick = onPick,
                 )
                 iconCatalog.forEach { category ->
@@ -510,18 +510,18 @@ private fun IconPickerIconsContent(
                         category.icons,
                         key = { index, _ -> "${category.nameRes}_$index" },
                     ) { _, choice ->
-                        val pendingFavorite = choice.key in pendingFavoriteIconKeys
+                        val pendingStarred = choice.key in pendingStarredIconKeys
                         IconTile(
                             choice = choice,
                             selected =
-                                if (favoriteSelectionActive) {
-                                    pendingFavorite
+                                if (starredSelectionActive) {
+                                    pendingStarred
                                 } else {
                                     choice.key == selectionKey
                                 },
                             onClick = {
-                                if (favoriteSelectionActive) {
-                                    onToggleFavoriteIcon(choice.key)
+                                if (starredSelectionActive) {
+                                    onToggleStarIcon(choice.key)
                                 } else {
                                     if (choice.key == defaultCatalogKey) {
                                         onPick(null)
@@ -552,18 +552,18 @@ private fun IconPickerIconsContent(
                     filteredOrdered,
                     key = { index, choice -> "icon_picker_search_${index}_${choice.key}" },
                 ) { _, choice ->
-                    val pendingFavorite = choice.key in pendingFavoriteIconKeys
+                    val pendingStarred = choice.key in pendingStarredIconKeys
                     IconTile(
                         choice = choice,
                         selected =
-                            if (favoriteSelectionActive) {
-                                pendingFavorite
+                            if (starredSelectionActive) {
+                                pendingStarred
                             } else {
                                 choice.key == selectionKey
                             },
                         onClick = {
-                            if (favoriteSelectionActive) {
-                                onToggleFavoriteIcon(choice.key)
+                            if (starredSelectionActive) {
+                                onToggleStarIcon(choice.key)
                             } else {
                                 if (choice.key == defaultCatalogKey) {
                                     onPick(null)
@@ -585,11 +585,11 @@ private fun IconPickerEmojiContent(
     emojiSkinToneIndex: EmojiSkinToneIndex,
     selectedCategoryKey: String,
     selectedEmoji: String?,
-    pendingFavoriteEmojis: List<String>,
-    favoriteSelectionActive: Boolean,
+    pendingStarredEmojis: List<String>,
+    starredSelectionActive: Boolean,
     onCategorySelected: (String) -> Unit,
-    onStartFavoriteSelection: () -> Unit,
-    onToggleFavoriteEmoji: (String) -> Unit,
+    onStartStarredSelection: () -> Unit,
+    onToggleStarEmoji: (String) -> Unit,
     onEmojiSelected: (String) -> Unit,
 ) {
     val displayEmojis =
@@ -607,14 +607,14 @@ private fun IconPickerEmojiContent(
                 modifier = Modifier.padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                item(key = EMOJI_FAVORITES_CATEGORY_KEY) {
+                item(key = EMOJI_STARRED_CATEGORY_KEY) {
                     FilterChip(
-                        selected = selectedCategoryKey == EMOJI_FAVORITES_CATEGORY_KEY,
+                        selected = selectedCategoryKey == EMOJI_STARRED_CATEGORY_KEY,
                         onClick = {
                             playTap()
-                            onCategorySelected(EMOJI_FAVORITES_CATEGORY_KEY)
+                            onCategorySelected(EMOJI_STARRED_CATEGORY_KEY)
                         },
-                        label = { Text(stringResource(R.string.icon_picker_favorites)) },
+                        label = { Text(stringResource(R.string.icon_picker_starred)) },
                         colors =
                             FilterChipDefaults.filterChipColors(
                                 selectedContainerColor = MaterialTheme.colorScheme.primary,
@@ -652,7 +652,7 @@ private fun IconPickerEmojiContent(
                     .fillMaxWidth()
                     .weight(1f),
         ) { categoryKey ->
-            val showingFavoriteCategory = categoryKey == EMOJI_FAVORITES_CATEGORY_KEY && trimmedQuery.isEmpty()
+            val showingStarredCategory = categoryKey == EMOJI_STARRED_CATEGORY_KEY && trimmedQuery.isEmpty()
             // Per-category grid state so scroll position from one category doesn't
             // leak into the next.
             val gridState =
@@ -683,10 +683,10 @@ private fun IconPickerEmojiContent(
                             modifier = Modifier.padding(vertical = 20.dp),
                         )
                     }
-                    if (showingFavoriteCategory && !favoriteSelectionActive) {
-                        item(key = "favorite_emoji_edit") {
-                            EditFavoritesTile(
-                                onClick = onStartFavoriteSelection,
+                    if (showingStarredCategory && !starredSelectionActive) {
+                        item(key = "starred_emoji_edit") {
+                            EditStarredTile(
+                                onClick = onStartStarredSelection,
                                 cellSize = 56.dp,
                             )
                         }
@@ -708,31 +708,31 @@ private fun IconPickerEmojiContent(
                         key = { index, entry -> "emoji_${index}_${entry.emoji.key}" },
                     ) { _, entry ->
                         val variantValues = entry.variants.map { it.emoji }
-                        val pendingFavorite = variantValues.any { it in pendingFavoriteEmojis }
+                        val pendingStarred = variantValues.any { it in pendingStarredEmojis }
                         val selectedVariant = variantValues.firstOrNull { it == selectedEmoji }
-                        val pendingVariant = variantValues.firstOrNull { it in pendingFavoriteEmojis }
+                        val pendingVariant = variantValues.firstOrNull { it in pendingStarredEmojis }
                         EmojiTile(
                             emoji = selectedVariant ?: pendingVariant ?: entry.displayEmoji,
                             variants = variantValues,
                             selected =
-                                if (favoriteSelectionActive) {
-                                    pendingFavorite
+                                if (starredSelectionActive) {
+                                    pendingStarred
                                 } else {
                                     selectedVariant != null
                                 },
                             onClick = { selectedEmojiValue ->
-                                if (favoriteSelectionActive) {
-                                    onToggleFavoriteEmoji(selectedEmojiValue)
+                                if (starredSelectionActive) {
+                                    onToggleStarEmoji(selectedEmojiValue)
                                 } else {
                                     onEmojiSelected(selectedEmojiValue)
                                 }
                             },
                         )
                     }
-                    if (showingFavoriteCategory && !favoriteSelectionActive) {
-                        item(key = "favorite_emoji_edit") {
-                            EditFavoritesTile(
-                                onClick = onStartFavoriteSelection,
+                    if (showingStarredCategory && !starredSelectionActive) {
+                        item(key = "starred_emoji_edit") {
+                            EditStarredTile(
+                                onClick = onStartStarredSelection,
                                 cellSize = 56.dp,
                             )
                         }
@@ -759,13 +759,13 @@ private fun defaultIconPickerTab(current: String?): IconPickerTab =
 
 private fun selectedIconGridIndex(
     selectionKey: String,
-    favoriteIconKeys: List<String>,
+    starredIconKeys: List<String>,
 ): Int {
-    val favoriteChoices = favoriteIconChoices(favoriteIconKeys)
-    if (favoriteChoices.any { it.key == selectionKey }) {
+    val starredChoices = starredIconChoices(starredIconKeys)
+    if (starredChoices.any { it.key == selectionKey }) {
         return 0
     }
-    var gridIndex = 1 + favoriteChoices.size + 1
+    var gridIndex = 1 + starredChoices.size + 1
     iconCatalog.forEach { category ->
         if (category.nameRes == R.string.icon_section_brand_google) {
             gridIndex += 1
@@ -783,34 +783,34 @@ private fun selectedEmojiCategoryKey(
     selectedEmoji: String?,
 ): String = emojis.firstOrNull { it.emoji == selectedEmoji }?.category ?: EmojiPickerCategory.SMILEYS_AND_PEOPLE.key
 
-private const val EMOJI_FAVORITES_CATEGORY_KEY = "favorites"
+private const val EMOJI_STARRED_CATEGORY_KEY = "starred"
 
-private fun LazyGridScope.iconFavoritesSection(
-    favoriteChoices: List<IconChoice>,
+private fun LazyGridScope.iconStarredSection(
+    starredChoices: List<IconChoice>,
     defaultCatalogKey: String,
     selectedKey: String?,
-    pendingFavoriteIconKeys: List<String>,
-    favoriteSelectionActive: Boolean,
-    onStartFavoriteSelection: () -> Unit,
-    onToggleFavoriteIcon: (String) -> Unit,
+    pendingStarredIconKeys: List<String>,
+    starredSelectionActive: Boolean,
+    onStartStarredSelection: () -> Unit,
+    onToggleStarIcon: (String) -> Unit,
     onPick: (String?) -> Unit,
 ) {
-    iconHeader(R.string.icon_picker_favorites, topPadding = 4.dp)
+    iconHeader(R.string.icon_picker_starred, topPadding = 4.dp)
     itemsIndexed(
-        favoriteChoices,
-        key = { index, choice -> "favorite_icon_${index}_${choice.key}" },
+        starredChoices,
+        key = { index, choice -> "starred_icon_${index}_${choice.key}" },
     ) { _, choice ->
         IconTile(
             choice = choice,
             selected =
-                if (favoriteSelectionActive) {
-                    choice.key in pendingFavoriteIconKeys
+                if (starredSelectionActive) {
+                    choice.key in pendingStarredIconKeys
                 } else {
                     choice.key == selectedKey
                 },
             onClick = {
-                if (favoriteSelectionActive) {
-                    onToggleFavoriteIcon(choice.key)
+                if (starredSelectionActive) {
+                    onToggleStarIcon(choice.key)
                 } else if (choice.key == defaultCatalogKey) {
                     onPick(null)
                 } else {
@@ -819,10 +819,10 @@ private fun LazyGridScope.iconFavoritesSection(
             },
         )
     }
-    if (!favoriteSelectionActive) {
-        item(key = "favorite_icon_add") {
-            EditFavoritesTile(
-                onClick = onStartFavoriteSelection,
+    if (!starredSelectionActive) {
+        item(key = "starred_icon_add") {
+            EditStarredTile(
+                onClick = onStartStarredSelection,
                 filled = false,
             )
         }
@@ -845,22 +845,22 @@ private enum class EmojiPickerCategory(
 
 private val emojiPickerCategories = EmojiPickerCategory.entries.toList()
 
-private fun favoriteIconChoices(favoriteIconKeys: List<String>): List<IconChoice> {
+private fun starredIconChoices(starredIconKeys: List<String>): List<IconChoice> {
     val choicesByKey = linkedMapOf<String, IconChoice>()
     iconCatalog.forEach { category ->
         category.icons.forEach { choice ->
             choicesByKey.putIfAbsent(choice.key, choice)
         }
     }
-    return favoriteIconKeys.mapNotNull { choicesByKey[it] }
+    return starredIconKeys.mapNotNull { choicesByKey[it] }
 }
 
-private fun favoriteEmojiEntries(
-    favoriteEmojis: List<String>,
+private fun starredEmojiEntries(
+    starredEmojis: List<String>,
     emojis: List<BundledEmoji>,
 ): List<BundledEmoji> {
     val emojisByValue = emojis.associateBy { it.emoji }
-    return favoriteEmojis.mapNotNull { emojisByValue[it] }
+    return starredEmojis.mapNotNull { emojisByValue[it] }
 }
 
 @Serializable
@@ -1150,14 +1150,14 @@ private fun buildIconSearchFields(
 
 private fun emojisRankedForSearch(
     emojis: List<BundledEmoji>,
-    favoriteEmojis: List<String>,
+    starredEmojis: List<String>,
     selectedCategoryKey: String,
     rawQuery: String,
 ): List<BundledEmoji> {
     val tokens = tokenizeQuery(rawQuery)
     if (tokens.isEmpty()) {
-        return if (selectedCategoryKey == EMOJI_FAVORITES_CATEGORY_KEY) {
-            favoriteEmojiEntries(favoriteEmojis, emojis)
+        return if (selectedCategoryKey == EMOJI_STARRED_CATEGORY_KEY) {
+            starredEmojiEntries(starredEmojis, emojis)
         } else {
             emojis.filter { emoji -> emoji.category == selectedCategoryKey }
         }
@@ -1260,7 +1260,7 @@ private fun LazyGridScope.iconBrandDivider() {
 }
 
 /**
- * "Edit favorites" affordance shared by both grids. 44 dp circle that matches
+ * "Edit starred" affordance shared by both grids. 44 dp circle that matches
  * [IconTile]'s Surface + CircleShape + clip structure (so the border antialiases
  * cleanly).
  *
@@ -1273,12 +1273,12 @@ private fun LazyGridScope.iconBrandDivider() {
  *   selectable icon.
  */
 @Composable
-private fun EditFavoritesTile(
+private fun EditStarredTile(
     onClick: () -> Unit,
     cellSize: Dp = 44.dp,
     filled: Boolean = true,
 ) {
-    val contentDescription = stringResource(R.string.icon_picker_add_favorites_cd)
+    val contentDescription = stringResource(R.string.icon_picker_add_starred_cd)
     val containerColor =
         if (filled) {
             MaterialTheme.colorScheme.surfaceContainerHigh

@@ -80,6 +80,7 @@ import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.data.UpdatePreferencesState
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.diagnostics.DiagnosticLog
+import dev.bikram.remember.ui.common.AppBottomSheetDragHandle
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
@@ -98,6 +99,7 @@ import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import dev.bikram.remember.update.RememberUpdateInfo
 import dev.bikram.remember.update.RememberUpdateState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -111,11 +113,16 @@ private data class PendingRestore(
     val mediaSummary: BackupIo.RestoreMediaSummary,
 )
 
+private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SettingsRoute(
     onOpenIntro: () -> Unit = {},
+    onOpenHelp: () -> Unit = {},
     openUpdateSheetRequest: Int = 0,
+    highlightSectionKey: String? = null,
+    onHighlightHandled: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -305,6 +312,9 @@ fun SettingsRoute(
             sectionKey in collapsedSettingsSectionKeys
         }
     val settingsListState = rememberLazyListState()
+    var notificationsHighlight by remember { mutableStateOf(false) }
+    var backupHighlight by remember { mutableStateOf(false) }
+    var securityHighlight by remember { mutableStateOf(false) }
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission(),
@@ -518,6 +528,54 @@ fun SettingsRoute(
             beginUpdateCheck()
         }
     }
+    val highlightSection = highlightSectionKey?.substringBefore(".")
+    val highlightItem = highlightSectionKey?.substringAfter(".", "")?.takeIf { it.isNotEmpty() }
+    var activeHighlightItem by remember { mutableStateOf<String?>(null) }
+    var activeHighlightItemRequestId by remember { mutableStateOf(0) }
+    LaunchedEffect(highlightSectionKey) {
+        val key = highlightSection ?: return@LaunchedEffect
+        activeHighlightItem = null
+        val wasCollapsed = key in collapsedSettingsSectionKeys
+        collapsedSettingsSectionKeys = collapsedSettingsSectionKeys - key
+        // Wait for expandVertically to finish before scrolling or starting item-level highlights.
+        if (wasCollapsed) delay(SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS)
+        val index =
+            settingsSectionScrollIndex[key] ?: run {
+                onHighlightHandled()
+                return@LaunchedEffect
+            }
+        settingsListState.animateScrollToItem(index)
+        if (highlightItem == null) {
+            when (key) {
+                "notifications" -> notificationsHighlight = true
+                "backup" -> backupHighlight = true
+                "security" -> securityHighlight = true
+            }
+            onHighlightHandled()
+        } else {
+            activeHighlightItem = highlightItem
+            activeHighlightItemRequestId += 1
+            onHighlightHandled()
+        }
+    }
+    LaunchedEffect(notificationsHighlight) {
+        if (!notificationsHighlight) return@LaunchedEffect
+        delay(4500)
+        notificationsHighlight = false
+    }
+    LaunchedEffect(backupHighlight) {
+        if (!backupHighlight) return@LaunchedEffect
+        delay(4500)
+        backupHighlight = false
+    }
+    LaunchedEffect(securityHighlight) {
+        if (!securityHighlight) return@LaunchedEffect
+        delay(4500)
+        securityHighlight = false
+    }
+    val notificationsHighlightAlpha = rememberSectionHighlightPulseAlpha(notificationsHighlight)
+    val backupHighlightAlpha = rememberSectionHighlightPulseAlpha(backupHighlight)
+    val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlight)
 
     if (showUpdateSheet) {
         ModalBottomSheet(
@@ -526,6 +584,7 @@ fun SettingsRoute(
                 downloadProgress = null
             },
             sheetState = updateSheetState,
+            dragHandle = { AppBottomSheetDragHandle() },
         ) {
             UpdateCheckBottomSheetContent(
                 isCheckingUpdate = isCheckingUpdate,
@@ -558,6 +617,24 @@ fun SettingsRoute(
                     )
                 },
                 actions = {
+                    val openHelpLabel = stringResource(R.string.settings_open_help_cd)
+                    RememberFilledTonalIconButton(
+                        onClick = onOpenHelp,
+                        modifier =
+                            Modifier.semantics {
+                                contentDescription = openHelpLabel
+                            },
+                        tooltipLabel = openHelpLabel,
+                    ) {
+                        Text(
+                            text = "?",
+                            style =
+                                MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.ExtraBold,
+                                    lineHeight = MaterialTheme.typography.headlineSmall.fontSize,
+                                ),
+                        )
+                    }
                     val expandCollapseAllLabel =
                         stringResource(
                             if (allSettingsSectionsCollapsed) {
@@ -631,27 +708,42 @@ fun SettingsRoute(
             }
 
             item(key = "notifications") {
-                SettingsExpandableSection(
-                    sectionKey = "notifications",
-                    materialSymbolName = "notifications",
-                    title = stringResource(R.string.settings_notifications_section),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .pulsingSectionHighlightOutline(
+                                active = notificationsHighlight,
+                                outlineColor =
+                                    MaterialTheme.colorScheme.primary.copy(
+                                        alpha = notificationsHighlightAlpha,
+                                    ),
+                            ),
                 ) {
-                    RemindersSection(
-                        reminderState = reminderState,
-                        reminderPrefs = reminderPrefs,
-                        quickCaptureState = quickCaptureState,
-                        quickCapturePrefs = quickCapturePrefs,
-                        noteRepository = noteRepository,
-                        notificationsGranted = notificationsGranted,
-                        notificationPermissionLauncher = notificationPermissionLauncher,
-                        permissionLinked = permissionLinked,
-                        canScheduleExactAlarms = canScheduleExactAlarms,
-                        isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
-                        scope = scope,
-                    )
-                }
+                    SettingsExpandableSection(
+                        sectionKey = "notifications",
+                        materialSymbolName = "notifications",
+                        title = stringResource(R.string.settings_notifications_section),
+                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                    ) {
+                        RemindersSection(
+                            reminderState = reminderState,
+                            reminderPrefs = reminderPrefs,
+                            quickCaptureState = quickCaptureState,
+                            quickCapturePrefs = quickCapturePrefs,
+                            noteRepository = noteRepository,
+                            notificationsGranted = notificationsGranted,
+                            notificationPermissionLauncher = notificationPermissionLauncher,
+                            permissionLinked = permissionLinked,
+                            canScheduleExactAlarms = canScheduleExactAlarms,
+                            isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
+                            scope = scope,
+                            highlightItemKey = activeHighlightItem,
+                            highlightItemRequestId = activeHighlightItemRequestId,
+                        )
+                    }
+                } // notifications Column
             }
 
             item(key = "swipe") {
@@ -744,57 +836,83 @@ fun SettingsRoute(
             }
 
             item(key = "security") {
-                SettingsExpandableSection(
-                    sectionKey = "security",
-                    materialSymbolName = "security",
-                    title = stringResource(R.string.settings_section_security),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .pulsingSectionHighlightOutline(
+                                active = securityHighlight,
+                                outlineColor =
+                                    MaterialTheme.colorScheme.primary.copy(
+                                        alpha = securityHighlightAlpha,
+                                    ),
+                            ),
                 ) {
-                    LockSection(
-                        lockState = lockState,
-                        lockPrefs = lockPrefs,
-                        biometricAvailable = biometricAvailable,
-                        deviceCredentialAvailable = deviceCredentialAvailable,
-                        snackbarHostState = snackbarHostState,
-                        scope = scope,
-                    )
-                }
+                    SettingsExpandableSection(
+                        sectionKey = "security",
+                        materialSymbolName = "security",
+                        title = stringResource(R.string.settings_section_security),
+                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                    ) {
+                        LockSection(
+                            lockState = lockState,
+                            lockPrefs = lockPrefs,
+                            biometricAvailable = biometricAvailable,
+                            deviceCredentialAvailable = deviceCredentialAvailable,
+                            snackbarHostState = snackbarHostState,
+                            scope = scope,
+                        )
+                    }
+                } // security Column
             }
 
             item(key = "backup") {
-                SettingsExpandableSection(
-                    sectionKey = "backup",
-                    materialSymbolName = "save",
-                    title = stringResource(R.string.settings_backup_section),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .pulsingSectionHighlightOutline(
+                                active = backupHighlight,
+                                outlineColor =
+                                    MaterialTheme.colorScheme.primary.copy(
+                                        alpha = backupHighlightAlpha,
+                                    ),
+                            ),
                 ) {
-                    BackupSection(
-                        backupState = backupState,
-                        backupPrefs = backupPrefs,
-                        backupIo = backupIo,
-                        snackbarHostState = snackbarHostState,
-                        scope = scope,
-                        onPickLocalFolder = {
-                            pendingBackupFolderTarget = BackupFolderTarget.Local
-                            folderLauncher.launch(null)
-                        },
-                        onPickCloudFolder = {
-                            cloudBackupDocumentLauncher.launch("remember_cloud_backup.zip")
-                        },
-                        onLaunchImportMerge = {
-                            importMergeLauncher.launch(
-                                arrayOf("application/zip", "application/json"),
-                            )
-                        },
-                        onLaunchImportReplace = {
-                            importReplaceLauncher.launch(
-                                arrayOf("application/zip", "application/json"),
-                            )
-                        },
-                    )
-                }
+                    SettingsExpandableSection(
+                        sectionKey = "backup",
+                        materialSymbolName = "save",
+                        title = stringResource(R.string.settings_backup_section),
+                        collapsedSectionKeys = collapsedSettingsSectionKeys,
+                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
+                    ) {
+                        BackupSection(
+                            backupState = backupState,
+                            backupPrefs = backupPrefs,
+                            backupIo = backupIo,
+                            snackbarHostState = snackbarHostState,
+                            scope = scope,
+                            onPickLocalFolder = {
+                                pendingBackupFolderTarget = BackupFolderTarget.Local
+                                folderLauncher.launch(null)
+                            },
+                            onPickCloudFolder = {
+                                cloudBackupDocumentLauncher.launch("remember_cloud_backup.zip")
+                            },
+                            onLaunchImportMerge = {
+                                importMergeLauncher.launch(
+                                    arrayOf("application/zip", "application/json"),
+                                )
+                            },
+                            onLaunchImportReplace = {
+                                importReplaceLauncher.launch(
+                                    arrayOf("application/zip", "application/json"),
+                                )
+                            },
+                        )
+                    }
+                } // backup Column
             }
 
             item(key = "updates") {
@@ -1011,3 +1129,10 @@ private fun notificationsAppSettingsIntent(context: Context): Intent =
     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
     }
+
+private val settingsSectionScrollIndex =
+    mapOf(
+        "notifications" to 1,
+        "security" to 4,
+        "backup" to 5,
+    )

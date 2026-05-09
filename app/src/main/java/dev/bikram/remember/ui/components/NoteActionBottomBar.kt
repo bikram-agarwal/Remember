@@ -56,7 +56,7 @@ enum class NoteShelfState { ACTIVE, ARCHIVED, TRASHED }
  * Action buttons for the Edit Note / Edit List screens, rendered as a full-width bottom bar
  * anchored to the navigation inset. The button set swaps based on [shelfState]:
  *
- *   ACTIVE   -> Edit/Done, Favorite, Archive, Trash
+ *   ACTIVE   -> Edit/Done, Star, Archive, Trash
  *   ARCHIVED -> Unarchive, Trash
  *   TRASHED  -> Restore, Delete forever
  *
@@ -70,11 +70,11 @@ fun NoteActionBottomBar(
     shelfState: NoteShelfState,
     existing: Boolean,
     isEditMode: Boolean,
-    favorite: Boolean,
+    starred: Boolean,
     completed: Boolean,
     visible: Boolean,
     onToggleEdit: () -> Unit,
-    onToggleFavorite: () -> Unit,
+    onToggleStar: () -> Unit,
     onToggleCompleted: () -> Unit,
     onArchive: () -> Unit,
     onNotification: () -> Unit,
@@ -94,10 +94,10 @@ fun NoteActionBottomBar(
             shelfState = shelfState,
             existing = existing,
             isEditMode = isEditMode,
-            favorite = favorite,
+            starred = starred,
             completed = completed,
             onToggleEdit = onToggleEdit,
-            onToggleFavorite = onToggleFavorite,
+            onToggleStar = onToggleStar,
             onToggleCompleted = onToggleCompleted,
             onArchive = onArchive,
             onNotification = onNotification,
@@ -123,10 +123,10 @@ fun NoteActionBottomBarContent(
     shelfState: NoteShelfState,
     existing: Boolean,
     isEditMode: Boolean,
-    favorite: Boolean,
+    starred: Boolean,
     completed: Boolean,
     onToggleEdit: () -> Unit,
-    onToggleFavorite: () -> Unit,
+    onToggleStar: () -> Unit,
     onToggleCompleted: () -> Unit,
     onArchive: () -> Unit,
     onNotification: () -> Unit,
@@ -154,7 +154,7 @@ fun NoteActionBottomBarContent(
             when (shelfState) {
                 NoteShelfState.ACTIVE -> {
                     EditActionItem(isEditMode = isEditMode, onClick = onToggleEdit)
-                    FavoriteActionItem(favorite = favorite, onClick = onToggleFavorite)
+                    StarActionItem(starred = starred, onClick = onToggleStar)
                     if (existing) {
                         // Mark done / not done. Filled check_circle when completed,
                         // outlined when active, so the toggle state reads at a glance.
@@ -398,28 +398,28 @@ private fun DoneActionItem(
 }
 
 /**
- * Favorite toggle: pulses on activate (scale bump + pink tint). When favorited, stays pink.
+ * Star toggle: pulses on activate (scale bump + yellow tint). When starred, stays yellow.
  */
 @Composable
-private fun FavoriteActionItem(
-    favorite: Boolean,
+private fun StarActionItem(
+    starred: Boolean,
     onClick: () -> Unit,
 ) {
     val hostView = LocalView.current
     val hapticEnabled = LocalHapticEnabled.current
     val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
     val colorEffectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
-    var favPulsing by remember { mutableStateOf(false) }
-    val favScale by animateFloatAsState(
-        targetValue = if (favPulsing) 1.35f else 1f,
+    var starPulsing by remember { mutableStateOf(false) }
+    val starScale by animateFloatAsState(
+        targetValue = if (starPulsing) 1.35f else 1f,
         animationSpec = effectsSpec,
-        finishedListener = { if (favPulsing) favPulsing = false },
-        label = "bottomBarFavScale",
+        finishedListener = { if (starPulsing) starPulsing = false },
+        label = "bottomBarStarScale",
     )
-    val favColor by animateColorAsState(
-        targetValue = if (favPulsing || favorite) Color(0xFFFF9EBC) else MaterialTheme.colorScheme.onSurface,
+    val starColor by animateColorAsState(
+        targetValue = if (starPulsing || starred) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface,
         animationSpec = colorEffectsSpec,
-        label = "bottomBarFavColor",
+        label = "bottomBarStarColor",
     )
     Column(
         modifier =
@@ -428,8 +428,8 @@ private fun FavoriteActionItem(
                 .clip(MaterialTheme.shapes.large)
                 .clickable(
                     onClick = {
-                        if (!favorite) {
-                            favPulsing = true
+                        if (!starred) {
+                            starPulsing = true
                             if (hapticEnabled) hostView.performSaveHaptic()
                         }
                         onClick()
@@ -438,23 +438,23 @@ private fun FavoriteActionItem(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        // Shape + color together, so the favorite state reads clearly even for users who
-        // can't distinguish the pink tint (color-blindness, high-contrast themes, grayscale).
-        // We swap the underlying FILL-instanced font family via `filled = favorite` rather
+        // Shape + color together, so the starred state reads clearly even for users who
+        // can't distinguish the yellow tint (color-blindness, high-contrast themes, grayscale).
+        // We swap the underlying FILL-instanced font family via `filled = starred` rather
         // than switching the ligature name, because in our instanced subset font both
-        // "favorite" and "favorite_border" resolve to the same FILL=1 glyph.
+        // "starred" and "star_border" resolve to the same FILL=1 glyph.
         RememberMaterialRoundedSymbol(
-            name = "favorite",
-            filled = favorite,
+            name = "star",
+            filled = starred,
             size = 24.dp,
-            tint = favColor,
+            tint = starColor,
             weight = FontWeight.Medium,
             opticalCenterYOffset = 1.5.dp,
-            modifier = Modifier.scale(favScale),
+            modifier = Modifier.scale(starScale),
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            text = stringResource(R.string.edit_bottom_bar_favorite),
+            text = stringResource(R.string.edit_bottom_bar_star),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,

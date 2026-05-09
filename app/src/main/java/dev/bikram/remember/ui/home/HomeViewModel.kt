@@ -233,10 +233,10 @@ class HomeViewModel
                     // Duplicate is additive: a new card appears in the list. The visible
                     // new row is its own confirmation; no snackbar to avoid noise.
                     NoteSwipeAction.DUPLICATE -> repository.duplicateNote(id)
-                    // Favorite toggles the heart icon in place. The state change is
+                    // Star toggles the star icon in place. The state change is
                     // already visible on the card so an Undo snackbar would be redundant.
-                    NoteSwipeAction.TOGGLE_FAVORITE ->
-                        repository.setFavorite(id, !note.note.favorite)
+                    NoteSwipeAction.TOGGLE_STAR ->
+                        repository.setStarred(id, !note.note.starred)
                     NoteSwipeAction.ARCHIVE -> {
                         repository.archiveNote(id)
                         emitSingleSwipeAction(BulkUndoableAction.Archived(setOf(id)))

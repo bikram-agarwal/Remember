@@ -8,6 +8,8 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -128,6 +130,20 @@ private fun AboutSettingsBlock(onOpenIntro: () -> Unit) {
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
     val profileUrl = stringResource(R.string.about_author_github_profile_url)
+    val buildFlavorLabel =
+        when (BuildConfig.FLAVOR) {
+            "github" -> stringResource(R.string.build_flavor_github)
+            "playstore" -> stringResource(R.string.build_flavor_playstore)
+            else -> BuildConfig.FLAVOR
+        }
+    val buildTypeLabel =
+        when (BuildConfig.BUILD_TYPE) {
+            "debug" -> stringResource(R.string.build_type_debug)
+            "devRelease" -> stringResource(R.string.build_type_dev_release)
+            "release" -> stringResource(R.string.build_type_release)
+            else -> BuildConfig.BUILD_TYPE
+        }
+    val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
     val copyAboutLink =
         remember(context) {
             { url: String ->
@@ -157,6 +173,17 @@ private fun AboutSettingsBlock(onOpenIntro: () -> Unit) {
                             R.string.app_version_format,
                             stringResource(R.string.app_name),
                             BuildConfig.VERSION_NAME,
+                        ),
+                    modifier =
+                        Modifier.combinedClickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {},
+                            onLongClick = {
+                                Toast
+                                    .makeText(context, buildVariantToastText, Toast.LENGTH_SHORT)
+                                    .show()
+                            },
                         ),
                     style = MaterialTheme.typography.displaySmall,
                     color = MaterialTheme.colorScheme.onSurface,

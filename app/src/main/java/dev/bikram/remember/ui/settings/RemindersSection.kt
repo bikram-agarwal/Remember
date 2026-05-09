@@ -19,6 +19,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +31,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -42,6 +48,7 @@ import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
@@ -70,8 +77,21 @@ internal fun RemindersSection(
     canScheduleExactAlarms: Boolean,
     isIgnoringBatteryOptimizations: Boolean,
     scope: CoroutineScope,
+    highlightItemKey: String? = null,
+    highlightItemRequestId: Int = 0,
 ) {
     val context = LocalContext.current
+    var keepUntilDoneHighlight by remember { mutableStateOf(false) }
+    LaunchedEffect(highlightItemKey, highlightItemRequestId) {
+        if (highlightItemKey == "keep_until_done") {
+            keepUntilDoneHighlight = true
+            delay(4500)
+            keepUntilDoneHighlight = false
+        } else {
+            keepUntilDoneHighlight = false
+        }
+    }
+    val keepUntilDoneHighlightAlpha = rememberSectionHighlightPulseAlpha(keepUntilDoneHighlight)
     GroupedListColumn {
         GroupedListItem(position = GroupPosition.FIRST) {
             Row(
@@ -203,7 +223,19 @@ internal fun RemindersSection(
                 )
             }
         }
-        GroupedListItem(position = GroupPosition.MIDDLE) {
+        GroupedListItem(
+            position = GroupPosition.MIDDLE,
+            modifier =
+                Modifier
+                    .zIndex(if (keepUntilDoneHighlight) 1f else 0f)
+                    .pulsingSectionHighlightOutline(
+                        active = keepUntilDoneHighlight,
+                        outlineColor =
+                            MaterialTheme.colorScheme.primary.copy(alpha = keepUntilDoneHighlightAlpha),
+                        expandDp = 4.dp,
+                        cornerRadiusDp = 12.dp,
+                    ),
+        ) {
             SettingsToggleRow(
                 materialSymbolName = "notification_important",
                 title = stringResource(R.string.settings_keep_reminders_until_done),

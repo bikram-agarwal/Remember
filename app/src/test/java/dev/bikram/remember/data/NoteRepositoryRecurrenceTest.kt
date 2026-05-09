@@ -23,7 +23,7 @@ class NoteRepositoryRecurrenceTest {
                         title = "Daily task",
                         body = "",
                         colorIndex = 0,
-                        favorite = false,
+                        starred = false,
                         trashed = false,
                         createdAt = reminderAt,
                         updatedAt = reminderAt,
@@ -60,7 +60,7 @@ class NoteRepositoryRecurrenceTest {
                         title = "One shot task",
                         body = "",
                         colorIndex = 0,
-                        favorite = false,
+                        starred = false,
                         trashed = false,
                         createdAt = reminderAt,
                         updatedAt = reminderAt,
@@ -93,7 +93,7 @@ class NoteRepositoryRecurrenceTest {
                         title = "Done task",
                         body = "",
                         colorIndex = 0,
-                        favorite = false,
+                        starred = false,
                         trashed = false,
                         createdAt = completedAt,
                         updatedAt = completedAt,
@@ -139,7 +139,7 @@ class NoteRepositoryRecurrenceTest {
                         title = "Done list",
                         body = "",
                         colorIndex = 0,
-                        favorite = false,
+                        starred = false,
                         trashed = false,
                         createdAt = completedAt,
                         updatedAt = completedAt,
@@ -220,11 +220,11 @@ class NoteRepositoryRecurrenceTest {
             }
         }
 
-        override suspend fun activeFavorites(): List<NoteWithItems> =
+        override suspend fun activeStarred(): List<NoteWithItems> =
             if (
                 !stored.note.trashed &&
                 !stored.note.archived &&
-                stored.note.favorite &&
+                stored.note.starred &&
                 stored.note.completedAt == null
             ) {
                 listOf(stored)
@@ -247,9 +247,9 @@ class NoteRepositoryRecurrenceTest {
             stored = stored.copy(note = note)
         }
 
-        override suspend fun setFavorite(
+        override suspend fun setStarred(
             id: Long,
-            favorite: Boolean,
+            starred: Boolean,
             updatedAt: Long,
         ) = Unit
 

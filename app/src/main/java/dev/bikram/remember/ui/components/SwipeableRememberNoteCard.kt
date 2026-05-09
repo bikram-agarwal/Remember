@@ -79,7 +79,7 @@ fun SwipeableRememberNoteCard(
     val swipeStart = interaction.swipeStartToEnd
     val swipeEnd = interaction.swipeEndToStart
     val noteCompleted = model.completed
-    val noteFavorite = model.favorite
+    val noteStarred = model.starred
     val revealKey = note.note.id
     val noteCardShape = MaterialTheme.shapes.medium
     // Always route through one of the two swipe wrappers below so the inner
@@ -96,7 +96,7 @@ fun SwipeableRememberNoteCard(
                     .map { action ->
                         action.revealTile(
                             noteCompleted = noteCompleted,
-                            noteFavorite = noteFavorite,
+                            noteStarred = noteStarred,
                             onClick = { onSwipeAction(note, action) },
                         )
                     }
@@ -110,7 +110,7 @@ fun SwipeableRememberNoteCard(
                     .map { action ->
                         action.revealTile(
                             noteCompleted = noteCompleted,
-                            noteFavorite = noteFavorite,
+                            noteStarred = noteStarred,
                             onClick = { onSwipeAction(note, action) },
                         )
                     }
@@ -171,8 +171,8 @@ fun SwipeableRememberNoteCard(
                 val iconFilled =
                     action == NoteSwipeAction.MARK_DONE &&
                         noteCompleted ||
-                        action == NoteSwipeAction.TOGGLE_FAVORITE &&
-                        noteFavorite
+                        action == NoteSwipeAction.TOGGLE_STAR &&
+                        noteStarred
                 val contentScale = 0.88f + 0.12f * revealProgress
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -193,13 +193,13 @@ fun SwipeableRememberNoteCard(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = action.labelString(noteCompleted, noteFavorite),
+                            text = action.labelString(noteCompleted, noteStarred),
                             style = MaterialTheme.typography.labelMedium,
                             color = tint,
                         )
                     } else {
                         Text(
-                            text = action.labelString(noteCompleted, noteFavorite),
+                            text = action.labelString(noteCompleted, noteStarred),
                             style = MaterialTheme.typography.labelMedium,
                             color = tint,
                         )
@@ -233,15 +233,15 @@ fun SwipeableRememberNoteCard(
 @Composable
 private fun NoteSwipeAction.labelString(
     noteCompleted: Boolean = false,
-    noteFavorite: Boolean = false,
+    noteStarred: Boolean = false,
 ): String =
     stringResource(
         when (this) {
             NoteSwipeAction.EDIT -> R.string.swipe_action_open
             NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
             NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
-            NoteSwipeAction.TOGGLE_FAVORITE -> {
-                if (noteFavorite) R.string.swipe_action_unfavorite else R.string.swipe_action_toggle_favorite
+            NoteSwipeAction.TOGGLE_STAR -> {
+                if (noteStarred) R.string.swipe_action_unstar else R.string.swipe_action_toggle_star
             }
             NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
             NoteSwipeAction.MARK_DONE ->
@@ -256,21 +256,21 @@ private fun NoteSwipeAction.labelString(
 @Composable
 private fun NoteSwipeAction.revealTile(
     noteCompleted: Boolean,
-    noteFavorite: Boolean,
+    noteStarred: Boolean,
     onClick: () -> Unit,
 ): SwipeRevealTile {
     val iconFilled =
         this == NoteSwipeAction.MARK_DONE &&
             noteCompleted ||
-            this == NoteSwipeAction.TOGGLE_FAVORITE &&
-            noteFavorite
+            this == NoteSwipeAction.TOGGLE_STAR &&
+            noteStarred
     val labelRes =
         when (this) {
             NoteSwipeAction.EDIT -> R.string.swipe_action_open
             NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
             NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
-            NoteSwipeAction.TOGGLE_FAVORITE -> {
-                if (noteFavorite) R.string.swipe_action_unfavorite else R.string.swipe_action_toggle_favorite
+            NoteSwipeAction.TOGGLE_STAR -> {
+                if (noteStarred) R.string.swipe_action_unstar else R.string.swipe_action_toggle_star
             }
             NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
             NoteSwipeAction.MARK_DONE -> {

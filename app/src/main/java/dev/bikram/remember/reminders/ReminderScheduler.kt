@@ -15,6 +15,7 @@ import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.ReminderPrefs
+import dev.bikram.remember.data.Visibility
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.edit.iconEmojiPayload
 import java.util.Calendar
@@ -166,6 +167,8 @@ class ReminderScheduler(
     }
 
     private fun summaryTitle(note: NoteEntity): String {
+        if (note.visibility == Visibility.SECRET) return context.getString(R.string.reminder_notification_hidden_title)
+
         val title = note.title.ifBlank { context.getString(R.string.options_reminder) }
         val emoji = iconEmojiPayload(note.iconKey) ?: return title
         return "$emoji $title"

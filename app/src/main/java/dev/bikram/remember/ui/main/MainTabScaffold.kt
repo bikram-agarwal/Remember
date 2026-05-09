@@ -120,6 +120,9 @@ fun MainTabScaffold(
     onOpenNote: (NoteWithItems, Boolean) -> Unit,
     onImportGoogleTasks: () -> Unit,
     onOpenIntro: () -> Unit,
+    onOpenHelp: () -> Unit = {},
+    settingsHighlightSection: String? = null,
+    onSettingsHighlightHandled: () -> Unit = {},
     openSettingsRequest: Int = 0,
     openUpdateSheetRequest: Int = 0,
 ) {
@@ -147,6 +150,11 @@ fun MainTabScaffold(
 
     LaunchedEffect(openSettingsRequest) {
         if (openSettingsRequest > 0) {
+            tab = MainTab.Settings
+        }
+    }
+    LaunchedEffect(settingsHighlightSection) {
+        if (settingsHighlightSection != null) {
             tab = MainTab.Settings
         }
     }
@@ -205,7 +213,10 @@ fun MainTabScaffold(
                         MainTab.Settings ->
                             SettingsRoute(
                                 onOpenIntro = onOpenIntro,
+                                onOpenHelp = onOpenHelp,
                                 openUpdateSheetRequest = openUpdateSheetRequest,
+                                highlightSectionKey = settingsHighlightSection,
+                                onHighlightHandled = onSettingsHighlightHandled,
                             )
                     }
                 }

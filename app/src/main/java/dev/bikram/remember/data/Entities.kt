@@ -24,7 +24,15 @@ fun Importance.labelRes(): Int =
     }
 
 @Serializable
-enum class Visibility { SECRET, PRIVATE, PUBLIC }
+enum class Visibility { DEFAULT, PRIVATE, SECRET }
+
+@StringRes
+fun Visibility.labelRes(): Int =
+    when (this) {
+        Visibility.DEFAULT -> R.string.visibility_default
+        Visibility.PRIVATE -> R.string.visibility_private
+        Visibility.SECRET -> R.string.visibility_secret
+    }
 
 @Serializable
 enum class ActionType {
@@ -89,13 +97,13 @@ data class NoteEntity(
     val title: String,
     val body: String,
     val colorIndex: Int,
-    val favorite: Boolean,
+    val starred: Boolean,
     val trashed: Boolean,
     val createdAt: Long,
     val updatedAt: Long,
     val reminderAt: Long? = null,
     val importance: Importance = Importance.DEFAULT,
-    val visibility: Visibility = Visibility.PRIVATE,
+    val visibility: Visibility = Visibility.DEFAULT,
     val pictureUri: String? = null,
     /** JSON from [dev.bikram.remember.ui.common.HeroFraming.toJsonString]; null = legacy center crop. */
     val pictureHeroFraming: String? = null,

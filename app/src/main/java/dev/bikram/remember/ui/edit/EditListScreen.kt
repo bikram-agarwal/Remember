@@ -95,6 +95,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import java.io.File
+import dev.bikram.remember.data.Visibility as NoteVisibility
 
 @Composable
 fun EditListRoute(
@@ -107,12 +108,13 @@ fun EditListRoute(
     val vm: EditListViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
     val title by vm.title.collectAsStateWithLifecycle()
-    val favorite by vm.favorite.collectAsStateWithLifecycle()
+    val starred by vm.starred.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
     val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
     val recurrence by vm.recurrence.collectAsStateWithLifecycle()
     val importance by vm.importance.collectAsStateWithLifecycle()
+    val visibility by vm.visibility.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
     val pictureRevision by vm.pictureRevision.collectAsStateWithLifecycle()
     val pictureHeroFraming by vm.pictureHeroFraming.collectAsStateWithLifecycle()
@@ -123,6 +125,7 @@ fun EditListRoute(
     val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
     val archived by vm.archived.collectAsStateWithLifecycle()
     val trashed by vm.trashed.collectAsStateWithLifecycle()
+    val hasUnsavedChanges by vm.hasUnsavedChanges.collectAsStateWithLifecycle()
 
     val snackbarHostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current
     val changesSavedMsg =
@@ -211,11 +214,12 @@ fun EditListRoute(
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
         EditListScreen(
             title = title,
-            favorite = favorite,
+            starred = starred,
             items = items,
             reminderAt = reminderAt,
             recurrence = recurrence,
             importance = importance,
+            visibility = visibility,
             pictureUri = pictureUri,
             pictureRevision = pictureRevision,
             pictureHeroFraming = pictureHeroFraming,
@@ -229,9 +233,10 @@ fun EditListRoute(
             existing = noteId != null,
             sharedNoteId = noteId,
             persistedForToolbar = hasPersistedRow,
+            hasUnsavedChanges = hasUnsavedChanges,
             forceEdit = forceEdit,
             onTitleChange = vm::setTitle,
-            onToggleFavorite = vm::toggleFavorite,
+            onToggleStar = vm::toggleStar,
             completed = completed,
             onToggleCompleted = { appScope.launch { vm.toggleCompleted() } },
             onAddItem = vm::addItem,
@@ -243,6 +248,7 @@ fun EditListRoute(
             onOutdent = vm::outdent,
             onReminderChange = vm::setReminder,
             onImportanceChange = vm::setImportance,
+            onVisibilityChange = vm::setVisibility,
             onPictureChange = vm::setPictureUri,
             onHeroCommitted = vm::setHeroWithFraming,
             onIconKeyChange = vm::setIconKey,
@@ -366,6 +372,7 @@ private fun EditListTopBarSection(
     iconKey: String?,
     isEditMode: Boolean,
     readOnly: Boolean,
+    hasUnsavedChanges: Boolean,
     sharedNoteId: Long?,
     sharedTransitionActive: Boolean,
     titleFocusRequester: FocusRequester,
@@ -492,10 +499,7 @@ private fun EditListTopBarSection(
                 }
             },
             actions = {
-                // In edit mode the NoteActionBottomBar slides out, so Save lives here.
-                // Outside edit mode this slot stays empty and the action bar handles Edit /
-                // Favorite / Archive / Trash.
-                if (isEditMode && !readOnly) {
+                if ((isEditMode || hasUnsavedChanges) && !readOnly) {
                     val saveCd = stringResource(R.string.edit_save_cd)
                     RememberIconButton(
                         onClick = onSave,
@@ -530,11 +534,12 @@ private fun EditListTopBarSection(
 @Composable
 fun EditListScreen(
     title: String,
-    favorite: Boolean,
+    starred: Boolean,
     items: List<EditableItem>,
     reminderAt: Long?,
     recurrence: RecurrenceRule?,
     importance: Importance,
+    visibility: NoteVisibility,
     pictureUri: String?,
     pictureRevision: Long,
     pictureHeroFraming: String?,
@@ -548,10 +553,11 @@ fun EditListScreen(
     existing: Boolean,
     sharedNoteId: Long?,
     persistedForToolbar: Boolean,
+    hasUnsavedChanges: Boolean,
     forceEdit: Boolean = false,
     completed: Boolean,
     onTitleChange: (String) -> Unit,
-    onToggleFavorite: () -> Unit,
+    onToggleStar: () -> Unit,
     onToggleCompleted: () -> Unit,
     onAddItem: () -> Unit,
     onItemTextChange: (Long, String) -> Unit,
@@ -570,6 +576,7 @@ fun EditListScreen(
     onOutdent: (localId: Long) -> Unit,
     onReminderChange: (Long?, RecurrenceRule?) -> Unit,
     onImportanceChange: (Importance) -> Unit,
+    onVisibilityChange: (NoteVisibility) -> Unit,
     onPictureChange: (String?) -> Unit,
     onHeroCommitted: (String, HeroFraming) -> Unit,
     onIconKeyChange: (String?) -> Unit,
@@ -706,6 +713,7 @@ fun EditListScreen(
                 iconKey = iconKey,
                 isEditMode = isEditMode,
                 readOnly = readOnly,
+                hasUnsavedChanges = hasUnsavedChanges,
                 sharedNoteId = sharedNoteId,
                 sharedTransitionActive = sharedTransitionActive,
                 titleFocusRequester = newListTitleFocus,
@@ -719,13 +727,13 @@ fun EditListScreen(
                 shelfState = shelfState,
                 existing = persistedForToolbar,
                 isEditMode = isEditMode,
-                favorite = favorite,
+                starred = starred,
                 completed = completed,
                 visible = actionBarVisible,
                 // Action bar is hidden while isEditMode, so this callback only fires from
                 // view mode - always turning edit mode ON. Save is owned by the top bar.
                 onToggleEdit = { if (!isEditMode) isEditMode = true else saveAndExitEditMode() },
-                onToggleFavorite = onToggleFavorite,
+                onToggleStar = onToggleStar,
                 onToggleCompleted = onToggleCompleted,
                 onArchive = onArchive,
                 onNotification = onNotification,
@@ -1118,6 +1126,7 @@ fun EditListScreen(
                     reminderAt = reminderAt,
                     recurrence = recurrence,
                     importance = importance,
+                    visibility = visibility,
                     pictureUri = pictureUri,
                     iconKey = iconKey,
                     isChecklist = true,
@@ -1126,13 +1135,14 @@ fun EditListScreen(
                     attachments = attachments,
                     onOpenReminder = if (readOnly) ({}) else ({ reminderPickerOpen = true }),
                     onSetImportance = if (readOnly) ({ _ -> }) else onImportanceChange,
+                    onSetVisibility = if (readOnly) ({ _ -> }) else onVisibilityChange,
                     onOpenPicture = if (readOnly) ({}) else launchHeroImagePick,
                     onOpenIcon = if (readOnly) ({}) else ({ iconPickerOpen = true }),
                     onOpenActions = if (readOnly) ({}) else ({ actionsPickerOpen = true }),
                     onOpenTags = if (readOnly) ({}) else ({ tagsPickerOpen = true }),
                     onOpenAttachments = if (readOnly) ({}) else ({ attachmentsPickerOpen = true }),
                     readOnly = readOnly,
-                    favorite = favorite,
+                    starred = starred,
                 )
                 Spacer(Modifier.height(40.dp + padding.calculateBottomPadding()))
             }

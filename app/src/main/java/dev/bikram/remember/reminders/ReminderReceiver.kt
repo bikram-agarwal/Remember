@@ -24,6 +24,7 @@ import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.ReminderPrefs
+import dev.bikram.remember.data.Visibility
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.ui.common.HeroFraming
@@ -115,14 +116,14 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setContentText(summary(context, note, items))
                     .setPriority(priorityFor(note.importance))
                     .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setVisibility(notificationVisibility(note))
                     .setContentIntent(openNotePendingIntent(context, note.id))
                     .setDeleteIntent(dismissPendingIntent(context, note.id).takeIf { keepUntilDone })
                     .setOngoing(true)
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(true)
 
-            val heroBitmap = decodeNotificationHeroBitmap(context, note)
+            val heroBitmap = if (note.visibility == Visibility.DEFAULT) decodeNotificationHeroBitmap(context, note) else null
             if (heroBitmap != null) {
                 val bigPictureStyle =
                     NotificationCompat
@@ -157,9 +158,9 @@ class ReminderReceiver : BroadcastReceiver() {
             // Pre-compute the share text so SHARE_CONTENT can be served by a direct
             // PendingIntent.getActivity (with the text baked into Intent.EXTRA_TEXT)
             // instead of going through ActionReceiver, which is subject to BAL.
-            val shareText = computeShareText(note, items)
+            val shareText = if (note.visibility != Visibility.SECRET) computeShareText(note, items) else ""
 
-            val customAction = note.actions.firstOrNull()
+            val customAction = if (note.visibility != Visibility.SECRET) note.actions.firstOrNull() else null
             if (customAction != null) {
                 builder.addAction(actionButton(context, note.id, 0, customAction, shareText))
             }
@@ -269,6 +270,8 @@ class ReminderReceiver : BroadcastReceiver() {
             context: Context,
             note: NoteEntity,
         ): String {
+            if (note.visibility == Visibility.SECRET) return context.getString(R.string.reminder_notification_hidden_title)
+
             val title = note.title.ifBlank { context.getString(R.string.options_reminder) }
             val emoji = iconEmojiPayload(note.iconKey) ?: return title
             return "$emoji $title"
@@ -280,6 +283,12 @@ class ReminderReceiver : BroadcastReceiver() {
             items: List<ChecklistItemEntity>,
             expanded: Boolean = false,
         ): String {
+            when (note.visibility) {
+                Visibility.SECRET -> return context.getString(R.string.reminder_notification_hidden_body)
+                Visibility.PRIVATE -> return context.getString(R.string.reminder_notification_hidden_body)
+                Visibility.DEFAULT -> Unit
+            }
+
             if (note.kind == NoteKind.LIST) {
                 val uncheckedItems =
                     items
@@ -400,6 +409,13 @@ class ReminderReceiver : BroadcastReceiver() {
                 items.sortedBy { it.sortOrder }.joinToString("\n") { item ->
                     if (item.checked) "[x] ${item.text}" else "[ ] ${item.text}"
                 }
+            }
+
+        private fun notificationVisibility(note: NoteEntity): Int =
+            when (note.visibility) {
+                Visibility.DEFAULT -> NotificationCompat.VISIBILITY_PUBLIC
+                Visibility.PRIVATE -> NotificationCompat.VISIBILITY_PRIVATE
+                Visibility.SECRET -> NotificationCompat.VISIBILITY_SECRET
             }
 
         private fun priorityFor(importance: Importance): Int =

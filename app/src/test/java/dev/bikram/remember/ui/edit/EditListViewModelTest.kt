@@ -214,13 +214,13 @@ private class FakeNoteDao(
 
     override suspend fun activeRemindersUntil(untilMillis: Long): List<NoteWithItems> = emptyList()
 
-    override suspend fun activeFavorites(): List<NoteWithItems> =
+    override suspend fun activeStarred(): List<NoteWithItems> =
         store.notes.keys
             .mapNotNull { noteId -> store.noteWithItems(noteId) }
             .filter { noteWithItems ->
                 !noteWithItems.note.trashed &&
                     !noteWithItems.note.archived &&
-                    noteWithItems.note.favorite &&
+                    noteWithItems.note.starred &&
                     noteWithItems.note.completedAt == null
             }.sortedByDescending { noteWithItems -> noteWithItems.note.updatedAt }
 
@@ -241,13 +241,13 @@ private class FakeNoteDao(
         store.notes[note.id] = note
     }
 
-    override suspend fun setFavorite(
+    override suspend fun setStarred(
         id: Long,
-        favorite: Boolean,
+        starred: Boolean,
         updatedAt: Long,
     ) {
         store.notes[id]?.let { note ->
-            store.notes[id] = note.copy(favorite = favorite, updatedAt = updatedAt)
+            store.notes[id] = note.copy(starred = starred, updatedAt = updatedAt)
         }
     }
 
@@ -371,10 +371,10 @@ private fun noteEntity(
         title = title,
         body = "",
         colorIndex = 0,
-        favorite = false,
+        starred = false,
         trashed = false,
         createdAt = 1L,
         updatedAt = 1L,
         importance = Importance.DEFAULT,
-        visibility = Visibility.PRIVATE,
+        visibility = Visibility.DEFAULT,
     )

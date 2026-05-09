@@ -1,0 +1,160 @@
+# Help search keyword mappings
+# Format: search phrase -> Subsection Title | Subsection Title
+# Phrases are matched as substrings of the user's query (case-insensitive).
+# Add common user phrasings that the content itself doesn't contain.
+
+# --- Reminders: not working / not firing ---
+reminder not working -> Troubleshooting reminders
+reminders not working -> Troubleshooting reminders
+not getting reminder -> Troubleshooting reminders
+not receiving reminder -> Troubleshooting reminders
+reminder not showing -> Troubleshooting reminders
+notification not showing -> Troubleshooting reminders | Notification permission and reliability
+reminder not firing -> Troubleshooting reminders
+reminder stopped -> Troubleshooting reminders
+alarm not working -> Troubleshooting reminders
+reminder broken -> Troubleshooting reminders
+missed reminder -> Troubleshooting reminders
+reminder missed -> Troubleshooting reminders
+reminder disappeared -> Troubleshooting reminders
+no notification -> Troubleshooting reminders | Notification permission and reliability
+notification missing -> Troubleshooting reminders | Notification permission and reliability
+
+# --- Reminders: late / delayed ---
+reminder late -> Troubleshooting reminders
+reminder delayed -> Troubleshooting reminders
+reminder slow -> Troubleshooting reminders
+late notification -> Troubleshooting reminders
+delayed notification -> Troubleshooting reminders
+wrong time -> Troubleshooting reminders
+
+# --- Notification permissions ---
+notification permission -> Notification permission and reliability
+allow notifications -> Notification permission and reliability
+enable notifications -> Notification permission and reliability
+grant notification -> Notification permission and reliability
+battery optimization -> Notification permission and reliability
+battery saver -> Troubleshooting reminders | Notification permission and reliability
+background restriction -> Notification permission and reliability
+reliable reminder -> Notification permission and reliability
+
+# --- Keep until done / persistent reminders ---
+keep reminding -> Keep reminders until done
+remind again -> Keep reminders until done
+keep notifying -> Keep reminders until done
+persistent reminder -> Keep reminders until done
+reminder keeps coming back -> Keep reminders until done
+re-post reminder -> Keep reminders until done
+sticky reminder -> Keep reminders until done
+annoying reminder -> Keep reminders until done
+
+# --- Snooze ---
+delay reminder -> Snooze
+postpone reminder -> Snooze
+remind me later -> Snooze
+later tonight -> Snooze
+snooze options -> Snooze
+push reminder -> Snooze
+
+# --- Recurring / repeating ---
+repeat reminder -> Recurring reminders
+repeating reminder -> Recurring reminders
+daily reminder -> Recurring reminders
+weekly reminder -> Recurring reminders
+monthly reminder -> Recurring reminders
+yearly reminder -> Recurring reminders
+recur -> Recurring reminders
+schedule repeat -> Recurring reminders
+reminder every day -> Recurring reminders
+
+# --- Notification actions ---
+call button notification -> How they work
+button in notification -> How they work
+action button -> How they work
+notification button -> How they work
+action not working -> Troubleshooting notification actions
+button not working -> Troubleshooting notification actions
+tap action -> How they work
+open app from notification -> How they work
+directions notification -> How they work
+phone call reminder -> How they work
+
+# --- Backup ---
+lost notes -> Import vs. restore
+notes gone -> Import vs. restore | Finding archived or trashed notes
+backup -> What a backup includes
+restore notes -> Import vs. restore
+import backup -> Import vs. restore
+export notes -> What a backup includes
+transfer notes -> What a backup includes
+move notes -> What a backup includes
+pictures missing -> Import vs. restore
+images missing -> Import vs. restore
+attachments missing -> Import vs. restore
+media missing -> Import vs. restore
+new phone -> Import vs. restore | What a backup includes
+reinstall -> Import vs. restore | What a backup includes
+
+# --- Google Tasks ---
+import google -> Importing from Google Tasks
+google tasks -> Importing from Google Tasks
+takeout -> Importing from Google Tasks
+tasks.json -> Importing from Google Tasks
+import failed -> Importing from Google Tasks
+
+# --- Privacy / security ---
+encrypt -> Where notes are stored
+encrypted -> Where notes are stored
+plaintext -> Where notes are stored
+data security -> Where notes are stored
+private -> Visibility: Default, Private, and Secret
+secret note -> Visibility: Default, Private, and Secret
+hide note -> Visibility: Default, Private, and Secret
+hide notification -> Visibility: Default, Private, and Secret
+lock -> App lock
+lock app -> App lock
+pin -> App lock
+biometric -> App lock
+fingerprint -> App lock
+face unlock -> App lock
+
+# --- Widgets ---
+widget not working -> Troubleshooting widgets
+widget not showing -> Troubleshooting widgets
+widget empty -> Troubleshooting widgets
+home screen widget -> Available widgets | Quick capture notification
+agenda widget -> Available widgets
+starred widget -> Available widgets
+quick note -> Quick capture notification
+capture shortcut -> Quick capture notification
+
+# --- Tags / organization ---
+organize -> Tags, stars, archive, and trash
+label -> Tags, stars, archive, and trash
+category -> Tags, stars, archive, and trash
+folder -> Tags, stars, archive, and trash
+find note -> Search | Finding archived or trashed notes
+deleted note -> Finding archived or trashed notes
+archived note -> Finding archived or trashed notes
+note disappeared -> Finding archived or trashed notes
+note missing -> Finding archived or trashed notes | Search
+trash -> Tags, stars, archive, and trash
+archive -> Tags, stars, archive, and trash
+recover note -> Finding archived or trashed notes
+restore note -> Finding archived or trashed notes
+
+# --- Appearance / theme ---
+dark mode -> Appearance
+light mode -> Appearance
+black theme -> Appearance
+oled -> Appearance
+color -> Appearance
+theme -> Appearance
+wallpaper color -> Appearance
+material you -> Appearance
+gradient -> Appearance
+blur -> Appearance
+swipe -> Swipe actions
+drag chip -> Swipe actions
+swipe action -> Swipe actions
+gesture -> Swipe actions

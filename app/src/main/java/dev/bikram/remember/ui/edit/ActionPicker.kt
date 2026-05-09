@@ -1,6 +1,12 @@
 package dev.bikram.remember.ui.edit
+
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
+import android.util.Patterns
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,26 +14,31 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.NoteAction
@@ -35,10 +46,12 @@ import dev.bikram.remember.data.dataLabelRes
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.components.RememberOutlinedButton
+import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+
+private const val LEGACY_CONTACT_MANUAL_ENTRY_EXTRA = "__remember_manual_contact_entry__"
 
 fun ActionType.materialSymbolName(): String =
     when (this) {
@@ -55,8 +68,12 @@ fun ActionType.materialSymbolName(): String =
         ActionType.SNOOZE -> "snooze"
     }
 
-@Composable
-private fun ActionType.dataLabelText(): String = stringResource(dataLabelRes())
+private enum class ActionPickerScreen {
+    ChooseType,
+    EditAction,
+    PickApp,
+    PickShortcutProvider,
+}
 
 @Composable
 fun ActionPicker(
@@ -64,552 +81,807 @@ fun ActionPicker(
     onConfirm: (List<NoteAction>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var draft by remember { mutableStateOf(current) }
-    var editorType by rememberSaveable { mutableStateOf<ActionType?>(null) }
-    var editingIndex by rememberSaveable { mutableStateOf<Int?>(null) }
-    var typePickerOpen by rememberSaveable { mutableStateOf(current.isEmpty()) }
-    val showMainSheet = current.isNotEmpty() || draft.isNotEmpty()
-
-    LaunchedEffect(showMainSheet, typePickerOpen, editorType) {
-        if (!showMainSheet && !typePickerOpen && editorType == null) {
-            onConfirm(draft)
-            onDismiss()
-        }
-    }
-
-    if (showMainSheet) {
-        AppBottomSheet(
-            title = stringResource(R.string.options_actions),
-            subtitle = stringResource(R.string.actions_sheet_subtitle),
-            onDismiss = onDismiss,
-            actions = {
-                RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-                RememberTextButton(onClick = { onConfirm(draft) }) { Text(stringResource(R.string.common_save)) }
+    val context = LocalContext.current
+    val packageManager = context.packageManager
+    val resources = LocalResources.current
+    val initialAction = remember(current) { current.firstOrNull() }
+    val hadInitialAction = initialAction != null
+    var screen by remember(initialAction) {
+        mutableStateOf(
+            if (initialAction == null) {
+                ActionPickerScreen.ChooseType
+            } else {
+                ActionPickerScreen.EditAction
             },
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 120.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                draft.forEachIndexed { idx, action ->
-                    ActionRow(
-                        action = action,
-                        onClick = {
-                            if (action.type != ActionType.COPY_TO_CLIPBOARD && action.type != ActionType.SHARE_CONTENT) {
-                                editingIndex = idx
-                                editorType = action.type
-                            }
-                        },
-                        onRemove = { draft = draft.toMutableList().apply { removeAt(idx) } },
-                    )
+        )
+    }
+    var selectedType by remember(initialAction) { mutableStateOf(initialAction?.type) }
+    var title by remember(initialAction) { mutableStateOf(initialAction?.title.orEmpty()) }
+    var details by remember(initialAction) { mutableStateOf(initialAction?.details.orEmpty()) }
+    var extra by remember(initialAction) { mutableStateOf(initialAction?.extra) }
+    var targetIcon by remember(initialAction) { mutableStateOf<Drawable?>(null) }
+
+    val targetDisplayName =
+        when (selectedType) {
+            ActionType.OPEN_APP ->
+                if (details.isBlank()) {
+                    stringResource(R.string.actions_pick_app)
+                } else {
+                    appLabel(packageManager, details) ?: extra?.takeIf { it.isNotBlank() } ?: details
                 }
-                if (draft.size < 1) {
-                    AddActionRow(onClick = { typePickerOpen = true })
+            ActionType.OPEN_SHORTCUT ->
+                if (details.isBlank()) {
+                    stringResource(R.string.actions_pick_shortcut)
+                } else {
+                    extra?.takeIf { it.isNotBlank() } ?: title.ifBlank { details.take(80) }
                 }
+            else -> ""
+        }
+    val targetDisplayIcon =
+        remember(selectedType, details, targetIcon) {
+            when (selectedType) {
+                ActionType.CALL_NUMBER,
+                ActionType.SEND_MESSAGE,
+                ActionType.SEND_EMAIL,
+                -> targetIcon
+                ActionType.OPEN_APP -> targetIcon ?: appIcon(packageManager, details)
+                ActionType.OPEN_SHORTCUT -> targetIcon ?: shortcutFallbackIcon(packageManager, details)
+                else -> null
             }
         }
+
+    fun selectType(type: ActionType) {
+        selectedType = type
+        title = resources.getString(type.labelRes())
+        details = ""
+        extra = null
+        targetIcon = null
+        screen =
+            when (type) {
+                ActionType.OPEN_APP -> ActionPickerScreen.PickApp
+                ActionType.OPEN_SHORTCUT -> ActionPickerScreen.PickShortcutProvider
+                else -> ActionPickerScreen.EditAction
+            }
     }
 
-    if (typePickerOpen) {
-        val copyToClipboardTitle = stringResource(ActionType.COPY_TO_CLIPBOARD.labelRes())
-        val shareContentTitle = stringResource(ActionType.SHARE_CONTENT.labelRes())
-        TypePickerDialog(
-            onPick = { type ->
-                typePickerOpen = false
-                if (type == ActionType.COPY_TO_CLIPBOARD || type == ActionType.SHARE_CONTENT) {
-                    val actionTitle =
-                        if (type == ActionType.COPY_TO_CLIPBOARD) {
-                            copyToClipboardTitle
-                        } else {
-                            shareContentTitle
-                        }
-                    val action = NoteAction(type, actionTitle, "")
-                    val idx = editingIndex
-                    if (idx != null && idx in draft.indices) {
-                        val mut = draft.toMutableList()
-                        mut[idx] = action
-                        draft = mut
-                    } else {
-                        draft = (draft + action).take(1)
-                    }
-                    editingIndex = null
-                } else {
-                    editorType = type
-                }
-            },
-            onDismiss = {
-                typePickerOpen = false
-            },
-        )
+    fun resetAction() {
+        selectedType = null
+        title = ""
+        details = ""
+        extra = null
+        targetIcon = null
+        screen = ActionPickerScreen.EditAction
     }
-    editorType?.let { t ->
-        DetailEditorDialog(
-            type = t,
-            initialAction = editingIndex?.let { draft.getOrNull(it) },
-            onConfirm = { action ->
-                val idx = editingIndex
-                if (idx != null && idx in draft.indices) {
-                    val mut = draft.toMutableList()
-                    mut[idx] = action
-                    draft = mut
-                } else {
-                    draft = (draft + action).take(1)
-                }
-                editorType = null
-                editingIndex = null
-            },
-            onDismiss = {
-                editorType = null
-                editingIndex = null
-            },
-        )
-    }
-}
 
-@Composable
-private fun ActionRow(
-    action: NoteAction,
-    onClick: () -> Unit,
-    onRemove: () -> Unit,
-) {
-    val removeActionCd = stringResource(R.string.common_remove)
-    val rowShape = MaterialTheme.shapes.medium
-    Surface(
-        shape = rowShape,
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier.fillMaxWidth().clip(rowShape).tapSoundClickable(onClick = onClick),
+    fun actionToSave(): NoteAction? {
+        val type = selectedType ?: return null
+        val cleanTitle = title.trim()
+        if (cleanTitle.isBlank()) return null
+        val cleanDetails = details.trim()
+        if (type.requiresDetails() && cleanDetails.isBlank()) return null
+        if (!type.isValidDetails(cleanDetails)) return null
+        val cleanExtra =
+            when (type) {
+                ActionType.OPEN_APP -> appLabel(packageManager, cleanDetails) ?: extra?.trim()?.takeIf { it.isNotBlank() }
+                ActionType.OPEN_SHORTCUT -> extra?.trim()?.takeIf { it.isNotBlank() }
+                ActionType.CALL_NUMBER,
+                ActionType.SEND_MESSAGE,
+                ActionType.SEND_EMAIL,
+                -> extra?.trim()?.takeIf { it.isNotBlank() && it != LEGACY_CONTACT_MANUAL_ENTRY_EXTRA }
+                else -> extra?.trim()?.takeIf { it.isNotBlank() }
+            }
+        return NoteAction(type, cleanTitle, cleanDetails, extra = cleanExtra)
+    }
+
+    val phoneLauncher =
+        rememberPhonePickLauncher { pick ->
+            val verb =
+                if (selectedType == ActionType.SEND_MESSAGE) {
+                    resources.getString(R.string.action_contact_verb_message)
+                } else {
+                    resources.getString(R.string.action_contact_verb_call)
+                }
+            if (pick.displayName.isNotBlank()) {
+                title =
+                    resources.getString(
+                        R.string.actions_contact_title_format,
+                        verb,
+                        pick.displayName,
+                    )
+            }
+            details = pick.data
+            extra = pick.displayName.takeIf { it.isNotBlank() }
+            targetIcon = pick.avatar
+        }
+    val emailLauncher =
+        rememberEmailPickLauncher { pick ->
+            if (pick.displayName.isNotBlank()) {
+                title =
+                    resources.getString(
+                        R.string.actions_contact_title_format,
+                        resources.getString(R.string.action_contact_verb_email),
+                        pick.displayName,
+                    )
+            }
+            details = pick.data
+            extra = pick.displayName.takeIf { it.isNotBlank() }
+            targetIcon = pick.avatar
+        }
+    val shortcutLauncher =
+        rememberShortcutPickLauncher { pick ->
+            val newTitle = pick.label.ifBlank { title.ifBlank { resources.getString(ActionType.OPEN_SHORTCUT.labelRes()) } }
+            title = newTitle
+            details = pick.intentUri
+            extra = pick.label.ifBlank { newTitle }
+            targetIcon = pick.icon
+            screen = ActionPickerScreen.EditAction
+        }
+    val saveEnabled =
+        when {
+            screen == ActionPickerScreen.ChooseType -> false
+            selectedType == null -> true
+            else -> actionToSave() != null
+        }
+    val pickingInSheet =
+        screen == ActionPickerScreen.PickApp ||
+            screen == ActionPickerScreen.PickShortcutProvider
+
+    AppBottomSheet(
+        title = stringResource(R.string.options_actions),
+        subtitle = if (screen == ActionPickerScreen.ChooseType) stringResource(R.string.actions_sheet_subtitle) else null,
+        onDismiss = onDismiss,
+        scrollable = !pickingInSheet,
+        actions = {
+            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            if (screen == ActionPickerScreen.EditAction && selectedType != null) {
+                RememberTextButton(onClick = ::resetAction) { Text(stringResource(R.string.action_reset)) }
+            }
+            if (screen == ActionPickerScreen.EditAction) {
+                RememberButton(
+                    enabled = saveEnabled,
+                    onClick = { onConfirm(actionToSave()?.let { listOf(it) } ?: emptyList()) },
+                ) {
+                    Text(stringResource(R.string.common_save))
+                }
+            }
+        },
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            RememberMaterialRoundedSymbol(
-                name = action.type.materialSymbolName(),
-                size = 22.dp,
-                tint = MaterialTheme.colorScheme.primary,
-                weight = FontWeight.Medium,
-            )
-            Spacer(Modifier.size(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    action.title.ifBlank { stringResource(action.type.labelRes()) },
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
+        when (screen) {
+            ActionPickerScreen.ChooseType ->
+                ActionTypeChooser(onPick = ::selectType)
+            ActionPickerScreen.EditAction ->
+                ActionEditor(
+                    type = selectedType,
+                    title = title,
+                    onTitleChange = { title = it },
+                    details = details,
+                    targetDisplayName = targetDisplayName,
+                    targetDisplayIcon = targetDisplayIcon,
+                    onDetailsChange = {
+                        details = it
+                        if (selectedType.isContactAction()) {
+                            extra = null
+                            targetIcon = null
+                        }
+                    },
+                    onChangeType = {
+                        screen = ActionPickerScreen.ChooseType
+                    },
+                    onPickContact = {
+                        when (selectedType) {
+                            ActionType.CALL_NUMBER,
+                            ActionType.SEND_MESSAGE,
+                            -> phoneLauncher.launch(phonePickIntent())
+                            ActionType.SEND_EMAIL -> emailLauncher.launch(emailPickIntent())
+                            else -> Unit
+                        }
+                    },
+                    onPickApp = {
+                        screen = ActionPickerScreen.PickApp
+                    },
+                    onPickShortcutProvider = {
+                        screen = ActionPickerScreen.PickShortcutProvider
+                    },
                 )
-                val summary = action.extra?.ifBlank { null } ?: action.details
-                if (summary.isNotBlank()) {
-                    Text(
-                        summary,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
-            }
-            RememberIconButton(onClick = onRemove) {
-                RememberMaterialRoundedSymbol(
-                    name = "delete",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    weight = FontWeight.Medium,
-                    modifier = Modifier.semantics { contentDescription = removeActionCd },
+            ActionPickerScreen.PickApp ->
+                InSheetAppPicker(
+                    title = stringResource(R.string.actions_pick_app),
+                    queryIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
+                    onBack = {
+                        screen = ActionPickerScreen.EditAction
+                    },
+                    onPick = { app ->
+                        val newTitle = resources.getString(R.string.actions_open_app_title, app.label)
+                        title = newTitle
+                        details = app.packageName
+                        extra = app.label
+                        targetIcon = app.icon
+                        screen = ActionPickerScreen.EditAction
+                    },
                 )
-            }
+            ActionPickerScreen.PickShortcutProvider ->
+                InSheetAppPicker(
+                    title = stringResource(R.string.actions_pick_app_shortcut),
+                    queryIntent = Intent(Intent.ACTION_CREATE_SHORTCUT),
+                    onBack = {
+                        screen = ActionPickerScreen.EditAction
+                    },
+                    onPick = { app ->
+                        screen = ActionPickerScreen.EditAction
+                        shortcutLauncher(app.componentName)
+                    },
+                )
         }
     }
 }
 
 @Composable
-private fun AddActionRow(onClick: () -> Unit) {
-    val rowShape = MaterialTheme.shapes.medium
-    Surface(
-        shape = rowShape,
-        color = MaterialTheme.colorScheme.primaryContainer,
+private fun ActionTypeChooser(
+    onPick: (ActionType) -> Unit,
+) {
+    Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(rowShape)
-                .tapSoundClickable(onClick = onClick),
+                .heightIn(min = 120.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            RememberMaterialRoundedSymbol(
-                name = "add",
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                weight = FontWeight.Medium,
-            )
-            Spacer(Modifier.size(8.dp))
-            Text(
-                stringResource(R.string.actions_add_sheet_title),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-    }
-}
-
-@Composable
-private fun TypePickerDialog(
-    onPick: (ActionType) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AppBottomSheet(
-        title = stringResource(R.string.actions_add_sheet_title),
-        onDismiss = onDismiss,
-        actions = {
-            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-        },
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            ActionType.entries.filter { it != ActionType.MARK_AS_DONE && it != ActionType.SNOOZE }.forEach { t ->
+        ActionType.entries
+            .filter { it != ActionType.MARK_AS_DONE && it != ActionType.SNOOZE }
+            .forEach { type ->
                 Row(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .tapSoundClickable { onPick(t) }
+                            .tapSoundClickable { onPick(type) }
                             .padding(horizontal = 8.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RememberMaterialRoundedSymbol(
-                        name = t.materialSymbolName(),
+                        name = type.materialSymbolName(),
                         size = 22.dp,
                         tint = MaterialTheme.colorScheme.primary,
                         weight = FontWeight.Medium,
                     )
                     Spacer(Modifier.size(14.dp))
                     Text(
-                        stringResource(t.labelRes()),
+                        stringResource(type.labelRes()),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface,
                     )
                 }
             }
-        }
     }
 }
 
 @Composable
-private fun DetailEditorDialog(
-    type: ActionType,
-    initialAction: NoteAction?,
-    onConfirm: (NoteAction) -> Unit,
-    onDismiss: () -> Unit,
+private fun ActionEditor(
+    type: ActionType?,
+    title: String,
+    onTitleChange: (String) -> Unit,
+    details: String,
+    targetDisplayName: String,
+    targetDisplayIcon: Drawable?,
+    onDetailsChange: (String) -> Unit,
+    onChangeType: () -> Unit,
+    onPickContact: () -> Unit,
+    onPickApp: () -> Unit,
+    onPickShortcutProvider: () -> Unit,
 ) {
-    when (type) {
-        ActionType.CALL_NUMBER, ActionType.SEND_MESSAGE ->
-            ContactBackedEditor(
-                type = type,
-                initialAction = initialAction,
-                pickWith = { launcher -> launcher.launch(phonePickIntent()) },
-                launcherFactory = { onPicked -> rememberPhonePickLauncher(onPicked) },
-                onConfirm = onConfirm,
-                onDismiss = onDismiss,
-            )
-        ActionType.SEND_EMAIL ->
-            ContactBackedEditor(
-                type = type,
-                initialAction = initialAction,
-                pickWith = { launcher -> launcher.launch(emailPickIntent()) },
-                launcherFactory = { onPicked -> rememberEmailPickLauncher(onPicked) },
-                onConfirm = onConfirm,
-                onDismiss = onDismiss,
-            )
-        ActionType.OPEN_APP -> AppBackedEditor(type = type, initialAction = initialAction, onConfirm = onConfirm, onDismiss = onDismiss)
-        ActionType.OPEN_SHORTCUT -> ShortcutBackedEditor(type = type, initialAction = initialAction, onConfirm = onConfirm, onDismiss = onDismiss)
-        ActionType.MARK_AS_DONE, ActionType.COPY_TO_CLIPBOARD, ActionType.SHARE_CONTENT, ActionType.SNOOZE -> SimpleEditor(type = type, initialAction = initialAction, showData = false, onConfirm = onConfirm, onDismiss = onDismiss)
-        else -> SimpleEditor(type = type, initialAction = initialAction, showData = true, onConfirm = onConfirm, onDismiss = onDismiss)
-    }
-}
-
-@Composable
-private fun SimpleEditor(
-    type: ActionType,
-    initialAction: NoteAction?,
-    showData: Boolean,
-    onConfirm: (NoteAction) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val defaultTitle = stringResource(type.labelRes())
-    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: defaultTitle) }
-    var data by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
-    val ready = title.isNotBlank() && (!showData || data.isNotBlank())
-    EditorShell(
-        type = type,
-        body = {
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text(stringResource(R.string.common_title)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (showData) {
-                val keyboardOptions =
-                    if (type == ActionType.OPEN_LINK) {
-                        androidx.compose.foundation.text
-                            .KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Uri)
-                    } else {
-                        androidx.compose.foundation.text.KeyboardOptions.Default
-                    }
-                OutlinedTextField(
-                    value = data,
-                    onValueChange = { data = it },
-                    label = { Text(type.dataLabelText()) },
-                    singleLine = true,
-                    keyboardOptions = keyboardOptions,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-        },
-        readyToSave = ready,
-        onSave = {
-            onConfirm(NoteAction(type, title.trim(), data.trim()))
-        },
-        onDismiss = onDismiss,
-    )
-}
-
-@Composable
-private fun ContactBackedEditor(
-    type: ActionType,
-    initialAction: NoteAction?,
-    pickWith: (androidx.activity.result.ActivityResultLauncher<Intent>) -> Unit,
-    launcherFactory: @Composable ((ContactPick) -> Unit) -> androidx.activity.result.ActivityResultLauncher<Intent>,
-    onConfirm: (NoteAction) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val resources = LocalResources.current
-    val defaultTitle = stringResource(type.labelRes())
-    val contactVerb =
-        when (type) {
-            ActionType.CALL_NUMBER -> stringResource(R.string.action_contact_verb_call)
-            ActionType.SEND_MESSAGE -> stringResource(R.string.action_contact_verb_message)
-            ActionType.SEND_EMAIL -> stringResource(R.string.action_contact_verb_email)
-            else -> null
-        }
-    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: defaultTitle) }
-    var data by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
-    val launcher =
-        launcherFactory { pick ->
-            if (contactVerb != null && pick.displayName.isNotBlank()) {
-                title =
-                    resources.getString(
-                        R.string.actions_contact_title_format,
-                        contactVerb,
-                        pick.displayName,
-                    )
-            }
-            data = pick.data
-        }
-    val ready = title.isNotBlank() && data.isNotBlank()
-    EditorShell(
-        type = type,
-        body = {
-            RememberOutlinedButton(
-                onClick = { pickWith(launcher) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                RememberMaterialRoundedSymbol(name = "contacts", weight = FontWeight.Medium)
-                Spacer(Modifier.size(8.dp))
-                Text(stringResource(R.string.actions_pick_contacts))
-            }
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text(stringResource(R.string.common_title)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            OutlinedTextField(
-                value = data,
-                onValueChange = { data = it },
-                label = { Text(type.dataLabelText()) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        },
-        readyToSave = ready,
-        onSave = { onConfirm(NoteAction(type, title.trim(), data.trim())) },
-        onDismiss = onDismiss,
-    )
-}
-
-@Composable
-private fun AppBackedEditor(
-    type: ActionType,
-    initialAction: NoteAction?,
-    onConfirm: (NoteAction) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val resources = LocalResources.current
-    val defaultTitle = stringResource(type.labelRes())
-    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: defaultTitle) }
-    var pkg by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
-    var pickerOpen by rememberSaveable(type, initialAction) { mutableStateOf(initialAction == null) }
-    val ready = title.isNotBlank() && pkg.isNotBlank()
-    EditorShell(
-        type = type,
-        body = {
-            RememberOutlinedButton(
-                onClick = { pickerOpen = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                RememberMaterialRoundedSymbol(name = "apps", weight = FontWeight.Medium)
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    if (pkg.isBlank()) {
-                        stringResource(R.string.actions_pick_app)
-                    } else {
-                        stringResource(R.string.actions_change_app)
-                    },
-                )
-            }
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text(stringResource(R.string.common_title)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (pkg.isNotBlank()) {
-                Text(
-                    pkg,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        readyToSave = ready,
-        onSave = { onConfirm(NoteAction(type, title.trim(), pkg.trim(), extra = title.trim())) },
-        onDismiss = onDismiss,
-    )
-    if (pickerOpen) {
-        AppPickerDialog(
-            title = stringResource(R.string.actions_pick_app),
-            queryIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER),
-            onPick = { app ->
-                pkg = app.packageName
-                val newTitle =
-                    if (title.isBlank() || title == defaultTitle) {
-                        resources.getString(R.string.actions_open_app_title, app.label)
-                    } else {
-                        title
-                    }
-                onConfirm(NoteAction(type, newTitle, pkg, extra = newTitle))
-                pickerOpen = false
-            },
-            onDismiss = { pickerOpen = false },
-        )
-    }
-}
-
-@Composable
-private fun ShortcutBackedEditor(
-    type: ActionType,
-    initialAction: NoteAction?,
-    onConfirm: (NoteAction) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    val defaultTitle = stringResource(type.labelRes())
-    var title by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.title ?: defaultTitle) }
-    var uri by rememberSaveable(type, initialAction) { mutableStateOf(initialAction?.details ?: "") }
-    var appPickerOpen by rememberSaveable(type, initialAction) { mutableStateOf(initialAction == null) }
-    val pickShortcut =
-        rememberShortcutPickLauncher { pickedUri, label ->
-            uri = pickedUri
-            if (label.isNotBlank()) title = label
-            onConfirm(NoteAction(type, title, uri, extra = title))
-        }
-    val ready = title.isNotBlank() && uri.isNotBlank()
-    EditorShell(
-        type = type,
-        body = {
-            RememberOutlinedButton(
-                onClick = { appPickerOpen = true },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                RememberMaterialRoundedSymbol(name = "app_shortcut", weight = FontWeight.Medium)
-                Spacer(Modifier.size(8.dp))
-                Text(
-                    if (uri.isBlank()) {
-                        stringResource(R.string.actions_pick_shortcut)
-                    } else {
-                        stringResource(R.string.actions_change_shortcut)
-                    },
-                )
-            }
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text(stringResource(R.string.common_title)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            if (uri.isNotBlank()) {
-                Text(
-                    uri.take(80),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        readyToSave = ready,
-        onSave = { onConfirm(NoteAction(type, title.trim(), uri, extra = title.trim())) },
-        onDismiss = onDismiss,
-    )
-    if (appPickerOpen) {
-        AppPickerDialog(
-            title = stringResource(R.string.actions_pick_app_shortcut),
-            queryIntent = Intent(Intent.ACTION_CREATE_SHORTCUT),
-            onPick = { app ->
-                appPickerOpen = false
-                pickShortcut(app.componentName)
-            },
-            onDismiss = { appPickerOpen = false },
-        )
-    }
-}
-
-@Composable
-private fun EditorShell(
-    type: ActionType,
-    body: @Composable () -> Unit,
-    readyToSave: Boolean,
-    onSave: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    AppBottomSheet(
-        title = stringResource(type.labelRes()),
-        onDismiss = onDismiss,
-        actions = {
-            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-            RememberTextButton(enabled = readyToSave, onClick = onSave) { Text(stringResource(R.string.common_add)) }
-        },
+    val detailsError = actionDetailsError(type, details)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                RememberMaterialRoundedSymbol(
-                    name = type.materialSymbolName(),
-                    tint = MaterialTheme.colorScheme.primary,
-                    weight = FontWeight.Medium,
-                )
-                Spacer(Modifier.size(10.dp))
-                Text(
-                    stringResource(type.labelRes()),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+        ActionNavigationRow(
+            iconName = type?.materialSymbolName() ?: "close",
+            label = stringResource(R.string.actions_field_action_type),
+            value = if (type == null) stringResource(R.string.common_none) else stringResource(type.labelRes()),
+            prominent = true,
+            onClick = onChangeType,
+        )
+        when (type) {
+            ActionType.CALL_NUMBER,
+            ActionType.SEND_MESSAGE,
+            ActionType.SEND_EMAIL,
+            -> {
+                ActionEditableRow(
+                    iconName = type.materialSymbolName(),
+                    icon = targetDisplayIcon,
+                    label = stringResource(type.dataLabelRes()),
+                    value = details,
+                    onValueChange = onDetailsChange,
+                    placeholder = stringResource(R.string.actions_contact_input_placeholder),
+                    keyboardOptions =
+                        if (type == ActionType.SEND_EMAIL) {
+                            KeyboardOptions(keyboardType = KeyboardType.Email)
+                        } else {
+                            KeyboardOptions(keyboardType = KeyboardType.Phone)
+                        },
+                    errorText = detailsError,
+                    trailingIconName = "contacts",
+                    leadingTone = ActionRowTone.SurfaceVariant,
+                    trailingTone = ActionRowTone.Primary,
+                    onTrailingClick = onPickContact,
                 )
             }
-            body()
+            ActionType.OPEN_APP -> {
+                ActionNavigationRow(
+                    iconName = "apps",
+                    icon = targetDisplayIcon,
+                    label = stringResource(R.string.actions_target_app),
+                    value = targetDisplayName,
+                    valuePlaceholder = details.isBlank(),
+                    leadingTone = ActionRowTone.SurfaceVariant,
+                    onClick = onPickApp,
+                )
+            }
+            ActionType.OPEN_SHORTCUT -> {
+                ActionNavigationRow(
+                    iconName = "app_shortcut",
+                    icon = targetDisplayIcon,
+                    label = stringResource(R.string.actions_target_shortcut),
+                    value = targetDisplayName,
+                    valuePlaceholder = details.isBlank(),
+                    leadingTone = ActionRowTone.SurfaceVariant,
+                    onClick = onPickShortcutProvider,
+                )
+            }
+            ActionType.COPY_TO_CLIPBOARD,
+            ActionType.SHARE_CONTENT,
+            ActionType.MARK_AS_DONE,
+            ActionType.SNOOZE,
+            -> Unit
+            null -> Unit
+            else -> {
+                ActionEditableRow(
+                    iconName = type.materialSymbolName(),
+                    label = stringResource(type.dataLabelRes()),
+                    value = details,
+                    onValueChange = onDetailsChange,
+                    placeholder = stringResource(type.dataLabelRes()),
+                    errorText = detailsError,
+                    leadingTone = ActionRowTone.SurfaceVariant,
+                    keyboardOptions =
+                        if (type == ActionType.OPEN_LINK) {
+                            KeyboardOptions(keyboardType = KeyboardType.Uri)
+                        } else {
+                            KeyboardOptions.Default
+                        },
+                )
+            }
+        }
+        if (type != null) {
+            ActionEditableRow(
+                iconName = "edit",
+                label = stringResource(R.string.actions_field_button_label),
+                value = title,
+                onValueChange = onTitleChange,
+                placeholder = stringResource(type.labelRes()),
+                leadingTone = ActionRowTone.Tertiary,
+            )
         }
     }
+}
+
+private enum class ActionRowTone {
+    Primary,
+    PrimarySubtle,
+    SurfaceVariant,
+    Tertiary,
+}
+
+private data class ActionToneColors(
+    val container: Color,
+    val content: Color,
+)
+
+@Composable
+private fun actionToneColors(tone: ActionRowTone): ActionToneColors {
+    val scheme = MaterialTheme.colorScheme
+    return when (tone) {
+        ActionRowTone.Primary ->
+            ActionToneColors(
+                container = scheme.primaryContainer,
+                content = scheme.onPrimaryContainer,
+            )
+        ActionRowTone.PrimarySubtle ->
+            ActionToneColors(
+                container = scheme.onPrimaryContainer.copy(alpha = 0.12f),
+                content = scheme.onPrimaryContainer,
+            )
+        ActionRowTone.SurfaceVariant ->
+            ActionToneColors(
+                container = scheme.surfaceVariant,
+                content = scheme.onSurfaceVariant,
+            )
+        ActionRowTone.Tertiary ->
+            ActionToneColors(
+                container = scheme.tertiaryContainer,
+                content = scheme.onTertiaryContainer,
+            )
+    }
+}
+
+@Composable
+private fun ActionNavigationRow(
+    iconName: String,
+    icon: Drawable? = null,
+    label: String,
+    value: String,
+    onClick: () -> Unit,
+    valuePlaceholder: Boolean = false,
+    errorText: String? = null,
+    trailingLabel: String? = null,
+    prominent: Boolean = false,
+    leadingTone: ActionRowTone = ActionRowTone.Primary,
+    onTrailingClick: (() -> Unit)? = null,
+) {
+    val scheme = MaterialTheme.colorScheme
+    val containerColor = if (prominent) scheme.primaryContainer else scheme.surfaceContainerHigh
+    val contentColor = if (prominent) scheme.onPrimaryContainer else scheme.onSurface
+    Column(Modifier.fillMaxWidth()) {
+        Surface(
+            color = containerColor,
+            contentColor = contentColor,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .tapSoundClickable(onClick = onClick)
+                        .padding(horizontal = 20.dp, vertical = 17.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ActionRowIcon(
+                    iconName = iconName,
+                    icon = icon,
+                    tone = if (prominent) ActionRowTone.PrimarySubtle else leadingTone,
+                )
+                ActionRowText(
+                    label = label,
+                    value = value,
+                    valuePlaceholder = valuePlaceholder,
+                    isError = errorText != null,
+                    modifier = Modifier.weight(1f),
+                )
+                if (trailingLabel != null && onTrailingClick != null) {
+                    RememberTextButton(onClick = onTrailingClick) {
+                        Text(trailingLabel)
+                    }
+                }
+                ActionTrailingIcon(
+                    iconName = "chevron_right",
+                    tone = if (prominent) ActionRowTone.PrimarySubtle else ActionRowTone.SurfaceVariant,
+                    onClick = onClick,
+                )
+            }
+        }
+        ActionRowErrorText(errorText)
+    }
+}
+
+@Composable
+private fun ActionEditableRow(
+    iconName: String,
+    icon: Drawable? = null,
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    errorText: String? = null,
+    trailingLabel: String? = null,
+    leadingTone: ActionRowTone = ActionRowTone.Tertiary,
+    trailingTone: ActionRowTone = ActionRowTone.SurfaceVariant,
+    trailingIconName: String = "chevron_right",
+    onTrailingClick: (() -> Unit)? = null,
+) {
+    val scheme = MaterialTheme.colorScheme
+    Column(Modifier.fillMaxWidth()) {
+        Surface(
+            color = scheme.surfaceContainerHigh,
+            contentColor = scheme.onSurface,
+            shape = MaterialTheme.shapes.large,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 17.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                ActionRowIcon(iconName = iconName, icon = icon, tone = leadingTone)
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                    )
+                    BasicTextField(
+                        value = value,
+                        onValueChange = onValueChange,
+                        singleLine = true,
+                        keyboardOptions = keyboardOptions,
+                        textStyle =
+                            MaterialTheme.typography.titleMedium.copy(
+                                color =
+                                    if (errorText != null) {
+                                        MaterialTheme.colorScheme.error
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    },
+                            ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                        modifier = Modifier.fillMaxWidth(),
+                        decorationBox = { innerTextField ->
+                            if (value.isBlank()) {
+                                Text(
+                                    placeholder,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            innerTextField()
+                        },
+                    )
+                }
+                if (trailingLabel != null && onTrailingClick != null) {
+                    RememberTextButton(onClick = onTrailingClick) {
+                        Text(trailingLabel)
+                    }
+                } else if (onTrailingClick != null) {
+                    ActionTrailingIcon(
+                        iconName = trailingIconName,
+                        tone = trailingTone,
+                        onClick = onTrailingClick,
+                    )
+                }
+            }
+        }
+        ActionRowErrorText(errorText)
+    }
+}
+
+@Composable
+private fun ActionTrailingIcon(
+    iconName: String,
+    tone: ActionRowTone,
+    onClick: (() -> Unit)? = null,
+) {
+    val colors = actionToneColors(tone)
+    RememberFilledTonalIconButton(
+        onClick = onClick ?: {},
+        enabled = onClick != null,
+        modifier = Modifier.size(32.dp),
+        colors =
+            IconButtonDefaults.filledTonalIconButtonColors(
+                containerColor = colors.container,
+                contentColor = colors.content,
+                disabledContainerColor = colors.container,
+                disabledContentColor = colors.content,
+            ),
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = iconName,
+            size = 20.dp,
+            tint = colors.content,
+            weight = FontWeight.Medium,
+        )
+    }
+}
+
+@Composable
+private fun ActionRowIcon(
+    iconName: String,
+    icon: Drawable? = null,
+    tone: ActionRowTone,
+) {
+    val painter =
+        remember(icon) {
+            icon?.let {
+                runCatching {
+                    BitmapPainter(it.toBitmap(96, 96).asImageBitmap())
+                }.getOrNull()
+            }
+        }
+    val colors = actionToneColors(tone)
+    Box(
+        modifier = Modifier.size(40.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            color = colors.container,
+            shape = MaterialTheme.shapes.medium,
+            modifier = Modifier.size(40.dp),
+        ) {}
+        if (painter != null) {
+            Image(
+                painter = painter,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+        } else {
+            RememberMaterialRoundedSymbol(
+                name = iconName,
+                size = 20.dp,
+                tint = colors.content,
+                weight = FontWeight.Medium,
+            )
+        }
+    }
+    Spacer(Modifier.size(18.dp))
+}
+
+@Composable
+private fun ActionRowText(
+    label: String,
+    value: String,
+    valuePlaceholder: Boolean,
+    isError: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier) {
+        Text(
+            label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+        )
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            color =
+                when {
+                    isError -> MaterialTheme.colorScheme.error
+                    valuePlaceholder -> MaterialTheme.colorScheme.onSurfaceVariant
+                    else -> MaterialTheme.colorScheme.onSurface
+                },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+@Composable
+private fun ActionRowErrorText(errorText: String?) {
+    if (errorText != null) {
+        Text(
+            errorText,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.error,
+            modifier = Modifier.padding(start = 52.dp, end = 8.dp, bottom = 8.dp),
+        )
+    }
+}
+
+@Composable
+private fun InSheetAppPicker(
+    title: String,
+    queryIntent: Intent,
+    onBack: () -> Unit,
+    onPick: (AppChoice) -> Unit,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            RememberTextButton(onClick = onBack) {
+                Text(stringResource(R.string.common_back))
+            }
+        }
+        AppPickerContent(
+            queryIntent = queryIntent,
+            onPick = onPick,
+        )
+    }
+}
+
+private fun ActionType.requiresDetails(): Boolean =
+    when (this) {
+        ActionType.CALL_NUMBER,
+        ActionType.SEND_MESSAGE,
+        ActionType.SEND_EMAIL,
+        ActionType.GET_DIRECTIONS,
+        ActionType.OPEN_LINK,
+        ActionType.OPEN_APP,
+        ActionType.OPEN_SHORTCUT,
+        -> true
+        ActionType.COPY_TO_CLIPBOARD,
+        ActionType.SHARE_CONTENT,
+        ActionType.MARK_AS_DONE,
+        ActionType.SNOOZE,
+        -> false
+    }
+
+private fun ActionType.isValidDetails(value: String): Boolean =
+    when (this) {
+        ActionType.CALL_NUMBER,
+        ActionType.SEND_MESSAGE,
+        -> value.isBlank() || value.isValidPhoneActionValue()
+        ActionType.SEND_EMAIL -> value.isBlank() || Patterns.EMAIL_ADDRESS.matcher(value).matches()
+        else -> true
+    }
+
+@Composable
+private fun actionDetailsError(
+    type: ActionType?,
+    value: String,
+): String? {
+    val trimmed = value.trim()
+    if (type == null || trimmed.isBlank() || type.isValidDetails(trimmed)) return null
+    return when (type) {
+        ActionType.CALL_NUMBER,
+        ActionType.SEND_MESSAGE,
+        -> if (trimmed.any { it.isDigit() }) stringResource(R.string.actions_error_phone_number) else null
+        ActionType.SEND_EMAIL -> stringResource(R.string.actions_error_email_address)
+        else -> null
+    }
+}
+
+private fun String.isValidPhoneActionValue(): Boolean =
+    trim().let { value ->
+        value.any { it.isDigit() } &&
+            value.matches(
+                Regex(
+                    pattern = """^\+?[0-9\s().-]+(?:\s*(?:x|ext\.?)\s*[0-9]+)?$""",
+                    option = RegexOption.IGNORE_CASE,
+                ),
+            )
+    }
+
+private fun ActionType?.isContactAction(): Boolean =
+    this == ActionType.CALL_NUMBER ||
+        this == ActionType.SEND_MESSAGE ||
+        this == ActionType.SEND_EMAIL
+
+private fun appLabel(
+    packageManager: PackageManager,
+    packageName: String,
+): String? =
+    if (packageName.isBlank()) {
+        null
+    } else {
+        runCatching {
+            val appInfo = packageManager.getApplicationInfo(packageName, 0)
+            packageManager.getApplicationLabel(appInfo).toString()
+        }.getOrNull()
+    }
+
+private fun appIcon(
+    packageManager: PackageManager,
+    packageName: String,
+): Drawable? =
+    if (packageName.isBlank()) {
+        null
+    } else {
+        runCatching { packageManager.getApplicationIcon(packageName) }.getOrNull()
+    }
+
+private fun shortcutFallbackIcon(
+    packageManager: PackageManager,
+    intentUri: String,
+): Drawable? {
+    if (intentUri.isBlank()) return null
+    val intent =
+        runCatching { Intent.parseUri(intentUri, Intent.URI_INTENT_SCHEME) }
+            .getOrNull() ?: return null
+    val packageName = intent.component?.packageName ?: intent.`package`
+    return packageName?.let { appIcon(packageManager, it) }
 }

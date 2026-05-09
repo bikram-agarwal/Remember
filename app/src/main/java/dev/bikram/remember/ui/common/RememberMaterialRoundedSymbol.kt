@@ -28,7 +28,7 @@ import dev.bikram.remember.R
 //   material_symbols_rounded_outlined.ttf  -> FILL=0 (outlined)
 // See font_subset/ for the build pipeline. Picking by FontFamily is the only
 // reliable way to get a truly unfilled outline; instancing collapses
-// "favorite_border"-style alt names into the same filled glyph shape.
+// "star_border"-style alt names into the same filled glyph shape.
 private val MaterialSymbolsRoundedFilledFontFamily: FontFamily =
     FontFamily(Font(R.font.material_symbols_rounded))
 
@@ -55,7 +55,7 @@ private val FlatLineHeightStyle =
  *   outlined glyph: the `_border` / `_outline` Material name aliases collapse to the
  *   filled shape once FILL is instanced.
  * @param opticalCenterYOffset Downward shift for glyphs that sit high in the em box (Material
- *   Symbols often center on the cap height; dense marks like the heart can look optically high).
+ *   Symbols often center on the cap height; dense marks like the star can look optically high).
  */
 @Composable
 fun RememberMaterialRoundedSymbol(

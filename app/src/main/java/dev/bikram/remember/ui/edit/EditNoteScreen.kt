@@ -157,8 +157,9 @@ fun EditNoteScreen(
 
     val archived by vm.archived.collectAsStateWithLifecycle()
     val trashed by vm.trashed.collectAsStateWithLifecycle()
-    val favorite by vm.favorite.collectAsStateWithLifecycle()
+    val starred by vm.starred.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
+    val hasUnsavedChanges by vm.hasUnsavedChanges.collectAsStateWithLifecycle()
     val shelfState =
         when {
             trashed -> NoteShelfState.TRASHED
@@ -338,6 +339,7 @@ fun EditNoteScreen(
                 sharedNoteId = sharedNoteId,
                 isEditMode = isEditMode,
                 readOnly = readOnly,
+                hasUnsavedChanges = hasUnsavedChanges,
                 markdownDisplayMode = markdownDisplayMode,
                 onBack = handleNavigateUp,
                 onToggleMarkdownDisplayMode = {
@@ -425,7 +427,7 @@ fun EditNoteScreen(
                             shelfState = shelfState,
                             existing = persistedForToolbar,
                             isEditMode = isEditMode,
-                            favorite = favorite,
+                            starred = starred,
                             completed = completed,
                             onToggleEdit = {
                                 // Outside edit mode this turns edit mode ON. The SAVE path is
@@ -434,7 +436,7 @@ fun EditNoteScreen(
                                 // side-effect to run here.
                                 if (!isEditMode) isEditMode = true else saveAndExitEditMode()
                             },
-                            onToggleFavorite = { vm.toggleFavorite() },
+                            onToggleStar = { vm.toggleStar() },
                             onToggleCompleted = {
                                 appScope.launch { vm.toggleCompleted() }
                             },

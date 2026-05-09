@@ -106,7 +106,7 @@ class BackupIo(
             put("title", note.title)
             put("body", note.body)
             put("colorIndex", note.colorIndex)
-            put("favorite", note.favorite)
+            put("starred", note.starred)
             put("trashed", note.trashed)
             put("archived", note.archived)
             note.trashedAt?.let { put("trashedAt", it) }
@@ -565,12 +565,14 @@ class BackupIo(
                     var entry = zipIn.nextEntry
                     while (entry != null) {
                         if (!entry.isDirectory) {
-                            val name = entry.name
-                            val outFile = File(extractRoot, name).canonicalFile
-                            val extractBase = extractRoot.canonicalFile
-                            if (outFile.path.startsWith(extractBase.path)) {
+                            val outFile =
+                                canonicalFileInsideBaseDirectoryOrNull(
+                                    candidate = File(extractRoot, entry.name),
+                                    baseDirectory = extractRoot,
+                                )
+                            if (outFile != null) {
                                 outFile.parentFile?.mkdirs()
-                                FileOutputStream(outFile).use { fos -> zipIn.copyTo(fos) }
+                                FileOutputStream(outFile).use { fileOutput -> zipIn.copyTo(fileOutput) }
                             }
                         }
                         entry = zipIn.nextEntry
@@ -687,7 +689,7 @@ class BackupIo(
             title = o.optString("title", ""),
             body = o.optString("body", ""),
             colorIndex = o.optInt("colorIndex", 0),
-            favorite = o.optBoolean("favorite", false),
+            starred = o.optBoolean("starred", false),
             trashed = o.optBoolean("trashed", false),
             archived = o.optBoolean("archived", false),
             trashedAt = o.optLongOrNull("trashedAt"),
@@ -699,8 +701,8 @@ class BackupIo(
                 runCatching { Importance.valueOf(o.optString("importance", Importance.DEFAULT.name)) }
                     .getOrDefault(Importance.DEFAULT),
             visibility =
-                runCatching { Visibility.valueOf(o.optString("visibility", Visibility.PRIVATE.name)) }
-                    .getOrDefault(Visibility.PRIVATE),
+                runCatching { Visibility.valueOf(o.optString("visibility", Visibility.DEFAULT.name)) }
+                    .getOrDefault(Visibility.DEFAULT),
             pictureUri = o.optStringOrNull("pictureUri"),
             pictureHeroFraming = o.optStringOrNull("pictureHeroFraming"),
             locked = o.optBoolean("locked", false),
@@ -762,9 +764,11 @@ class BackupIo(
         destNoteId: Long,
         label: String,
     ): String? {
-        val source = File(extractDir, relative).canonicalFile
-        val base = extractDir.canonicalFile
-        if (!source.path.startsWith(base.path)) return null
+        val source =
+            canonicalFileInsideBaseDirectoryOrNull(
+                candidate = File(extractDir, relative),
+                baseDirectory = extractDir,
+            ) ?: return null
         if (!source.isFile) return null
         val destDir = File(context.filesDir, "remember_backup/$destNoteId").apply { mkdirs() }
         val safeName = label.replace(Regex("[^a-zA-Z0-9._-]"), "_").take(80)

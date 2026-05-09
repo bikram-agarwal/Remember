@@ -158,13 +158,10 @@ class AppMediaStorage
                     relativePathSegments.fold(File(context.filesDir, rootDirectory)) { currentDirectory, pathSegment ->
                         File(currentDirectory, pathSegment)
                     }
-                val baseDirectory = context.filesDir.canonicalFile
-                val canonicalCandidate = candidate.canonicalFile
-                return if (canonicalCandidate.path.startsWith(baseDirectory.path)) {
-                    canonicalCandidate
-                } else {
-                    null
-                }
+                return canonicalFileInsideBaseDirectoryOrNull(
+                    candidate = candidate,
+                    baseDirectory = context.filesDir,
+                )
             }
 
             private fun safeFileName(
