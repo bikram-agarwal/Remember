@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -95,6 +96,7 @@ fun RememberNavGraph(
     val navController = rememberNavController()
     val helpVm: HelpViewModel = hiltViewModel()
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
+    var openSettingsUpdatesRequest by remember { mutableIntStateOf(0) }
     val onboardingState by onboardingPrefs.state.collectAsStateWithLifecycle(initialValue = null)
     val currentOnboardingState = onboardingState
     val onboardingScope = rememberCoroutineScope()
@@ -142,6 +144,13 @@ fun RememberNavGraph(
                             return@collectLatest
                         }
                         navController.openEditRouteFor(note, exitOnBack = action.exitOnBack)
+                    }
+                    LaunchAction.OpenSettingsUpdates -> {
+                        navController.navigate(Routes.MAIN) {
+                            popUpTo(navController.graph.findStartDestination().id)
+                            launchSingleTop = true
+                        }
+                        openSettingsUpdatesRequest += 1
                     }
                 }
             } finally {
@@ -246,8 +255,8 @@ fun RememberNavGraph(
                         onOpenHelp = { navController.navigate(Routes.HELP) },
                         settingsHighlightSection = settingsHighlightSection,
                         onSettingsHighlightHandled = { settingsHighlightSection = null },
-                        openSettingsRequest = openSettingsRequest,
-                        openUpdateSheetRequest = openUpdateSheetRequest,
+                        openSettingsRequest = openSettingsRequest + openSettingsUpdatesRequest,
+                        openUpdateSheetRequest = openUpdateSheetRequest + openSettingsUpdatesRequest,
                     )
                 }
             }

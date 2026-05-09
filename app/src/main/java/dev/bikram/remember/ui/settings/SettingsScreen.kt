@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.settings
 
 import android.Manifest
+import android.app.Activity
 import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
@@ -53,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
@@ -96,12 +98,16 @@ import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
 import dev.bikram.remember.update.RememberUpdateInfo
 import dev.bikram.remember.update.RememberUpdateState
+import dev.bikram.remember.update.notificationDedupeKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.HttpURLConnection
+import java.net.URL
 
 private enum class BackupFolderTarget {
     Local,
@@ -125,6 +131,7 @@ fun SettingsRoute(
     onHighlightHandled: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val resources = LocalResources.current
     val settingsDependencies =
         remember(context) {
@@ -146,8 +153,11 @@ fun SettingsRoute(
     val playStoreUpdateChecker = settingsDependencies.playStoreUpdateChecker()
     val playInAppUpdateStarter = settingsDependencies.playInAppUpdateStarter()
     val playInAppUpdateProgressController = settingsDependencies.playInAppUpdateProgressController()
+    val playUpdateSessionHandle = settingsDependencies.playUpdateSessionHandle()
     val rememberUpdateState: RememberUpdateState = settingsDependencies.rememberUpdateState()
+    val updateAvailableNotifier = settingsDependencies.updateAvailableNotifier()
     val updateCheckWorkScheduler = settingsDependencies.updateCheckWorkScheduler()
+    val appReviewLauncher = settingsDependencies.appReviewLauncher()
     val scope = rememberCoroutineScope()
 
     val lockState by lockPrefs.state.collectAsStateWithLifecycle(
@@ -187,6 +197,7 @@ fun SettingsRoute(
         initialValue = UpdatePreferencesState(),
     )
     val globalUpdateInfo by rememberUpdateState.updateInfo.collectAsStateWithLifecycle(initialValue = null)
+    val maxUpdateSheetHeight = (configuration.screenHeightDp * 0.85f).dp
 
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
@@ -194,12 +205,22 @@ fun SettingsRoute(
     var updateCheckFinishedWithoutResult by rememberSaveable { mutableStateOf(false) }
     var downloadProgress by rememberSaveable { mutableStateOf<Float?>(null) }
     var updateInfo by remember { mutableStateOf<RememberUpdateInfo?>(null) }
+    var updateSheetChangelog by remember { mutableStateOf<ChangelogUiState>(ChangelogUiState.Hidden) }
     val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val playInAppUpdateLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartIntentSenderForResult(),
-        ) {
-            playInAppUpdateProgressController.onFlexibleUpdateFlowStarted()
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                playInAppUpdateProgressController.onFlexibleUpdateFlowStarted()
+            } else {
+                Toast
+                    .makeText(
+                        context,
+                        resources.getString(R.string.settings_play_in_app_update_canceled),
+                        Toast.LENGTH_SHORT,
+                    ).show()
+            }
         }
 
     LaunchedEffect(globalUpdateInfo) {
@@ -305,7 +326,7 @@ fun SettingsRoute(
                 "security",
                 "backup",
                 "updates",
-            ) + if (BuildConfig.BUILD_TYPE == "devRelease") setOf("dev_release_mocks") else emptySet()
+            ) + if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease") setOf("dev_release_mocks") else emptySet()
         }
     val allSettingsSectionsCollapsed =
         settingsExpandableSectionKeys.all { sectionKey ->
@@ -361,8 +382,50 @@ fun SettingsRoute(
     val blurStyle = rememberProgressiveBlurStyle()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pillInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
+    val fetchRawChangelog = {
+        val repo = BuildConfig.CHANGELOG_GITHUB_REPO
+        val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
+        val connection =
+            URL("https://raw.githubusercontent.com/$repo/$branch/CHANGELOG.md").openConnection() as HttpURLConnection
+        connection.instanceFollowRedirects = true
+        connection.connectTimeout = 15_000
+        connection.readTimeout = 20_000
+        try {
+            connection.connect()
+            connection.inputStream.bufferedReader().use { reader -> reader.readText() }
+        } finally {
+            connection.disconnect()
+        }
+    }
+    val loadUpdateSheetChangelog = {
+        if (BuildConfig.CHANGELOG_GITHUB_REPO.isBlank()) {
+            updateSheetChangelog =
+                ChangelogUiState.Failed(
+                    resources.getString(R.string.settings_changelog_load_failed),
+                )
+        } else {
+            updateSheetChangelog = ChangelogUiState.Loading
+            scope.launch {
+                val loaded =
+                    withContext(Dispatchers.IO) {
+                        runCatching { fetchRawChangelog() }
+                    }
+                updateSheetChangelog =
+                    loaded.fold(
+                        onSuccess = { markdown -> ChangelogUiState.Ready(markdown) },
+                        onFailure = {
+                            ChangelogUiState.Failed(
+                                resources.getString(R.string.settings_changelog_load_failed),
+                            )
+                        },
+                    )
+            }
+        }
+        Unit
+    }
     val beginUpdateCheck = {
         showUpdateSheet = true
+        loadUpdateSheetChangelog()
         isCheckingUpdate = true
         updateCheckFinishedWithoutResult = false
         downloadProgress = null
@@ -379,8 +442,11 @@ fun SettingsRoute(
                     onSuccess = { availableUpdate ->
                         updateInfo = availableUpdate
                         rememberUpdateState.showUpdate(availableUpdate)
-                        if (availableUpdate != null) {
+                        if (availableUpdate != null && availableUpdate.isPlayStoreUpdateInProgress) {
                             playInAppUpdateProgressController.ensureInstallStateListenerRegistered()
+                            updateAvailableNotifier.notifyIfNewUpdateAvailable(availableUpdate, updatePrefs.snapshot())
+                        } else if (availableUpdate != null) {
+                            updateAvailableNotifier.notifyIfNewUpdateAvailable(availableUpdate, updatePrefs.snapshot())
                         }
                         updateCheckFinishedWithoutResult = availableUpdate == null
                     },
@@ -413,6 +479,9 @@ fun SettingsRoute(
                     onSuccess = { availableUpdate ->
                         updateInfo = availableUpdate
                         rememberUpdateState.showUpdate(availableUpdate)
+                        if (availableUpdate != null) {
+                            updateAvailableNotifier.notifyIfNewUpdateAvailable(availableUpdate, updatePrefs.snapshot())
+                        }
                         updateCheckFinishedWithoutResult = availableUpdate == null
                     },
                     onFailure = { throwable ->
@@ -445,7 +514,7 @@ fun SettingsRoute(
                     Toast
                         .makeText(
                             context,
-                            resources.getString(R.string.settings_update_check_failed),
+                            resources.getString(R.string.settings_play_in_app_update_failed),
                             Toast.LENGTH_SHORT,
                         ).show()
                 }
@@ -455,6 +524,7 @@ fun SettingsRoute(
             val downloadResult =
                 withContext(Dispatchers.IO) {
                     runCatching {
+                        updatePrefs.clearUpdateApkDownloadsCopySucceeded()
                         downloadUpdateApk(
                             context = context,
                             updateInfo = availableUpdate,
@@ -473,7 +543,10 @@ fun SettingsRoute(
                             copyUpdateApkToMediaStoreDownloads(
                                 context = context,
                                 cacheApkFile = apkFile,
-                                displayName = "Remember-${availableUpdate.versionName}.apk",
+                                displayName =
+                                    availableUpdate.remoteApkFileName.ifBlank {
+                                        "Remember-${availableUpdate.versionName}.apk"
+                                    },
                             )
                         }.onFailure { throwable ->
                             DiagnosticLog.record(context, "Saving update APK to Downloads failed", throwable)
@@ -483,6 +556,8 @@ fun SettingsRoute(
                                     resources.getString(R.string.settings_update_apk_save_to_downloads_failed),
                                     Toast.LENGTH_SHORT,
                                 ).show()
+                        }.onSuccess {
+                            updatePrefs.markUpdateApkDownloadsCopySucceeded()
                         }
                     }
                     downloadProgress = -1f
@@ -507,6 +582,12 @@ fun SettingsRoute(
                                     Toast.LENGTH_SHORT,
                                 ).show()
                         }
+                    if (BuildConfig.FLAVOR == "github" && availableUpdate.remoteApkAssetUpdatedAt.isNotBlank()) {
+                        updatePrefs.writeGithubReleaseAck(
+                            fingerprint = availableUpdate.notificationDedupeKey(),
+                            installedVersionName = BuildConfig.VERSION_NAME,
+                        )
+                    }
                     downloadProgress = null
                 },
                 onFailure = { throwable ->
@@ -582,17 +663,43 @@ fun SettingsRoute(
             onDismissRequest = {
                 showUpdateSheet = false
                 downloadProgress = null
+                updateSheetChangelog = ChangelogUiState.Hidden
+                val playBannerState = playInAppUpdateProgressController.bannerUiState.value
+                val blocksPendingPlayClear =
+                    playBannerState is PlayInAppUpdateBannerUiState.Downloading ||
+                        playBannerState is PlayInAppUpdateBannerUiState.ReadyToInstall
+                if (!blocksPendingPlayClear) {
+                    playUpdateSessionHandle.clearPendingPlayUpdate()
+                }
             },
             sheetState = updateSheetState,
             dragHandle = { AppBottomSheetDragHandle() },
         ) {
             UpdateCheckBottomSheetContent(
+                maxSheetHeight = maxUpdateSheetHeight,
                 isCheckingUpdate = isCheckingUpdate,
                 updateInfo = updateInfo,
                 updateCheckFinishedWithoutResult = updateCheckFinishedWithoutResult,
                 downloadProgress = downloadProgress,
+                changelogState = updateSheetChangelog,
+                showGithubExtraUi = BuildConfig.FLAVOR == "github",
+                usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
                 onCheckAgain = beginUpdateCheck,
                 onDownloadClick = downloadUpdate,
+                onSkipVersionClick = skipVersion@{
+                    val availableUpdate = updateInfo ?: return@skipVersion
+                    if (availableUpdate.remoteApkAssetUpdatedAt.isBlank()) return@skipVersion
+                    scope.launch {
+                        updatePrefs.writeGithubReleaseAck(
+                            fingerprint = availableUpdate.notificationDedupeKey(),
+                            installedVersionName = BuildConfig.VERSION_NAME,
+                        )
+                        updateInfo = null
+                        rememberUpdateState.showUpdate(null)
+                        showUpdateSheet = false
+                        updateSheetChangelog = ChangelogUiState.Hidden
+                    }
+                },
             )
         }
     }
@@ -1037,7 +1144,7 @@ fun SettingsRoute(
                 }
             }
 
-            if (BuildConfig.BUILD_TYPE == "devRelease") {
+            if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease") {
                 item(key = "dev_release_mocks") {
                     Column(modifier = Modifier.padding(top = 24.dp)) {
                         SettingsExpandableSection(
@@ -1077,7 +1184,17 @@ fun SettingsRoute(
             }
 
             item(key = "about") {
-                AboutSection(onOpenIntro = onOpenIntro)
+                AboutSection(
+                    onOpenIntro = onOpenIntro,
+                    onLaunchPlayReview = { onFlowFinished ->
+                        val hostActivity = context as? ComponentActivity
+                        if (hostActivity != null) {
+                            appReviewLauncher.tryLaunchInAppReview(hostActivity, onFlowFinished)
+                        } else {
+                            onFlowFinished()
+                        }
+                    },
+                )
             }
         }
     }

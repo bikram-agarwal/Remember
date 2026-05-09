@@ -26,9 +26,7 @@ class PlayStoreUpdateCheckerImpl
                     return null
                 }
             return when (updateInfo.updateAvailability()) {
-                UpdateAvailability.UPDATE_AVAILABLE,
-                UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS,
-                -> {
+                UpdateAvailability.UPDATE_AVAILABLE -> {
                     val flexibleAllowed = updateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
                     val immediateAllowed = updateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
                     if (!flexibleAllowed && !immediateAllowed) {
@@ -40,6 +38,22 @@ class PlayStoreUpdateCheckerImpl
                         versionName = semanticVersionNameFromPlayUpdateInfo(updateInfo),
                         downloadUrl = "",
                         releaseNotes = "",
+                        isPlayStoreUpdateInProgress = false,
+                    )
+                }
+                UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
+                    val flexibleAllowed = updateInfo.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE)
+                    val immediateAllowed = updateInfo.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)
+                    if (!flexibleAllowed && !immediateAllowed) {
+                        playInAppUpdateSession.clearPendingPlayUpdate()
+                        return null
+                    }
+                    playInAppUpdateSession.setPendingAppUpdateInfo(updateInfo)
+                    RememberUpdateInfo(
+                        versionName = semanticVersionNameFromPlayUpdateInfo(updateInfo),
+                        downloadUrl = "",
+                        releaseNotes = "",
+                        isPlayStoreUpdateInProgress = true,
                     )
                 }
                 UpdateAvailability.UPDATE_NOT_AVAILABLE,

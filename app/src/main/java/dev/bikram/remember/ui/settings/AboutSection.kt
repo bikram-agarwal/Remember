@@ -25,7 +25,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -62,7 +65,10 @@ import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun AboutSection(onOpenIntro: () -> Unit) {
+internal fun AboutSection(
+    onOpenIntro: () -> Unit,
+    onLaunchPlayReview: (onFlowFinished: () -> Unit) -> Unit,
+) {
     val context = LocalContext.current
     val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
     val shareDiagnostics = rememberDiagnosticsShareAction(context, diagnosticsChooserTitle)
@@ -86,7 +92,10 @@ internal fun AboutSection(onOpenIntro: () -> Unit) {
             },
         )
         Spacer(Modifier.height(8.dp))
-        AboutSettingsBlock(onOpenIntro = onOpenIntro)
+        AboutSettingsBlock(
+            onOpenIntro = onOpenIntro,
+            onLaunchPlayReview = onLaunchPlayReview,
+        )
     }
 }
 
@@ -124,7 +133,10 @@ private fun rememberDiagnosticsShareAction(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AboutSettingsBlock(onOpenIntro: () -> Unit) {
+private fun AboutSettingsBlock(
+    onOpenIntro: () -> Unit,
+    onLaunchPlayReview: (onFlowFinished: () -> Unit) -> Unit,
+) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
@@ -157,6 +169,7 @@ private fun AboutSettingsBlock(onOpenIntro: () -> Unit) {
     val iconShape = MaterialTheme.shapes.extraLarge
     val authorShape = MaterialTheme.shapes.large
     val aboutPillShape = MaterialTheme.shapes.extraExtraLarge
+    var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
 
     GroupedListColumn {
         GroupedListItem(position = GroupPosition.ONLY) {
@@ -327,10 +340,16 @@ private fun AboutSettingsBlock(onOpenIntro: () -> Unit) {
                                     .clip(aboutPillShape)
                                     .tapSoundCombinedClickable(
                                         onClick = {
-                                            runCatching {
-                                                context.startActivity(
-                                                    Intent(Intent.ACTION_VIEW, playStoreListingUrl.toUri()),
-                                                )
+                                            if (playStoreAboutUsesListingOnly) {
+                                                runCatching {
+                                                    context.startActivity(
+                                                        Intent(Intent.ACTION_VIEW, playStoreListingUrl.toUri()),
+                                                    )
+                                                }
+                                            } else {
+                                                onLaunchPlayReview {
+                                                    playStoreAboutUsesListingOnly = true
+                                                }
                                             }
                                         },
                                         onLongClick = { copyAboutLink(playStoreListingUrl) },

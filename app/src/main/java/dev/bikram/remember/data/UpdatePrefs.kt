@@ -3,6 +3,7 @@ package dev.bikram.remember.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
@@ -21,6 +22,14 @@ data class UpdatePreferencesState(
     val notifyOnNewUpdates: Boolean = false,
     val updateLastNotifiedDedupeKey: String = "",
     val saveUpdateApkToDownloads: Boolean = false,
+    val updateApkDownloadsCopySucceeded: Boolean = false,
+    val inAppReviewAutoNeverAskAgain: Boolean = false,
+    val playAutoReviewPromptedForLastUpdateTime: Long = 0L,
+)
+
+data class GithubReleaseAckState(
+    val fingerprint: String?,
+    val forInstalledVersion: String?,
 )
 
 private val Context.updateDataStore by preferencesDataStore(name = "update_prefs")
@@ -33,6 +42,12 @@ class UpdatePrefs(
         val NOTIFY_ON_NEW_UPDATES = booleanPreferencesKey("notify_on_new_updates")
         val UPDATE_LAST_NOTIFIED_DEDUPE_KEY = stringPreferencesKey("update_last_notified_dedupe_key")
         val SAVE_UPDATE_APK_TO_DOWNLOADS = booleanPreferencesKey("save_update_apk_to_downloads")
+        val UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED = booleanPreferencesKey("update_apk_downloads_copy_succeeded")
+        val GITHUB_ACK_FINGERPRINT = stringPreferencesKey("github_last_acknowledged_release_fingerprint")
+        val GITHUB_ACK_INSTALLED_VERSION = stringPreferencesKey("github_acknowledged_for_installed_version")
+        val IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN = booleanPreferencesKey("in_app_review_auto_never_ask_again")
+        val PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME =
+            longPreferencesKey("play_auto_review_prompted_for_last_update_time")
     }
 
     val state: Flow<UpdatePreferencesState> =
@@ -45,6 +60,10 @@ class UpdatePrefs(
                 notifyOnNewUpdates = prefs[Keys.NOTIFY_ON_NEW_UPDATES] ?: false,
                 updateLastNotifiedDedupeKey = prefs[Keys.UPDATE_LAST_NOTIFIED_DEDUPE_KEY].orEmpty(),
                 saveUpdateApkToDownloads = prefs[Keys.SAVE_UPDATE_APK_TO_DOWNLOADS] ?: false,
+                updateApkDownloadsCopySucceeded = prefs[Keys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED] ?: false,
+                inAppReviewAutoNeverAskAgain = prefs[Keys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN] ?: false,
+                playAutoReviewPromptedForLastUpdateTime =
+                    prefs[Keys.PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME] ?: 0L,
             )
         }
 
@@ -74,6 +93,49 @@ class UpdatePrefs(
     suspend fun setSaveUpdateApkToDownloads(enabled: Boolean) {
         context.updateDataStore.edit { prefs ->
             prefs[Keys.SAVE_UPDATE_APK_TO_DOWNLOADS] = enabled
+            prefs.remove(Keys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED)
+        }
+    }
+
+    suspend fun clearUpdateApkDownloadsCopySucceeded() {
+        context.updateDataStore.edit { prefs ->
+            prefs.remove(Keys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED)
+        }
+    }
+
+    suspend fun markUpdateApkDownloadsCopySucceeded() {
+        context.updateDataStore.edit { prefs ->
+            prefs[Keys.UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED] = true
+        }
+    }
+
+    suspend fun readGithubReleaseAck(): GithubReleaseAckState {
+        val prefs = context.updateDataStore.data.first()
+        return GithubReleaseAckState(
+            fingerprint = prefs[Keys.GITHUB_ACK_FINGERPRINT],
+            forInstalledVersion = prefs[Keys.GITHUB_ACK_INSTALLED_VERSION],
+        )
+    }
+
+    suspend fun writeGithubReleaseAck(
+        fingerprint: String,
+        installedVersionName: String,
+    ) {
+        context.updateDataStore.edit { prefs ->
+            prefs[Keys.GITHUB_ACK_FINGERPRINT] = fingerprint
+            prefs[Keys.GITHUB_ACK_INSTALLED_VERSION] = installedVersionName
+        }
+    }
+
+    suspend fun setInAppReviewAutoNeverAskAgain(neverAskAgain: Boolean) {
+        context.updateDataStore.edit { prefs ->
+            prefs[Keys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN] = neverAskAgain
+        }
+    }
+
+    suspend fun setPlayAutoReviewPromptedForLastUpdateTime(lastUpdateTimeMillis: Long) {
+        context.updateDataStore.edit { prefs ->
+            prefs[Keys.PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME] = lastUpdateTimeMillis
         }
     }
 }

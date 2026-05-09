@@ -133,6 +133,8 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
             buildConfigField("Boolean", "SHOW_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
         create("playstore") {
             dimension = "distribution"
@@ -140,6 +142,8 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
             buildConfigField("Boolean", "SHOW_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
     }
 
@@ -225,4 +229,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     add("playstoreImplementation", "com.google.android.play:app-update:2.1.0")
     add("playstoreImplementation", "com.google.android.play:app-update-ktx:2.1.0")
+    add("playstoreImplementation", "com.google.android.play:review:2.0.2")
+    add("playstoreImplementation", "com.google.android.play:review-ktx:2.0.2")
 }
