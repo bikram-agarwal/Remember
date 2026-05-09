@@ -762,6 +762,7 @@
     <string name="google_tasks_import_switch_account">Switch account</string>
     <string name="google_tasks_import_signed_in_unknown_email">your Google account</string>
     <string name="google_tasks_import_loading">Loading your Google Tasks…</string>
+    <string name="google_tasks_import_disconnecting">Disconnecting Google account…</string>
     <string name="google_tasks_import_empty_title">No tasks under %1$s</string>
     <string name="google_tasks_import_empty_title_no_email">No tasks in your Google account</string>
     <string name="google_tasks_import_empty_body">When you add tasks in Google Tasks they will show up here</string>
@@ -812,6 +813,10 @@
     <string name="google_tasks_import_source_switch_confirm_continue">Switch source</string>
     <string name="google_tasks_import_cancel_takeout_confirm_title">Cancel import?</string>
     <string name="google_tasks_import_cancel_takeout_confirm_body">None of these tasks are saved to Remember yet. Cancel and start again?</string>
+    <string name="google_tasks_import_leave_confirm_body">None of these tasks are saved to Remember yet. Leave this import?</string>
+    <string name="google_tasks_import_cancel_active_confirm_body">Import is still running. Cancel now? Any tasks already saved will stay in Remember.</string>
+    <string name="google_tasks_import_cancel_active_confirm_action">Cancel import</string>
+    <string name="google_tasks_import_keep_importing">Keep importing</string>
     <string name="google_tasks_import_source_chip_expand_cd">Show source options</string>
     <string name="google_tasks_import_source_chip_collapse_cd">Hide source options</string>
     <string name="google_tasks_import_group_collapse_cd">Collapse %1$s</string>

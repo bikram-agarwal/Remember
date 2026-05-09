@@ -214,9 +214,7 @@ dependencies {
     implementation(libs.documentfile)
     // Google account picker + OAuth token mint for Google Tasks import.
     // play-services-auth provides Identity Services (modern picker + Authorization API).
-    // androidx.credentials provides clearCredentialState() which is the only reliable way to
-    // force the modern picker to re-appear on "Switch account" without revoking the OAuth grant
-    // (revoking the grant breaks the freshly-issued tokens that come back after re-consent).
+    // androidx.credentials provides clearCredentialState() for explicit Disconnect cleanup.
     implementation(libs.play.services.auth)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)

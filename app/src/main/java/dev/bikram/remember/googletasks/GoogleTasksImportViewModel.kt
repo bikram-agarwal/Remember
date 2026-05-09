@@ -9,7 +9,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.remember.data.NoteRepository
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,8 +31,8 @@ import javax.inject.Inject
  *      - If it returns NeedsConsent we surface a [GoogleTasksImportEffect.LaunchConsent] which
  *        the screen forwards into a StartIntentSenderForResult launcher. The result returns to
  *        [onConsentResult] which calls authorize() again (or parses the result intent directly).
- *  - Loaded -> tap "Switch account" -> auth is forgotten, state resets, then the consent flow
- *    re-runs to surface the picker.
+ *  - Loaded -> tap "Switch account" -> the consent flow re-runs with SELECT_ACCOUNT. Existing
+ *    grants are kept so previously authorized accounts can be selected again without disconnecting.
  *
  * The ViewModel never touches Activity context; effects are surfaced as one-shot events.
  */
@@ -54,6 +57,8 @@ class GoogleTasksImportViewModel
         val effects: StateFlow<GoogleTasksImportEffect?> = _effects.asStateFlow()
 
         private var cachedToken: String? = null
+        private var importJob: Job? = null
+        private val activeImportMappings = mutableMapOf<String, Long>()
 
         init {
             viewModelScope.launch {
@@ -95,10 +100,10 @@ class GoogleTasksImportViewModel
         }
 
         /** User pressed "Connect Google account". Either silently fetches or launches the picker. */
-        fun connect() {
+        fun connect(forceAccountSelection: Boolean = false) {
             viewModelScope.launch {
                 _state.update { it.copy(isFetching = true, error = null) }
-                when (val auth = auth.authorize(appContext)) {
+                when (val auth = auth.authorize(appContext, forceAccountSelection)) {
                     is GoogleTasksAuthorizationResult.Success -> handleAuthSuccess(auth)
                     is GoogleTasksAuthorizationResult.NeedsConsent -> {
                         _state.update { it.copy(isFetching = false) }
@@ -142,7 +147,7 @@ class GoogleTasksImportViewModel
                     }
                 parsed
                     .onSuccess { importData ->
-                        val alreadyImported = refreshedImportedMap()
+                        val alreadyImported = refreshedImportedMap(GOOGLE_TASKS_TAKEOUT_SOURCE_KEY)
                         _state.update {
                             it.copy(
                                 selectedMethod = ImportMethod.ManualImport,
@@ -238,31 +243,24 @@ class GoogleTasksImportViewModel
             fetchEverything()
         }
 
-        /**
-         * "Switch account" - clear our app-side state, revoke the access token server-side if we
-         * have one, and clear Identity Services' sign-in cache. After this call we run [connect]
-         * which goes back through `authorize()`. Whether the picker actually appears depends on
-         * Google's local credential cache: if it's been cleared, the picker shows; if Google
-         * decides to silently reuse the last account, the user lands in that account. That's the
-         * documented limitation of the Identity Services Authorization API and the in-app banner
-         * tells the user to revoke at myaccount.google.com if they need a hard switch.
-         */
+        /** Switch account without revoking the current account's grant. */
         fun switchAccount() {
-            viewModelScope.launch {
-                _state.update { it.copy(isFetching = true, error = null) }
-                auth.forget(appContext, cachedToken)
-                prefs.reset()
-                cachedToken = null
-                _state.value = GoogleTasksImportUiState()
-                connect()
+            cachedToken = null
+            _state.update { current ->
+                GoogleTasksImportUiState(
+                    rememberedEmail = current.rememberedEmail,
+                    selectedMethod = ImportMethod.GrantPermission,
+                )
             }
+            connect(forceAccountSelection = true)
         }
 
         fun disconnect() {
             viewModelScope.launch {
-                _state.update { it.copy(isFetching = true, error = null) }
-                auth.forget(appContext, cachedToken)
-                prefs.reset()
+                val accountEmail = _state.value.accountEmail
+                _state.update { it.copy(isDisconnecting = true, error = null) }
+                auth.disconnect(appContext, accountEmail, cachedToken)
+                prefs.resetSource(accountEmail.sourceKey())
                 cachedToken = null
                 _state.value = GoogleTasksImportUiState()
             }
@@ -327,7 +325,7 @@ class GoogleTasksImportViewModel
                     }
                 }
             }
-            val alreadyImported = refreshedImportedMap()
+            val alreadyImported = refreshedImportedMap(_state.value.importedSourceKey())
             _state.update {
                 it.copy(
                     isFetching = false,
@@ -414,33 +412,83 @@ class GoogleTasksImportViewModel
             if (current.isImporting) return
             val toImport = current.visibleTasks().filter { it.task.id in current.selectedTaskIds }
             if (toImport.isEmpty()) return
-            viewModelScope.launch {
-                _state.update {
-                    it.copy(
-                        isImporting = true,
-                        importCompletedCount = 0,
-                        importTotalCount = toImport.size,
-                    )
-                }
-                val freshAlreadyImported = refreshedImportedMap()
-                val outcome =
-                    importer.import(
-                        tasks = toImport,
-                        mode = current.importMode,
-                        alreadyImported = freshAlreadyImported,
-                        overwrite = current.overwriteAlreadyImported,
-                    ) { completedCount ->
-                        _state.update { it.copy(importCompletedCount = completedCount) }
+            val newImportJob =
+                viewModelScope.launch {
+                    activeImportMappings.clear()
+                    _state.update {
+                        it.copy(
+                            isImporting = true,
+                            importCompletedCount = 0,
+                            importTotalCount = toImport.size,
+                        )
                     }
-                prefs.recordImported(outcome.googleTaskIdToRememberNoteId)
+                    try {
+                        val sourceKey = current.importedSourceKey()
+                        val freshAlreadyImported = refreshedImportedMap(sourceKey)
+                        val outcome =
+                            importer.import(
+                                tasks = toImport,
+                                mode = current.importMode,
+                                alreadyImported = freshAlreadyImported,
+                                overwrite = current.overwriteAlreadyImported,
+                                onImported = { googleTaskId, rememberNoteId ->
+                                    activeImportMappings[googleTaskId] = rememberNoteId
+                                },
+                            ) { completedCount ->
+                                _state.update { it.copy(importCompletedCount = completedCount) }
+                            }
+                        prefs.recordImported(sourceKey, outcome.googleTaskIdToRememberNoteId)
+                        _state.update {
+                            it.copy(
+                                isImporting = false,
+                                selectedTaskIds = emptySet(),
+                                alreadyImportedIds = it.alreadyImportedIds + outcome.googleTaskIdToRememberNoteId.keys,
+                                lastOutcome = outcome,
+                            )
+                        }
+                    } catch (cancellation: CancellationException) {
+                        val importedBeforeCancellation = activeImportMappings.toMap()
+                        if (importedBeforeCancellation.isNotEmpty()) {
+                            prefs.recordImported(_state.value.importedSourceKey(), importedBeforeCancellation)
+                        }
+                        _state.update {
+                            it.copy(
+                                isImporting = false,
+                                selectedTaskIds = it.selectedTaskIds - importedBeforeCancellation.keys,
+                                alreadyImportedIds = it.alreadyImportedIds + importedBeforeCancellation.keys,
+                            )
+                        }
+                    } finally {
+                        activeImportMappings.clear()
+                        importJob = null
+                    }
+                }
+            importJob = newImportJob
+        }
+
+        fun cancelImport(onCancelled: () -> Unit) {
+            val jobToCancel = importJob
+            if (jobToCancel == null) {
+                onCancelled()
+                return
+            }
+            viewModelScope.launch {
+                val importedBeforeCancel = activeImportMappings.toMap()
+                jobToCancel.cancelAndJoin()
+                if (importedBeforeCancel.isNotEmpty()) {
+                    prefs.recordImported(_state.value.importedSourceKey(), importedBeforeCancel)
+                }
+                activeImportMappings.clear()
+                importJob = null
                 _state.update {
                     it.copy(
                         isImporting = false,
-                        selectedTaskIds = emptySet(),
-                        alreadyImportedIds = it.alreadyImportedIds + outcome.googleTaskIdToRememberNoteId.keys,
-                        lastOutcome = outcome,
+                        importCompletedCount = 0,
+                        importTotalCount = 0,
+                        alreadyImportedIds = it.alreadyImportedIds + importedBeforeCancel.keys,
                     )
                 }
+                onCancelled()
             }
         }
 
@@ -454,8 +502,8 @@ class GoogleTasksImportViewModel
             }
         }
 
-        private suspend fun refreshedImportedMap(): Map<String, Long> {
-            val importedMap = prefs.importedMap()
+        private suspend fun refreshedImportedMap(sourceKey: String): Map<String, Long> {
+            val importedMap = prefs.importedMap(sourceKey)
             if (importedMap.isEmpty()) {
                 return emptyMap()
             }
@@ -465,7 +513,7 @@ class GoogleTasksImportViewModel
                     .filterTo(mutableSetOf()) { noteId ->
                         noteRepository.get(noteId) != null
                     }
-            prefs.pruneMissing(existingNoteIds)
+            prefs.pruneMissing(sourceKey, existingNoteIds)
             return importedMap.filterValues { noteId -> noteId in existingNoteIds }
         }
     }
@@ -481,6 +529,7 @@ data class GoogleTasksImportUiState(
      */
     val connected: Boolean = false,
     val isFetching: Boolean = false,
+    val isDisconnecting: Boolean = false,
     val isImporting: Boolean = false,
     val importCompletedCount: Int = 0,
     val importTotalCount: Int = 0,
@@ -514,9 +563,27 @@ data class GoogleTasksImportUiState(
         }
     }
 
-    val isLoaded: Boolean get() = !isFetching && connected && taskLists.isNotEmpty()
-    val isEmpty: Boolean get() = !isFetching && connected && taskLists.isEmpty()
+    val isLoaded: Boolean get() = !isFetching && !isDisconnecting && connected && taskLists.isNotEmpty()
+    val isEmpty: Boolean get() = !isFetching && !isDisconnecting && connected && taskLists.isEmpty()
+
+    fun importedSourceKey(): String =
+        if (selectedMethod == ImportMethod.ManualImport) {
+            GOOGLE_TASKS_TAKEOUT_SOURCE_KEY
+        } else {
+            accountEmail.sourceKey()
+        }
 }
+
+private const val GOOGLE_TASKS_TAKEOUT_SOURCE_KEY = "manual:takeout"
+
+private fun String?.sourceKey(): String =
+    "google:" + (
+        this
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
+            ?: "unknown"
+    )
 
 sealed class ImportError {
     data object Network : ImportError()

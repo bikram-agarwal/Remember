@@ -12,6 +12,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +36,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -77,6 +80,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberCheckbox
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
@@ -117,6 +121,24 @@ fun GoogleTasksImportRoute(
     val effect by vm.effects.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val uriHandler = LocalUriHandler.current
+    var pendingExitConfirmation by rememberSaveable { mutableStateOf<ImportExitConfirmation?>(null) }
+
+    val requestBack = {
+        pendingExitConfirmation =
+            when {
+                state.isImporting -> ImportExitConfirmation.CancelActiveImport
+                state.isLoaded -> ImportExitConfirmation.LeaveLoadedImport
+                else -> null
+            }
+        if (pendingExitConfirmation == null) {
+            onBack()
+        }
+    }
+
+    RememberPredictiveBackHandler(
+        enabled = state.isImporting || state.isLoaded,
+        onBack = requestBack,
+    )
 
     val consentLauncher =
         rememberLauncherForActivityResult(
@@ -208,7 +230,7 @@ fun GoogleTasksImportRoute(
                                 .padding(start = 4.dp)
                                 .size(40.dp)
                                 .clip(MaterialTheme.shapes.extraExtraLarge)
-                                .tapSoundClickable(onClick = onBack),
+                                .tapSoundClickable(onClick = requestBack),
                         contentAlignment = Alignment.Center,
                     ) {
                         RememberMaterialRoundedSymbol(
@@ -259,6 +281,8 @@ fun GoogleTasksImportRoute(
             }
             Box(modifier = Modifier.weight(1f)) {
                 when {
+                    state.isDisconnecting ->
+                        LoadingPanel(messageRes = R.string.google_tasks_import_disconnecting)
                     state.isLoaded ->
                         LoadedPanel(
                             state = state,
@@ -310,6 +334,72 @@ fun GoogleTasksImportRoute(
             }
         }
     }
+
+    pendingExitConfirmation?.let { confirmation ->
+        ImportExitConfirmationDialog(
+            confirmation = confirmation,
+            onConfirm = {
+                val resolvedConfirmation = confirmation
+                pendingExitConfirmation = null
+                if (resolvedConfirmation == ImportExitConfirmation.CancelActiveImport) {
+                    vm.cancelImport(onCancelled = onBack)
+                } else {
+                    onBack()
+                }
+            },
+            onDismiss = { pendingExitConfirmation = null },
+        )
+    }
+}
+
+private enum class ImportExitConfirmation {
+    LeaveLoadedImport,
+    CancelActiveImport,
+}
+
+@Composable
+private fun ImportExitConfirmationDialog(
+    confirmation: ImportExitConfirmation,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(stringResource(R.string.google_tasks_import_cancel_takeout_confirm_title))
+        },
+        text = {
+            Text(
+                when (confirmation) {
+                    ImportExitConfirmation.LeaveLoadedImport ->
+                        stringResource(R.string.google_tasks_import_leave_confirm_body)
+                    ImportExitConfirmation.CancelActiveImport ->
+                        stringResource(R.string.google_tasks_import_cancel_active_confirm_body)
+                },
+            )
+        },
+        confirmButton = {
+            RememberTextButton(onClick = onConfirm) {
+                Text(
+                    when (confirmation) {
+                        ImportExitConfirmation.LeaveLoadedImport -> stringResource(R.string.common_yes)
+                        ImportExitConfirmation.CancelActiveImport ->
+                            stringResource(R.string.google_tasks_import_cancel_active_confirm_action)
+                    },
+                )
+            }
+        },
+        dismissButton = {
+            RememberTextButton(onClick = onDismiss) {
+                Text(
+                    when (confirmation) {
+                        ImportExitConfirmation.LeaveLoadedImport -> stringResource(R.string.common_no)
+                        ImportExitConfirmation.CancelActiveImport -> stringResource(R.string.google_tasks_import_keep_importing)
+                    },
+                )
+            }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -378,9 +468,8 @@ private fun SignedOutPanel(
                 Text(stringResource(R.string.google_tasks_import_continue_as, rememberedEmail))
             }
             Spacer(Modifier.height(8.dp))
-            // Routes through switchAccount(), not connect(), so the OAuth grant gets revoked
-            // before the next authorize() runs - otherwise Identity Services silently returns
-            // the cached account and the picker never appears.
+            // Routes through switchAccount(), not connect(), so Identity Services is explicitly
+            // asked to show the account selector without disconnecting the existing account.
             RememberOutlinedButton(onClick = onSwitchAccount, modifier = Modifier.fillMaxWidth()) {
                 Text(stringResource(R.string.google_tasks_import_pick_other_account))
             }
@@ -469,7 +558,9 @@ private fun TakeoutImportPanel(
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun LoadingPanel() {
+private fun LoadingPanel(
+    messageRes: Int = R.string.google_tasks_import_loading,
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(24.dp),
         verticalArrangement = Arrangement.Center,
@@ -481,7 +572,7 @@ private fun LoadingPanel() {
         )
         Spacer(Modifier.height(18.dp))
         Text(
-            stringResource(R.string.google_tasks_import_loading),
+            stringResource(messageRes),
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface,
         )
@@ -559,12 +650,25 @@ private fun LoadedPanel(
     var sourceSheetExpanded by rememberSaveable { mutableStateOf(false) }
     var pendingSourceSwitch by rememberSaveable { mutableStateOf<PendingSourceSwitch?>(null) }
 
-    val attemptSwitch: (PendingSourceSwitch) -> Unit = { switch ->
+    LaunchedEffect(state.isImporting) {
+        if (state.isImporting) {
+            sourceSheetExpanded = false
+        }
+    }
+
+    val attemptSwitch: (PendingSourceSwitch) -> Unit = attemptSwitch@{ switch ->
+        if (state.isImporting) return@attemptSwitch
+        val exitsLoadedGoogle =
+            state.selectedMethod == ImportMethod.GrantPermission &&
+                (
+                    switch == PendingSourceSwitch.SwitchGoogleAccount ||
+                        switch == PendingSourceSwitch.SwitchToTakeout ||
+                        switch == PendingSourceSwitch.Disconnect
+                )
         val exitsLoadedTakeout =
             state.selectedMethod == ImportMethod.ManualImport &&
-                state.tasks.isNotEmpty() &&
                 (switch == PendingSourceSwitch.SwitchToGoogle || switch == PendingSourceSwitch.CancelTakeout)
-        if (totalSelected > 0 || exitsLoadedTakeout) {
+        if (totalSelected > 0 || exitsLoadedGoogle || exitsLoadedTakeout) {
             pendingSourceSwitch = switch
         } else {
             sourceSheetExpanded = false
@@ -675,6 +779,18 @@ private fun LoadedPanel(
                 onImport = onImport,
                 onSourceToggle = { sourceSheetExpanded = !sourceSheetExpanded },
                 onImportingDone = onImportingDone,
+            )
+        }
+
+        if (state.isImporting) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) {},
             )
         }
 
@@ -1587,12 +1703,21 @@ private fun ImportProgressInline(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
-            LinearWavyProgressIndicator(
-                progress = { animatedProgress },
-                modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.primary,
-                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f),
-            )
+            if (completed) {
+                LinearProgressIndicator(
+                    progress = { 1f },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f),
+                )
+            } else {
+                LinearWavyProgressIndicator(
+                    progress = { animatedProgress },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f),
+                )
+            }
             if (completed) {
                 RememberButton(
                     onClick = onDone,
@@ -1606,8 +1731,8 @@ private fun ImportProgressInline(
 }
 
 /**
- * Confirmation shown when a user taps a source action with a non-empty selection.
- * Continuing clears the current task selection/source before anything is saved to Remember.
+ * Confirmation shown before a loaded source is swapped, disconnected, or cleared.
+ * Continuing clears the current source before anything is saved to Remember.
  */
 @Composable
 private fun SourceSwitchConfirmation(
@@ -1620,25 +1745,30 @@ private fun SourceSwitchConfirmation(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                when (pendingSourceSwitch) {
-                    PendingSourceSwitch.SwitchToGoogle,
-                    PendingSourceSwitch.CancelTakeout,
-                    -> stringResource(R.string.google_tasks_import_cancel_takeout_confirm_title)
-                    else ->
-                        pluralStringResource(
-                            R.plurals.google_tasks_import_source_switch_confirm_title,
-                            selectedCount,
-                            selectedCount,
-                        )
+                if (
+                    selectedCount > 0 &&
+                    pendingSourceSwitch != PendingSourceSwitch.SwitchToGoogle &&
+                    pendingSourceSwitch != PendingSourceSwitch.CancelTakeout
+                ) {
+                    pluralStringResource(
+                        R.plurals.google_tasks_import_source_switch_confirm_title,
+                        selectedCount,
+                        selectedCount,
+                    )
+                } else {
+                    stringResource(R.string.google_tasks_import_cancel_takeout_confirm_title)
                 },
             )
         },
         text = {
             Text(
-                when (pendingSourceSwitch) {
-                    PendingSourceSwitch.CancelTakeout ->
+                when {
+                    pendingSourceSwitch == PendingSourceSwitch.CancelTakeout ->
                         stringResource(R.string.google_tasks_import_cancel_takeout_confirm_body)
-                    else -> stringResource(R.string.google_tasks_import_source_switch_confirm_body)
+                    selectedCount > 0 ->
+                        stringResource(R.string.google_tasks_import_source_switch_confirm_body)
+                    else ->
+                        stringResource(R.string.google_tasks_import_leave_confirm_body)
                 },
             )
         },
@@ -1649,7 +1779,12 @@ private fun SourceSwitchConfirmation(
                         PendingSourceSwitch.SwitchToGoogle,
                         PendingSourceSwitch.CancelTakeout,
                         -> stringResource(R.string.common_yes)
-                        else -> stringResource(R.string.google_tasks_import_source_switch_confirm_continue)
+                        PendingSourceSwitch.SwitchGoogleAccount ->
+                            stringResource(R.string.google_tasks_import_source_action_switch_account)
+                        PendingSourceSwitch.SwitchToTakeout ->
+                            stringResource(R.string.google_tasks_import_source_action_use_takeout)
+                        PendingSourceSwitch.Disconnect ->
+                            stringResource(R.string.google_tasks_import_source_action_disconnect)
                     },
                 )
             }

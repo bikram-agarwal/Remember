@@ -46,6 +46,7 @@ class GoogleTasksImporter(
         mode: ImportMode,
         alreadyImported: Map<String, Long>,
         overwrite: Boolean,
+        onImported: (googleTaskId: String, rememberNoteId: Long) -> Unit,
         onProgress: (completedCount: Int) -> Unit = {},
     ): ImportOutcome {
         val createdPairs = mutableMapOf<String, Long>()
@@ -70,6 +71,7 @@ class GoogleTasksImporter(
                     val noteId = upsertOneTask(task, existingNoteId.takeIf { overwrite })
                     if (noteId != null) {
                         createdPairs[task.task.id] = noteId
+                        onImported(task.task.id, noteId)
                         written++
                     }
                     completedCount++
@@ -111,7 +113,10 @@ class GoogleTasksImporter(
                             items = itemTexts.filter { it.isNotBlank() },
                             options = NoteOptions(tags = listOf(taskListTitle)),
                         )
-                    group.forEach { createdPairs[it.task.id] = newId }
+                    group.forEach {
+                        createdPairs[it.task.id] = newId
+                        onImported(it.task.id, newId)
+                    }
                     written += group.size
                     completedCount += group.size
                     onProgress(completedCount)
@@ -155,7 +160,10 @@ class GoogleTasksImporter(
                             colorIndex = 0,
                             options = NoteOptions(tags = listOf(title)),
                         )
-                    group.forEach { createdPairs[it.task.id] = newId }
+                    group.forEach {
+                        createdPairs[it.task.id] = newId
+                        onImported(it.task.id, newId)
+                    }
                     written += group.size
                     completedCount += group.size
                     onProgress(completedCount)

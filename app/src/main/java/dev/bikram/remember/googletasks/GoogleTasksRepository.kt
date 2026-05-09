@@ -51,8 +51,8 @@ class GoogleTasksRepository(
                         GoogleTasksFetchResult.Success(second.value, refresh.accessToken)
                     // A double-401 here is rare and usually a transient post-grant propagation
                     // gap. Surface it as AuthError; the screen shows a message and the user
-                    // can retry. We deliberately do NOT forget()+re-authorize here because
-                    // that would tear down a freshly-established grant and re-open the picker
+                    // can retry. We deliberately do NOT disconnect()+re-authorize here because
+                    // that would tear down a freshly established grant and re-open the picker
                     // in a loop right after a successful sign-in.
                     else -> second.toFetchFailure()
                 }
