@@ -1,15 +1,12 @@
 package dev.bikram.remember.reminders
 
-import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.R
@@ -138,13 +135,7 @@ class ActionReceiver : BroadcastReceiver() {
     private fun callIntent(
         context: Context,
         number: String,
-    ): Intent {
-        val granted =
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) ==
-                PackageManager.PERMISSION_GRANTED
-        val action = if (granted) Intent.ACTION_CALL else Intent.ACTION_DIAL
-        return Intent(action, "tel:$number".toUri())
-    }
+    ): Intent = Intent(Intent.ACTION_DIAL, "tel:$number".toUri())
 
     private fun normalizeUrl(s: String): String = if (s.startsWith("http://") || s.startsWith("https://")) s else "https://$s"
 
