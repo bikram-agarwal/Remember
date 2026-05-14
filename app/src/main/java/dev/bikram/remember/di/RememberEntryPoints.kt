@@ -12,11 +12,14 @@ import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.UpdatePrefs
+import dev.bikram.remember.update.AppReviewLauncher
 import dev.bikram.remember.update.PlayInAppUpdateProgressController
 import dev.bikram.remember.update.PlayInAppUpdateStarter
 import dev.bikram.remember.update.PlayStoreUpdateChecker
+import dev.bikram.remember.update.PlayUpdateSessionHandle
 import dev.bikram.remember.update.RememberUpdateChecker
 import dev.bikram.remember.update.RememberUpdateState
+import dev.bikram.remember.update.UpdateAvailableNotifier
 import dev.bikram.remember.update.UpdateCheckWorkScheduler
 import dev.bikram.remember.widget.NotesWidgetUpdater
 
@@ -49,9 +52,15 @@ interface SettingsDependenciesEntryPoint {
 
     fun playInAppUpdateProgressController(): PlayInAppUpdateProgressController
 
+    fun playUpdateSessionHandle(): PlayUpdateSessionHandle
+
     fun rememberUpdateState(): RememberUpdateState
 
+    fun updateAvailableNotifier(): UpdateAvailableNotifier
+
     fun updateCheckWorkScheduler(): UpdateCheckWorkScheduler
+
+    fun appReviewLauncher(): AppReviewLauncher
 }
 
 @EntryPoint

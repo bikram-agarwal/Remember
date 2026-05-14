@@ -1,14 +1,12 @@
 # Remember
 
-<img alt="Remember: Notes, lists, reminders - done right." src="./fastlane/metadata/android/en-US/images/featureGraphic.png" />
+<img alt="Remember: Notes, tasks, reminders - done right." src="./fastlane/metadata/android/en-US/images/featureGraphic.png" />
 
 **Never lose an important reminder to an accidental swipe.**
 
 You're clearing your notification shade — swiping away emails, messages, news — and a reminder goes with them. You didn't mean to. Now you're not sure what it said, just that it was probably important. That brief flash of *"wait, what was that?"* is the problem Remember solves.
 
 If a reminder notification gets swiped away without being marked `Done`, Remember brings it back. Not as nagging — just a quiet signal that something is still waiting. Mark it done and it's gone for good.
-
-Get it on [**Google Play**](https://play.google.com/store/apps/details?id=dev.bikram.remember) or [**GitHub**](https://github.com/bikram-agarwal/Remember/releases/latest)
 
 ---
 
@@ -50,8 +48,7 @@ Notes are stored on-device. No Remember servers. Manual backup and restore let y
 
 ## Download
 
-[**Google Play**](https://play.google.com/store/apps/details?id=dev.bikram.remember) · [**APK (Releases)**](https://github.com/bikram-agarwal/Remember/releases)
-
+Coming soon
 ---
 
-**Links:** [Project site](https://bikram-agarwal.github.io/Remember/) · [Privacy policy](https://bikram-agarwal.github.io/Remember/privacy.html)
+**Links:** [Project site](https://bikram-agarwal.github.io/remember/) · [Privacy policy](https://bikram-agarwal.github.io/remember/privacy)

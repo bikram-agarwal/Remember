@@ -536,10 +536,6 @@ class ReminderReceiver : BroadcastReceiver() {
                             addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                             putExtra(SnoozeActivity.EXTRA_NOTE_ID, noteId)
                         }
-                    // Always ACTION_DIAL even when CALL_PHONE is granted. ACTION_CALL from a
-                    // PendingIntent is fragile (some OEMs deny it without an active activity)
-                    // and dropping the user into the dialer with the number pre-filled is the
-                    // more predictable behavior anyway.
                     ActionType.CALL_NUMBER -> Intent(Intent.ACTION_DIAL, "tel:${action.details}".toUri())
                     ActionType.SEND_MESSAGE -> Intent(Intent.ACTION_SENDTO, "smsto:${action.details}".toUri())
                     ActionType.SEND_EMAIL -> Intent(Intent.ACTION_SENDTO, "mailto:${action.details}".toUri())

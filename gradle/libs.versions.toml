@@ -3,7 +3,7 @@ java = "21"
 agp = "9.2.1"
 kotlin = "2.3.21"
 ksp = "2.3.7"
-composeBom = "2026.04.01"
+composeBom = "2026.05.00"
 composeMaterial3Expressive = "1.5.0-alpha18"
 coreKtx = "1.18.0"
 lifecycle = "2.10.0"
@@ -45,10 +45,9 @@ androidx-ui = { group = "androidx.compose.ui", name = "ui" }
 androidx-ui-graphics = { group = "androidx.compose.ui", name = "ui-graphics" }
 androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
-# Explicit Expressive build of material3, overriding BOM (matches filepipe).
+# Explicit Expressive build of material3, overriding BOM
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "composeMaterial3Expressive" }
 androidx-material3-adaptive-navigation-suite = { group = "androidx.compose.material3", name = "material3-adaptive-navigation-suite", version.ref = "composeMaterial3Expressive" }
-androidx-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigation" }
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }

@@ -28,6 +28,7 @@ class GoogleTasksImportPrefs(
     private object Keys {
         val LAST_ACCOUNT_EMAIL = stringPreferencesKey("last_account_email")
         val IMPORTED_MAP_JSON = stringPreferencesKey("imported_map_json")
+        val IMPORTED_MAPS_BY_SOURCE_JSON = stringPreferencesKey("imported_maps_by_source_json")
     }
 
     private val json: Json = Json { ignoreUnknownKeys = true }
@@ -35,6 +36,11 @@ class GoogleTasksImportPrefs(
     @Serializable
     private data class ImportedMap(
         val map: Map<String, Long>,
+    )
+
+    @Serializable
+    private data class ImportedMapsBySource(
+        val maps: Map<String, Map<String, Long>>,
     )
 
     val lastAccountEmail: Flow<String?> =
@@ -53,7 +59,11 @@ class GoogleTasksImportPrefs(
     }
 
     /** Returns the full map of googleTaskId -> rememberNoteId. Empty when nothing is imported. */
-    suspend fun importedMap(): Map<String, Long> {
+    suspend fun importedMap(sourceKey: String): Map<String, Long> {
+        val mapsBySource = importedMapsBySource()
+        if (sourceKey in mapsBySource) {
+            return mapsBySource[sourceKey].orEmpty()
+        }
         val raw =
             context.googleTasksImportDataStore.data
                 .first()[Keys.IMPORTED_MAP_JSON]
@@ -67,46 +77,76 @@ class GoogleTasksImportPrefs(
      * Replace the entries for [pairs] in the persisted map. Existing entries for other Google
      * task ids are preserved.
      */
-    suspend fun recordImported(pairs: Map<String, Long>) {
+    suspend fun recordImported(
+        sourceKey: String,
+        pairs: Map<String, Long>,
+    ) {
         if (pairs.isEmpty()) return
         context.googleTasksImportDataStore.edit { prefs ->
-            val current = prefs[Keys.IMPORTED_MAP_JSON].orEmpty()
-            val existing =
-                if (current.isBlank()) {
-                    emptyMap()
-                } else {
-                    runCatching { json.decodeFromString(ImportedMap.serializer(), current).map }
-                        .getOrDefault(emptyMap())
-                }
+            val existingMaps = decodeMapsBySource(prefs[Keys.IMPORTED_MAPS_BY_SOURCE_JSON].orEmpty())
+            val existing = existingMaps[sourceKey].orEmpty()
             val merged = existing.toMutableMap().apply { putAll(pairs) }
-            prefs[Keys.IMPORTED_MAP_JSON] =
+            val nextMaps = existingMaps.toMutableMap().apply { put(sourceKey, merged) }
+            prefs[Keys.IMPORTED_MAPS_BY_SOURCE_JSON] =
                 json.encodeToString(
-                    ImportedMap.serializer(),
-                    ImportedMap(merged),
+                    ImportedMapsBySource.serializer(),
+                    ImportedMapsBySource(nextMaps),
                 )
+            prefs.remove(Keys.IMPORTED_MAP_JSON)
         }
     }
 
     /** Drop entries whose values are not in [stillExistingNoteIds]. Used as a best-effort sweep. */
-    suspend fun pruneMissing(stillExistingNoteIds: Set<Long>) {
-        val current = importedMap()
+    suspend fun pruneMissing(
+        sourceKey: String,
+        stillExistingNoteIds: Set<Long>,
+    ) {
+        val current = importedMap(sourceKey)
         if (current.isEmpty()) return
         val pruned = current.filterValues { it in stillExistingNoteIds }
         if (pruned.size == current.size) return
         context.googleTasksImportDataStore.edit { prefs ->
-            prefs[Keys.IMPORTED_MAP_JSON] =
+            val existingMaps = decodeMapsBySource(prefs[Keys.IMPORTED_MAPS_BY_SOURCE_JSON].orEmpty())
+            val nextMaps = existingMaps.toMutableMap().apply { put(sourceKey, pruned) }
+            prefs[Keys.IMPORTED_MAPS_BY_SOURCE_JSON] =
                 json.encodeToString(
-                    ImportedMap.serializer(),
-                    ImportedMap(pruned),
+                    ImportedMapsBySource.serializer(),
+                    ImportedMapsBySource(nextMaps),
                 )
-        }
-    }
-
-    /** Forget the picked account and clear the imported-id map. Used on user "switch account". */
-    suspend fun reset() {
-        context.googleTasksImportDataStore.edit { prefs ->
-            prefs.remove(Keys.LAST_ACCOUNT_EMAIL)
             prefs.remove(Keys.IMPORTED_MAP_JSON)
         }
     }
+
+    /** Forget the visible source only. Used when user disconnects or clears a Takeout import. */
+    suspend fun resetSource(sourceKey: String?) {
+        context.googleTasksImportDataStore.edit { prefs ->
+            prefs.remove(Keys.LAST_ACCOUNT_EMAIL)
+            prefs.remove(Keys.IMPORTED_MAP_JSON)
+            val key = sourceKey?.takeIf { it.isNotBlank() } ?: return@edit
+            val existingMaps = decodeMapsBySource(prefs[Keys.IMPORTED_MAPS_BY_SOURCE_JSON].orEmpty())
+            if (key in existingMaps) {
+                val nextMaps = existingMaps.toMutableMap().apply { remove(key) }
+                prefs[Keys.IMPORTED_MAPS_BY_SOURCE_JSON] =
+                    json.encodeToString(
+                        ImportedMapsBySource.serializer(),
+                        ImportedMapsBySource(nextMaps),
+                    )
+            }
+        }
+    }
+
+    private suspend fun importedMapsBySource(): Map<String, Map<String, Long>> =
+        decodeMapsBySource(
+            context.googleTasksImportDataStore.data
+                .first()[Keys.IMPORTED_MAPS_BY_SOURCE_JSON]
+                .orEmpty(),
+        )
+
+    private fun decodeMapsBySource(raw: String): Map<String, Map<String, Long>> =
+        if (raw.isBlank()) {
+            emptyMap()
+        } else {
+            runCatching { json.decodeFromString(ImportedMapsBySource.serializer(), raw).maps }
+                .getOrDefault(emptyMap())
+        }
 }

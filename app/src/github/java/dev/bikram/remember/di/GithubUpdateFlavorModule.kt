@@ -4,6 +4,8 @@ import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
+import dev.bikram.remember.update.AppReviewLauncher
+import dev.bikram.remember.update.GithubAppReviewLauncher
 import dev.bikram.remember.update.GithubPlayInAppUpdateProgressController
 import dev.bikram.remember.update.GithubPlayInAppUpdateStarter
 import dev.bikram.remember.update.GithubPlayStoreUpdateChecker
@@ -34,4 +36,8 @@ abstract class GithubUpdateFlavorModule {
     @Binds
     @Singleton
     abstract fun bindPlayStoreUpdateChecker(checker: GithubPlayStoreUpdateChecker): PlayStoreUpdateChecker
+
+    @Binds
+    @Singleton
+    abstract fun bindAppReviewLauncher(launcher: GithubAppReviewLauncher): AppReviewLauncher
 }

@@ -739,9 +739,6 @@ internal fun CalendarPickerDialog(
     }
 }
 
-/**
- * Same structure as FilePipe `ScheduleTimePickerDialog`; uses the app [MaterialTheme] (no nested palette).
- */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun ReminderTimePickerDialog(

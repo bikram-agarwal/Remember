@@ -34,19 +34,24 @@ import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.OnboardingState
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.data.TagRepository
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
+import dev.bikram.remember.data.UpdatePreferencesState
+import dev.bikram.remember.data.UpdatePrefs
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.di.LaunchAction
+import dev.bikram.remember.ui.InAppRatingAutoPromptHost
 import dev.bikram.remember.ui.components.PlayStoreGlobalUpdateBanner
 import dev.bikram.remember.ui.components.SwipeDismissableUpdatePromoBanner
 import dev.bikram.remember.ui.lock.LockScreen
 import dev.bikram.remember.ui.nav.RememberNavGraph
 import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
+import dev.bikram.remember.update.AppReviewLauncher
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
 import dev.bikram.remember.update.PlayInAppUpdateProgressController
 import dev.bikram.remember.update.RememberUpdateState
@@ -69,7 +74,11 @@ class MainActivity : FragmentActivity() {
 
     @Inject lateinit var lockPrefs: LockPrefs
 
+    @Inject lateinit var updatePrefs: UpdatePrefs
+
     @Inject lateinit var rememberUpdateState: RememberUpdateState
+
+    @Inject lateinit var appReviewLauncher: AppReviewLauncher
 
     @Inject lateinit var playInAppUpdateProgressController: PlayInAppUpdateProgressController
 
@@ -85,6 +94,7 @@ class MainActivity : FragmentActivity() {
         const val ACTION_SHORTCUT_NEW_LIST = "dev.bikram.remember.action.SHORTCUT_NEW_LIST"
         const val EXTRA_OPEN_NOTE_ID = "open_note_id"
         const val EXTRA_OPEN_NOTE_EXIT_ON_BACK = "open_note_exit_on_back"
+        const val EXTRA_OPEN_SETTINGS_UPDATES = "extra_open_settings_updates"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -129,7 +139,9 @@ class MainActivity : FragmentActivity() {
                         onboardingPrefs = onboardingPrefs,
                         interactionPrefs = interactionPrefs,
                         lockPrefs = lockPrefs,
+                        updatePrefs = updatePrefs,
                         rememberUpdateState = rememberUpdateState,
+                        appReviewLauncher = appReviewLauncher,
                         playInAppUpdateProgressController = playInAppUpdateProgressController,
                         appScope = applicationScope,
                         launchFlow = pendingLaunch,
@@ -148,6 +160,11 @@ class MainActivity : FragmentActivity() {
 
     private fun handleIntent(intent: Intent?) {
         intent ?: return
+        if (intent.getBooleanExtra(EXTRA_OPEN_SETTINGS_UPDATES, false)) {
+            pendingLaunch.value = LaunchAction.OpenSettingsUpdates
+            intent.removeExtra(EXTRA_OPEN_SETTINGS_UPDATES)
+            return
+        }
         when (intent.action) {
             Intent.ACTION_SEND -> {
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
@@ -184,7 +201,9 @@ private fun AppRoot(
     onboardingPrefs: OnboardingPrefs,
     interactionPrefs: InteractionPrefs,
     lockPrefs: LockPrefs,
+    updatePrefs: UpdatePrefs,
     rememberUpdateState: RememberUpdateState,
+    appReviewLauncher: AppReviewLauncher,
     playInAppUpdateProgressController: PlayInAppUpdateProgressController,
     appScope: CoroutineScope,
     launchFlow: MutableStateFlow<LaunchAction?>,
@@ -192,6 +211,12 @@ private fun AppRoot(
 ) {
     val lockState by lockPrefs.state.collectAsStateWithLifecycle(
         initialValue = null,
+    )
+    val onboardingState by onboardingPrefs.state.collectAsStateWithLifecycle(
+        initialValue = OnboardingState(),
+    )
+    val updatePreferencesState by updatePrefs.state.collectAsStateWithLifecycle(
+        initialValue = UpdatePreferencesState(),
     )
     val unlocked by appUnlocked.collectAsStateWithLifecycle(initialValue = false)
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
@@ -224,6 +249,13 @@ private fun AppRoot(
             verify = { pin -> lockPrefs.verify(pin) },
         )
     } else {
+        InAppRatingAutoPromptHost(
+            onboardingState = onboardingState,
+            updateState = updatePreferencesState,
+            activity = LocalContext.current as FragmentActivity,
+            updatePrefs = updatePrefs,
+            appReviewLauncher = appReviewLauncher,
+        )
         androidx.compose.runtime.CompositionLocalProvider(
             dev.bikram.remember.ui.theme.LocalSnackbarHostState provides snackbarHostState,
         ) {

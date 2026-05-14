@@ -46,3 +46,15 @@ class GithubPlayStoreUpdateChecker
     constructor() : PlayStoreUpdateChecker {
         override suspend fun checkForUpdate(): RememberUpdateInfo? = null
     }
+
+@Singleton
+class GithubAppReviewLauncher
+    @Inject
+    constructor() : AppReviewLauncher {
+        override fun tryLaunchInAppReview(
+            activity: ComponentActivity,
+            onFlowFinished: () -> Unit,
+        ) {
+            onFlowFinished()
+        }
+    }

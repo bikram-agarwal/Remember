@@ -11,4 +11,6 @@ sealed interface LaunchAction {
         val id: Long,
         val exitOnBack: Boolean = false,
     ) : LaunchAction
+
+    data object OpenSettingsUpdates : LaunchAction
 }

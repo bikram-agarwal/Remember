@@ -133,6 +133,8 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
             buildConfigField("Boolean", "SHOW_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
         create("playstore") {
             dimension = "distribution"
@@ -140,6 +142,8 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
             buildConfigField("Boolean", "SHOW_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
     }
 
@@ -210,9 +214,7 @@ dependencies {
     implementation(libs.documentfile)
     // Google account picker + OAuth token mint for Google Tasks import.
     // play-services-auth provides Identity Services (modern picker + Authorization API).
-    // androidx.credentials provides clearCredentialState() which is the only reliable way to
-    // force the modern picker to re-appear on "Switch account" without revoking the OAuth grant
-    // (revoking the grant breaks the freshly-issued tokens that come back after re-consent).
+    // androidx.credentials provides clearCredentialState() for explicit Disconnect cleanup.
     implementation(libs.play.services.auth)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
@@ -225,4 +227,6 @@ dependencies {
     androidTestImplementation(libs.androidx.test.runner)
     add("playstoreImplementation", "com.google.android.play:app-update:2.1.0")
     add("playstoreImplementation", "com.google.android.play:app-update-ktx:2.1.0")
+    add("playstoreImplementation", "com.google.android.play:review:2.0.2")
+    add("playstoreImplementation", "com.google.android.play:review-ktx:2.0.2")
 }

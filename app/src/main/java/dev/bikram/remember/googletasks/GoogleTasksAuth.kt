@@ -5,6 +5,7 @@
 
 package dev.bikram.remember.googletasks
 
+import android.accounts.Account
 import android.content.Context
 import android.content.Intent
 import androidx.activity.result.IntentSenderRequest
@@ -13,6 +14,7 @@ import androidx.credentials.CredentialManager
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.AuthorizationResult
 import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.auth.api.identity.RevokeAccessRequest
 import com.google.android.gms.common.api.ApiException
 import com.google.android.gms.common.api.Scope
 import com.google.android.gms.tasks.Task
@@ -57,19 +59,26 @@ object GoogleTasksAuth {
     private const val EMAIL_SCOPE = "https://www.googleapis.com/auth/userinfo.email"
     private const val USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
     private const val REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+    private const val GOOGLE_ACCOUNT_TYPE = "com.google"
 
     private val json = Json { ignoreUnknownKeys = true }
+    private val requestedScopes = listOf(Scope(TASKS_READONLY_SCOPE), Scope(EMAIL_SCOPE))
 
     @Serializable
     private data class UserInfoResponse(
         val email: String? = null,
     )
 
-    private fun authorizationRequest(): AuthorizationRequest =
-        AuthorizationRequest
-            .Builder()
-            .setRequestedScopes(listOf(Scope(TASKS_READONLY_SCOPE), Scope(EMAIL_SCOPE)))
-            .build()
+    private fun authorizationRequest(forceAccountSelection: Boolean): AuthorizationRequest {
+        val builder =
+            AuthorizationRequest
+                .Builder()
+                .setRequestedScopes(requestedScopes)
+        if (forceAccountSelection) {
+            builder.setPrompt(AuthorizationRequest.Prompt.SELECT_ACCOUNT)
+        }
+        return builder.build()
+    }
 
     /**
      * Attempt to authorize the requested scopes.
@@ -85,9 +94,12 @@ object GoogleTasksAuth {
      * [androidx.activity.result.contract.ActivityResultContracts.StartIntentSenderForResult]
      * and feeds the returned [Intent] back through [parseConsentResult].
      */
-    suspend fun authorize(context: Context): GoogleTasksAuthorizationResult =
+    suspend fun authorize(
+        context: Context,
+        forceAccountSelection: Boolean = false,
+    ): GoogleTasksAuthorizationResult =
         try {
-            val task = Identity.getAuthorizationClient(context).authorize(authorizationRequest())
+            val task = Identity.getAuthorizationClient(context).authorize(authorizationRequest(forceAccountSelection))
             val result = task.await()
             result.toAuthorizationResult()
         } catch (e: ApiException) {
@@ -118,31 +130,29 @@ object GoogleTasksAuth {
     }
 
     /**
-     * Forget the current authorization grant so the next [authorize] call shows the picker
-     * again instead of silently returning the previously picked account.
+     * Disconnect the current account from this app. Account switching deliberately does not call
+     * this path; it uses [AuthorizationRequest.Prompt.SELECT_ACCOUNT] so previously granted
+     * accounts can be selected again without revoking their grants.
      *
      * The combination matters - none of these alone is enough:
-     *  1. **`CredentialManager.clearCredentialState()`** - the AndroidX Credential Manager API.
-     *     This is what actually convinces Identity Services to drop its "current account"
-     *     pointer so `authorize()` returns a NeedsConsent (picker) on the next call. Critically,
-     *     it does NOT revoke the underlying OAuth grant, so freshly-issued tokens after
-     *     re-consent still work for the Tasks API.
-     *  2. **REST `/revoke`** of the current access token - kills the access token + sibling
-     *     refresh token server-side. Belt-and-suspenders for the security-token side.
+     *  1. **`CredentialManager.clearCredentialState()`** - clears local credential picker state.
+     *  2. **`AuthorizationClient.revokeAccess()`** - revokes the Tasks grant for the selected
+     *     Google account using the native Identity Services API. If we do not have the email
+     *     needed to construct an Account, we fall back to token revocation.
      *  3. **`SignInClient.signOut()`** - clears the legacy Identity Services sign-in cache.
-     *
-     * Why we deliberately do NOT use `GoogleSignInClient.revokeAccess()` (legacy API): that
-     * call fully wipes the OAuth grant for our app, which is too aggressive - the new tokens
-     * issued after re-consent are then rejected by the Tasks API in a loop.
      */
-    suspend fun forget(
+    suspend fun disconnect(
         context: Context,
+        accountEmail: String?,
         accessToken: String? = null,
     ) {
         runCatching {
             CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest())
         }
-        if (!accessToken.isNullOrBlank()) {
+        val account = accountEmail?.takeIf { it.isNotBlank() }?.let { Account(it, GOOGLE_ACCOUNT_TYPE) }
+        if (account != null) {
+            revokeGrantedScopes(context, account)
+        } else if (!accessToken.isNullOrBlank()) {
             revokeToken(accessToken)
         }
         runCatching {
@@ -167,13 +177,7 @@ object GoogleTasksAuth {
     }
 
     /**
-     * POST to https://oauth2.googleapis.com/revoke with the access token in the body. After
-     * this returns 200 the OAuth grant for (this app, this account) is gone, and any future
-     * authorize() call goes through the consent UI again.
-     *
-     * Errors are swallowed: failure to revoke is not catastrophic since we're about to launch
-     * a fresh authorization anyway, but a successful revoke gives the cleaner UX (the picker
-     * re-appears rather than silently re-using the cached account).
+     * Fallback for the rare case where we cannot identify the selected account by email.
      */
     private suspend fun revokeToken(accessToken: String) {
         withContext(Dispatchers.IO) {
@@ -199,6 +203,21 @@ object GoogleTasksAuth {
         }
     }
 
+    private suspend fun revokeGrantedScopes(
+        context: Context,
+        account: Account,
+    ) {
+        runCatching {
+            val request =
+                RevokeAccessRequest
+                    .builder()
+                    .setAccount(account)
+                    .setScopes(requestedScopes)
+                    .build()
+            Identity.getAuthorizationClient(context).revokeAccess(request).await()
+        }
+    }
+
     private suspend fun AuthorizationResult.toAuthorizationResult(): GoogleTasksAuthorizationResult {
         if (hasResolution()) {
             val sender =
@@ -214,6 +233,11 @@ object GoogleTasksAuth {
         if (token.isNullOrBlank()) {
             return GoogleTasksAuthorizationResult.Failure(
                 IllegalStateException("Authorization result has neither resolution nor access token"),
+            )
+        }
+        if (TASKS_READONLY_SCOPE !in grantedScopes.orEmpty()) {
+            return GoogleTasksAuthorizationResult.Failure(
+                IllegalStateException("Google Tasks permission was not granted"),
             )
         }
         // toGoogleSignInAccount() is a bridge to the legacy GoogleSignIn API and returns null
@@ -253,15 +277,19 @@ object GoogleTasksAuth {
 }
 
 interface GoogleTasksAuthDelegate {
-    suspend fun authorize(context: Context): GoogleTasksAuthorizationResult
+    suspend fun authorize(
+        context: Context,
+        forceAccountSelection: Boolean = false,
+    ): GoogleTasksAuthorizationResult
 
     suspend fun parseConsentResult(
         context: Context,
         data: Intent?,
     ): GoogleTasksAuthorizationResult
 
-    suspend fun forget(
+    suspend fun disconnect(
         context: Context,
+        accountEmail: String?,
         accessToken: String? = null,
     )
 
@@ -272,18 +300,22 @@ interface GoogleTasksAuthDelegate {
 }
 
 object DefaultGoogleTasksAuthDelegate : GoogleTasksAuthDelegate {
-    override suspend fun authorize(context: Context): GoogleTasksAuthorizationResult = GoogleTasksAuth.authorize(context)
+    override suspend fun authorize(
+        context: Context,
+        forceAccountSelection: Boolean,
+    ): GoogleTasksAuthorizationResult = GoogleTasksAuth.authorize(context, forceAccountSelection)
 
     override suspend fun parseConsentResult(
         context: Context,
         data: Intent?,
     ): GoogleTasksAuthorizationResult = GoogleTasksAuth.parseConsentResult(context, data)
 
-    override suspend fun forget(
+    override suspend fun disconnect(
         context: Context,
+        accountEmail: String?,
         accessToken: String?,
     ) {
-        GoogleTasksAuth.forget(context, accessToken)
+        GoogleTasksAuth.disconnect(context, accountEmail, accessToken)
     }
 
     override suspend fun invalidateToken(

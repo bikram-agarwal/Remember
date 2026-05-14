@@ -32,6 +32,7 @@ class RememberUpdateState
             _devReleasePlayBannerMockUiState.asStateFlow()
         private var devReleasePlayBannerMockSequenceJob: Job? = null
         private var devReleaseUpdatePromoMockArmed = false
+        private val updateMocksAvailable = BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease"
 
         fun showUpdate(info: RememberUpdateInfo?) {
             _updateInfo.value = info
@@ -50,19 +51,26 @@ class RememberUpdateState
         }
 
         fun devReleaseMockArmUpdatePromoBanner() {
-            if (BuildConfig.BUILD_TYPE != "devRelease" || !BuildConfig.SHOW_UPDATES) return
+            if (!updateMocksAvailable || !BuildConfig.SHOW_UPDATES) return
             _updateInfo.value =
                 RememberUpdateInfo(
                     versionName = "9.9.9",
                     downloadUrl = "",
                     releaseNotes = "",
+                    remoteApkAssetUpdatedAt =
+                        if (BuildConfig.FLAVOR == "github") {
+                            DEV_RELEASE_MOCK_GITHUB_ASSET_UPDATED_AT
+                        } else {
+                            ""
+                        },
+                    isDevReleaseMock = true,
                 )
             devReleaseUpdatePromoMockArmed = true
             _updatePromoBannerDismissedThisSession.value = false
         }
 
         fun devReleaseMockStartPlayUpdateBannerSequence() {
-            if (BuildConfig.BUILD_TYPE != "devRelease") return
+            if (!updateMocksAvailable) return
             devReleasePlayBannerMockSequenceJob?.cancel()
             devReleasePlayBannerMockSequenceJob =
                 applicationScope.launch {
@@ -79,7 +87,7 @@ class RememberUpdateState
         }
 
         fun devReleaseCompletePlayUpdateIfReady(): Boolean {
-            if (BuildConfig.BUILD_TYPE != "devRelease") return false
+            if (!updateMocksAvailable) return false
             if (_devReleasePlayBannerMockUiState.value != PlayInAppUpdateBannerUiState.ReadyToInstall) return false
             devReleasePlayBannerMockSequenceJob?.cancel()
             _devReleasePlayBannerMockUiState.value = PlayInAppUpdateBannerUiState.Hidden
@@ -89,5 +97,6 @@ class RememberUpdateState
         companion object {
             private const val MOCK_PLAY_UPDATE_BYTES_DOWNLOADED: Long = 3_000_000L
             private const val MOCK_PLAY_UPDATE_BYTES_TOTAL: Long = 10_000_000L
+            private const val DEV_RELEASE_MOCK_GITHUB_ASSET_UPDATED_AT = "2000-01-01T00:00:00Z"
         }
     }

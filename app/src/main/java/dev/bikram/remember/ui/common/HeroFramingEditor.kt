@@ -120,8 +120,18 @@ fun HeroFramingEditorDialog(
                         val topUnclamped = maskH / 2f - framing.focalY * ih * displayScale
                         val minLeft = maskW - scaledW
                         val minTop = maskH - scaledH
-                        val left = leftUnclamped.coerceIn(minLeft, 0f)
-                        val top = topUnclamped.coerceIn(minTop, 0f)
+                        val left =
+                            if (minLeft <= 0f) {
+                                leftUnclamped.coerceIn(minLeft, 0f)
+                            } else {
+                                minLeft / 2f
+                            }
+                        val top =
+                            if (minTop <= 0f) {
+                                topUnclamped.coerceIn(minTop, 0f)
+                            } else {
+                                minTop / 2f
+                            }
                         val centerLeft = (maskW - scaledW) / 2f
                         val centerTop = (maskH - scaledH) / 2f
                         panXPx = left - centerLeft
@@ -143,8 +153,20 @@ fun HeroFramingEditorDialog(
                         val scaledH = ih * displayScale
                         val centerLeft = (maskW - scaledW) / 2f
                         val centerTop = (maskH - scaledH) / 2f
-                        val left = (centerLeft + panXPx).coerceIn(maskW - scaledW, 0f)
-                        val top = (centerTop + panYPx).coerceIn(maskH - scaledH, 0f)
+                        val minLeft = maskW - scaledW
+                        val minTop = maskH - scaledH
+                        val left =
+                            if (minLeft <= 0f) {
+                                (centerLeft + panXPx).coerceIn(minLeft, 0f)
+                            } else {
+                                minLeft / 2f
+                            }
+                        val top =
+                            if (minTop <= 0f) {
+                                (centerTop + panYPx).coerceIn(minTop, 0f)
+                            } else {
+                                minTop / 2f
+                            }
                         val widthDp = with(density) { scaledW.toDp() }
                         val heightDp = with(density) { scaledH.toDp() }
                         val offsetXDp = with(density) { (maskLeft + left).toDp() }
