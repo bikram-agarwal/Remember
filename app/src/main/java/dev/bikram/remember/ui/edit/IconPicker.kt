@@ -5,13 +5,19 @@ import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +28,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -33,20 +40,23 @@ import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.GenericShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -62,16 +72,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
@@ -80,9 +98,10 @@ import dev.bikram.remember.data.IconPickerPrefs
 import dev.bikram.remember.data.IconPickerStarredState
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.components.RememberSegmentedButton
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
+import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import kotlinx.coroutines.delay
@@ -116,7 +135,6 @@ fun IconPicker(
         }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
-    val searchFocusRequester = remember { FocusRequester() }
     var selectedTab by rememberSaveable { mutableStateOf(defaultIconPickerTab(current)) }
     var starredSelectionTab by rememberSaveable { mutableStateOf<IconPickerTab?>(null) }
     var pendingStarredIconKeys by rememberSaveable { mutableStateOf(emptyList<String>()) }
@@ -203,12 +221,6 @@ fun IconPicker(
             }
     }
 
-    LaunchedEffect(searchExpanded) {
-        if (searchExpanded) {
-            searchFocusRequester.requestFocus()
-        }
-    }
-
     // Debounced trimmed query. Without this, every keystroke re-runs the linear scan
     // over ~510 icons + ~3.7k emojis with per-item stem / Levenshtein scoring; on
     // burst typing that's wasted work + visible churn. We propagate clears (empty
@@ -275,74 +287,23 @@ fun IconPicker(
                     .height(iconSheetContentHeight),
         ) {
             Column(modifier = Modifier.fillMaxWidth()) {
-                Row(
+                IconPickerSearchTitleRow(
+                    searchExpanded = searchExpanded,
+                    title = stringResource(titleRes),
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    onToggleSearch = {
+                        if (searchExpanded && searchQuery.isNotEmpty()) {
+                            searchQuery = ""
+                        }
+                        searchExpanded = !searchExpanded
+                    },
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 20.dp)
                             .padding(bottom = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (!searchExpanded) {
-                        Text(
-                            text = stringResource(titleRes),
-                            style = MaterialTheme.typography.titleLarge,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.weight(1f),
-                        )
-                        RememberIconButton(onClick = { searchExpanded = true }) {
-                            RememberMaterialRoundedSymbol(
-                                name = "search",
-                                size = 24.dp,
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                weight = FontWeight.Medium,
-                            )
-                        }
-                    } else {
-                        OutlinedTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            modifier =
-                                Modifier
-                                    .weight(1f)
-                                    .focusRequester(searchFocusRequester),
-                            singleLine = true,
-                            shape = CircleShape,
-                            placeholder = { Text(stringResource(R.string.icon_picker_search_hint)) },
-                            leadingIcon = {
-                                RememberMaterialRoundedSymbol(
-                                    name = "search",
-                                    size = 24.dp,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    weight = FontWeight.Medium,
-                                )
-                            },
-                            trailingIcon = {
-                                RememberIconButton(
-                                    onClick = {
-                                        searchExpanded = false
-                                        searchQuery = ""
-                                    },
-                                ) {
-                                    RememberMaterialRoundedSymbol(
-                                        name = "close",
-                                        size = 22.dp,
-                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        weight = FontWeight.Medium,
-                                    )
-                                }
-                            },
-                            colors =
-                                OutlinedTextFieldDefaults.colors(
-                                    focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                    focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
-                                    cursorColor = MaterialTheme.colorScheme.primary,
-                                ),
-                        )
-                    }
-                }
+                )
 
                 IconPickerTabRow(
                     selectedTab = selectedTab,
@@ -419,6 +380,153 @@ fun IconPicker(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun IconPickerSearchTitleRow(
+    searchExpanded: Boolean,
+    title: String,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onToggleSearch: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
+    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val scaleIconSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AnimatedContent(
+            targetState = searchExpanded,
+            modifier = Modifier.weight(1f),
+            transitionSpec = {
+                val enter =
+                    fadeIn(fadeInSpec) +
+                        expandHorizontally(spatialSpec, expandFrom = Alignment.End)
+                val exit =
+                    fadeOut(fadeOutSpec) +
+                        shrinkHorizontally(spatialSpec, shrinkTowards = Alignment.End)
+                (enter togetherWith exit).using(SizeTransform(clip = false))
+            },
+            label = "iconPickerSearchExpand",
+        ) { expanded ->
+            if (expanded) {
+                IconPickerInlineSearchField(
+                    query = query,
+                    onQueryChange = onQueryChange,
+                )
+            } else {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+
+        val cdCloseSearch = stringResource(R.string.cd_close_search)
+        val cdSearch = stringResource(R.string.cd_search)
+        RememberFilledTonalIconButton(onClick = onToggleSearch) {
+            AnimatedContent(
+                targetState = searchExpanded,
+                transitionSpec = {
+                    (scaleIn(scaleIconSpec) + fadeIn(fadeInSpec)) togetherWith
+                        (scaleOut(scaleIconSpec) + fadeOut(fadeOutSpec))
+                },
+                label = "iconPickerSearchIconSwap",
+            ) { expanded ->
+                RememberMaterialRoundedSymbol(
+                    name = if (expanded) "close" else "search",
+                    weight = FontWeight.Medium,
+                    modifier =
+                        Modifier.semantics {
+                            contentDescription = if (expanded) cdCloseSearch else cdSearch
+                        },
+                )
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+    }
+}
+
+@Composable
+private fun IconPickerInlineSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+) {
+    val focusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var searchFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(TextFieldValue(query, selection = TextRange(query.length)))
+    }
+    LaunchedEffect(query) {
+        if (query != searchFieldValue.text) {
+            searchFieldValue = TextFieldValue(query, selection = TextRange(query.length))
+        }
+    }
+    LaunchedEffect(Unit) {
+        focusRequester.requestFocus()
+        keyboardController?.show()
+    }
+
+    val searchContentDescription = stringResource(R.string.cd_search)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    MaterialTheme.colorScheme.surfaceContainerHigh,
+                    MaterialTheme.shapes.extraLargeIncreased,
+                ).padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = "search",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            weight = FontWeight.Medium,
+        )
+        Spacer(Modifier.width(10.dp))
+        BasicTextField(
+            value = searchFieldValue,
+            onValueChange = { newValue ->
+                searchFieldValue = newValue
+                if (newValue.text != query) {
+                    onQueryChange(newValue.text)
+                }
+            },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+            textStyle =
+                MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .focusRequester(focusRequester)
+                    .semantics {
+                        contentDescription = searchContentDescription
+                    },
+            decorationBox = { innerTextField ->
+                if (searchFieldValue.text.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.icon_picker_search_hint),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                innerTextField()
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun IconPickerTabRow(
     selectedTab: IconPickerTab,
@@ -426,15 +534,55 @@ private fun IconPickerTabRow(
     enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    SingleChoiceSegmentedButtonRow(modifier = modifier) {
-        val tabs = IconPickerTab.entries
+    val tabs = IconPickerTab.entries
+    val labels = tabs.map { tab -> stringResource(tab.labelRes) }
+    val shapes =
+        tabs.mapIndexed { index, _ ->
+            when (index) {
+                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                tabs.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            }
+        }
+    val colors =
+        ToggleButtonDefaults.toggleButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    ButtonGroup(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
+    ) {
         tabs.forEachIndexed { index, tab ->
-            RememberSegmentedButton(
-                selected = selectedTab == tab,
-                onClick = { onTabSelected(tab) },
-                shape = SegmentedButtonDefaults.itemShape(index, tabs.size),
-                enabled = enabled,
-                label = { Text(stringResource(tab.labelRes)) },
+            val label = labels[index]
+            customItem(
+                buttonGroupContent = {
+                    RememberToggleButton(
+                        checked = selectedTab == tab,
+                        onCheckedChange = { checked -> if (checked) onTabSelected(tab) },
+                        modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+                        enabled = enabled,
+                        shapes = shapes[index],
+                        colors = colors,
+                    ) {
+                        Text(label)
+                    }
+                },
+                menuContent = { menuState ->
+                    RememberDropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onTabSelected(tab)
+                            menuState.dismiss()
+                        },
+                        enabled = enabled,
+                    )
+                },
             )
         }
     }

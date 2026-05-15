@@ -4,24 +4,21 @@
 .idea/
 build/
 localdocs/
-devRelease.lnk
-release.lnk 
+*.lnk
 
-# font_subset: full variable font (~14 MB) and generated TTFs (subset_font.py)
-font_subset/*.ttf
+# Fastlane generated output (store metadata lives in fastlane/metadata and is committed)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output
 
-# font_subset: cached upstream metadata fetched by build_emoji_data.py and
-# build_icon_keywords.py. The committed res/raw/*.json outputs are the artefacts.
 font_subset/cache/
+font_subset/*.ttf
+font_subset/*.json
+font_subset/*.txt
 
 # Machine-local Android SDK path (never commit)
 local.properties
 
 # CI-generated signing files if reproduced locally (do not commit)
 keystore.properties
-remember-release.keystore
-
-# Fastlane generated output (store metadata lives in fastlane/metadata and is committed)
-fastlane/report.xml
-fastlane/Preview.html
-fastlane/test_output
+*-release.keystore

@@ -33,3 +33,7 @@ fun View.performLongPressHaptic() {
 fun View.performSaveHaptic() {
     performHapticFeedback(HapticFeedbackConstants.CONFIRM)
 }
+
+fun View.performRejectHaptic() {
+    performHapticFeedback(HapticFeedbackConstants.REJECT)
+}

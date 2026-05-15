@@ -77,7 +77,6 @@ import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.QuickCaptureState
 import dev.bikram.remember.data.ReminderPreferencesState
-import dev.bikram.remember.data.SwipeGestureMode
 import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.data.UpdatePreferencesState
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
@@ -719,7 +718,6 @@ fun SettingsRoute(
                 title = {
                     Text(
                         stringResource(R.string.settings_title),
-                        style = MaterialTheme.typography.headlineLargeEmphasized,
                         fontWeight = FontWeight.Bold,
                     )
                 },
@@ -862,57 +860,28 @@ fun SettingsRoute(
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
                 ) {
                     GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.FIRST) {
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.settings_swipe_gesture),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                SwipeGestureModeDropdown(
-                                    current = interactionState.swipeGestureMode,
-                                    onSelect = { mode ->
-                                        scope.launch { interactionPrefs.setSwipeGestureMode(mode) }
-                                    },
-                                )
-                            }
-                        }
-                        if (interactionState.swipeGestureMode == SwipeGestureMode.EXECUTE_ONE) {
-                            GroupedListItem(position = GroupPosition.LAST) {
-                                SwipeExecuteOneActionsEditor(
-                                    startTitle = stringResource(R.string.settings_swipe_right_actions),
-                                    endTitle = stringResource(R.string.settings_swipe_left_actions),
-                                    startAction = interactionState.swipeStartToEnd,
-                                    endAction = interactionState.swipeEndToStart,
-                                    onStartActionChange = { action ->
-                                        scope.launch { interactionPrefs.setSwipeStartToEnd(action) }
-                                    },
-                                    onEndActionChange = { action ->
-                                        scope.launch { interactionPrefs.setSwipeEndToStart(action) }
-                                    },
-                                )
-                            }
-                        } else {
-                            GroupedListItem(position = GroupPosition.LAST) {
-                                SwipeRevealSlotsEditor(
-                                    startTitle = stringResource(R.string.settings_swipe_right_actions),
-                                    endTitle = stringResource(R.string.settings_swipe_left_actions),
-                                    startActions = interactionState.swipeStartToEndRevealActions,
-                                    endActions = interactionState.swipeEndToStartRevealActions,
-                                    onActionsChange = { startActions, endActions ->
-                                        scope.launch {
-                                            interactionPrefs.setSwipeRevealActions(startActions, endActions)
-                                        }
-                                    },
-                                )
-                            }
+                        GroupedListItem(position = GroupPosition.ONLY) {
+                            SwipeGestureSettingsPanel(
+                                currentMode = interactionState.swipeGestureMode,
+                                onModeChange = { mode ->
+                                    scope.launch { interactionPrefs.setSwipeGestureMode(mode) }
+                                },
+                                startAction = interactionState.swipeStartToEnd,
+                                endAction = interactionState.swipeEndToStart,
+                                onStartActionChange = { action ->
+                                    scope.launch { interactionPrefs.setSwipeStartToEnd(action) }
+                                },
+                                onEndActionChange = { action ->
+                                    scope.launch { interactionPrefs.setSwipeEndToStart(action) }
+                                },
+                                startActions = interactionState.swipeStartToEndRevealActions,
+                                endActions = interactionState.swipeEndToStartRevealActions,
+                                onRevealActionsChange = { startActions, endActions ->
+                                    scope.launch {
+                                        interactionPrefs.setSwipeRevealActions(startActions, endActions)
+                                    }
+                                },
+                            )
                         }
                     }
                 }

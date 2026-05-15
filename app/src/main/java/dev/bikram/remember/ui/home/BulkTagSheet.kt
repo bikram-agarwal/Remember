@@ -9,6 +9,9 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +23,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -38,11 +40,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
@@ -54,10 +62,14 @@ import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.parseHexColor
 import dev.bikram.remember.ui.components.tagColor
-import dev.bikram.remember.ui.edit.ColorGrid
 import dev.bikram.remember.ui.edit.CompactOutlinedField
-import dev.bikram.remember.ui.edit.paletteHex
+import dev.bikram.remember.ui.edit.EditableTagHexChip
+import dev.bikram.remember.ui.edit.TagColorSlider
+import dev.bikram.remember.ui.edit.defaultTagColorHex
+import dev.bikram.remember.ui.edit.sanitizeTagNameInput
+import dev.bikram.remember.ui.edit.toTagHexFieldValue
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import kotlinx.coroutines.delay
 
 /**
  * Per-tag intent the user can stage while the sheet is open. [NEUTRAL] means "leave this tag
@@ -73,14 +85,12 @@ private fun BulkTagIntent.next(): BulkTagIntent =
         BulkTagIntent.REMOVE -> BulkTagIntent.NEUTRAL
     }
 
-private val BulkTagFieldHeight = 40.dp
-
 /**
  * Bottom sheet for applying / removing tags on a batch of selected notes.
  *
  * Primary affordance is the grid of existing tag chips: each chip cycles NEUTRAL -> ADD -> REMOVE
  * on tap. A secondary "+ Create new tag" pill expands inline to reveal the full tag creation form
- * (name, color grid, hex entry). The Apply button stays anchored to the sheet's action row.
+ * (name, color slider, hex entry). The Apply button stays anchored to the sheet's action row.
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -107,9 +117,14 @@ fun BulkTagSheet(
 
     var createExpanded by rememberSaveable { mutableStateOf(false) }
     var draftName by rememberSaveable { mutableStateOf("") }
-    val presetHex = remember { paletteHex(TagPalette.presets[0]) }
-    var hexInput by rememberSaveable { mutableStateOf(presetHex) }
+    val presetHex = remember { defaultTagColorHex() }
     var lastValidHex by rememberSaveable { mutableStateOf(presetHex) }
+    var hexEditing by rememberSaveable { mutableStateOf(false) }
+    var hexDraft by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(presetHex.toTagHexFieldValue())
+    }
+    var sheetBodyCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var hexEditorBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
 
     val trimmedDraft = draftName.trim()
     val normalizedLowerTags = mergedTags.map { it.lowercase() }.toSet()
@@ -117,17 +132,46 @@ fun BulkTagSheet(
         trimmedDraft.isNotBlank() &&
             normalizedLowerTags.contains(trimmedDraft.lowercase())
     val chosenColor: Color = parseHexColor(lastValidHex) ?: TagPalette.presets[0]
-    val hexSwatchShape = MaterialTheme.shapes.extraSmall
     val canStageNewTag = trimmedDraft.isNotBlank() && !draftIsDuplicate
 
     val hasPending = tagIntents.values.any { it != BulkTagIntent.NEUTRAL }
 
+    fun commitHexEditing(): String {
+        val draftHex =
+            if (hexDraft.text.length == 6) {
+                normalizeHex("#${hexDraft.text}")
+            } else {
+                null
+            }
+        val committedHex = draftHex ?: lastValidHex
+        lastValidHex = committedHex
+        hexDraft = committedHex.toTagHexFieldValue()
+        hexEditing = false
+        hexEditorBoundsInRoot = null
+        return committedHex
+    }
+
     fun stageNewTag() {
         if (!canStageNewTag) return
+        val committedHex = commitHexEditing()
         extraAdded.add(trimmedDraft)
         tagIntents[trimmedDraft] = BulkTagIntent.ADD
-        newTagColorsState[trimmedDraft] = lastValidHex
+        newTagColorsState[trimmedDraft] = committedHex
         draftName = ""
+    }
+
+    LaunchedEffect(hexEditing, hexDraft.text) {
+        if (!hexEditing || hexDraft.text.length != 6) return@LaunchedEffect
+        delay(TAG_BULK_HEX_INPUT_DEBOUNCE_MILLIS)
+        normalizeHex("#${hexDraft.text}")?.let { normalized ->
+            lastValidHex = normalized
+        }
+    }
+
+    LaunchedEffect(hexEditing, lastValidHex) {
+        if (!hexEditing) {
+            hexDraft = lastValidHex.toTagHexFieldValue()
+        }
     }
 
     AppBottomSheet(
@@ -166,154 +210,143 @@ fun BulkTagSheet(
             }
         },
     ) {
-        // --- Primary section: existing tag chips, tri-state cycling ---
-        if (mergedTags.isEmpty()) {
-            Text(
-                text = stringResource(R.string.home_bulk_tag_no_existing),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 12.dp),
-            )
-        } else {
-            FlowRow(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                mergedTags.forEach { tag ->
-                    val intent = tagIntents[tag] ?: BulkTagIntent.NEUTRAL
-                    // A tag staged during this sheet session has its color in newTagColorsState
-                    // but NOT yet in LocalTagColors (that only updates post-apply). Prefer the
-                    // pending color so the chip matches what the user just picked in the form.
-                    val pendingHex =
-                        newTagColorsState.entries
-                            .firstOrNull { (tagName) -> tagName.equals(tag, ignoreCase = true) }
-                            ?.value
-                    val chipColor = pendingHex?.let { parseHexColor(it) } ?: tagColor(tag)
-                    TriStateTagChip(
-                        tag = tag,
-                        color = chipColor,
-                        intent = intent,
-                        onCycle = { tagIntents[tag] = intent.next() },
-                    )
-                }
-            }
-        }
-
-        Spacer(Modifier.height(4.dp))
-
-        // --- Secondary section: pull-tab disclosure + collapsible create form ---
-        CreateNewTagPullTab(
-            expanded = createExpanded,
-            onToggle = { createExpanded = !createExpanded },
-        )
-        AnimatedVisibility(
-            visible = createExpanded,
-            enter = fadeIn() + expandVertically(),
-            exit = fadeOut() + shrinkVertically(),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp)
-                        .animateContentSize(),
-            ) {
-                // Name field + live preview in one row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    CompactOutlinedField(
-                        value = draftName,
-                        onValueChange = { draftName = it.filter { ch -> ch != '\n' } },
-                        placeholder = stringResource(R.string.tag_editor_field_placeholder),
-                        modifier = Modifier.weight(1f),
-                    )
-                    val previewLabel =
-                        trimmedDraft.ifBlank {
-                            stringResource(R.string.tag_editor_field_placeholder)
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .onGloballyPositioned { sheetBodyCoordinates = it }
+                    .pointerInput(hexEditing, hexDraft, lastValidHex) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                            val wasEditingAtDown = hexEditing
+                            val up = waitForUpOrCancellation(pass = PointerEventPass.Initial) ?: return@awaitEachGesture
+                            if (!wasEditingAtDown || !hexEditing) return@awaitEachGesture
+                            val tapInRoot =
+                                sheetBodyCoordinates?.localToRoot(up.position)
+                                    ?: return@awaitEachGesture
+                            val editorBounds = hexEditorBoundsInRoot
+                            if (editorBounds == null || !editorBounds.contains(tapInRoot)) {
+                                commitHexEditing()
+                            }
                         }
-                    Box(
-                        modifier =
-                            Modifier
-                                .height(BulkTagFieldHeight)
-                                .widthIn(min = 80.dp)
-                                .clip(CircleShape)
-                                .background(chosenColor)
-                                .padding(horizontal = 16.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = previewLabel,
-                            style = MaterialTheme.typography.labelLarge,
-                            color = TagPalette.textOn(chosenColor),
-                            maxLines = 1,
+                    },
+        ) {
+            // --- Primary section: existing tag chips, tri-state cycling ---
+            if (mergedTags.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.home_bulk_tag_no_existing),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 12.dp),
+                )
+            } else {
+                FlowRow(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    mergedTags.forEach { tag ->
+                        val intent = tagIntents[tag] ?: BulkTagIntent.NEUTRAL
+                        // A tag staged during this sheet session has its color in newTagColorsState
+                        // but NOT yet in LocalTagColors (that only updates post-apply). Prefer the
+                        // pending color so the chip matches what the user just picked in the form.
+                        val pendingHex =
+                            newTagColorsState.entries
+                                .firstOrNull { (tagName) -> tagName.equals(tag, ignoreCase = true) }
+                                ?.value
+                        val chipColor = pendingHex?.let { parseHexColor(it) } ?: tagColor(tag)
+                        TriStateTagChip(
+                            tag = tag,
+                            color = chipColor,
+                            intent = intent,
+                            onCycle = { tagIntents[tag] = intent.next() },
                         )
                     }
                 }
+            }
 
-                Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(4.dp))
 
-                // 12 x 5 color grid
-                ColorGrid(
-                    selectedHex = lastValidHex,
-                    onSelect = { hex ->
-                        hexInput = hex
-                        lastValidHex = hex
-                    },
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                // Hex entry: color swatch on the left, hex text field, Add button on the right
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+            // --- Secondary section: pull-tab disclosure + collapsible create form ---
+            CreateNewTagPullTab(
+                expanded = createExpanded,
+                onToggle = { createExpanded = !createExpanded },
+            )
+            AnimatedVisibility(
+                visible = createExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically(),
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 12.dp)
+                            .animateContentSize(),
                 ) {
-                    CompactOutlinedField(
-                        value = hexInput,
-                        onValueChange = { raw ->
-                            hexInput = raw
-                            normalizeHex(raw)?.let { lastValidHex = it }
-                        },
-                        placeholder = stringResource(R.string.tag_editor_hex_label),
-                        modifier = Modifier.weight(1f),
-                        leading = {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .size(20.dp)
-                                        .clip(hexSwatchShape)
-                                        .background(chosenColor)
-                                        .border(
-                                            width = 1.dp,
-                                            color =
-                                                MaterialTheme.colorScheme.outline
-                                                    .copy(alpha = 0.45f),
-                                            shape = hexSwatchShape,
-                                        ),
-                            )
+                    // Name field + live preview in one row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        CompactOutlinedField(
+                            value = draftName,
+                            onValueChange = { draftName = sanitizeTagNameInput(it) },
+                            placeholder = stringResource(R.string.tag_editor_field_placeholder),
+                            modifier = Modifier.weight(1f),
+                        )
+                        EditableTagHexChip(
+                            hex = lastValidHex,
+                            color = chosenColor,
+                            editing = hexEditing,
+                            draft = hexDraft,
+                            onStartEditing = {
+                                hexDraft = lastValidHex.toTagHexFieldValue()
+                                hexEditing = true
+                            },
+                            onDraftChange = { hexDraft = it },
+                            onStopEditing = { commitHexEditing() },
+                            onBoundsChange = { hexEditorBoundsInRoot = it },
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    TagColorSlider(
+                        selectedHex = lastValidHex,
+                        onSelect = { hex ->
+                            lastValidHex = hex
+                            hexDraft = hex.toTagHexFieldValue()
                         },
                     )
-                    RememberButton(
-                        onClick = { stageNewTag() },
-                        enabled = canStageNewTag,
+
+                    Spacer(Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.End,
                     ) {
-                        Text(stringResource(R.string.home_bulk_tag_stage))
+                        RememberButton(
+                            onClick = { stageNewTag() },
+                            enabled = canStageNewTag,
+                        ) {
+                            Text(stringResource(R.string.home_bulk_tag_stage))
+                        }
                     }
                 }
             }
-        }
 
-        Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
+        }
     }
 }
+
+private const val TAG_BULK_HEX_INPUT_DEBOUNCE_MILLIS = 450L
 
 /**
  * "Pull-tab on divider" disclosure (Option D). A horizontal line crosses the full width with a

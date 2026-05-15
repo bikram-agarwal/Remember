@@ -26,7 +26,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -417,6 +416,7 @@ private fun UpToDatePhoneIcon() {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
     val scheme = MaterialTheme.colorScheme
@@ -463,7 +463,7 @@ private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
             }
         }
         if (downloadProgress == -1f || downloadProgress == -2f) {
-            LinearProgressIndicator(
+            LinearWavyProgressIndicator(
                 modifier =
                     Modifier
                         .fillMaxWidth()

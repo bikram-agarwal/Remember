@@ -17,7 +17,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CardElevation
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ElevatedCard
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalButton
@@ -33,8 +32,6 @@ import androidx.compose.material3.MenuItemColors
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SingleChoiceSegmentedButtonRowScope
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
@@ -729,45 +726,6 @@ fun RememberDropdownMenuItem(
         colors = colors,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun androidx.compose.material3.SingleChoiceSegmentedButtonRowScope.RememberSegmentedButton(
-    selected: Boolean,
-    onClick: () -> Unit,
-    shape: Shape,
-    modifier: Modifier = Modifier,
-    enabled: Boolean = true,
-    colors: androidx.compose.material3.SegmentedButtonColors =
-        androidx.compose.material3.SegmentedButtonDefaults
-            .colors(),
-    border: BorderStroke =
-        androidx.compose.material3.SegmentedButtonDefaults
-            .borderStroke(colors.activeBorderColor),
-    interactionSource: MutableInteractionSource? = null,
-    icon: @Composable () -> Unit = {
-        androidx.compose.material3.SegmentedButtonDefaults
-            .Icon(selected)
-    },
-    label: @Composable () -> Unit,
-) {
-    val playTap = rememberPlayTapSound()
-    this.SegmentedButton(
-        selected = selected,
-        onClick = {
-            playTap()
-            onClick()
-        },
-        shape = shape,
-        modifier = modifier,
-        enabled = enabled,
-        colors = colors,
-        border = border,
-        interactionSource = interactionSource,
-        icon = icon,
-        label = label,
     )
 }
 

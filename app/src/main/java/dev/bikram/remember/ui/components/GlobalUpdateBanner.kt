@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Text
@@ -134,6 +135,7 @@ fun SwipeDismissableUpdatePromoBanner(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun PlayStoreGlobalUpdateBanner(
     state: PlayInAppUpdateBannerUiState,
@@ -191,7 +193,7 @@ fun PlayStoreGlobalUpdateBanner(
                         )
                         Spacer(Modifier.height(12.dp))
                         if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
-                            LinearProgressIndicator(
+                            LinearWavyProgressIndicator(
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
@@ -204,7 +206,7 @@ fun PlayStoreGlobalUpdateBanner(
                             val fraction =
                                 (state.bytesDownloaded.toFloat() / state.totalBytesToDownload.toFloat())
                                     .coerceIn(0f, 1f)
-                            LinearProgressIndicator(
+                            LinearWavyProgressIndicator(
                                 progress = { fraction },
                                 modifier =
                                     Modifier

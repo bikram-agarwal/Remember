@@ -167,9 +167,24 @@ class ThemePrefs(
 
     suspend fun setActiveCustomSeed(hex: String) {
         val normalized = normalizeHex(hex) ?: return
-        context.themePrefsDataStore.edit {
-            it[Keys.ACTIVE_CUSTOM_SEED] = normalized
-            it[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
+        context.themePrefsDataStore.edit { p ->
+            val matchedStored =
+                decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty())
+                    .firstOrNull { stored ->
+                        normalizeHex(stored) == normalized
+                    }
+                    ?: return@edit
+            val matchedNorm = normalizeHex(matchedStored) ?: return@edit
+            p[Keys.ACTIVE_CUSTOM_SEED] = matchedNorm
+            p[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
+        }
+    }
+
+    suspend fun previewCustomSeed(hex: String) {
+        val normalized = normalizeHex(hex) ?: return
+        context.themePrefsDataStore.edit { p ->
+            p[Keys.ACTIVE_CUSTOM_SEED] = normalized
+            p[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
         }
     }
 

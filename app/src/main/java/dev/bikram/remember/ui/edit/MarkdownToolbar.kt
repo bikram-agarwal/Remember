@@ -12,6 +12,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ButtonGroupScope
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonColors
@@ -36,10 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 
-@Suppress("DEPRECATION")
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun MarkdownToolbar(
@@ -54,6 +55,10 @@ internal fun MarkdownToolbar(
     val selectionRevision = state.selectionRevision
     val activeHeading = remember(selectionRevision) { state.headingLevel }
     val cursorInLink = remember(selectionRevision) { state.selectedLinkUrl != null }
+    val isBulletList = remember(selectionRevision) { state.isBulletList }
+    val isNumberedList = remember(selectionRevision) { state.isNumberedList }
+    val isChecklist = remember(selectionRevision) { state.isChecklist }
+    val isQuote = remember(selectionRevision) { state.isQuote }
 
     if (showLinkDialog) {
         MarkdownLinkDialog(
@@ -63,6 +68,40 @@ internal fun MarkdownToolbar(
         )
     }
 
+    val colors =
+        IconButtonDefaults.iconButtonColors(
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    val activeColors =
+        IconButtonDefaults.iconButtonColors(
+            contentColor = MaterialTheme.colorScheme.primary,
+            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+        )
+    val undoLabel = stringResource(R.string.common_undo)
+    val redoLabel = stringResource(R.string.cd_redo)
+    val boldLabel = stringResource(R.string.cd_bold)
+    val italicLabel = stringResource(R.string.cd_italic)
+    val underlineLabel = stringResource(R.string.cd_underline)
+    val strikethroughLabel = stringResource(R.string.cd_strikethrough)
+    val headingOneLabel = stringResource(R.string.rt_h1)
+    val headingOneContentDescription = stringResource(R.string.rt_h1_cd)
+    val headingTwoLabel = stringResource(R.string.rt_h2)
+    val headingTwoContentDescription = stringResource(R.string.rt_h2_cd)
+    val headingThreeLabel = stringResource(R.string.rt_h3)
+    val headingThreeContentDescription = stringResource(R.string.rt_h3_cd)
+    val bulletListLabel = stringResource(R.string.cd_bullet_list)
+    val numberedListLabel = stringResource(R.string.cd_numbered_list)
+    val checklistLabel = stringResource(R.string.cd_checklist)
+    val quoteLabel = stringResource(R.string.cd_quote)
+    val inlineCodeLabel = stringResource(R.string.cd_inline_code)
+    val codeBlockLabel = stringResource(R.string.cd_code_block)
+    val linkLabel =
+        if (cursorInLink) {
+            stringResource(R.string.rt_edit_link)
+        } else {
+            stringResource(R.string.rt_add_link)
+        }
+
     ButtonGroup(
         modifier =
             modifier
@@ -71,21 +110,14 @@ internal fun MarkdownToolbar(
                 .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 .horizontalScroll(rememberScrollState())
                 .padding(4.dp),
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
     ) {
-        val colors =
-            IconButtonDefaults.iconButtonColors(
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        val activeColors =
-            IconButtonDefaults.iconButtonColors(
-                contentColor = MaterialTheme.colorScheme.primary,
-                containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
-            )
-
         if (onUndo != null) {
             MarkdownToolbarIconButton(
                 symbolName = "undo",
-                contentDescription = stringResource(R.string.common_undo),
+                contentDescription = undoLabel,
                 enabled = canUndo,
                 colors = colors,
                 onClick = onUndo,
@@ -94,7 +126,7 @@ internal fun MarkdownToolbar(
         if (onRedo != null) {
             MarkdownToolbarIconButton(
                 symbolName = "redo",
-                contentDescription = stringResource(R.string.cd_redo),
+                contentDescription = redoLabel,
                 enabled = canRedo,
                 colors = colors,
                 onClick = onRedo,
@@ -103,48 +135,48 @@ internal fun MarkdownToolbar(
 
         MarkdownToolbarIconButton(
             symbolName = "format_bold",
-            contentDescription = stringResource(R.string.cd_bold),
+            contentDescription = boldLabel,
             colors = colors,
             onClick = state::toggleBold,
         )
         MarkdownToolbarIconButton(
             symbolName = "format_italic",
-            contentDescription = stringResource(R.string.cd_italic),
+            contentDescription = italicLabel,
             colors = colors,
             onClick = state::toggleItalic,
         )
         MarkdownToolbarIconButton(
             symbolName = "format_underlined",
-            contentDescription = stringResource(R.string.cd_underline),
+            contentDescription = underlineLabel,
             colors = colors,
             onClick = state::toggleUnderline,
         )
         MarkdownToolbarIconButton(
             symbolName = "format_strikethrough",
-            contentDescription = stringResource(R.string.cd_strikethrough),
+            contentDescription = strikethroughLabel,
             colors = colors,
             onClick = state::toggleStrikethrough,
         )
 
         HeadingButton(
-            label = stringResource(R.string.rt_h1),
-            contentDescription = stringResource(R.string.rt_h1_cd),
+            label = headingOneLabel,
+            contentDescription = headingOneContentDescription,
             active = activeHeading == 1,
             onClick = { state.applyHeading(1) },
             colors = colors,
             activeColors = activeColors,
         )
         HeadingButton(
-            label = stringResource(R.string.rt_h2),
-            contentDescription = stringResource(R.string.rt_h2_cd),
+            label = headingTwoLabel,
+            contentDescription = headingTwoContentDescription,
             active = activeHeading == 2,
             onClick = { state.applyHeading(2) },
             colors = colors,
             activeColors = activeColors,
         )
         HeadingButton(
-            label = stringResource(R.string.rt_h3),
-            contentDescription = stringResource(R.string.rt_h3_cd),
+            label = headingThreeLabel,
+            contentDescription = headingThreeContentDescription,
             active = activeHeading == 3,
             onClick = { state.applyHeading(3) },
             colors = colors,
@@ -153,57 +185,50 @@ internal fun MarkdownToolbar(
 
         MarkdownToolbarIconButton(
             symbolName = "format_list_bulleted",
-            contentDescription = stringResource(R.string.cd_bullet_list),
-            colors = if (remember(selectionRevision) { state.isBulletList }) activeColors else colors,
+            contentDescription = bulletListLabel,
+            colors = if (isBulletList) activeColors else colors,
             onClick = state::applyBulletList,
         )
         MarkdownToolbarIconButton(
             symbolName = "format_list_numbered",
-            contentDescription = stringResource(R.string.cd_numbered_list),
-            colors = if (remember(selectionRevision) { state.isNumberedList }) activeColors else colors,
+            contentDescription = numberedListLabel,
+            colors = if (isNumberedList) activeColors else colors,
             onClick = state::applyNumberedList,
         )
         MarkdownToolbarIconButton(
             symbolName = "checklist",
-            contentDescription = stringResource(R.string.cd_checklist),
-            colors = if (remember(selectionRevision) { state.isChecklist }) activeColors else colors,
+            contentDescription = checklistLabel,
+            colors = if (isChecklist) activeColors else colors,
             onClick = state::applyChecklist,
         )
         MarkdownToolbarIconButton(
             symbolName = "format_quote",
-            contentDescription = stringResource(R.string.cd_quote),
-            colors = if (remember(selectionRevision) { state.isQuote }) activeColors else colors,
+            contentDescription = quoteLabel,
+            colors = if (isQuote) activeColors else colors,
             onClick = state::applyQuote,
         )
         MarkdownToolbarIconButton(
             symbolName = "code",
-            contentDescription = stringResource(R.string.cd_inline_code),
+            contentDescription = inlineCodeLabel,
             colors = colors,
             onClick = state::toggleInlineCode,
         )
         MarkdownToolbarTextButton(
             label = "```",
-            contentDescription = stringResource(R.string.cd_code_block),
+            contentDescription = codeBlockLabel,
             colors = colors,
             onClick = state::applyCodeBlock,
             fontFamily = FontFamily.Monospace,
         )
         MarkdownToolbarIconButton(
             symbolName = "add_link",
-            contentDescription =
-                if (cursorInLink) {
-                    stringResource(R.string.rt_edit_link)
-                } else {
-                    stringResource(R.string.rt_add_link)
-                },
+            contentDescription = linkLabel,
             colors = if (cursorInLink) activeColors else colors,
             onClick = { showLinkDialog = true },
         )
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
 private fun ButtonGroupScope.MarkdownToolbarIconButton(
     symbolName: String,
     contentDescription: String,
@@ -211,24 +236,36 @@ private fun ButtonGroupScope.MarkdownToolbarIconButton(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    RememberIconButton(
-        onClick = onClick,
-        enabled = enabled,
-        colors = colors,
-        modifier = Modifier.animateWidth(interactionSource),
-        interactionSource = interactionSource,
-    ) {
-        RememberMaterialRoundedSymbol(
-            name = symbolName,
-            weight = FontWeight.Medium,
-            modifier = Modifier.semantics { this.contentDescription = contentDescription },
-        )
-    }
+    customItem(
+        buttonGroupContent = {
+            val interactionSource = remember { MutableInteractionSource() }
+            RememberIconButton(
+                onClick = onClick,
+                enabled = enabled,
+                colors = colors,
+                modifier = Modifier.animateWidth(interactionSource),
+                interactionSource = interactionSource,
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name = symbolName,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.semantics { this.contentDescription = contentDescription },
+                )
+            }
+        },
+        menuContent = { menuState ->
+            RememberDropdownMenuItem(
+                text = { Text(contentDescription) },
+                onClick = {
+                    onClick()
+                    menuState.dismiss()
+                },
+                enabled = enabled,
+            )
+        },
+    )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
 private fun ButtonGroupScope.MarkdownToolbarTextButton(
     label: String,
     contentDescription: String,
@@ -236,25 +273,36 @@ private fun ButtonGroupScope.MarkdownToolbarTextButton(
     onClick: () -> Unit,
     fontFamily: FontFamily? = null,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    RememberIconButton(
-        onClick = onClick,
-        colors = colors,
-        modifier = Modifier.animateWidth(interactionSource),
-        interactionSource = interactionSource,
-    ) {
-        Text(
-            text = label,
-            fontFamily = fontFamily,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.semantics { this.contentDescription = contentDescription },
-        )
-    }
+    customItem(
+        buttonGroupContent = {
+            val interactionSource = remember { MutableInteractionSource() }
+            RememberIconButton(
+                onClick = onClick,
+                colors = colors,
+                modifier = Modifier.animateWidth(interactionSource),
+                interactionSource = interactionSource,
+            ) {
+                Text(
+                    text = label,
+                    fontFamily = fontFamily,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { this.contentDescription = contentDescription },
+                )
+            }
+        },
+        menuContent = { menuState ->
+            RememberDropdownMenuItem(
+                text = { Text(contentDescription) },
+                onClick = {
+                    onClick()
+                    menuState.dismiss()
+                },
+            )
+        },
+    )
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
-@Composable
 private fun ButtonGroupScope.HeadingButton(
     label: String,
     contentDescription: String,
@@ -263,20 +311,33 @@ private fun ButtonGroupScope.HeadingButton(
     colors: IconButtonColors,
     activeColors: IconButtonColors,
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    RememberIconButton(
-        onClick = onClick,
-        colors = if (active) activeColors else colors,
-        modifier = Modifier.animateWidth(interactionSource),
-        interactionSource = interactionSource,
-    ) {
-        Text(
-            text = label,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.semantics { this.contentDescription = contentDescription },
-        )
-    }
+    customItem(
+        buttonGroupContent = {
+            val interactionSource = remember { MutableInteractionSource() }
+            RememberIconButton(
+                onClick = onClick,
+                colors = if (active) activeColors else colors,
+                modifier = Modifier.animateWidth(interactionSource),
+                interactionSource = interactionSource,
+            ) {
+                Text(
+                    text = label,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.semantics { this.contentDescription = contentDescription },
+                )
+            }
+        },
+        menuContent = { menuState ->
+            RememberDropdownMenuItem(
+                text = { Text(contentDescription) },
+                onClick = {
+                    onClick()
+                    menuState.dismiss()
+                },
+            )
+        },
+    )
 }
 
 @Composable

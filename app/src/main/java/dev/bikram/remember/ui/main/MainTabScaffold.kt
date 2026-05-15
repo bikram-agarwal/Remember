@@ -69,6 +69,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
+import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.NoteRepository
@@ -135,7 +136,15 @@ fun MainTabScaffold(
     var historyVisibleItemCount by rememberSaveable { mutableIntStateOf(0) }
     val tabStateHolder = rememberSaveableStateHolder()
     val context = LocalContext.current
-    val shareText = stringResource(R.string.main_share_text)
+    val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
+    val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
+    val shareUrl =
+        when {
+            BuildConfig.FLAVOR == "playstore" -> playStoreListingUrl
+            githubRepoForSourceLink.isNotEmpty() -> "https://github.com/$githubRepoForSourceLink/releases/latest"
+            else -> playStoreListingUrl
+        }
+    val shareText = context.getString(R.string.about_share_text, shareUrl)
     val shareChooserTitle = stringResource(R.string.main_share_chooser_title)
     val reducedMotion = LocalReducedMotion.current
 

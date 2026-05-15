@@ -304,7 +304,6 @@ fun HomeScreen(
                     if (state.inSelectionMode) {
                         Text(
                             text = stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.headlineLargeEmphasized,
                             fontWeight = FontWeight.Bold,
                         )
                     } else {

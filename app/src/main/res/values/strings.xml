@@ -3,7 +3,7 @@
 
     <!-- App -->
     <string name="app_name">Remember</string>
-    <string name="app_tagline">Notes, lists, reminders - done right</string>
+    <string name="app_tagline">Notes, tasks, reminders - done right</string>
     <string name="app_version_format">%1$s v%2$s</string>
     <string name="about_build_variant_format">%1$s, %2$s</string>
     <string name="build_flavor_github">GitHub</string>
@@ -119,7 +119,7 @@
     <string name="main_fab_create">Create</string>
     <string name="main_menu_share_app">Share app</string>
     <string name="main_share_chooser_title">Share Remember</string>
-    <string name="main_share_text">Remember - notes, lists, reminders - done right. https://play.google.com/store/apps/details?id=dev.bikram.remember</string>
+    <string name="about_share_text">Finally found a solid app to manage my tasks and notes with a beautiful UI and fail-safe reminders. Check it out: %s</string>
     <string name="main_empty_trash_title">Empty trash?</string>
     <string name="main_empty_trash_subtitle">Permanently delete all trashed items. This cannot be undone.</string>
     <string name="main_move_archive_to_trash_title">Move all archived items to trash?</string>
@@ -525,8 +525,9 @@
     <string name="tag_editor_hex_label">HEX</string>
     <string name="tag_editor_duplicate">Already added</string>
     <string name="tag_editor_duplicate_existing">A tag with this name already exists</string>
+    <string name="tag_editor_edit_mode_label">Edit mode</string>
     <string name="tag_editor_edit_mode_cd">Edit tags</string>
-    <string name="tag_editor_edit_mode_hint">Edit mode: tap a tag to change its name and color</string>
+    <string name="tag_editor_edit_mode_hint">Create new tag or tap a tag to change its name and color</string>
     <string name="tag_editor_assign_mode_hint">Tap a tag to change its state: (+) Assign, (x) Remove</string>
     <string name="tag_editor_unsaved_title">Unsaved tag changes</string>
     <string name="tag_editor_unsaved_body">Tag changes are not saved yet. Discard them?</string>
@@ -679,7 +680,7 @@
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>
     <string name="appearance_add_custom_color_cd">Add custom color</string>
     <string name="appearance_custom_accent_title">Custom accent color</string>
-    <string name="appearance_custom_accent_body">Pick any hex color - Material You will generate a harmonized palette from it</string>
+    <string name="appearance_select_color">Select a color</string>
     <string name="appearance_preview">Preview</string>
     <string name="appearance_invalid_hex">Invalid hex</string>
     <string name="appearance_hex_placeholder">#FF5733 or FF5733</string>
@@ -732,8 +733,25 @@
     <string name="settings_swipe_gesture">Swipe actions</string>
     <string name="settings_swipe_mode_execute_one">Swipe to execute one action</string>
     <string name="settings_swipe_mode_reveal_actions">Swipe to reveal three actions</string>
-    <string name="settings_swipe_right_actions">Right swipe actions</string>
-    <string name="settings_swipe_left_actions">Left swipe actions</string>
+    <string name="settings_swipe_right_label">Swipe right</string>
+    <string name="settings_swipe_left_label">Swipe left</string>
+    <string name="settings_swipe_reveal_title">Reveal</string>
+    <string name="settings_swipe_reveal_subtitle">3 per side</string>
+    <string name="settings_swipe_execute_title">Execute</string>
+    <string name="settings_swipe_execute_subtitle">1 per side</string>
+    <string name="settings_swipe_actions_configured">%1$d of %2$d actions configured</string>
+    <string name="settings_swipe_single_action_desc">Single action - fires on full swipe</string>
+    <string name="settings_swipe_drag_hint">Each swipe reveals three actions. Drag to reorder.</string>
+    <string name="settings_swipe_tap_hint">Each swipe runs one action. Tap to change the action.</string>
+    <string name="settings_swipe_action_done_short">Done</string>
+    <plurals name="settings_swipe_right_actions">
+        <item quantity="one">Right swipe action</item>
+        <item quantity="other">Right swipe actions</item>
+    </plurals>
+    <plurals name="settings_swipe_left_actions">
+        <item quantity="one">Left swipe action</item>
+        <item quantity="other">Left swipe actions</item>
+    </plurals>
     <string name="settings_swipe_none">None</string>
     <string name="swipe_action_open">Edit</string>
     <string name="swipe_action_duplicate">Duplicate</string>

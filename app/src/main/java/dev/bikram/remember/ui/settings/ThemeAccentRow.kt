@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -81,6 +82,7 @@ fun ThemeAccentRow(
     colorSource: ColorSource,
     activeCustomSeedHex: String,
     savedCustomSeedHexes: List<String>,
+    customColorPickerOpen: Boolean,
     onSelectPreset: (ColorSource) -> Unit,
     onSelectCustomHex: (String) -> Unit,
     onCustomHexLongPress: (String) -> Unit,
@@ -175,11 +177,14 @@ fun ThemeAccentRow(
                 contentAlignment = Alignment.Center,
             ) {
                 RememberMaterialRoundedSymbol(
-                    name = "add",
-                    size = 26.dp,
+                    name = if (customColorPickerOpen) "chevron_right" else "add",
+                    size = if (customColorPickerOpen) 22.dp else 26.dp,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     weight = FontWeight.Medium,
-                    modifier = Modifier.semantics { contentDescription = addCustomColorCd },
+                    modifier =
+                        Modifier
+                            .graphicsLayer { rotationZ = if (customColorPickerOpen) 90f else 0f }
+                            .semantics { contentDescription = addCustomColorCd },
                 )
             }
         }
