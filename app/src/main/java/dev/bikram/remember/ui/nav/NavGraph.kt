@@ -2,6 +2,10 @@ package dev.bikram.remember.ui.nav
 
 import android.app.Activity
 import android.net.Uri
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -15,10 +19,13 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -33,14 +40,20 @@ import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.googletasks.GoogleTasksImportRoute
+import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.edit.EditListRoute
 import dev.bikram.remember.ui.edit.EditNoteRoute
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import dev.bikram.remember.ui.help.HelpScreen
 import dev.bikram.remember.ui.help.HelpViewModel
+import dev.bikram.remember.ui.history.HistoryRoute
+import dev.bikram.remember.ui.history.HistorySection
+import dev.bikram.remember.ui.home.HomeRoute
+import dev.bikram.remember.ui.main.MainTab
 import dev.bikram.remember.ui.main.MainTabScaffold
 import dev.bikram.remember.ui.onboarding.OnboardingPermissionsScreen
 import dev.bikram.remember.ui.onboarding.OnboardingTitleScreen
+import dev.bikram.remember.ui.settings.SettingsRoute
+import dev.bikram.remember.ui.theme.LocalReducedMotion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -50,7 +63,9 @@ object Routes {
     const val ONBOARDING_TITLE = "onboardingTitle"
     const val ONBOARDING_PERMISSIONS = "onboardingPermissions"
     const val EXTERNAL_LAUNCH = "externalLaunch"
-    const val MAIN = "main"
+    const val NOTES = "notes"
+    const val HISTORY = "history"
+    const val SETTINGS = "settings"
     const val EDIT_NOTE = "editNote"
     const val EDIT_LIST = "editList"
     const val GOOGLE_TASKS_IMPORT = "googleTasksImport"
@@ -92,6 +107,11 @@ fun RememberNavGraph(
     launchFlow: MutableStateFlow<LaunchAction?>? = null,
     openSettingsRequest: Int = 0,
     openUpdateSheetRequest: Int = 0,
+    updateBarState: UpdateChromeState = UpdateChromeState.Hidden,
+    updateFabState: UpdateChromeState = UpdateChromeState.Hidden,
+    onUpdateClick: () -> Unit = {},
+    onDismissUpdateAvailable: () -> Unit = {},
+    onInstallUpdate: () -> Unit = {},
 ) {
     val navController = rememberNavController()
     val helpVm: HelpViewModel = hiltViewModel()
@@ -100,6 +120,9 @@ fun RememberNavGraph(
     val onboardingState by onboardingPrefs.state.collectAsStateWithLifecycle(initialValue = null)
     val currentOnboardingState = onboardingState
     val onboardingScope = rememberCoroutineScope()
+    val reducedMotion = LocalReducedMotion.current
+    var historySection by rememberSaveable { mutableStateOf(HistorySection.ARCHIVE) }
+    var historyVisibleItemCount by rememberSaveable { mutableIntStateOf(0) }
 
     if (currentOnboardingState == null) {
         Box(modifier = Modifier.fillMaxSize())
@@ -118,9 +141,19 @@ fun RememberNavGraph(
             when {
                 !currentOnboardingState.hasSeenIntro -> Routes.ONBOARDING_TITLE
                 initialExternalLaunch -> Routes.EXTERNAL_LAUNCH
-                else -> Routes.MAIN
+                else -> Routes.NOTES
             }
         }
+
+    val openMainTab: (MainTab) -> Unit = { selectedTab ->
+        navController.navigate(routeForMainTab(selectedTab)) {
+            popUpTo(navController.graph.findStartDestination().id) {
+                saveState = true
+            }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     LaunchedEffect(launchFlow, currentOnboardingState.hasSeenIntro) {
         if (!currentOnboardingState.hasSeenIntro) return@LaunchedEffect
@@ -134,7 +167,7 @@ fun RememberNavGraph(
                         val note = repository.get(action.id)
                         if (note == null) {
                             if (action.exitOnBack) {
-                                navController.navigate(Routes.MAIN) {
+                                navController.navigate(Routes.NOTES) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         inclusive = true
                                     }
@@ -146,7 +179,7 @@ fun RememberNavGraph(
                         navController.openEditRouteFor(note, exitOnBack = action.exitOnBack)
                     }
                     LaunchAction.OpenSettingsUpdates -> {
-                        navController.navigate(Routes.MAIN) {
+                        navController.navigate(Routes.SETTINGS) {
                             popUpTo(navController.graph.findStartDestination().id)
                             launchSingleTop = true
                         }
@@ -156,6 +189,18 @@ fun RememberNavGraph(
             } finally {
                 launchFlow.value = null
             }
+        }
+    }
+
+    val settingsRequest = openSettingsRequest + openSettingsUpdatesRequest
+    LaunchedEffect(settingsRequest) {
+        if (settingsRequest > 0) {
+            openMainTab(MainTab.Settings)
+        }
+    }
+    LaunchedEffect(settingsHighlightSection) {
+        if (settingsHighlightSection != null) {
+            openMainTab(MainTab.Settings)
         }
     }
 
@@ -199,7 +244,7 @@ fun RememberNavGraph(
                 },
                 exitTransition = {
                     if (targetState.destination.route == Routes.ONBOARDING_TITLE ||
-                        targetState.destination.route == Routes.MAIN
+                        targetState.destination.route == Routes.NOTES
                     ) {
                         slideOutHorizontally { -it / 3 } + fadeOut()
                     } else {
@@ -225,7 +270,7 @@ fun RememberNavGraph(
                     onContinue = {
                         onboardingScope.launch {
                             onboardingPrefs.markIntroSeen()
-                            navController.navigate(Routes.MAIN) {
+                            navController.navigate(Routes.NOTES) {
                                 popUpTo(navController.graph.id) {
                                     inclusive = true
                                 }
@@ -239,25 +284,116 @@ fun RememberNavGraph(
                 Box(modifier = Modifier.fillMaxSize())
             }
 
-            composable(Routes.MAIN) {
+            composable(
+                route = Routes.NOTES,
+                enterTransition = { primaryTabEnterTransition(reducedMotion) },
+                exitTransition = { primaryTabExitTransition(reducedMotion) },
+                popEnterTransition = { primaryTabEnterTransition(reducedMotion) },
+                popExitTransition = { primaryTabExitTransition(reducedMotion) },
+            ) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
                     LocalNavAnimatedVisibilityScope provides this@composable,
                 ) {
                     MainTabScaffold(
                         repository = repository,
-                        interactionPrefs = interactionPrefs,
+                        currentTab = MainTab.Notes,
+                        onTabSelected = openMainTab,
                         onCreateNote = { navController.navigate(Routes.editNote(null)) },
                         onCreateList = { navController.navigate(Routes.editList(null)) },
-                        onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
                         onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
-                        onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
-                        onOpenHelp = { navController.navigate(Routes.HELP) },
-                        settingsHighlightSection = settingsHighlightSection,
-                        onSettingsHighlightHandled = { settingsHighlightSection = null },
-                        openSettingsRequest = openSettingsRequest + openSettingsUpdatesRequest,
-                        openUpdateSheetRequest = openUpdateSheetRequest + openSettingsUpdatesRequest,
-                    )
+                        historySection = historySection,
+                        historyVisibleItemCount = historyVisibleItemCount,
+                        updateBarState = updateBarState,
+                        updateFabState = updateFabState,
+                        onUpdateClick = onUpdateClick,
+                        onDismissUpdateAvailable = onDismissUpdateAvailable,
+                        onInstallUpdate = onInstallUpdate,
+                    ) { closeRevealRequest ->
+                        HomeRoute(
+                            interactionPrefs = interactionPrefs,
+                            closeRevealRequest = closeRevealRequest,
+                            onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
+                            onCreateNote = { navController.navigate(Routes.editNote(null)) },
+                            onCreateList = { navController.navigate(Routes.editList(null)) },
+                        )
+                    }
+                }
+            }
+
+            composable(
+                route = Routes.HISTORY,
+                enterTransition = { primaryTabEnterTransition(reducedMotion) },
+                exitTransition = { primaryTabExitTransition(reducedMotion) },
+                popEnterTransition = { primaryTabEnterTransition(reducedMotion) },
+                popExitTransition = { primaryTabExitTransition(reducedMotion) },
+            ) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                    LocalNavAnimatedVisibilityScope provides this@composable,
+                ) {
+                    MainTabScaffold(
+                        repository = repository,
+                        currentTab = MainTab.History,
+                        onTabSelected = openMainTab,
+                        onCreateNote = { navController.navigate(Routes.editNote(null)) },
+                        onCreateList = { navController.navigate(Routes.editList(null)) },
+                        onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
+                        historySection = historySection,
+                        historyVisibleItemCount = historyVisibleItemCount,
+                        updateBarState = updateBarState,
+                        updateFabState = updateFabState,
+                        onUpdateClick = onUpdateClick,
+                        onDismissUpdateAvailable = onDismissUpdateAvailable,
+                        onInstallUpdate = onInstallUpdate,
+                    ) {
+                        HistoryRoute(
+                            interactionPrefs = interactionPrefs,
+                            section = historySection,
+                            onSectionChange = { selectedSection -> historySection = selectedSection },
+                            onVisibleItemCountChange = { visibleItemCount ->
+                                historyVisibleItemCount = visibleItemCount
+                            },
+                            onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
+                        )
+                    }
+                }
+            }
+
+            composable(
+                route = Routes.SETTINGS,
+                enterTransition = { primaryTabEnterTransition(reducedMotion) },
+                exitTransition = { primaryTabExitTransition(reducedMotion) },
+                popEnterTransition = { primaryTabEnterTransition(reducedMotion) },
+                popExitTransition = { primaryTabExitTransition(reducedMotion) },
+            ) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                    LocalNavAnimatedVisibilityScope provides this@composable,
+                ) {
+                    MainTabScaffold(
+                        repository = repository,
+                        currentTab = MainTab.Settings,
+                        onTabSelected = openMainTab,
+                        onCreateNote = { navController.navigate(Routes.editNote(null)) },
+                        onCreateList = { navController.navigate(Routes.editList(null)) },
+                        onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
+                        historySection = historySection,
+                        historyVisibleItemCount = historyVisibleItemCount,
+                        updateBarState = updateBarState,
+                        updateFabState = updateFabState,
+                        onUpdateClick = onUpdateClick,
+                        onDismissUpdateAvailable = onDismissUpdateAvailable,
+                        onInstallUpdate = onInstallUpdate,
+                    ) {
+                        SettingsRoute(
+                            onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                            onOpenHelp = { navController.navigate(Routes.HELP) },
+                            openUpdateSheetRequest = openUpdateSheetRequest + openSettingsUpdatesRequest,
+                            highlightSectionKey = settingsHighlightSection,
+                            onHighlightHandled = { settingsHighlightSection = null },
+                        )
+                    }
                 }
             }
 
@@ -303,7 +439,7 @@ fun RememberNavGraph(
                 }
                 val onNavigateUp = {
                     if (exitOnBack) {
-                        navController.navigate(Routes.MAIN) {
+                        navController.navigate(Routes.NOTES) {
                             popUpTo(navController.graph.id) {
                                 inclusive = true
                             }
@@ -348,7 +484,11 @@ fun RememberNavGraph(
                     onBack = { navController.popBackStack() },
                     onOpenAppSection = { sectionKey ->
                         settingsHighlightSection = sectionKey
-                        navController.popBackStack()
+                        val returnedToExistingSettings =
+                            navController.popBackStack(Routes.SETTINGS, inclusive = false)
+                        if (!returnedToExistingSettings) {
+                            openMainTab(MainTab.Settings)
+                        }
                     },
                     helpVm = helpVm,
                 )
@@ -392,7 +532,7 @@ fun RememberNavGraph(
                 }
                 val onNavigateUp = {
                     if (exitOnBack) {
-                        navController.navigate(Routes.MAIN) {
+                        navController.navigate(Routes.NOTES) {
                             popUpTo(navController.graph.id) {
                                 inclusive = true
                             }
@@ -437,5 +577,48 @@ private fun NavController.openEditRouteFor(
             }
         }
         launchSingleTop = true
+    }
+}
+
+private fun routeForMainTab(tab: MainTab): String =
+    when (tab) {
+        MainTab.Notes -> Routes.NOTES
+        MainTab.History -> Routes.HISTORY
+        MainTab.Settings -> Routes.SETTINGS
+    }
+
+private fun mainTabForRoute(route: String?): MainTab? =
+    when (route) {
+        Routes.NOTES -> MainTab.Notes
+        Routes.HISTORY -> MainTab.History
+        Routes.SETTINGS -> MainTab.Settings
+        else -> null
+    }
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabEnterTransition(
+    reducedMotion: Boolean,
+): EnterTransition? {
+    val initialTab = mainTabForRoute(initialState.destination.route) ?: return null
+    val targetTab = mainTabForRoute(targetState.destination.route) ?: return null
+    return if (reducedMotion) {
+        fadeIn(animationSpec = tween(durationMillis = 0))
+    } else if (targetTab.ordinal > initialTab.ordinal) {
+        slideInHorizontally { it } + fadeIn()
+    } else {
+        slideInHorizontally { -it } + fadeIn()
+    }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.primaryTabExitTransition(
+    reducedMotion: Boolean,
+): ExitTransition? {
+    val initialTab = mainTabForRoute(initialState.destination.route) ?: return null
+    val targetTab = mainTabForRoute(targetState.destination.route) ?: return null
+    return if (reducedMotion) {
+        fadeOut(animationSpec = tween(durationMillis = 0))
+    } else if (targetTab.ordinal > initialTab.ordinal) {
+        slideOutHorizontally { -it / 3 } + fadeOut()
+    } else {
+        slideOutHorizontally { it } + fadeOut()
     }
 }

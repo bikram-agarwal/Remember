@@ -9,24 +9,18 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
@@ -34,8 +28,8 @@ import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteRepository
-import dev.bikram.remember.data.OnboardingState
 import dev.bikram.remember.data.OnboardingPrefs
+import dev.bikram.remember.data.OnboardingState
 import dev.bikram.remember.data.TagRepository
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemePrefs
@@ -45,8 +39,7 @@ import dev.bikram.remember.data.UpdatePrefs
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.ui.InAppRatingAutoPromptHost
-import dev.bikram.remember.ui.components.PlayStoreGlobalUpdateBanner
-import dev.bikram.remember.ui.components.SwipeDismissableUpdatePromoBanner
+import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.lock.LockScreen
 import dev.bikram.remember.ui.nav.RememberNavGraph
 import dev.bikram.remember.ui.tags.LocalTagColors
@@ -55,6 +48,7 @@ import dev.bikram.remember.update.AppReviewLauncher
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
 import dev.bikram.remember.update.PlayInAppUpdateProgressController
 import dev.bikram.remember.update.RememberUpdateState
+import dev.bikram.remember.update.notificationDedupeKey
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -221,7 +215,6 @@ private fun AppRoot(
     val unlocked by appUnlocked.collectAsStateWithLifecycle(initialValue = false)
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val updateInfo by rememberUpdateState.updateInfo.collectAsStateWithLifecycle(initialValue = null)
-    val updatePromoDismissed by rememberUpdateState.updatePromoBannerDismissedThisSession.collectAsStateWithLifecycle()
     val realPlayBannerState by playInAppUpdateProgressController.bannerUiState.collectAsStateWithLifecycle()
     val devReleaseMockPlayBannerState by rememberUpdateState.devReleasePlayBannerMockUiState.collectAsStateWithLifecycle()
     val playBannerState =
@@ -233,6 +226,7 @@ private fun AppRoot(
     val context = LocalContext.current
     var openSettingsRequest by rememberSaveable { mutableIntStateOf(0) }
     var openUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
+    var dismissedUpdateBarKey by rememberSaveable { mutableStateOf<String?>(null) }
     val currentLockState = lockState
 
     if (currentLockState == null) {
@@ -259,53 +253,65 @@ private fun AppRoot(
         androidx.compose.runtime.CompositionLocalProvider(
             dev.bikram.remember.ui.theme.LocalSnackbarHostState provides snackbarHostState,
         ) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                RememberNavGraph(
-                    repository = noteRepository,
-                    onboardingPrefs = onboardingPrefs,
-                    interactionPrefs = interactionPrefs,
-                    appScope = appScope,
-                    launchFlow = launchFlow,
-                    openSettingsRequest = openSettingsRequest,
-                    openUpdateSheetRequest = openUpdateSheetRequest,
-                )
-                val showPlayBanner = playBannerState != PlayInAppUpdateBannerUiState.Hidden
-                val showUpdatePromo =
-                    BuildConfig.SHOW_UPDATES &&
-                        updateInfo != null &&
-                        !updatePromoDismissed &&
-                        !showPlayBanner
-                if (showPlayBanner || showUpdatePromo) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .align(Alignment.TopCenter)
-                                .windowInsetsPadding(WindowInsets.statusBars)
-                                .padding(start = 16.dp, end = 16.dp, top = 4.dp),
-                    ) {
-                        if (showPlayBanner) {
-                            PlayStoreGlobalUpdateBanner(
-                                state = playBannerState,
-                                onInstallClick = {
-                                    if (rememberUpdateState.devReleaseCompletePlayUpdateIfReady()) return@PlayStoreGlobalUpdateBanner
-                                    val activity = context as? Activity ?: return@PlayStoreGlobalUpdateBanner
-                                    playInAppUpdateProgressController.completeFlexibleUpdateIfReady(activity)
-                                },
-                            )
-                        } else if (showUpdatePromo) {
-                            SwipeDismissableUpdatePromoBanner(
-                                onDismiss = { rememberUpdateState.dismissUpdatePromoBanner() },
-                                onOpenSettingsClick = {
-                                    openSettingsRequest += 1
-                                    openUpdateSheetRequest += 1
-                                },
-                            )
+            val currentUpdateInfo = updateInfo
+            val updateKey = currentUpdateInfo?.notificationDedupeKey()
+            val updateAvailable = BuildConfig.SHOW_UPDATES && currentUpdateInfo != null
+            val updateFabState =
+                when (val currentPlayState = playBannerState) {
+                    is PlayInAppUpdateBannerUiState.Downloading ->
+                        UpdateChromeState.Downloading(
+                            bytesDownloaded = currentPlayState.bytesDownloaded,
+                            totalBytesToDownload = currentPlayState.totalBytesToDownload,
+                            indeterminateProgress = currentPlayState.indeterminateProgress,
+                        )
+                    PlayInAppUpdateBannerUiState.ReadyToInstall -> UpdateChromeState.ReadyToInstall
+                    PlayInAppUpdateBannerUiState.Hidden ->
+                        if (updateAvailable) {
+                            UpdateChromeState.Available
+                        } else {
+                            UpdateChromeState.Hidden
+                        }
+                }
+            val updateBarState =
+                when (val currentPlayState = playBannerState) {
+                    is PlayInAppUpdateBannerUiState.Downloading ->
+                        UpdateChromeState.Downloading(
+                            bytesDownloaded = currentPlayState.bytesDownloaded,
+                            totalBytesToDownload = currentPlayState.totalBytesToDownload,
+                            indeterminateProgress = currentPlayState.indeterminateProgress,
+                        )
+                    PlayInAppUpdateBannerUiState.ReadyToInstall -> UpdateChromeState.ReadyToInstall
+                    PlayInAppUpdateBannerUiState.Hidden ->
+                        if (updateAvailable && updateKey != dismissedUpdateBarKey) {
+                            UpdateChromeState.Available
+                        } else {
+                            UpdateChromeState.Hidden
+                        }
+                }
+            RememberNavGraph(
+                repository = noteRepository,
+                onboardingPrefs = onboardingPrefs,
+                interactionPrefs = interactionPrefs,
+                appScope = appScope,
+                launchFlow = launchFlow,
+                openSettingsRequest = openSettingsRequest,
+                openUpdateSheetRequest = openUpdateSheetRequest,
+                updateBarState = updateBarState,
+                updateFabState = updateFabState,
+                onUpdateClick = {
+                    openSettingsRequest += 1
+                    openUpdateSheetRequest += 1
+                },
+                onDismissUpdateAvailable = { dismissedUpdateBarKey = updateKey },
+                onInstallUpdate = {
+                    if (!rememberUpdateState.devReleaseCompletePlayUpdateIfReady()) {
+                        val activity = context as? Activity
+                        if (activity != null) {
+                            playInAppUpdateProgressController.completeFlexibleUpdateIfReady(activity)
                         }
                     }
-                }
-            }
+                },
+            )
         }
     }
 }

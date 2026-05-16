@@ -12,9 +12,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import dev.bikram.remember.R
 
-/**
- * Profile photo from [R.drawable.me_600], backed by `res/drawable/me_600.webp` in this module.
- */
 @Composable
 fun AboutAuthorPhoto(modifier: Modifier = Modifier) {
     Box(

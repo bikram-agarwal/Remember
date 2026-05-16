@@ -1,19 +1,14 @@
 package dev.bikram.remember.ui.main
 
 import android.content.Intent
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -54,7 +49,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,24 +65,22 @@ import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
-import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.NoteRepository
-import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.components.RememberFloatingActionButton
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.UpdateChromeState
+import dev.bikram.remember.ui.components.UpdateFloatingBar
+import dev.bikram.remember.ui.components.UpdateFloatingFab
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.history.HistoryRoute
 import dev.bikram.remember.ui.history.HistorySection
-import dev.bikram.remember.ui.home.HomeRoute
-import dev.bikram.remember.ui.settings.SettingsRoute
-import dev.bikram.remember.ui.theme.LocalReducedMotion
+import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.RoundedPolygonShape
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -115,26 +107,24 @@ enum class MainTab(
 @Composable
 fun MainTabScaffold(
     repository: NoteRepository,
-    interactionPrefs: InteractionPrefs,
+    currentTab: MainTab,
+    onTabSelected: (MainTab) -> Unit,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
-    onOpenNote: (NoteWithItems, Boolean) -> Unit,
     onImportGoogleTasks: () -> Unit,
-    onOpenIntro: () -> Unit,
-    onOpenHelp: () -> Unit = {},
-    settingsHighlightSection: String? = null,
-    onSettingsHighlightHandled: () -> Unit = {},
-    openSettingsRequest: Int = 0,
-    openUpdateSheetRequest: Int = 0,
+    historySection: HistorySection,
+    historyVisibleItemCount: Int,
+    updateBarState: UpdateChromeState,
+    updateFabState: UpdateChromeState,
+    onUpdateClick: () -> Unit,
+    onDismissUpdateAvailable: () -> Unit,
+    onInstallUpdate: () -> Unit,
+    content: @Composable (closeRevealRequest: Int) -> Unit,
 ) {
-    var tab by rememberSaveable { mutableStateOf(MainTab.Notes) }
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
     var clearTrashOpen by rememberSaveable { mutableStateOf(false) }
     var moveArchiveToTrashOpen by rememberSaveable { mutableStateOf(false) }
     var closeNotesRevealRequest by rememberSaveable { mutableIntStateOf(0) }
-    var historySection by rememberSaveable { mutableStateOf(HistorySection.ARCHIVE) }
-    var historyVisibleItemCount by rememberSaveable { mutableIntStateOf(0) }
-    val tabStateHolder = rememberSaveableStateHolder()
     val context = LocalContext.current
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
@@ -146,31 +136,16 @@ fun MainTabScaffold(
         }
     val shareText = context.getString(R.string.about_share_text, shareUrl)
     val shareChooserTitle = stringResource(R.string.main_share_chooser_title)
-    val reducedMotion = LocalReducedMotion.current
 
-    // Back handling: when the FAB speed dial is open, back closes it first.
-    // On History/Settings tab, back returns to the Notes tab instead of exiting.
-    // On Notes tab with nothing open, the default handler runs (exits the app).
+    // Back handling: when the FAB speed dial is open, back closes it first. Tab route
+    // back behavior is owned by Navigation Compose so predictive back can preview it.
     RememberPredictiveBackHandler(enabled = fabExpanded) { fabExpanded = false }
-    RememberPredictiveBackHandler(enabled = !fabExpanded && tab != MainTab.Notes) {
-        tab = MainTab.Notes
-    }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(openSettingsRequest) {
-        if (openSettingsRequest > 0) {
-            tab = MainTab.Settings
-        }
-    }
-    LaunchedEffect(settingsHighlightSection) {
-        if (settingsHighlightSection != null) {
-            tab = MainTab.Settings
-        }
-    }
-    LaunchedEffect(tab) {
+    LaunchedEffect(currentTab) {
         // Switching tabs collapses the speed dial so the captured FAB bounds do not
         // briefly point at a stale location while the new tab's FAB rebinds.
-        if (tab != MainTab.Notes) fabExpanded = false
+        if (currentTab != MainTab.Notes) fabExpanded = false
     }
 
     val navigationSuiteType =
@@ -178,63 +153,12 @@ fun MainTabScaffold(
     val useAdaptiveNavigationRail = navigationSuiteType != NavigationSuiteType.NavigationBar
     val mainContent: @Composable () -> Unit = {
         Box(modifier = Modifier.fillMaxSize()) {
-            AnimatedContent(
-                targetState = tab,
-                transitionSpec = {
-                    if (reducedMotion) {
-                        fadeIn(animationSpec = tween(durationMillis = 0)) togetherWith
-                            fadeOut(animationSpec = tween(durationMillis = 0))
-                    } else if (targetState.ordinal > initialState.ordinal) {
-                        (slideInHorizontally { it } + fadeIn()) togetherWith
-                            (slideOutHorizontally { -it / 3 } + fadeOut())
-                    } else {
-                        (slideInHorizontally { -it } + fadeIn()) togetherWith
-                            (slideOutHorizontally { it } + fadeOut())
-                    }
-                },
-                label = "tab",
-                modifier = Modifier.fillMaxSize(),
-            ) { current ->
-                tabStateHolder.SaveableStateProvider(current.name) {
-                    when (current) {
-                        MainTab.Notes ->
-                            HomeRoute(
-                                interactionPrefs = interactionPrefs,
-                                closeRevealRequest = closeNotesRevealRequest,
-                                onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
-                                onCreateNote = {
-                                    fabExpanded = false
-                                    onCreateNote()
-                                },
-                                onCreateList = {
-                                    fabExpanded = false
-                                    onCreateList()
-                                },
-                            )
-                        MainTab.History ->
-                            HistoryRoute(
-                                interactionPrefs = interactionPrefs,
-                                section = historySection,
-                                onSectionChange = { historySection = it },
-                                onVisibleItemCountChange = { historyVisibleItemCount = it },
-                                onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
-                            )
-                        MainTab.Settings ->
-                            SettingsRoute(
-                                onOpenIntro = onOpenIntro,
-                                onOpenHelp = onOpenHelp,
-                                openUpdateSheetRequest = openUpdateSheetRequest,
-                                highlightSectionKey = settingsHighlightSection,
-                                onHighlightHandled = onSettingsHighlightHandled,
-                            )
-                    }
-                }
-            }
+            content(closeNotesRevealRequest)
 
             // Scrim covers the page (not the toolbar / FAB) when the speed dial is open.
             // Tapping the scrim collapses the menu, matching standard speed-dial dismiss.
             AnimatedVisibility(
-                visible = fabExpanded && tab == MainTab.Notes,
+                visible = fabExpanded && currentTab == MainTab.Notes,
                 enter = fadeIn(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
                 exit = fadeOut(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
                 modifier = Modifier.fillMaxSize(),
@@ -246,6 +170,20 @@ fun MainTabScaffold(
                             .tapSoundClickable(onClick = { fabExpanded = false }),
                 )
             }
+
+            UpdateFloatingBar(
+                state = updateBarState,
+                onCheckClick = onUpdateClick,
+                onDismissAvailable = onDismissUpdateAvailable,
+                onInstallClick = onInstallUpdate,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .windowInsetsPadding(WindowInsets.navigationBars)
+                        .padding(horizontal = 16.dp)
+                        .padding(bottom = PillBottomBarHeight + 28.dp),
+            )
 
             // Bottom strip. Pill mode (phones) re-uses the original CenteredPillWithSideFab
             // layout so the FAB visually attaches to the pill at the same position as
@@ -262,7 +200,7 @@ fun MainTabScaffold(
                             .padding(end = 24.dp, bottom = 24.dp),
                 ) {
                     MainFabSlot(
-                        tab = tab,
+                        tab = currentTab,
                         fabExpanded = fabExpanded,
                         onToggleNotesFab = {
                             closeNotesRevealRequest++
@@ -308,17 +246,34 @@ fun MainTabScaffold(
                     fabGap = 12.dp,
                     pill = {
                         RememberFloatingNavPill(
-                            currentTab = tab,
+                            currentTab = currentTab,
                             onTabClick = { selected ->
                                 closeNotesRevealRequest++
-                                tab = selected
+                                onTabSelected(selected)
                                 fabExpanded = false
                             },
                         )
                     },
+                    leadingFab =
+                        if (updateFabState == UpdateChromeState.Hidden) {
+                            null
+                        } else {
+                            {
+                                UpdateFloatingFab(
+                                    state = updateFabState,
+                                    onClick = {
+                                        if (updateFabState == UpdateChromeState.ReadyToInstall) {
+                                            onInstallUpdate()
+                                        } else {
+                                            onUpdateClick()
+                                        }
+                                    },
+                                )
+                            }
+                        },
                     fab = {
                         MainFabSlot(
-                            tab = tab,
+                            tab = currentTab,
                             fabExpanded = fabExpanded,
                             onToggleNotesFab = {
                                 closeNotesRevealRequest++
@@ -353,8 +308,8 @@ fun MainTabScaffold(
                             },
                         )
                     },
-                    fabRightInset = if (tab == MainTab.Notes) 16.dp else 0.dp,
-                    fabBottomInset = if (tab == MainTab.Notes) 16.dp else 0.dp,
+                    fabRightInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
+                    fabBottomInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
                 )
             }
 
@@ -376,17 +331,17 @@ fun MainTabScaffold(
             navigationSuiteItems = {
                 MainTab.entries.forEach { tabItem ->
                     item(
-                        selected = tab == tabItem,
+                        selected = currentTab == tabItem,
                         onClick = {
                             closeNotesRevealRequest++
-                            tab = tabItem
+                            onTabSelected(tabItem)
                             fabExpanded = false
                         },
                         icon = {
                             RememberMaterialRoundedSymbol(
                                 name = tabItem.symbolName,
                                 weight = FontWeight.Medium,
-                                filled = tab == tabItem,
+                                filled = currentTab == tabItem,
                             )
                         },
                         label = {
@@ -505,6 +460,7 @@ private fun CenteredPillWithSideFab(
     fab: @Composable () -> Unit,
     fabGap: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
+    leadingFab: (@Composable () -> Unit)? = null,
     fabCoreSize: androidx.compose.ui.unit.Dp = 56.dp,
     fabRightInset: androidx.compose.ui.unit.Dp = 0.dp,
     fabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
@@ -514,6 +470,9 @@ private fun CenteredPillWithSideFab(
         content = {
             Box { pill() }
             Box { fab() }
+            if (leadingFab != null) {
+                Box { leadingFab() }
+            }
         },
     ) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
@@ -524,6 +483,10 @@ private fun CenteredPillWithSideFab(
             measurables[1].measure(
                 loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity),
             )
+        val leadingFabPlaceable =
+            measurables
+                .getOrNull(2)
+                ?.measure(loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
         val gapPx = fabGap.roundToPx()
         val fabCorePx = fabCoreSize.roundToPx()
         val fabRightInsetPx = fabRightInset.roundToPx()
@@ -567,6 +530,12 @@ private fun CenteredPillWithSideFab(
             val fabBottomY = (stripHeight + fabCorePx) / 2 + fabBottomInsetPx
             val fabY = fabBottomY - fabPlaceable.height
             fabPlaceable.place(fabX, fabY)
+
+            leadingFabPlaceable?.let { leadingPlaceable ->
+                val leadingX = (pillX - gapPx - fabCorePx).coerceAtLeast(0)
+                val leadingY = (stripHeight - leadingPlaceable.height) / 2
+                leadingPlaceable.place(leadingX, leadingY)
+            }
         }
     }
 }

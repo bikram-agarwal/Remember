@@ -479,57 +479,59 @@ fun HistoryRoute(
             )
         },
         topBar = {
-            LargeTopAppBar(
-                colors = transparentLargeTopAppBarColors(),
-                title = {
-                    Text(
-                        text = stringResource(R.string.main_tab_history),
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                actions = {
-                    if (inSelectionMode) {
-                        val cdSelectAll = stringResource(R.string.home_select_all)
-                        Box(modifier = Modifier.size(48.dp)) {
-                            RememberFilledTonalIconButton(
-                                onClick = { vm.selectNotes(selectableVisibleIds) },
-                                enabled = selectableVisibleIds.isNotEmpty(),
-                                modifier = Modifier.align(Alignment.Center),
-                            ) {
+            Column(Modifier.fillMaxWidth()) {
+                LargeTopAppBar(
+                    colors = transparentLargeTopAppBarColors(),
+                    title = {
+                        Text(
+                            text = stringResource(R.string.main_tab_history),
+                            fontWeight = FontWeight.Bold,
+                        )
+                    },
+                    actions = {
+                        if (inSelectionMode) {
+                            val cdSelectAll = stringResource(R.string.home_select_all)
+                            Box(modifier = Modifier.size(48.dp)) {
+                                RememberFilledTonalIconButton(
+                                    onClick = { vm.selectNotes(selectableVisibleIds) },
+                                    enabled = selectableVisibleIds.isNotEmpty(),
+                                    modifier = Modifier.align(Alignment.Center),
+                                ) {
+                                    RememberMaterialRoundedSymbol(
+                                        name = "select_all",
+                                        weight = FontWeight.Medium,
+                                        modifier = Modifier.semantics { contentDescription = cdSelectAll },
+                                    )
+                                }
+                                Badge(
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomStart)
+                                            .offset(x = 2.dp, y = (-2).dp),
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ) {
+                                    Text(
+                                        text = selectedIds.size.toString(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            val cdUnselectAll = stringResource(R.string.home_unselect_all)
+                            RememberFilledTonalIconButton(onClick = vm::clearSelection) {
                                 RememberMaterialRoundedSymbol(
-                                    name = "select_all",
+                                    name = "deselect",
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.semantics { contentDescription = cdSelectAll },
+                                    modifier = Modifier.semantics { contentDescription = cdUnselectAll },
                                 )
                             }
-                            Badge(
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomStart)
-                                        .offset(x = 2.dp, y = (-2).dp),
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ) {
-                                Text(
-                                    text = selectedIds.size.toString(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            }
+                            Spacer(Modifier.width(4.dp))
                         }
-                        Spacer(Modifier.width(6.dp))
-                        val cdUnselectAll = stringResource(R.string.home_unselect_all)
-                        RememberFilledTonalIconButton(onClick = vm::clearSelection) {
-                            RememberMaterialRoundedSymbol(
-                                name = "deselect",
-                                weight = FontWeight.Medium,
-                                modifier = Modifier.semantics { contentDescription = cdUnselectAll },
-                            )
-                        }
-                        Spacer(Modifier.width(4.dp))
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
         },
     ) { padding ->
         // The Box fills the full Scaffold area so the progressive blur (which fades content

@@ -7,6 +7,7 @@ import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -177,7 +178,8 @@ private fun AboutSettingsBlock(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 24.dp),
+                        .padding(horizontal = 20.dp)
+                        .padding(top = 24.dp, bottom = 8.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
@@ -277,12 +279,7 @@ private fun AboutSettingsBlock(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center,
                             ) {
-                                RememberMaterialRoundedSymbol(
-                                    name = "store",
-                                    size = 20.dp,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    weight = FontWeight.Medium,
-                                )
+                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(R.string.settings_rate_on_play_store),
@@ -360,12 +357,7 @@ private fun AboutSettingsBlock(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center,
                             ) {
-                                RememberMaterialRoundedSymbol(
-                                    name = "store",
-                                    size = 20.dp,
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                    weight = FontWeight.Medium,
-                                )
+                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.onPrimary)
                                 Spacer(Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(R.string.settings_rate_on_play_store),
@@ -415,7 +407,206 @@ private fun AboutSettingsBlock(
                         }
                     }
                 }
+                Spacer(Modifier.height(24.dp))
+                AboutOtherAppsAndLinks(
+                    context = context,
+                    copyAboutLink = copyAboutLink,
+                )
             }
         }
     }
+}
+
+@Composable
+private fun AboutPlayStoreIcon(tint: Color) {
+    Icon(
+        painter = painterResource(R.drawable.ic_google_play_mark),
+        contentDescription = null,
+        modifier = Modifier.size(20.dp),
+        tint = tint,
+    )
+}
+
+@Composable
+private fun AboutOtherAppsAndLinks(
+    context: Context,
+    copyAboutLink: (String) -> Unit,
+) {
+    val filePipeStoreUrl =
+        stringResource(
+            if (BuildConfig.FLAVOR == "github") {
+                R.string.settings_about_filepipe_github_url
+            } else {
+                R.string.settings_about_filepipe_play_store_url
+            },
+        )
+    val obtainXStoreUrl = stringResource(R.string.settings_about_obtainx_github_url)
+    val websiteUrl = stringResource(R.string.settings_about_remember_website_url)
+    val privacyUrl = stringResource(R.string.settings_about_remember_privacy_url)
+    val termsUrl = stringResource(R.string.settings_about_remember_terms_url)
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.settings_about_other_apps),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        AboutAppStoreButton(
+            iconResId = R.drawable.filepipe_logo,
+            name = stringResource(R.string.settings_about_filepipe_name),
+            tagline = stringResource(R.string.settings_about_filepipe_tagline),
+            url = filePipeStoreUrl,
+            accentColor = Color(0xFF5967D8),
+            context = context,
+            copyAboutLink = copyAboutLink,
+        )
+        if (BuildConfig.FLAVOR == "github") {
+            Spacer(Modifier.height(8.dp))
+            AboutAppStoreButton(
+                iconResId = R.drawable.obtainx_logo,
+                name = stringResource(R.string.settings_about_obtainx_name),
+                tagline = stringResource(R.string.settings_about_obtainx_tagline),
+                url = obtainXStoreUrl,
+                accentColor = Color(0xFF7C55D9),
+                context = context,
+                copyAboutLink = copyAboutLink,
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(
+            modifier = Modifier.align(Alignment.CenterHorizontally),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AboutTextLink(
+                label = stringResource(R.string.settings_about_website),
+                url = websiteUrl,
+                context = context,
+                copyAboutLink = copyAboutLink,
+            )
+            AboutLinkSeparator()
+            AboutTextLink(
+                label = stringResource(R.string.settings_about_privacy_policy),
+                url = privacyUrl,
+                context = context,
+                copyAboutLink = copyAboutLink,
+            )
+            AboutLinkSeparator()
+            AboutTextLink(
+                label = stringResource(R.string.settings_about_terms),
+                url = termsUrl,
+                context = context,
+                copyAboutLink = copyAboutLink,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AboutAppStoreButton(
+    iconResId: Int,
+    name: String,
+    tagline: String,
+    url: String,
+    accentColor: Color,
+    context: Context,
+    copyAboutLink: (String) -> Unit,
+) {
+    val shape = MaterialTheme.shapes.large
+    Surface(
+        shape = shape,
+        color = accentColor.copy(alpha = 0.13f),
+        border = BorderStroke(1.dp, accentColor.copy(alpha = 0.16f)),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .tapSoundCombinedClickable(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                        }
+                    },
+                    onLongClick = { copyAboutLink(url) },
+                ),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = painterResource(iconResId),
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(40.dp)
+                        .clip(MaterialTheme.shapes.medium),
+            )
+            Spacer(Modifier.width(10.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = tagline,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.width(8.dp))
+            RememberMaterialRoundedSymbol(
+                name = "chevron_right",
+                size = 20.dp,
+                tint = accentColor.copy(alpha = 0.86f),
+                weight = FontWeight.Medium,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AboutLinkSeparator() {
+    Text(
+        text = "•",
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+    )
+}
+
+@Composable
+private fun AboutTextLink(
+    label: String,
+    url: String,
+    context: Context,
+    copyAboutLink: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = label,
+        modifier =
+            modifier
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .tapSoundCombinedClickable(
+                    onClick = {
+                        runCatching {
+                            context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
+                        }
+                    },
+                    onLongClick = { copyAboutLink(url) },
+                ),
+        style = MaterialTheme.typography.labelMedium,
+        color = MaterialTheme.colorScheme.primary,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }

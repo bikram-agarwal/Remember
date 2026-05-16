@@ -600,7 +600,7 @@ private fun SwipeExecuteActionPicker(
                     modifier = Modifier.weight(1f),
                 )
                 RememberMaterialRoundedSymbol(
-                    name = "keyboard_arrow_down",
+                    name = "expand_more",
                     size = 17.dp,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

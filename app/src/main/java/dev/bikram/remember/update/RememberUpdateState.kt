@@ -76,6 +76,14 @@ class RememberUpdateState
                 applicationScope.launch {
                     _devReleasePlayBannerMockUiState.value =
                         PlayInAppUpdateBannerUiState.Downloading(
+                            bytesDownloaded = 0L,
+                            totalBytesToDownload = 0L,
+                            indeterminateProgress = true,
+                        )
+                    delay(1_200L)
+                    if (!isActive) return@launch
+                    _devReleasePlayBannerMockUiState.value =
+                        PlayInAppUpdateBannerUiState.Downloading(
                             bytesDownloaded = MOCK_PLAY_UPDATE_BYTES_DOWNLOADED,
                             totalBytesToDownload = MOCK_PLAY_UPDATE_BYTES_TOTAL,
                             indeterminateProgress = false,
@@ -91,6 +99,11 @@ class RememberUpdateState
             if (_devReleasePlayBannerMockUiState.value != PlayInAppUpdateBannerUiState.ReadyToInstall) return false
             devReleasePlayBannerMockSequenceJob?.cancel()
             _devReleasePlayBannerMockUiState.value = PlayInAppUpdateBannerUiState.Hidden
+            if (_updateInfo.value?.isDevReleaseMock == true) {
+                _updateInfo.value = null
+                devReleaseUpdatePromoMockArmed = false
+                _updatePromoBannerDismissedThisSession.value = false
+            }
             return true
         }
 

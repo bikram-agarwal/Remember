@@ -58,6 +58,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -75,6 +76,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.painterResource
@@ -92,6 +94,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ICON_PICKER_MAX_STARRED
 import dev.bikram.remember.data.IconPickerPrefs
@@ -121,6 +126,9 @@ fun IconPicker(
     val context = LocalContext.current
     val resources = LocalResources.current
     val configuration = LocalConfiguration.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val iconPickerPrefs = remember(context.applicationContext) { IconPickerPrefs(context.applicationContext) }
     val starredState by iconPickerPrefs.starred.collectAsState(initial = IconPickerStarredState())
     val scope = rememberCoroutineScope()
@@ -135,11 +143,25 @@ fun IconPicker(
         }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
+    var searchFocusRequestKey by rememberSaveable { mutableStateOf(0) }
     var selectedTab by rememberSaveable { mutableStateOf(defaultIconPickerTab(current)) }
     var starredSelectionTab by rememberSaveable { mutableStateOf<IconPickerTab?>(null) }
     var pendingStarredIconKeys by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var pendingStarredEmojis by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val iconSheetContentHeight = 644.dp
+
+    DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_PAUSE) {
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
     val emojis =
         remember(configuration) {
             loadBundledEmojis(resources)
@@ -289,6 +311,7 @@ fun IconPicker(
             Column(modifier = Modifier.fillMaxWidth()) {
                 IconPickerSearchTitleRow(
                     searchExpanded = searchExpanded,
+                    focusRequestKey = searchFocusRequestKey,
                     title = stringResource(titleRes),
                     query = searchQuery,
                     onQueryChange = { searchQuery = it },
@@ -296,7 +319,11 @@ fun IconPicker(
                         if (searchExpanded && searchQuery.isNotEmpty()) {
                             searchQuery = ""
                         }
-                        searchExpanded = !searchExpanded
+                        val nextSearchExpanded = !searchExpanded
+                        searchExpanded = nextSearchExpanded
+                        if (nextSearchExpanded) {
+                            searchFocusRequestKey += 1
+                        }
                     },
                     modifier =
                         Modifier
@@ -384,6 +411,7 @@ fun IconPicker(
 @Composable
 private fun IconPickerSearchTitleRow(
     searchExpanded: Boolean,
+    focusRequestKey: Int,
     title: String,
     query: String,
     onQueryChange: (String) -> Unit,
@@ -415,6 +443,7 @@ private fun IconPickerSearchTitleRow(
         ) { expanded ->
             if (expanded) {
                 IconPickerInlineSearchField(
+                    focusRequestKey = focusRequestKey,
                     query = query,
                     onQueryChange = onQueryChange,
                 )
@@ -454,6 +483,7 @@ private fun IconPickerSearchTitleRow(
 
 @Composable
 private fun IconPickerInlineSearchField(
+    focusRequestKey: Int,
     query: String,
     onQueryChange: (String) -> Unit,
 ) {
@@ -467,7 +497,7 @@ private fun IconPickerInlineSearchField(
             searchFieldValue = TextFieldValue(query, selection = TextRange(query.length))
         }
     }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(focusRequestKey) {
         focusRequester.requestFocus()
         keyboardController?.show()
     }

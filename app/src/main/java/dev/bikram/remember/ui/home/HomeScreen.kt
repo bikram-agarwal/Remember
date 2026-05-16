@@ -2,6 +2,7 @@ package dev.bikram.remember.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -29,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -49,6 +51,8 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,6 +60,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
@@ -163,6 +170,7 @@ fun HomeScreen(
     val topBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var searchShouldRequestFocus by rememberSaveable { mutableStateOf(false) }
     var tagSheetOpen by rememberSaveable { mutableStateOf(false) }
     // Collapsed by default so the search results feel focused on active notes. Each section
     // remembers its own expansion state when the user switches away and comes back.
@@ -186,10 +194,25 @@ fun HomeScreen(
     val blurStyle = rememberProgressiveBlurStyle()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val initialListLiftPx =
         with(LocalDensity.current) {
             16.dp.roundToPx()
         }
+
+    DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_PAUSE) {
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // Back gesture exits selection mode before the default handler runs.
     androidx.activity.compose.BackHandler(enabled = state.inSelectionMode) {
@@ -242,7 +265,11 @@ fun HomeScreen(
                         counts[item.card.id] = (counts[item.card.id] ?: 0) + 1
                     }
                 }
-                counts.asSequence().filter { it.value > 1 }.map { it.key }.toSet()
+                counts
+                    .asSequence()
+                    .filter { it.value > 1 }
+                    .map { it.key }
+                    .toSet()
             }
         }
 
@@ -293,80 +320,88 @@ fun HomeScreen(
             )
         },
         topBar = {
-            LargeTopAppBar(
-                colors = transparentLargeTopAppBarColors(),
-                title = {
-                    // Selection mode swaps the title for the plain app name; the
-                    // selection action chrome lives in the `actions` slot. Otherwise
-                    // we hand the whole title row over to SearchableTopBarTitle, which
-                    // owns both the title-or-search-field swap AND the toggle button
-                    // so the search bar visually emerges from the button's left edge.
-                    if (state.inSelectionMode) {
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            fontWeight = FontWeight.Bold,
-                        )
-                    } else {
-                        SearchableTopBarTitle(
-                            searchOpen = searchOpen,
-                            query = state.filter.text,
-                            onQueryChange = onQueryChange,
-                            onToggleSearch = {
-                                if (searchOpen && state.filter.text.isNotEmpty()) {
-                                    onQueryChange("")
-                                }
-                                searchOpen = !searchOpen
-                            },
-                        )
-                    }
-                },
-                actions = {
-                    if (state.inSelectionMode) {
-                        val cdSelectAll = stringResource(R.string.home_select_all)
-                        Box(modifier = Modifier.size(48.dp)) {
-                            RememberFilledTonalIconButton(
-                                onClick = { onSelectAllVisible(selectableVisibleIds) },
-                                enabled = selectableVisibleIds.isNotEmpty(),
-                                modifier = Modifier.align(Alignment.Center),
-                            ) {
-                                RememberMaterialRoundedSymbol(
-                                    name = "select_all",
-                                    weight = FontWeight.Medium,
-                                    modifier = Modifier.semantics { contentDescription = cdSelectAll },
-                                )
-                            }
-                            Badge(
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomStart)
-                                        .offset(x = 2.dp, y = (-2).dp),
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ) {
-                                Text(
-                                    text = state.selectedIds.size.toString(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(6.dp))
-                        val cdUnselectAll = stringResource(R.string.home_unselect_all)
-                        RememberFilledTonalIconButton(onClick = onClearSelection) {
-                            RememberMaterialRoundedSymbol(
-                                name = "deselect",
-                                weight = FontWeight.Medium,
-                                modifier = Modifier.semantics { contentDescription = cdUnselectAll },
+            Column(Modifier.fillMaxWidth()) {
+                LargeTopAppBar(
+                    colors = transparentLargeTopAppBarColors(),
+                    title = {
+                        // Selection mode swaps the title for the plain app name; the
+                        // selection action chrome lives in the `actions` slot. Otherwise
+                        // we hand the whole title row over to SearchableTopBarTitle, which
+                        // owns both the title-or-search-field swap AND the toggle button
+                        // so the search bar visually emerges from the button's left edge.
+                        if (state.inSelectionMode) {
+                            Text(
+                                text = stringResource(R.string.app_name),
+                                fontWeight = FontWeight.Bold,
+                            )
+                        } else {
+                            SearchableTopBarTitle(
+                                searchOpen = searchOpen,
+                                requestSearchFocus = searchShouldRequestFocus,
+                                query = state.filter.text,
+                                onQueryChange = onQueryChange,
+                                onSearchFocusRequested = { searchShouldRequestFocus = false },
+                                onToggleSearch = {
+                                    if (searchOpen && state.filter.text.isNotEmpty()) {
+                                        onQueryChange("")
+                                    }
+                                    val nextSearchOpen = !searchOpen
+                                    searchOpen = nextSearchOpen
+                                    if (nextSearchOpen) {
+                                        searchShouldRequestFocus = true
+                                    }
+                                },
                             )
                         }
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    // Non-selection-mode actions live inside [SearchableTopBarTitle] so the
-                    // search bar can visually emerge from the toggle button on the right
-                    // edge of the title row instead of from the actions slot, which would
-                    // sit visually disconnected from where the user just tapped.
-                },
-                scrollBehavior = scrollBehavior,
-            )
+                    },
+                    actions = {
+                        if (state.inSelectionMode) {
+                            val cdSelectAll = stringResource(R.string.home_select_all)
+                            Box(modifier = Modifier.size(48.dp)) {
+                                RememberFilledTonalIconButton(
+                                    onClick = { onSelectAllVisible(selectableVisibleIds) },
+                                    enabled = selectableVisibleIds.isNotEmpty(),
+                                    modifier = Modifier.align(Alignment.Center),
+                                ) {
+                                    RememberMaterialRoundedSymbol(
+                                        name = "select_all",
+                                        weight = FontWeight.Medium,
+                                        modifier = Modifier.semantics { contentDescription = cdSelectAll },
+                                    )
+                                }
+                                Badge(
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomStart)
+                                            .offset(x = 2.dp, y = (-2).dp),
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ) {
+                                    Text(
+                                        text = state.selectedIds.size.toString(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            val cdUnselectAll = stringResource(R.string.home_unselect_all)
+                            RememberFilledTonalIconButton(onClick = onClearSelection) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "deselect",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = cdUnselectAll },
+                                )
+                            }
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        // Non-selection-mode actions live inside [SearchableTopBarTitle] so the
+                        // search bar can visually emerge from the toggle button on the right
+                        // edge of the title row instead of from the actions slot, which would
+                        // sit visually disconnected from where the user just tapped.
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
         },
     ) { padding ->
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }

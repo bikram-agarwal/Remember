@@ -919,17 +919,18 @@
     <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Download failed</string>
     <string name="notification_channel_updates_name">App updates</string>
     <string name="notification_channel_updates_description">Alerts when a new app version is available</string>
-    <string name="notification_update_available_title">Update available</string>
+    <string name="notification_update_available_title">App update available</string>
     <string name="notification_update_available_text">Version %1$s is ready to install</string>
-    <string name="update_banner_available_title">Update available</string>
-    <string name="update_banner_available_message">A newer Remember version is ready</string>
-    <string name="update_banner_available_action">Open</string>
+    <string name="update_banner_available_title">App update available</string>
+    <string name="update_banner_available_message">A new version is available</string>
+    <string name="update_banner_available_action">Check</string>
+    <string name="update_fab_label">Update</string>
     <string name="play_update_banner_downloading_title">Downloading update</string>
-    <string name="play_update_banner_downloading">Downloading from Play Store…</string>
+    <string name="play_update_banner_downloading">from Play Store…</string>
     <string name="play_update_banner_downloading_bytes">%1$s of %2$s</string>
-    <string name="play_update_banner_install_title">Update ready</string>
-    <string name="play_update_banner_install_subtitle">Restart Remember to finish installing</string>
-    <string name="play_update_banner_install_action">Restart</string>
+    <string name="play_update_banner_install_title">Ready to install</string>
+    <string name="play_update_banner_install_subtitle">Restart to use the new version</string>
+    <string name="play_update_banner_install_action">Install &amp; restart</string>
     <string name="settings_dev_release_mocks_section">Dev release mocks</string>
     <string name="settings_dev_release_mock_update_banner">Arm update promo banner</string>
     <string name="settings_dev_release_mock_play_banner">Play update banner (download then install)</string>
@@ -941,6 +942,20 @@
     <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
     <string name="settings_rate_on_play_store">Rate on Play Store</string>
     <string name="settings_star_on_github">Star on GitHub</string>
+    <string name="settings_about_other_apps">More from Bikram</string>
+    <string name="settings_about_filepipe_name">FilePipe</string>
+    <string name="settings_about_filepipe_tagline">Organize your files automatically</string>
+    <string name="settings_about_obtainx_name">ObtainX</string>
+    <string name="settings_about_obtainx_tagline">Get app updates straight from the source</string>
+    <string name="settings_about_website">Website</string>
+    <string name="settings_about_privacy_policy">Privacy policy</string>
+    <string name="settings_about_terms">Terms</string>
+    <string name="settings_about_remember_website_url" translatable="false">https://bikram-agarwal.github.io/remember/</string>
+    <string name="settings_about_remember_privacy_url" translatable="false">https://bikram-agarwal.github.io/remember/privacy/</string>
+    <string name="settings_about_remember_terms_url" translatable="false">https://bikram-agarwal.github.io/remember/terms/</string>
+    <string name="settings_about_filepipe_play_store_url" translatable="false">https://play.google.com/store/apps/details?id=dev.bikram.filepipe</string>
+    <string name="settings_about_filepipe_github_url" translatable="false">https://github.com/bikram-agarwal/filepipe/releases/latest</string>
+    <string name="settings_about_obtainx_github_url" translatable="false">https://github.com/bikram-agarwal/ObtainX/releases/latest</string>
     <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
 
 </resources>

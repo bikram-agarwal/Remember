@@ -1,281 +1,245 @@
 package dev.bikram.remember.ui.components
 
 import android.text.format.Formatter
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.LinearWavyProgressIndicator
+import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
-import kotlin.math.absoluteValue
-import kotlin.math.roundToInt
+import dev.bikram.remember.ui.theme.RoundedPolygonShape
 
-@Composable
-fun UpdateAvailableGlobalBanner(
-    modifier: Modifier = Modifier,
-    onOpenSettingsClick: () -> Unit,
-) {
-    val scheme = MaterialTheme.colorScheme
-    val expressiveShape = MaterialTheme.shapes.extraLargeIncreased
-    OutlinedCard(
-        modifier = modifier.fillMaxWidth(),
-        shape = expressiveShape,
-        border = BorderStroke(1.dp, scheme.outlineVariant),
-        colors =
-            CardDefaults.outlinedCardColors(
-                containerColor = scheme.surfaceContainerHigh,
-                contentColor = scheme.onSurface,
-            ),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            RememberMaterialRoundedSymbol(
-                name = "new_releases",
-                size = 40.dp,
-                tint = scheme.primary,
-            )
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = stringResource(R.string.update_banner_available_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.update_banner_available_message),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = scheme.onSurfaceVariant,
-                )
-            }
-            Button(
-                onClick = onOpenSettingsClick,
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = scheme.primary,
-                        contentColor = scheme.onPrimary,
-                    ),
-            ) {
-                Text(stringResource(R.string.update_banner_available_action))
-            }
-        }
-    }
+sealed interface UpdateChromeState {
+    data object Hidden : UpdateChromeState
+
+    data object Available : UpdateChromeState
+
+    data class Downloading(
+        val bytesDownloaded: Long,
+        val totalBytesToDownload: Long,
+        val indeterminateProgress: Boolean,
+    ) : UpdateChromeState
+
+    data object ReadyToInstall : UpdateChromeState
 }
 
 @Composable
-fun SwipeDismissableUpdatePromoBanner(
+fun UpdateFloatingFab(
+    state: UpdateChromeState,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    onDismiss: () -> Unit,
-    onOpenSettingsClick: () -> Unit,
 ) {
-    val density = LocalDensity.current
-    val dismissThresholdPx = remember(density) { with(density) { 96.dp.toPx() } }
-    val dragAccumulatedPx = remember { mutableFloatStateOf(0f) }
-    Box(
-        modifier
-            .fillMaxWidth()
-            .offset { IntOffset(dragAccumulatedPx.floatValue.roundToInt(), 0) }
-            .pointerInput(dismissThresholdPx) {
-                detectHorizontalDragGestures(
-                    onHorizontalDrag = { _, dragDelta ->
-                        dragAccumulatedPx.floatValue += dragDelta
-                    },
-                    onDragEnd = {
-                        if (dragAccumulatedPx.floatValue.absoluteValue >= dismissThresholdPx) {
-                            onDismiss()
-                        }
-                        dragAccumulatedPx.floatValue = 0f
-                    },
-                    onDragCancel = {
-                        dragAccumulatedPx.floatValue = 0f
-                    },
-                )
-            },
+    if (state == UpdateChromeState.Hidden) return
+
+    val label = stringResource(R.string.update_fab_label)
+    val shape = remember { RoundedPolygonShape(MaterialShapes.Cookie9Sided) }
+    RememberFloatingActionButton(
+        onClick = onClick,
+        modifier = modifier.semantics { contentDescription = label },
+        shape = shape,
+        containerColor = MaterialTheme.colorScheme.primaryContainer,
+        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp),
+        tooltipLabel = label,
     ) {
-        UpdateAvailableGlobalBanner(
-            modifier = Modifier.fillMaxWidth(),
-            onOpenSettingsClick = onOpenSettingsClick,
+        RememberMaterialRoundedSymbol(
+            name = if (state == UpdateChromeState.ReadyToInstall) "download_done" else "download",
+            size = 28.dp,
+            weight = FontWeight.Medium,
         )
     }
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun PlayStoreGlobalUpdateBanner(
-    state: PlayInAppUpdateBannerUiState,
+fun UpdateFloatingBar(
+    state: UpdateChromeState,
+    onCheckClick: () -> Unit,
+    onDismissAvailable: () -> Unit,
     onInstallClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (state == UpdateChromeState.Hidden) return
+
     val context = LocalContext.current
     val scheme = MaterialTheme.colorScheme
-    val expressiveShape = MaterialTheme.shapes.extraLargeIncreased
-    when (state) {
-        is PlayInAppUpdateBannerUiState.Hidden -> Unit
-        is PlayInAppUpdateBannerUiState.Downloading -> {
-            OutlinedCard(
-                modifier = modifier.fillMaxWidth(),
-                shape = expressiveShape,
-                border = BorderStroke(1.dp, scheme.outlineVariant),
-                colors =
-                    CardDefaults.outlinedCardColors(
-                        containerColor = scheme.surfaceContainerHigh,
-                        contentColor = scheme.onSurface,
-                    ),
+    val iconShape = remember { RoundedPolygonShape(MaterialShapes.Cookie9Sided) }
+    val (title, body) =
+        when (state) {
+            UpdateChromeState.Hidden -> return
+            UpdateChromeState.Available ->
+                Pair(
+                    stringResource(R.string.update_banner_available_title),
+                    null,
+                )
+            is UpdateChromeState.Downloading -> {
+                val progressLabel =
+                    if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
+                        stringResource(R.string.play_update_banner_downloading)
+                    } else {
+                        val downloaded = Formatter.formatFileSize(context, state.bytesDownloaded)
+                        val total = Formatter.formatFileSize(context, state.totalBytesToDownload)
+                        stringResource(R.string.play_update_banner_downloading_bytes, downloaded, total)
+                    }
+                Pair(
+                    stringResource(R.string.play_update_banner_downloading_title),
+                    progressLabel,
+                )
+            }
+            UpdateChromeState.ReadyToInstall ->
+                Pair(
+                    stringResource(R.string.play_update_banner_install_title),
+                    stringResource(R.string.play_update_banner_install_subtitle),
+                )
+        }
+
+    Surface(
+        modifier = modifier,
+        shape = MaterialTheme.shapes.extraExtraLarge,
+        color = scheme.surfaceContainerHigh,
+        tonalElevation = 3.dp,
+        shadowElevation = 3.dp,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .padding(start = 14.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                Surface(
+                    modifier = Modifier.size(34.dp),
+                    shape = iconShape,
+                    color = scheme.primaryContainer,
+                    contentColor = scheme.onPrimaryContainer,
                 ) {
-                    RememberMaterialRoundedSymbol(
-                        name = "system_update",
-                        size = 40.dp,
-                        tint = scheme.primary,
+                    Box(contentAlignment = Alignment.Center) {
+                        RememberMaterialRoundedSymbol(
+                            name = if (state == UpdateChromeState.ReadyToInstall) "download_done" else "download",
+                            size = 24.dp,
+                            weight = FontWeight.Medium,
+                            tint = scheme.onPrimaryContainer,
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelLargeEmphasized,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
-                    Column(modifier = Modifier.weight(1f)) {
+                    if (body != null) {
                         Text(
-                            text = stringResource(R.string.play_update_banner_downloading_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        val progressLabel =
-                            if (state.indeterminateProgress) {
-                                stringResource(R.string.play_update_banner_downloading)
-                            } else {
-                                val downloaded = Formatter.formatFileSize(context, state.bytesDownloaded)
-                                val total = Formatter.formatFileSize(context, state.totalBytesToDownload)
-                                stringResource(R.string.play_update_banner_downloading_bytes, downloaded, total)
-                            }
-                        Text(
-                            text = progressLabel,
-                            style = MaterialTheme.typography.bodyMedium,
+                            text = body,
+                            style = MaterialTheme.typography.labelMedium,
                             color = scheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                         )
-                        Spacer(Modifier.height(12.dp))
-                        if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
-                            LinearWavyProgressIndicator(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(expressiveShape),
-                                color = scheme.primary,
-                                trackColor = scheme.surfaceContainerHighest,
-                            )
-                        } else {
-                            val fraction =
-                                (state.bytesDownloaded.toFloat() / state.totalBytesToDownload.toFloat())
-                                    .coerceIn(0f, 1f)
-                            LinearWavyProgressIndicator(
-                                progress = { fraction },
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .height(8.dp)
-                                        .clip(expressiveShape),
-                                color = scheme.primary,
-                                trackColor = scheme.surfaceContainerHighest,
+                    }
+                }
+
+                when (state) {
+                    UpdateChromeState.Available -> {
+                        RememberButton(
+                            onClick = onCheckClick,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = scheme.primary,
+                                    contentColor = scheme.onPrimary,
+                                ),
+                        ) {
+                            Text(stringResource(R.string.update_banner_available_action))
+                        }
+                        val closeLabel = stringResource(R.string.main_fab_close)
+                        RememberIconButton(
+                            onClick = onDismissAvailable,
+                            modifier =
+                                Modifier
+                                    .size(40.dp)
+                                    .semantics { contentDescription = closeLabel },
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "close",
+                                size = 20.dp,
+                                weight = FontWeight.Medium,
                             )
                         }
                     }
+                    is UpdateChromeState.Downloading -> Unit
+                    UpdateChromeState.ReadyToInstall ->
+                        RememberButton(
+                            onClick = onInstallClick,
+                            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = scheme.primary,
+                                    contentColor = scheme.onPrimary,
+                                ),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.play_update_banner_install_action),
+                                maxLines = 1,
+                            )
+                        }
+                    UpdateChromeState.Hidden -> Unit
                 }
             }
-        }
-        PlayInAppUpdateBannerUiState.ReadyToInstall -> {
-            OutlinedCard(
-                modifier = modifier.fillMaxWidth(),
-                shape = expressiveShape,
-                border = BorderStroke(1.dp, scheme.outlineVariant),
-                colors =
-                    CardDefaults.outlinedCardColors(
-                        containerColor = scheme.surfaceContainerHigh,
-                        contentColor = scheme.onSurface,
-                    ),
-            ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                ) {
-                    RememberMaterialRoundedSymbol(
-                        name = "new_releases",
-                        size = 40.dp,
-                        tint = scheme.primary,
+
+            if (state is UpdateChromeState.Downloading) {
+                if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
+                    LinearWavyProgressIndicator(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(8.dp),
+                        color = scheme.primary,
+                        trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
                     )
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.play_update_banner_install_title),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Spacer(Modifier.height(4.dp))
-                        Text(
-                            text = stringResource(R.string.play_update_banner_install_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = scheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                    Button(
-                        onClick = onInstallClick,
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = scheme.primary,
-                                contentColor = scheme.onPrimary,
-                            ),
-                    ) {
-                        Text(
-                            text = stringResource(R.string.play_update_banner_install_action),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
+                } else {
+                    val fraction =
+                        (state.bytesDownloaded.toFloat() / state.totalBytesToDownload.toFloat())
+                            .coerceIn(0f, 1f)
+                    LinearWavyProgressIndicator(
+                        progress = { fraction },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(8.dp),
+                        color = scheme.primary,
+                        trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
+                    )
                 }
             }
         }

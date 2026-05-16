@@ -46,12 +46,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.MarkdownText
@@ -85,6 +90,9 @@ fun HelpScreen(
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     val blurStyle = rememberProgressiveBlurStyle(bottomExtra = 0.dp)
     val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val lifecycleOwner = LocalLifecycleOwner.current
 
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = helpVm.scrollIndex,
@@ -92,6 +100,17 @@ fun HelpScreen(
     )
     DisposableEffect(Unit) {
         onDispose { helpVm.saveScrollState(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+    }
+    DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_PAUSE) {
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(

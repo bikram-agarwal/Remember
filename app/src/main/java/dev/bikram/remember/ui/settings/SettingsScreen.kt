@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -332,9 +333,12 @@ fun SettingsRoute(
             sectionKey in collapsedSettingsSectionKeys
         }
     val settingsListState = rememberLazyListState()
-    var notificationsHighlight by remember { mutableStateOf(false) }
-    var backupHighlight by remember { mutableStateOf(false) }
-    var securityHighlight by remember { mutableStateOf(false) }
+    var notificationsHighlight by rememberSaveable { mutableStateOf(false) }
+    var notificationsHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
+    var backupHighlight by rememberSaveable { mutableStateOf(false) }
+    var backupHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
+    var securityHighlight by rememberSaveable { mutableStateOf(false) }
+    var securityHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission(),
@@ -385,7 +389,7 @@ fun SettingsRoute(
         val repo = BuildConfig.CHANGELOG_GITHUB_REPO
         val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
         val connection =
-            URL("https://raw.githubusercontent.com/$repo/$branch/CHANGELOG.md").openConnection() as HttpURLConnection
+            URL("https://raw.githubusercontent.com/$repo/$branch/docs/CHANGELOG.md").openConnection() as HttpURLConnection
         connection.instanceFollowRedirects = true
         connection.connectTimeout = 15_000
         connection.readTimeout = 20_000
@@ -624,12 +628,24 @@ fun SettingsRoute(
                 onHighlightHandled()
                 return@LaunchedEffect
             }
+        topBarState.heightOffset = topBarState.heightOffsetLimit
         settingsListState.animateScrollToItem(index)
+        topBarState.heightOffset = topBarState.heightOffsetLimit
         if (highlightItem == null) {
+            val highlightExpiresAtMillis = SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
             when (key) {
-                "notifications" -> notificationsHighlight = true
-                "backup" -> backupHighlight = true
-                "security" -> securityHighlight = true
+                "notifications" -> {
+                    notificationsHighlight = true
+                    notificationsHighlightExpiresAtMillis = highlightExpiresAtMillis
+                }
+                "backup" -> {
+                    backupHighlight = true
+                    backupHighlightExpiresAtMillis = highlightExpiresAtMillis
+                }
+                "security" -> {
+                    securityHighlight = true
+                    securityHighlightExpiresAtMillis = highlightExpiresAtMillis
+                }
             }
             onHighlightHandled()
         } else {
@@ -638,24 +654,34 @@ fun SettingsRoute(
             onHighlightHandled()
         }
     }
-    LaunchedEffect(notificationsHighlight) {
+    LaunchedEffect(notificationsHighlight, notificationsHighlightExpiresAtMillis) {
         if (!notificationsHighlight) return@LaunchedEffect
-        delay(4500)
+        val remainingHighlightMillis = notificationsHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
         notificationsHighlight = false
+        notificationsHighlightExpiresAtMillis = 0L
     }
-    LaunchedEffect(backupHighlight) {
+    LaunchedEffect(backupHighlight, backupHighlightExpiresAtMillis) {
         if (!backupHighlight) return@LaunchedEffect
-        delay(4500)
+        val remainingHighlightMillis = backupHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
         backupHighlight = false
+        backupHighlightExpiresAtMillis = 0L
     }
-    LaunchedEffect(securityHighlight) {
+    LaunchedEffect(securityHighlight, securityHighlightExpiresAtMillis) {
         if (!securityHighlight) return@LaunchedEffect
-        delay(4500)
+        val remainingHighlightMillis = securityHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
         securityHighlight = false
+        securityHighlightExpiresAtMillis = 0L
     }
-    val notificationsHighlightAlpha = rememberSectionHighlightPulseAlpha(notificationsHighlight)
-    val backupHighlightAlpha = rememberSectionHighlightPulseAlpha(backupHighlight)
-    val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlight)
+    val highlightNowMillis = SystemClock.elapsedRealtime()
+    val notificationsHighlightActive = notificationsHighlight && notificationsHighlightExpiresAtMillis > highlightNowMillis
+    val backupHighlightActive = backupHighlight && backupHighlightExpiresAtMillis > highlightNowMillis
+    val securityHighlightActive = securityHighlight && securityHighlightExpiresAtMillis > highlightNowMillis
+    val notificationsHighlightAlpha = rememberSectionHighlightPulseAlpha(notificationsHighlightActive)
+    val backupHighlightAlpha = rememberSectionHighlightPulseAlpha(backupHighlightActive)
+    val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlightActive)
 
     if (showUpdateSheet) {
         ModalBottomSheet(
@@ -713,65 +739,67 @@ fun SettingsRoute(
             )
         },
         topBar = {
-            LargeTopAppBar(
-                colors = transparentLargeTopAppBarColors(),
-                title = {
-                    Text(
-                        stringResource(R.string.settings_title),
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                actions = {
-                    val openHelpLabel = stringResource(R.string.settings_open_help_cd)
-                    RememberFilledTonalIconButton(
-                        onClick = onOpenHelp,
-                        modifier =
-                            Modifier.semantics {
-                                contentDescription = openHelpLabel
-                            },
-                        tooltipLabel = openHelpLabel,
-                    ) {
+            Column(Modifier.fillMaxWidth()) {
+                LargeTopAppBar(
+                    colors = transparentLargeTopAppBarColors(),
+                    title = {
                         Text(
-                            text = "?",
-                            style =
-                                MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    lineHeight = MaterialTheme.typography.headlineSmall.fontSize,
-                                ),
+                            stringResource(R.string.settings_title),
+                            fontWeight = FontWeight.Bold,
                         )
-                    }
-                    val expandCollapseAllLabel =
-                        stringResource(
-                            if (allSettingsSectionsCollapsed) {
-                                R.string.settings_expand_all_sections_cd
-                            } else {
-                                R.string.settings_collapse_all_sections_cd
-                            },
-                        )
-                    RememberFilledTonalIconButton(
-                        onClick = {
-                            collapsedSettingsSectionKeys =
+                    },
+                    actions = {
+                        val openHelpLabel = stringResource(R.string.settings_open_help_cd)
+                        RememberFilledTonalIconButton(
+                            onClick = onOpenHelp,
+                            modifier =
+                                Modifier.semantics {
+                                    contentDescription = openHelpLabel
+                                },
+                            tooltipLabel = openHelpLabel,
+                        ) {
+                            Text(
+                                text = "?",
+                                style =
+                                    MaterialTheme.typography.headlineSmall.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        lineHeight = MaterialTheme.typography.headlineSmall.fontSize,
+                                    ),
+                            )
+                        }
+                        val expandCollapseAllLabel =
+                            stringResource(
                                 if (allSettingsSectionsCollapsed) {
-                                    collapsedSettingsSectionKeys - settingsExpandableSectionKeys
+                                    R.string.settings_expand_all_sections_cd
                                 } else {
-                                    collapsedSettingsSectionKeys + settingsExpandableSectionKeys
-                                }
-                        },
-                        modifier =
-                            Modifier.semantics {
-                                contentDescription = expandCollapseAllLabel
+                                    R.string.settings_collapse_all_sections_cd
+                                },
+                            )
+                        RememberFilledTonalIconButton(
+                            onClick = {
+                                collapsedSettingsSectionKeys =
+                                    if (allSettingsSectionsCollapsed) {
+                                        collapsedSettingsSectionKeys - settingsExpandableSectionKeys
+                                    } else {
+                                        collapsedSettingsSectionKeys + settingsExpandableSectionKeys
+                                    }
                             },
-                        tooltipLabel = expandCollapseAllLabel,
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = if (allSettingsSectionsCollapsed) "unfold_more" else "unfold_less",
-                            size = 22.dp,
-                            weight = FontWeight.Medium,
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
+                            modifier =
+                                Modifier.semantics {
+                                    contentDescription = expandCollapseAllLabel
+                                },
+                            tooltipLabel = expandCollapseAllLabel,
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = if (allSettingsSectionsCollapsed) "unfold_more" else "unfold_less",
+                                size = 22.dp,
+                                weight = FontWeight.Medium,
+                            )
+                        }
+                    },
+                    scrollBehavior = scrollBehavior,
+                )
+            }
         },
     ) { padding ->
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
@@ -818,7 +846,7 @@ fun SettingsRoute(
                         Modifier
                             .fillMaxWidth()
                             .pulsingSectionHighlightOutline(
-                                active = notificationsHighlight,
+                                active = notificationsHighlightActive,
                                 outlineColor =
                                     MaterialTheme.colorScheme.primary.copy(
                                         alpha = notificationsHighlightAlpha,
@@ -917,7 +945,7 @@ fun SettingsRoute(
                         Modifier
                             .fillMaxWidth()
                             .pulsingSectionHighlightOutline(
-                                active = securityHighlight,
+                                active = securityHighlightActive,
                                 outlineColor =
                                     MaterialTheme.colorScheme.primary.copy(
                                         alpha = securityHighlightAlpha,
@@ -949,7 +977,7 @@ fun SettingsRoute(
                         Modifier
                             .fillMaxWidth()
                             .pulsingSectionHighlightOutline(
-                                active = backupHighlight,
+                                active = backupHighlightActive,
                                 outlineColor =
                                     MaterialTheme.colorScheme.primary.copy(
                                         alpha = backupHighlightAlpha,

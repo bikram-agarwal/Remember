@@ -79,8 +79,10 @@ import dev.bikram.remember.ui.feedback.tapSoundClickable
 @Composable
 internal fun SearchableTopBarTitle(
     searchOpen: Boolean,
+    requestSearchFocus: Boolean,
     query: String,
     onQueryChange: (String) -> Unit,
+    onSearchFocusRequested: () -> Unit,
     onToggleSearch: () -> Unit,
 ) {
     val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
@@ -107,7 +109,12 @@ internal fun SearchableTopBarTitle(
             label = "topBarTitleSearchExpand",
         ) { open ->
             if (open) {
-                InlineSearchField(query = query, onQueryChange = onQueryChange)
+                InlineSearchField(
+                    query = query,
+                    requestFocus = requestSearchFocus,
+                    onQueryChange = onQueryChange,
+                    onFocusRequested = onSearchFocusRequested,
+                )
             } else {
                 Text(
                     text = stringResource(R.string.app_name),
@@ -146,7 +153,9 @@ internal fun SearchableTopBarTitle(
 @Composable
 internal fun InlineSearchField(
     query: String,
+    requestFocus: Boolean,
     onQueryChange: (String) -> Unit,
+    onFocusRequested: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -158,9 +167,12 @@ internal fun InlineSearchField(
             searchFieldValue = TextFieldValue(query, selection = TextRange(query.length))
         }
     }
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-        keyboardController?.show()
+    LaunchedEffect(requestFocus) {
+        if (requestFocus) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+            onFocusRequested()
+        }
     }
     val searchContentDescription = stringResource(R.string.cd_search)
     Row(
