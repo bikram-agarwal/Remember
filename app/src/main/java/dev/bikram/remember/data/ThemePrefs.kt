@@ -343,6 +343,10 @@ class ThemePrefs(
             }
         }
     }
+
+    suspend fun reset() {
+        context.themePrefsDataStore.edit { it.clear() }
+    }
 }
 
 /**

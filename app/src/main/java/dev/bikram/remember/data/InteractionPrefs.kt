@@ -229,6 +229,10 @@ class InteractionPrefs(
         }
     }
 
+    suspend fun reset() {
+        context.interactionDataStore.edit { it.clear() }
+    }
+
     companion object {
         const val REVEAL_SLOT_COUNT = 3
     }

@@ -108,6 +108,7 @@ enum class MainTab(
 fun MainTabScaffold(
     repository: NoteRepository,
     currentTab: MainTab,
+    chromeVisible: Boolean = true,
     onTabSelected: (MainTab) -> Unit,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
@@ -139,13 +140,13 @@ fun MainTabScaffold(
 
     // Back handling: when the FAB speed dial is open, back closes it first. Tab route
     // back behavior is owned by Navigation Compose so predictive back can preview it.
-    RememberPredictiveBackHandler(enabled = fabExpanded) { fabExpanded = false }
+    RememberPredictiveBackHandler(enabled = chromeVisible && fabExpanded) { fabExpanded = false }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(currentTab) {
+    LaunchedEffect(chromeVisible, currentTab) {
         // Switching tabs collapses the speed dial so the captured FAB bounds do not
         // briefly point at a stale location while the new tab's FAB rebinds.
-        if (currentTab != MainTab.Notes) fabExpanded = false
+        if (!chromeVisible || currentTab != MainTab.Notes) fabExpanded = false
     }
 
     val navigationSuiteType =
@@ -158,7 +159,7 @@ fun MainTabScaffold(
             // Scrim covers the page (not the toolbar / FAB) when the speed dial is open.
             // Tapping the scrim collapses the menu, matching standard speed-dial dismiss.
             AnimatedVisibility(
-                visible = fabExpanded && currentTab == MainTab.Notes,
+                visible = chromeVisible && fabExpanded && currentTab == MainTab.Notes,
                 enter = fadeIn(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
                 exit = fadeOut(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
                 modifier = Modifier.fillMaxSize(),
@@ -171,107 +172,37 @@ fun MainTabScaffold(
                 )
             }
 
-            UpdateFloatingBar(
-                state = updateBarState,
-                onCheckClick = onUpdateClick,
-                onDismissAvailable = onDismissUpdateAvailable,
-                onInstallClick = onInstallUpdate,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(horizontal = 16.dp)
-                        .padding(bottom = PillBottomBarHeight + 28.dp),
-            )
-
-            // Bottom strip. Pill mode (phones) re-uses the original CenteredPillWithSideFab
-            // layout so the FAB visually attaches to the pill at the same position as
-            // before; the layout's measure logic clamps its reported height to the FAB's
-            // *core* size, so when the FloatingActionButtonMenu's content expands the
-            // wrapper grows upward beyond the strip's reported bounds without pushing the
-            // pill. Rail mode is unaffected - the FAB sits in its own BottomEnd box.
-            if (useAdaptiveNavigationRail) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(end = 24.dp, bottom = 24.dp),
-                ) {
-                    MainFabSlot(
-                        tab = currentTab,
-                        fabExpanded = fabExpanded,
-                        onToggleNotesFab = {
-                            closeNotesRevealRequest++
-                            fabExpanded = !fabExpanded
-                        },
-                        historySection = historySection,
-                        historyVisibleItemCount = historyVisibleItemCount,
-                        onClearTrashRequest = { clearTrashOpen = true },
-                        onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
-                        onShareApp = {
-                            val send =
-                                Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, shareText)
-                                }
-                            context.startActivity(Intent.createChooser(send, shareChooserTitle))
-                        },
-                        onPickImport = {
-                            closeNotesRevealRequest++
-                            fabExpanded = false
-                            onImportGoogleTasks()
-                        },
-                        onPickList = {
-                            closeNotesRevealRequest++
-                            fabExpanded = false
-                            onCreateList()
-                        },
-                        onPickNote = {
-                            closeNotesRevealRequest++
-                            fabExpanded = false
-                            onCreateNote()
-                        },
-                    )
-                }
-            } else {
-                CenteredPillWithSideFab(
+            if (chromeVisible) {
+                UpdateFloatingBar(
+                    state = updateBarState,
+                    onCheckClick = onUpdateClick,
+                    onDismissAvailable = onDismissUpdateAvailable,
+                    onInstallClick = onInstallUpdate,
                     modifier =
                         Modifier
                             .align(Alignment.BottomCenter)
                             .fillMaxWidth()
                             .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
-                    fabGap = 12.dp,
-                    pill = {
-                        RememberFloatingNavPill(
-                            currentTab = currentTab,
-                            onTabClick = { selected ->
-                                closeNotesRevealRequest++
-                                onTabSelected(selected)
-                                fabExpanded = false
-                            },
-                        )
-                    },
-                    leadingFab =
-                        if (updateFabState == UpdateChromeState.Hidden) {
-                            null
-                        } else {
-                            {
-                                UpdateFloatingFab(
-                                    state = updateFabState,
-                                    onClick = {
-                                        if (updateFabState == UpdateChromeState.ReadyToInstall) {
-                                            onInstallUpdate()
-                                        } else {
-                                            onUpdateClick()
-                                        }
-                                    },
-                                )
-                            }
-                        },
-                    fab = {
+                            .padding(horizontal = 16.dp)
+                            .padding(bottom = PillBottomBarHeight + 28.dp),
+                )
+            }
+
+            if (chromeVisible) {
+                // Bottom strip. Pill mode (phones) re-uses the original CenteredPillWithSideFab
+                // layout so the FAB visually attaches to the pill at the same position as
+                // before; the layout's measure logic clamps its reported height to the FAB's
+                // *core* size, so when the FloatingActionButtonMenu's content expands the
+                // wrapper grows upward beyond the strip's reported bounds without pushing the
+                // pill. Rail mode is unaffected - the FAB sits in its own BottomEnd box.
+                if (useAdaptiveNavigationRail) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(end = 24.dp, bottom = 24.dp),
+                    ) {
                         MainFabSlot(
                             tab = currentTab,
                             fabExpanded = fabExpanded,
@@ -307,10 +238,84 @@ fun MainTabScaffold(
                                 onCreateNote()
                             },
                         )
-                    },
-                    fabRightInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
-                    fabBottomInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
-                )
+                    }
+                } else {
+                    CenteredPillWithSideFab(
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
+                        fabGap = 12.dp,
+                        pill = {
+                            RememberFloatingNavPill(
+                                currentTab = currentTab,
+                                onTabClick = { selected ->
+                                    closeNotesRevealRequest++
+                                    onTabSelected(selected)
+                                    fabExpanded = false
+                                },
+                            )
+                        },
+                        leadingFab =
+                            if (updateFabState == UpdateChromeState.Hidden) {
+                                null
+                            } else {
+                                {
+                                    UpdateFloatingFab(
+                                        state = updateFabState,
+                                        onClick = {
+                                            if (updateFabState == UpdateChromeState.ReadyToInstall) {
+                                                onInstallUpdate()
+                                            } else {
+                                                onUpdateClick()
+                                            }
+                                        },
+                                    )
+                                }
+                            },
+                        fab = {
+                            MainFabSlot(
+                                tab = currentTab,
+                                fabExpanded = fabExpanded,
+                                onToggleNotesFab = {
+                                    closeNotesRevealRequest++
+                                    fabExpanded = !fabExpanded
+                                },
+                                historySection = historySection,
+                                historyVisibleItemCount = historyVisibleItemCount,
+                                onClearTrashRequest = { clearTrashOpen = true },
+                                onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
+                                onShareApp = {
+                                    val send =
+                                        Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, shareText)
+                                        }
+                                    context.startActivity(Intent.createChooser(send, shareChooserTitle))
+                                },
+                                onPickImport = {
+                                    closeNotesRevealRequest++
+                                    fabExpanded = false
+                                    onImportGoogleTasks()
+                                },
+                                onPickList = {
+                                    closeNotesRevealRequest++
+                                    fabExpanded = false
+                                    onCreateList()
+                                },
+                                onPickNote = {
+                                    closeNotesRevealRequest++
+                                    fabExpanded = false
+                                    onCreateNote()
+                                },
+                            )
+                        },
+                        fabRightInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
+                        fabBottomInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
+                    )
+                }
             }
 
             androidx.compose.material3.SnackbarHost(
@@ -324,7 +329,7 @@ fun MainTabScaffold(
         }
     }
 
-    if (useAdaptiveNavigationRail) {
+    if (chromeVisible && useAdaptiveNavigationRail) {
         NavigationSuiteScaffold(
             layoutType = navigationSuiteType,
             containerColor = Color.Transparent,

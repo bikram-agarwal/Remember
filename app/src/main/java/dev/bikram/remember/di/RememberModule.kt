@@ -11,6 +11,7 @@ import dev.bikram.remember.backup.NoteBackupDirtyTracker
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.BackupPrefs
+import dev.bikram.remember.data.DevModePrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteRepository
@@ -50,6 +51,12 @@ object RememberModule {
     @Singleton
     @ApplicationScope
     fun provideApplicationScope(): CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+    @Provides
+    @Singleton
+    fun provideDevModePrefs(
+        @ApplicationContext context: Context,
+    ): DevModePrefs = DevModePrefs(context)
 
     @Provides
     @Singleton

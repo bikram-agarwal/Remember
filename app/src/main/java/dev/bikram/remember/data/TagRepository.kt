@@ -20,7 +20,10 @@ class TagRepository(
 
     fun observeActiveTagSuggestions(): Flow<List<String>> =
         observeActiveTags().map { tags ->
-            tags.map { tag -> tag.name }.sortedBy { tagName -> tagName.lowercase(Locale.ROOT) }
+            tags
+                .map { tag -> tag.name }
+                .filterNot { RememberReservedTags.isSuggestionReserved(it) }
+                .sortedBy { tagName -> tagName.lowercase(Locale.ROOT) }
         }
 
     fun observeTagColorMap(): Flow<Map<String, String>> =
@@ -51,7 +54,7 @@ class TagRepository(
         colorHex: String?,
     ) {
         val cleanedName = tagName.trim()
-        if (cleanedName.isBlank() || cleanedName == RememberReservedTags.STARRED) return
+        if (cleanedName.isBlank() || RememberReservedTags.isSuggestionReserved(cleanedName)) return
         val normalizedColor = colorHex?.let { normalizeHex(it) }
         if (colorHex != null && normalizedColor == null) return
         if (database != null) {
@@ -75,7 +78,7 @@ class TagRepository(
         val cleanedNewName = newName.trim()
         val newNormalizedName = normalizeTagName(cleanedNewName)
         if (oldNormalizedName.isBlank() || newNormalizedName.isBlank()) return null
-        if (oldName.trim() == RememberReservedTags.STARRED || cleanedNewName == RememberReservedTags.STARRED) {
+        if (RememberReservedTags.isSuggestionReserved(oldName.trim()) || RememberReservedTags.isSuggestionReserved(cleanedNewName)) {
             return null
         }
         val normalizedColor = if (resetColor) null else colorHex?.let { normalizeHex(it) }

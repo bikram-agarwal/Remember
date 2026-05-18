@@ -525,6 +525,7 @@
     <string name="tag_editor_hex_label">HEX</string>
     <string name="tag_editor_duplicate">Already added</string>
     <string name="tag_editor_duplicate_existing">A tag with this name already exists</string>
+    <string name="tag_editor_reserved_name">This tag name is reserved by the app</string>
     <string name="tag_editor_edit_mode_label">Edit mode</string>
     <string name="tag_editor_edit_mode_cd">Edit tags</string>
     <string name="tag_editor_edit_mode_hint">Create new tag or tap a tag to change its name and color</string>
@@ -957,5 +958,118 @@
     <string name="settings_about_filepipe_github_url" translatable="false">https://github.com/bikram-agarwal/filepipe/releases/latest</string>
     <string name="settings_about_obtainx_github_url" translatable="false">https://github.com/bikram-agarwal/ObtainX/releases/latest</string>
     <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
+
+    <!-- Developer options -->
+    <string name="dev_options_title">Developer options</string>
+    <string name="dev_options_back_cd">Back</string>
+    <string name="dev_options_mode_label">Developer mode</string>
+    <string name="dev_options_mode_subtitle">Disable to hide this page from Settings</string>
+    <string name="dev_options_warning">These are developer tools, not real app features. Do not use unless you know what you\'re doing. Some actions permanently change app state.</string>
+    <string name="dev_options_taps_remaining">%1$d more taps to enable developer options</string>
+    <string name="dev_options_settings_entry_label">Open developer options</string>
+
+    <!-- Developer options: sections -->
+    <string name="dev_options_section_data">Mock data</string>
+    <string name="dev_options_section_notifications">Notification testing</string>
+    <string name="dev_options_section_settings">Settings</string>
+    <string name="dev_options_section_db">Database inspection</string>
+    <string name="dev_options_section_diagnostics">Diagnostic tools</string>
+
+    <!-- Developer options: data population -->
+    <string name="dev_options_create_mock_notes">Create mock notes</string>
+    <string name="dev_options_mock_notes_already_exist">Already present — delete them first</string>
+    <string name="dev_options_clear_mock_data">Delete mock notes</string>
+    <string name="dev_options_toast_mock_created">Created %1$d mock notes</string>
+    <string name="dev_options_toast_mock_cleared">Mock notes deleted</string>
+
+    <!-- Developer options: notification testing -->
+    <string name="dev_options_notif_low">LOW</string>
+    <string name="dev_options_notif_default">DEFAULT</string>
+    <string name="dev_options_notif_high">HIGH</string>
+    <string name="dev_options_notif_big_picture">BigPicture</string>
+    <string name="dev_options_notif_big_text">BigText</string>
+    <string name="dev_options_notif_summary">Summary</string>
+    <string name="dev_options_notif_overdue">Overdue (keep-until-done)</string>
+    <string name="dev_options_toast_keep_until_done_enabled">Temporarily enabled \'Keep reminders until done\'</string>
+    <string name="dev_options_notif_mock_update">Mock update flow</string>
+    <string name="dev_options_notif_mock_play">Mock PlayStore update flow</string>
+
+    <!-- Developer options: settings rows -->
+    <string name="dev_options_open_notif_settings">Open notification settings</string>
+    <string name="dev_options_open_alarm_settings">Open alarms &amp; reminders settings</string>
+    <string name="dev_options_open_battery_settings">Open battery optimization settings</string>
+    <string name="dev_options_reset_skipped_update">Reset skipped update version</string>
+    <string name="dev_options_reset_first_launch">Reset first-launch flag</string>
+    <string name="dev_options_toast_skipped_cleared">Skipped update version cleared</string>
+    <string name="dev_options_toast_first_launch_reset">First-launch flag reset</string>
+
+    <!-- Developer options: already unlocked -->
+    <string name="dev_options_already_unlocked">No need. Developer options are already unlocked.</string>
+
+    <!-- Developer options: database inspection -->
+    <string name="dev_options_db_stat_version">Version</string>
+    <string name="dev_options_db_stat_build">Build</string>
+    <string name="dev_options_db_stat_room_schema">Room schema</string>
+    <string name="dev_options_db_stat_active_notes">Active notes</string>
+    <string name="dev_options_db_stat_archived">Archived</string>
+    <string name="dev_options_db_stat_trash">Trash</string>
+    <string name="dev_options_db_stat_file_size">DB file size</string>
+    <string name="dev_options_db_stat_loading">loading…</string>
+    <string name="dev_options_db_stat_room_version" translatable="false">v1</string>
+    <string name="dev_options_db_build_format" translatable="false">%1$s · %2$s</string>
+    <string name="dev_options_db_version_format" translatable="false">%1$s (%2$d)</string>
+    <string name="dev_options_db_stat_images_stored">Images stored</string>
+    <string name="dev_options_db_stat_images_linked">Images linked</string>
+    <string name="dev_options_db_stat_attachments_stored">Attachments stored</string>
+    <string name="dev_options_db_stat_attachments_linked">Attachments linked</string>
+    <string name="dev_options_db_stat_count_with_size" translatable="false">%1$d | %2$s total</string>
+
+    <!-- Developer options: diagnostic tools -->
+    <string name="dev_options_force_refresh">Force refresh widgets</string>
+    <string name="dev_options_force_crash">Force crash</string>
+    <string name="dev_options_copy_diagnostics">Copy diagnostic dump</string>
+    <string name="dev_options_export_logs">Export logs</string>
+    <string name="dev_options_clear_logs">Clear logs</string>
+    <string name="dev_options_toast_refresh">Refresh triggered</string>
+    <string name="dev_options_toast_diagnostics_copied">Diagnostics copied to clipboard</string>
+    <string name="dev_options_toast_logs_cleared">Logs cleared</string>
+    <string name="dev_options_export_logs_chooser">Export diagnostic log</string>
+
+    <!-- Developer options: reset all -->
+    <string name="dev_options_reset_all">Reset all preferences</string>
+    <string name="dev_options_reset_all_title">Reset all preferences?</string>
+    <string name="dev_options_reset_all_message">All app settings will be reset to their defaults — theme, view options, gestures, reminders, quick capture, lock, backup, and update preferences.\n\nNotes, lists, and their metadata are not touched.\n\nTHIS IS NOT A MOCK. IT WILL ACTUALLY HAPPEN, WITH NO UNDO.</string>
+    <string name="dev_options_reset_all_confirm">Reset</string>
+    <string name="dev_options_toast_reset_done">All preferences reset</string>
+
+    <!-- Developer options: test notification content -->
+    <string name="dev_options_test_notif_body">Developer options test — tap Snooze or Done to test actions.</string>
+    <string name="dev_options_test_notif_low_title" translatable="false">Test: LOW channel</string>
+    <string name="dev_options_test_notif_default_title" translatable="false">Test: DEFAULT channel</string>
+    <string name="dev_options_test_notif_high_title" translatable="false">Test: HIGH channel</string>
+    <string name="dev_options_test_notif_big_picture_title" translatable="false">Test: BigPicture</string>
+    <string name="dev_options_test_notif_big_picture_body">Hero image notification test — tap Snooze or Done to test actions.</string>
+    <string name="dev_options_test_notif_big_text_title" translatable="false">Test: BigText list</string>
+    <string name="dev_options_test_notif_overdue_title" translatable="false">Test: Keep-Until-Done</string>
+    <string name="dev_options_test_notif_overdue_body">Dismiss this notification — it should reappear until you tap Done.</string>
+    <string name="dev_options_test_notif_summary_title">3 reminders due</string>
+    <string name="dev_options_test_notif_summary_text">Buy milk · Call doctor · Pack for trip</string>
+    <string name="dev_options_test_notif_summary_line1">Buy milk — overdue</string>
+    <string name="dev_options_test_notif_summary_line2">Call doctor — overdue</string>
+    <string name="dev_options_test_notif_summary_line3">Pack for trip — today</string>
+
+    <!-- Developer options: mock note content -->
+    <string name="dev_options_mock_checklist_title" translatable="false">Dev: Mock Checklist</string>
+    <string name="dev_options_mock_checklist_tag1" translatable="false">Testing</string>
+    <string name="dev_options_mock_checklist_item_groceries">Groceries</string>
+    <string name="dev_options_mock_checklist_item_milk">Milk</string>
+    <string name="dev_options_mock_checklist_item_eggs">Eggs</string>
+    <string name="dev_options_mock_checklist_item_bread">Bread</string>
+    <string name="dev_options_mock_checklist_item_work">Work tasks</string>
+    <string name="dev_options_mock_checklist_item_report">Write report</string>
+    <string name="dev_options_mock_checklist_item_pr">Review PR</string>
+    <string name="dev_options_mock_checklist_item_dentist">Book dentist</string>
+    <string name="dev_options_mock_note_title" translatable="false">Dev: Markdown Showcase</string>
+    <string name="dev_options_mock_note_body" translatable="false"># Heading 1\n## Heading 2\n\n**Bold**, *italic*, &lt;u&gt;underline&lt;/u&gt;, ~~strikethrough~~\n\n`inline code` and [a link](https://example.com)\n\n> A blockquote line\n\n- Bullet item 1\n- Bullet item 2\n\n1. Ordered item 1\n2. Ordered item 2</string>
 
 </resources>

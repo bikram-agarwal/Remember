@@ -76,6 +76,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
+import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.data.normalizeTagName
@@ -137,8 +138,8 @@ fun TagEditorSheet(
             lastValidHex
         }
 
-    val chosenHex: String = currentDraftHexOrLastValid()
-    val chosenColor: Color = parseHexColor(chosenHex) ?: TagPalette.presets[0]
+    val committedDraftHex: String = currentDraftHexOrLastValid()
+    val chosenColor: Color = parseHexColor(committedDraftHex) ?: TagPalette.presets[0]
 
     fun hexForTag(tag: String): String {
         val key = normalizeTagName(tag)
@@ -306,7 +307,7 @@ fun TagEditorSheet(
             trimmedDraft.isNotBlank() &&
             (
                 !editingTag.equals(trimmedDraft, ignoreCase = true) ||
-                    !hexForTag(editingTag.orEmpty()).equals(chosenHex, ignoreCase = true)
+                    !hexForTag(editingTag.orEmpty()).equals(committedDraftHex, ignoreCase = true)
             )
     val draftDirty = editingTag == null && trimmedDraft.isNotBlank()
     val sheetDirty = pendingTagChanges || editDirty || draftDirty
@@ -327,15 +328,16 @@ fun TagEditorSheet(
                 },
         )
 
-    val draftIsDuplicate =
-        editMode &&
-            trimmedDraft.isNotBlank() &&
+    val draftConflictsWithExistingTag =
+        trimmedDraft.isNotBlank() &&
             allTags.any { tag ->
                 tag.equals(trimmedDraft, ignoreCase = true) &&
                     !tag.equals(editingTag.orEmpty(), ignoreCase = true)
             }
+    val draftIsReserved =
+        trimmedDraft.isNotBlank() && RememberReservedTags.isSuggestionReserved(trimmedDraft)
     val primaryIsSave = sheetDirty
-    val canSave = !draftIsDuplicate
+    val canSave = !draftConflictsWithExistingTag && !draftIsReserved
 
     LaunchedEffect(hexEditing, hexDraft.text) {
         if (!hexEditing || hexDraft.text.length != 6) return@LaunchedEffect
@@ -514,7 +516,7 @@ fun TagEditorSheet(
                             modifier = Modifier.weight(1f),
                         )
                         EditableTagHexChip(
-                            hex = chosenHex,
+                            hex = committedDraftHex,
                             color = chosenColor,
                             editing = hexEditing,
                             draft = hexDraft,
@@ -528,10 +530,19 @@ fun TagEditorSheet(
                         )
                     }
 
-                    if (draftIsDuplicate) {
+                    if (draftConflictsWithExistingTag) {
                         Spacer(Modifier.height(6.dp))
                         Text(
                             text = stringResource(R.string.tag_editor_duplicate_existing),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+
+                    if (draftIsReserved) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = stringResource(R.string.tag_editor_reserved_name),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error,
                         )

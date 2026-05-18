@@ -138,4 +138,15 @@ class UpdatePrefs(
             prefs[Keys.PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME] = lastUpdateTimeMillis
         }
     }
+
+    suspend fun clearGithubReleaseAck() {
+        context.updateDataStore.edit { prefs ->
+            prefs.remove(Keys.GITHUB_ACK_FINGERPRINT)
+            prefs.remove(Keys.GITHUB_ACK_INSTALLED_VERSION)
+        }
+    }
+
+    suspend fun reset() {
+        context.updateDataStore.edit { it.clear() }
+    }
 }

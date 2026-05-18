@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
+import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.AppBottomSheet
@@ -132,7 +133,7 @@ fun BulkTagSheet(
         trimmedDraft.isNotBlank() &&
             normalizedLowerTags.contains(trimmedDraft.lowercase())
     val chosenColor: Color = parseHexColor(lastValidHex) ?: TagPalette.presets[0]
-    val canStageNewTag = trimmedDraft.isNotBlank() && !draftIsDuplicate
+    val canStageNewTag = trimmedDraft.isNotBlank() && !draftIsDuplicate && !RememberReservedTags.isSuggestionReserved(trimmedDraft)
 
     val hasPending = tagIntents.values.any { it != BulkTagIntent.NEUTRAL }
 

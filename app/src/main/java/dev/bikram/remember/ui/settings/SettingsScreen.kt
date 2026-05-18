@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -126,6 +127,7 @@ private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
 fun SettingsRoute(
     onOpenIntro: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
+    onOpenDevOptions: () -> Unit = {},
     openUpdateSheetRequest: Int = 0,
     highlightSectionKey: String? = null,
     onHighlightHandled: () -> Unit = {},
@@ -140,6 +142,7 @@ fun SettingsRoute(
                 SettingsDependenciesEntryPoint::class.java,
             )
         }
+    val devModePrefs = settingsDependencies.devModePrefs()
     val lockPrefs = settingsDependencies.lockPrefs()
     val interactionPrefs = settingsDependencies.interactionPrefs()
     val quickCapturePrefs = settingsDependencies.quickCapturePrefs()
@@ -160,6 +163,7 @@ fun SettingsRoute(
     val appReviewLauncher = settingsDependencies.appReviewLauncher()
     val scope = rememberCoroutineScope()
 
+    val devModeEnabled by devModePrefs.isEnabled.collectAsStateWithLifecycle(initialValue = false)
     val lockState by lockPrefs.state.collectAsStateWithLifecycle(
         initialValue = LockPrefs.State(),
     )
@@ -1141,48 +1145,23 @@ fun SettingsRoute(
                 }
             }
 
-            if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease") {
-                item(key = "dev_release_mocks") {
-                    Column(modifier = Modifier.padding(top = 24.dp)) {
-                        SettingsExpandableSection(
-                            sectionKey = "dev_release_mocks",
-                            materialSymbolName = "bug_report",
-                            title = stringResource(R.string.settings_dev_release_mocks_section),
-                            collapsedSectionKeys = collapsedSettingsSectionKeys,
-                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                        ) {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                RememberOutlinedButton(
-                                    onClick = {
-                                        rememberUpdateState.devReleaseMockArmUpdatePromoBanner()
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(stringResource(R.string.settings_dev_release_mock_update_banner))
-                                }
-                                RememberOutlinedButton(
-                                    onClick = {
-                                        rememberUpdateState.devReleaseMockStartPlayUpdateBannerSequence()
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(stringResource(R.string.settings_dev_release_mock_play_banner))
-                                }
-                            }
-                        }
-                    }
+            if (devModeEnabled) {
+                item(key = "dev_options_entry") {
+                    DevOptionsSettingsEntry(
+                        modifier = Modifier.padding(top = 24.dp),
+                        onClick = onOpenDevOptions,
+                    )
                 }
             }
 
             item(key = "about") {
                 AboutSection(
                     onOpenIntro = onOpenIntro,
+                    devModeEnabled = devModeEnabled,
+                    onDevModeActivated = {
+                        scope.launch { devModePrefs.setEnabled(true) }
+                        onOpenDevOptions()
+                    },
                     onLaunchPlayReview = { onFlowFinished ->
                         val hostActivity = context as? ComponentActivity
                         if (hostActivity != null) {
@@ -1236,6 +1215,38 @@ fun SettingsRoute(
                 }
             },
         )
+    }
+}
+
+@Composable
+private fun DevOptionsSettingsEntry(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier) {
+        SettingsStaticSectionHeader(
+            materialSymbolName = "developer_board",
+            title = stringResource(R.string.dev_options_title),
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
+            GroupedListItem(position = GroupPosition.ONLY) {
+                androidx.compose.material3.ListItem(
+                    headlineContent = { Text(stringResource(R.string.dev_options_settings_entry_label)) },
+                    trailingContent = {
+                        RememberMaterialRoundedSymbol(
+                            name = "chevron_right",
+                            size = 20.dp,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    },
+                    modifier = Modifier.tapSoundClickable(onClick = onClick),
+                    colors = androidx.compose.material3.ListItemDefaults.colors(
+                        containerColor = Color.Transparent,
+                    ),
+                )
+            }
+        }
     }
 }
 

@@ -49,4 +49,8 @@ class QuickCapturePrefs(
             }
         }
     }
+
+    suspend fun reset() {
+        context.quickCaptureDataStore.edit { it.clear() }
+    }
 }

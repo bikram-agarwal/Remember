@@ -69,6 +69,8 @@ import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 internal fun AboutSection(
     onOpenIntro: () -> Unit,
     onLaunchPlayReview: (onFlowFinished: () -> Unit) -> Unit,
+    onDevModeActivated: () -> Unit = {},
+    devModeEnabled: Boolean = false,
 ) {
     val context = LocalContext.current
     val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
@@ -96,6 +98,8 @@ internal fun AboutSection(
         AboutSettingsBlock(
             onOpenIntro = onOpenIntro,
             onLaunchPlayReview = onLaunchPlayReview,
+            onDevModeActivated = onDevModeActivated,
+            devModeEnabled = devModeEnabled,
         )
     }
 }
@@ -137,6 +141,8 @@ private fun rememberDiagnosticsShareAction(
 private fun AboutSettingsBlock(
     onOpenIntro: () -> Unit,
     onLaunchPlayReview: (onFlowFinished: () -> Unit) -> Unit,
+    onDevModeActivated: () -> Unit = {},
+    devModeEnabled: Boolean = false,
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -157,6 +163,8 @@ private fun AboutSettingsBlock(
             else -> BuildConfig.BUILD_TYPE
         }
     val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
+    var devModeTapCount by remember { mutableStateOf(0) }
+    var lastAlreadyUnlockedToastMs by remember { mutableStateOf(0L) }
     val copyAboutLink =
         remember(context) {
             { url: String ->
@@ -193,8 +201,26 @@ private fun AboutSettingsBlock(
                         Modifier.combinedClickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = {},
+                            onClick = {
+                                if (devModeEnabled) {
+                                    val now = System.currentTimeMillis()
+                                    if (now - lastAlreadyUnlockedToastMs > 2_500L) {
+                                        lastAlreadyUnlockedToastMs = now
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_already_unlocked), Toast.LENGTH_SHORT).show()
+                                    }
+                                } else {
+                                    devModeTapCount++
+                                    if (devModeTapCount >= 7) {
+                                        devModeTapCount = 0
+                                        onDevModeActivated()
+                                    } else if (devModeTapCount >= 3) {
+                                        val tapsLeft = 7 - devModeTapCount
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_taps_remaining, tapsLeft), Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            },
                             onLongClick = {
+                                devModeTapCount = 0
                                 Toast
                                     .makeText(context, buildVariantToastText, Toast.LENGTH_SHORT)
                                     .show()

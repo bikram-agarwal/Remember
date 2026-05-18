@@ -75,6 +75,10 @@ class BackupPrefs(
         }
     }
 
+    suspend fun reset() {
+        context.backupDataStore.edit { it.clear() }
+    }
+
     suspend fun importFromBackup(json: JSONObject?) {
         if (json == null || json.length() == 0) return
         context.backupDataStore.edit { mutable ->

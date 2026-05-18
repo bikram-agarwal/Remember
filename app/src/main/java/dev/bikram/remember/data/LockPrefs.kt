@@ -146,6 +146,10 @@ class LockPrefs(
         }
     }
 
+    suspend fun reset() {
+        context.lockDataStore.edit { it.clear() }
+    }
+
     suspend fun importFromBackup(json: JSONObject?) {
         if (json == null || json.length() == 0) return
         // Restore from a backup is conservative for security-sensitive keys: we only ever

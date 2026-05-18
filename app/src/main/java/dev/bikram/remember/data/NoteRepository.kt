@@ -109,7 +109,7 @@ class NoteRepository(
                 .map { notes ->
                     notes
                         .flatMap { it.note.tags }
-                        .filterNot { it == RememberReservedTags.STARRED }
+                        .filterNot { RememberReservedTags.isSuggestionReserved(it) }
                         .distinct()
                         .sorted()
                 }.flowOn(defaultDispatcher)

@@ -44,4 +44,8 @@ class ReminderPrefs(
             prefs[Keys.SUMMARY_NOTIFICATION] = enabled
         }
     }
+
+    suspend fun reset() {
+        context.reminderDataStore.edit { it.clear() }
+    }
 }
