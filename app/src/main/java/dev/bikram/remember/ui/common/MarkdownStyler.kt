@@ -83,7 +83,7 @@ internal class MarkdownStyler(
     val linkSpanStyle: SpanStyle = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
     val inlineCodeSpanStyle: SpanStyle = SpanStyle(background = codeBackground, fontFamily = FontFamily.Monospace)
     val quoteSpanStyle: SpanStyle = SpanStyle(color = quoteColor, fontStyle = FontStyle.Italic)
-    val codeBlockSpanStyle: SpanStyle = SpanStyle(color = quoteColor, fontFamily = FontFamily.Monospace)
+    val codeBlockSpanStyle: SpanStyle = SpanStyle(color = quoteColor, background = codeBackground, fontFamily = FontFamily.Monospace)
     val boldSpanStyle: SpanStyle = SpanStyle(fontWeight = FontWeight.Bold)
     val italicSpanStyle: SpanStyle = SpanStyle(fontStyle = FontStyle.Italic)
     val underlineSpanStyle: SpanStyle = SpanStyle(textDecoration = TextDecoration.Underline)

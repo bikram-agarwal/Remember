@@ -513,6 +513,13 @@ fun TagEditorSheet(
                             value = draftName,
                             onValueChange = { draftName = sanitizeTagNameInput(it) },
                             placeholder = stringResource(R.string.tag_editor_create_placeholder),
+                            counterText =
+                                stringResource(
+                                    R.string.tag_editor_name_length_counter,
+                                    draftName.length,
+                                    TAG_NAME_MAX_LENGTH,
+                                ),
+                            counterHighlighted = draftName.length >= TAG_NAME_MAX_LENGTH,
                             modifier = Modifier.weight(1f),
                         )
                         EditableTagHexChip(
@@ -778,6 +785,8 @@ internal fun CompactOutlinedField(
     placeholder: String,
     modifier: Modifier = Modifier,
     leading: (@Composable () -> Unit)? = null,
+    counterText: String? = null,
+    counterHighlighted: Boolean = false,
 ) {
     val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
     val pillShape = MaterialTheme.shapes.medium
@@ -822,6 +831,20 @@ internal fun CompactOutlinedField(
                     }
                     inner()
                 },
+            )
+        }
+        if (counterText != null) {
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = counterText,
+                style = MaterialTheme.typography.labelSmall,
+                color =
+                    if (counterHighlighted) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                maxLines = 1,
             )
         }
     }

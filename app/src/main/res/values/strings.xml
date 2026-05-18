@@ -521,6 +521,7 @@
     <string name="tag_editor_no_available_tags">No available tags</string>
     <string name="tag_editor_create_placeholder">Create new tag</string>
     <string name="tag_editor_field_placeholder">Name this tag</string>
+    <string name="tag_editor_name_length_counter">%1$d/%2$d</string>
     <string name="tag_editor_preview_placeholder">Preview</string>
     <string name="tag_editor_hex_label">HEX</string>
     <string name="tag_editor_duplicate">Already added</string>

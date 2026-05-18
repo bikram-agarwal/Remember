@@ -14,8 +14,9 @@ import dev.bikram.remember.ui.common.MarkdownQuoteLineRegex
 import dev.bikram.remember.ui.common.MarkdownStyler
 
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
-private const val LivePreviewBulletIndent = "  "
-private const val LivePreviewNumberedIndent = " "
+private const val LivePreviewUncheckedChecklistMarker = "\u2610 "
+private const val LivePreviewCheckedChecklistMarker = "\u2611 "
+private const val LivePreviewQuoteMarker = "| "
 
 internal class MarkdownVisualTransformation(
     private val styler: MarkdownStyler,
@@ -47,9 +48,6 @@ private class MarkdownPreviewTransformationBuilder(
 ) {
     private val hiddenRanges = mutableListOf<HiddenRange>()
     private val styleRanges = mutableListOf<MarkdownStyleRange>()
-    // Source character index → replacement char shown in the transformed text instead.
-    // Used so list markers can be swapped in-place without shifting offsets.
-    private val replacementChars = mutableMapOf<Int, Char>()
     private val insertedTextBeforeSourceIndex = mutableMapOf<Int, String>()
 
     fun build(): TransformedMarkdown {
@@ -63,9 +61,9 @@ private class MarkdownPreviewTransformationBuilder(
 
         for (sourceIndex in source.indices) {
             insertedTextBeforeSourceIndex[sourceIndex]?.let { insertedText ->
-                insertedText.forEach {
+                insertedText.forEach { character ->
                     transformedToOriginal.add(sourceIndex)
-                    transformedText.append(it)
+                    transformedText.append(character)
                     transformedOffset++
                 }
             }
@@ -84,7 +82,7 @@ private class MarkdownPreviewTransformationBuilder(
                 if (transformedToOriginal.size == transformedOffset) {
                     transformedToOriginal.add(sourceIndex)
                 }
-                transformedText.append(replacementChars[sourceIndex] ?: source[sourceIndex])
+                transformedText.append(source[sourceIndex])
                 transformedOffset++
             }
         }
@@ -153,33 +151,39 @@ private class MarkdownPreviewTransformationBuilder(
         }
 
         MarkdownChecklistLineRegex.matchEntire(line)?.let { match ->
+            val checked = match.groupValues[2].equals("x", ignoreCase = true)
             val contentStartIndex = lineStartIndex + match.groups[3]!!.range.first
+            insertedTextBeforeSourceIndex[lineStartIndex] =
+                match.groupValues[1] +
+                    if (checked) {
+                        LivePreviewCheckedChecklistMarker
+                    } else {
+                        LivePreviewUncheckedChecklistMarker
+                    }
             hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)
             return
         }
 
         MarkdownBulletLineRegex.matchEntire(line)?.let { match ->
-            // Replace the -, *, or + marker with • in-place (1:1 char swap, offset mapping stays
-            // correct). A short inserted prefix gives live preview the same inset without the
-            // oversized gaps caused by paragraph TextIndent inside BasicTextField.
-            val indentLength = match.groups[1]!!.value.length
-            insertedTextBeforeSourceIndex[lineStartIndex] = LivePreviewBulletIndent
-            replacementChars[lineStartIndex + indentLength] = '•'
             val contentStartIndex = lineStartIndex + match.groups[2]!!.range.first
+            insertedTextBeforeSourceIndex[lineStartIndex] = "  " + match.groupValues[1] + "\u2022 "
+            hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)
             return
         }
 
         MarkdownNumberedLineRegex.matchEntire(line)?.let { match ->
-            insertedTextBeforeSourceIndex[lineStartIndex] = LivePreviewNumberedIndent
             val contentStartIndex = lineStartIndex + match.groups[3]!!.range.first
+            insertedTextBeforeSourceIndex[lineStartIndex] = " " + match.groupValues[1] + match.groupValues[2] + ". "
+            hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)
             return
         }
 
         MarkdownQuoteLineRegex.matchEntire(line)?.let { match ->
             val contentStartIndex = lineStartIndex + match.groups[1]!!.range.first
+            insertedTextBeforeSourceIndex[lineStartIndex] = LivePreviewQuoteMarker
             hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             styleRanges.add(MarkdownStyleRange(contentStartIndex, lineEndIndex, styler.quoteSpanStyle))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)

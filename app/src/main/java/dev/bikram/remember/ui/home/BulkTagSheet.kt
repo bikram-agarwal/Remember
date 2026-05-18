@@ -65,6 +65,7 @@ import dev.bikram.remember.ui.components.parseHexColor
 import dev.bikram.remember.ui.components.tagColor
 import dev.bikram.remember.ui.edit.CompactOutlinedField
 import dev.bikram.remember.ui.edit.EditableTagHexChip
+import dev.bikram.remember.ui.edit.TAG_NAME_MAX_LENGTH
 import dev.bikram.remember.ui.edit.TagColorSlider
 import dev.bikram.remember.ui.edit.defaultTagColorHex
 import dev.bikram.remember.ui.edit.sanitizeTagNameInput
@@ -298,6 +299,13 @@ fun BulkTagSheet(
                             value = draftName,
                             onValueChange = { draftName = sanitizeTagNameInput(it) },
                             placeholder = stringResource(R.string.tag_editor_field_placeholder),
+                            counterText =
+                                stringResource(
+                                    R.string.tag_editor_name_length_counter,
+                                    draftName.length,
+                                    TAG_NAME_MAX_LENGTH,
+                                ),
+                            counterHighlighted = draftName.length >= TAG_NAME_MAX_LENGTH,
                             modifier = Modifier.weight(1f),
                         )
                         EditableTagHexChip(

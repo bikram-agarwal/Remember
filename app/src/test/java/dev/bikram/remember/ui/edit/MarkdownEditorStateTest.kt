@@ -28,6 +28,17 @@ class MarkdownEditorStateTest {
     }
 
     @Test
+    fun backspaceInsideEmptyBoldMarkersRemovesWholeWrapper() {
+        val state = MarkdownEditorState()
+        state.toggleBold()
+
+        state.update(TextFieldValue("***", selection = TextRange(1)))
+
+        assertEquals("", state.markdown)
+        assertEquals(TextRange(0), state.textFieldValue.selection)
+    }
+
+    @Test
     fun boldWithSelectionInsideExistingBoldMarkersRemovesMarkers() {
         val state = MarkdownEditorState("**Test**")
         state.update(TextFieldValue("**Test**", selection = TextRange(2, 6)))
@@ -97,6 +108,54 @@ class MarkdownEditorStateTest {
         state.applyHeading(2)
 
         assertEquals(true, state.shouldCapitalizeNextInputInEmptyInlineWrapper)
+    }
+
+    @Test
+    fun backspaceInsideEmptyHeadingPrefixRemovesFormattedLine() {
+        val state = MarkdownEditorState("First\n")
+        state.update(TextFieldValue("First\n", selection = TextRange(6)))
+        state.applyHeading(3)
+
+        state.update(TextFieldValue("First\n###", selection = TextRange(9)))
+
+        assertEquals("First", state.markdown)
+        assertEquals(TextRange(5), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun backspaceInsideEmptyBulletPrefixRemovesFormattedLine() {
+        val state = MarkdownEditorState("First\n")
+        state.update(TextFieldValue("First\n", selection = TextRange(6)))
+        state.applyBulletList()
+
+        state.update(TextFieldValue("First\n-", selection = TextRange(7)))
+
+        assertEquals("First", state.markdown)
+        assertEquals(TextRange(5), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun backspaceInsideEmptyChecklistPrefixRemovesFormattedLine() {
+        val state = MarkdownEditorState("First\n")
+        state.update(TextFieldValue("First\n", selection = TextRange(6)))
+        state.applyChecklist()
+
+        state.update(TextFieldValue("First\n- [ ]", selection = TextRange(11)))
+
+        assertEquals("First", state.markdown)
+        assertEquals(TextRange(5), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun backspaceInsideEmptyNumberedPrefixRemovesFormattedLine() {
+        val state = MarkdownEditorState("First\n")
+        state.update(TextFieldValue("First\n", selection = TextRange(6)))
+        state.applyNumberedList()
+
+        state.update(TextFieldValue("First\n1.", selection = TextRange(8)))
+
+        assertEquals("First", state.markdown)
+        assertEquals(TextRange(5), state.textFieldValue.selection)
     }
 
     @Test
@@ -192,6 +251,70 @@ class MarkdownEditorStateTest {
 
         assertEquals("<u>test</u>", state.markdown)
         assertEquals(TextRange(3, 7), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun pressingEnterAtEndOfUnderlineContinuesAfterClosingMarker() {
+        val state = MarkdownEditorState("<u>text</u>")
+        state.update(TextFieldValue("<u>text</u>", selection = TextRange(7)))
+
+        state.update(TextFieldValue("<u>text\n</u>", selection = TextRange(8)))
+
+        assertEquals("<u>text</u>\n", state.markdown)
+        assertEquals(TextRange(12), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun pressingEnterAtEndOfUnderlineInsideBulletClosesUnderlineThenContinuesList() {
+        val state = MarkdownEditorState("- <u>text</u>")
+        state.update(TextFieldValue("- <u>text</u>", selection = TextRange(9)))
+
+        state.update(TextFieldValue("- <u>text\n</u>", selection = TextRange(10)))
+
+        assertEquals("- <u>text</u>\n- ", state.markdown)
+        assertEquals(TextRange(16), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun backspaceAfterUnderlineClosingMarkerDeletesLastVisibleCharacter() {
+        val state = MarkdownEditorState("<u>text</u>")
+
+        state.update(TextFieldValue("<u>text</u", selection = TextRange(10)))
+
+        assertEquals("<u>tex</u>", state.markdown)
+        assertEquals(TextRange(6), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun backspaceInsideUnderlineClosingMarkerDeletesLastVisibleCharacter() {
+        val state = MarkdownEditorState("<u>text</u>")
+        state.update(TextFieldValue("<u>text</u>", selection = TextRange(10)))
+
+        state.update(TextFieldValue("<u>text</>", selection = TextRange(9)))
+
+        assertEquals("<u>tex</u>", state.markdown)
+        assertEquals(TextRange(6), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun pressingEnterAtEndOfBoldContinuesAfterClosingMarker() {
+        val state = MarkdownEditorState("**text**")
+        state.update(TextFieldValue("**text**", selection = TextRange(6)))
+
+        state.update(TextFieldValue("**text\n**", selection = TextRange(7)))
+
+        assertEquals("**text**\n", state.markdown)
+        assertEquals(TextRange(9), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun backspaceAfterBoldClosingMarkerDeletesLastVisibleCharacter() {
+        val state = MarkdownEditorState("**text**")
+
+        state.update(TextFieldValue("**text*", selection = TextRange(7)))
+
+        assertEquals("**tex**", state.markdown)
+        assertEquals(TextRange(5), state.textFieldValue.selection)
     }
 
     @Test
