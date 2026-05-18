@@ -1,13 +1,10 @@
 package dev.bikram.remember.ui.edit
 
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.ParagraphStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextIndent
-import androidx.compose.ui.unit.sp
 import dev.bikram.remember.ui.common.MarkdownBulletLineRegex
 import dev.bikram.remember.ui.common.MarkdownChecklistLineRegex
 import dev.bikram.remember.ui.common.MarkdownCodeFenceLineRegex
@@ -17,6 +14,8 @@ import dev.bikram.remember.ui.common.MarkdownQuoteLineRegex
 import dev.bikram.remember.ui.common.MarkdownStyler
 
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
+private const val LivePreviewBulletIndent = "  "
+private const val LivePreviewNumberedIndent = " "
 
 internal class MarkdownVisualTransformation(
     private val styler: MarkdownStyler,
@@ -48,10 +47,10 @@ private class MarkdownPreviewTransformationBuilder(
 ) {
     private val hiddenRanges = mutableListOf<HiddenRange>()
     private val styleRanges = mutableListOf<MarkdownStyleRange>()
-    private val paragraphStyleRanges = mutableListOf<MarkdownParagraphStyleRange>()
     // Source character index → replacement char shown in the transformed text instead.
     // Used so list markers can be swapped in-place without shifting offsets.
     private val replacementChars = mutableMapOf<Int, Char>()
+    private val insertedTextBeforeSourceIndex = mutableMapOf<Int, String>()
 
     fun build(): TransformedMarkdown {
         collectMarkdownRanges()
@@ -63,6 +62,13 @@ private class MarkdownPreviewTransformationBuilder(
         var transformedOffset = 0
 
         for (sourceIndex in source.indices) {
+            insertedTextBeforeSourceIndex[sourceIndex]?.let { insertedText ->
+                insertedText.forEach {
+                    transformedToOriginal.add(sourceIndex)
+                    transformedText.append(it)
+                    transformedOffset++
+                }
+            }
             while (
                 hiddenRangeIndex < normalizedHiddenRanges.size &&
                 sourceIndex >= normalizedHiddenRanges[hiddenRangeIndex].end
@@ -93,13 +99,6 @@ private class MarkdownPreviewTransformationBuilder(
                     val transformedEnd = originalToTransformed[styleRange.end.coerceIn(0, source.length)]
                     if (transformedStart < transformedEnd) {
                         addStyle(styleRange.style, transformedStart, transformedEnd)
-                    }
-                }
-                paragraphStyleRanges.forEach { pRange ->
-                    val transformedStart = originalToTransformed[pRange.start.coerceIn(0, source.length)]
-                    val transformedEnd = originalToTransformed[pRange.end.coerceIn(0, source.length)]
-                    if (transformedStart < transformedEnd) {
-                        addStyle(pRange.style, transformedStart, transformedEnd)
                     }
                 }
             }
@@ -162,42 +161,18 @@ private class MarkdownPreviewTransformationBuilder(
 
         MarkdownBulletLineRegex.matchEntire(line)?.let { match ->
             // Replace the -, *, or + marker with • in-place (1:1 char swap, offset mapping stays
-            // correct). Then apply a hanging-indent ParagraphStyle so wrapped lines align with the
-            // content start, mirroring the Row+padding layout used in MarkdownText view mode.
+            // correct). A short inserted prefix gives live preview the same inset without the
+            // oversized gaps caused by paragraph TextIndent inside BasicTextField.
             val indentLength = match.groups[1]!!.value.length
+            insertedTextBeforeSourceIndex[lineStartIndex] = LivePreviewBulletIndent
             replacementChars[lineStartIndex + indentLength] = '•'
-            paragraphStyleRanges.add(
-                MarkdownParagraphStyleRange(
-                    start = lineStartIndex,
-                    end = lineEndIndex,
-                    style = ParagraphStyle(
-                        textIndent = TextIndent(
-                            firstLine = (14 + indentLength * 12).sp,
-                            restLine = (28 + indentLength * 12).sp,
-                        ),
-                    ),
-                ),
-            )
             val contentStartIndex = lineStartIndex + match.groups[2]!!.range.first
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)
             return
         }
 
         MarkdownNumberedLineRegex.matchEntire(line)?.let { match ->
-            // Keep prefix visible, apply paragraph style for hanging indent on wrapped lines.
-            val indentLength = match.groups[1]!!.value.length
-            paragraphStyleRanges.add(
-                MarkdownParagraphStyleRange(
-                    start = lineStartIndex,
-                    end = lineEndIndex,
-                    style = ParagraphStyle(
-                        textIndent = TextIndent(
-                            firstLine = (8 + indentLength * 12).sp,
-                            restLine = (24 + indentLength * 12).sp,
-                        ),
-                    ),
-                ),
-            )
+            insertedTextBeforeSourceIndex[lineStartIndex] = LivePreviewNumberedIndent
             val contentStartIndex = lineStartIndex + match.groups[3]!!.range.first
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)
             return
@@ -338,12 +313,6 @@ private data class MarkdownStyleRange(
     val start: Int,
     val end: Int,
     val style: androidx.compose.ui.text.SpanStyle,
-)
-
-private data class MarkdownParagraphStyleRange(
-    val start: Int,
-    val end: Int,
-    val style: ParagraphStyle,
 )
 
 private data class TransformedMarkdown(

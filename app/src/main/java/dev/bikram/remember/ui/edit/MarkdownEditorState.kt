@@ -668,22 +668,55 @@ internal class MarkdownEditorState(
         if (!previousValue.selection.collapsed || !updatedValue.selection.collapsed) {
             return null
         }
-        if (updatedValue.text.length != previousValue.text.length + 1) {
-            return null
-        }
 
         val insertionIndex = updatedValue.selection.start - 1
         if (insertionIndex !in updatedValue.text.indices || updatedValue.text[insertionIndex] != '\n') {
             return null
         }
 
-        val expectedText =
-            previousValue.text.replaceRange(
-                startIndex = insertionIndex,
-                endIndex = insertionIndex,
-                replacement = "\n",
-            )
-        if (expectedText != updatedValue.text) {
+        if (updatedValue.text.length == previousValue.text.length + 1) {
+            val expectedText =
+                previousValue.text.replaceRange(
+                    startIndex = insertionIndex,
+                    endIndex = insertionIndex,
+                    replacement = "\n",
+                )
+            if (expectedText == updatedValue.text) {
+                return NewlineInsertion(index = insertionIndex)
+            }
+        }
+
+        val previousCursor = previousValue.selection.start.coerceIn(0, previousValue.text.length)
+        val previousLineStart =
+            if (previousCursor == 0) {
+                0
+            } else {
+                previousValue.text.lastIndexOf('\n', previousCursor - 1).let { newlineIndex ->
+                    if (newlineIndex < 0) 0 else newlineIndex + 1
+                }
+            }
+        val previousLineBeforeCursor = previousValue.text.substring(previousLineStart, previousCursor)
+        if (
+            continuationPrefixForLine(
+                line = previousLineBeforeCursor,
+                lineStart = previousLineStart,
+                sourceText = previousValue.text,
+            ) == null
+        ) {
+            return null
+        }
+
+        val updatedLineStart =
+            if (insertionIndex == 0) {
+                0
+            } else {
+                updatedValue.text.lastIndexOf('\n', insertionIndex - 1).let { newlineIndex ->
+                    if (newlineIndex < 0) 0 else newlineIndex + 1
+                }
+            }
+        val textBeforeLineChanged = previousValue.text.substring(0, previousLineStart) != updatedValue.text.substring(0, updatedLineStart)
+        val textAfterCursorChanged = previousValue.text.substring(previousCursor) != updatedValue.text.substring(insertionIndex + 1)
+        if (textBeforeLineChanged || textAfterCursorChanged) {
             return null
         }
         return NewlineInsertion(index = insertionIndex)

@@ -16,8 +16,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -26,12 +30,13 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LargeTopAppBar
@@ -54,6 +59,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
@@ -86,7 +93,6 @@ import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.common.AppBottomSheetDragHandle
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
-import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
@@ -97,6 +103,9 @@ import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.nav.DevOptionsSharedBoundsKey
+import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
+import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
 import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
@@ -1148,7 +1157,6 @@ fun SettingsRoute(
             if (devModeEnabled) {
                 item(key = "dev_options_entry") {
                     DevOptionsSettingsEntry(
-                        modifier = Modifier.padding(top = 24.dp),
                         onClick = onOpenDevOptions,
                     )
                 }
@@ -1156,6 +1164,12 @@ fun SettingsRoute(
 
             item(key = "about") {
                 AboutSection(
+                    modifier =
+                        if (devModeEnabled) {
+                            Modifier
+                        } else {
+                            Modifier.padding(top = 24.dp)
+                        },
                     onOpenIntro = onOpenIntro,
                     devModeEnabled = devModeEnabled,
                     onDevModeActivated = {
@@ -1218,34 +1232,79 @@ fun SettingsRoute(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 private fun DevOptionsSettingsEntry(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier) {
-        SettingsStaticSectionHeader(
-            materialSymbolName = "developer_board",
-            title = stringResource(R.string.dev_options_title),
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
-            GroupedListItem(position = GroupPosition.ONLY) {
-                androidx.compose.material3.ListItem(
-                    headlineContent = { Text(stringResource(R.string.dev_options_settings_entry_label)) },
-                    trailingContent = {
-                        RememberMaterialRoundedSymbol(
-                            name = "chevron_right",
-                            size = 20.dp,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    },
-                    modifier = Modifier.tapSoundClickable(onClick = onClick),
-                    colors = androidx.compose.material3.ListItemDefaults.colors(
-                        containerColor = Color.Transparent,
-                    ),
+    val sharedScope = LocalSharedTransitionScope.current
+    val navScope = LocalNavAnimatedVisibilityScope.current
+    val sharedBoundsSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
+    val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
+    val sharedModifier =
+        if (sharedScope != null && navScope != null) {
+            with(sharedScope) {
+                Modifier.sharedBounds(
+                    sharedContentState = rememberSharedContentState(key = DevOptionsSharedBoundsKey),
+                    animatedVisibilityScope = navScope,
+                    boundsTransform = sharedBoundsTransform,
                 )
             }
+        } else {
+            Modifier
+        }
+    Row(
+        modifier =
+            modifier
+                .then(sharedModifier)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .tapSoundClickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(36.dp)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f),
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = "developer_board",
+                size = 21.dp,
+                tint = MaterialTheme.colorScheme.primary,
+                weight = FontWeight.Medium,
+            )
+        }
+        Text(
+            text = stringResource(R.string.dev_options_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = "arrow_outward",
+                size = 20.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
+            )
         }
     }
 }

@@ -462,12 +462,17 @@ fun RememberNavGraph(
 
             composable(
                 route = Routes.DEV_OPTIONS,
-                enterTransition = { slideInHorizontally { it } + fadeIn() },
-                exitTransition = { slideOutHorizontally { it } + fadeOut() },
-                popEnterTransition = { slideInHorizontally { it } + fadeIn() },
-                popExitTransition = { slideOutHorizontally { it } + fadeOut() },
+                enterTransition = { fadeIn() },
+                exitTransition = { fadeOut() },
+                popEnterTransition = { fadeIn() },
+                popExitTransition = { fadeOut() },
             ) {
-                DevOptionsRoute(onBack = { navController.popBackStack() })
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                    LocalNavAnimatedVisibilityScope provides this@composable,
+                ) {
+                    DevOptionsRoute(onBack = { navController.popBackStack() })
+                }
             }
 
             composable(

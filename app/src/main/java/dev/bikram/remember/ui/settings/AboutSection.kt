@@ -71,11 +71,12 @@ internal fun AboutSection(
     onLaunchPlayReview: (onFlowFinished: () -> Unit) -> Unit,
     onDevModeActivated: () -> Unit = {},
     devModeEnabled: Boolean = false,
+    modifier: Modifier = Modifier.padding(top = 24.dp),
 ) {
     val context = LocalContext.current
     val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
     val shareDiagnostics = rememberDiagnosticsShareAction(context, diagnosticsChooserTitle)
-    Column(modifier = Modifier.padding(top = 24.dp)) {
+    Column(modifier = modifier) {
         SettingsStaticSectionHeader(
             materialSymbolName = "info",
             title = stringResource(R.string.settings_section_about),

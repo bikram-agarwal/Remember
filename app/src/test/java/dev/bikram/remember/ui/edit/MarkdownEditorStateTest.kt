@@ -321,6 +321,18 @@ class MarkdownEditorStateTest {
     }
 
     @Test
+    fun pressingEnterAfterNumberedItemContinuesWhenImeCommitsComposition() {
+        val state = MarkdownEditorState("1. adress")
+        val updatedMarkdown = "1. address\n"
+
+        state.update(TextFieldValue(updatedMarkdown, selection = TextRange(updatedMarkdown.length)))
+
+        val expectedMarkdown = "1. address\n2. "
+        assertEquals(expectedMarkdown, state.markdown)
+        assertEquals(TextRange(expectedMarkdown.length), state.textFieldValue.selection)
+    }
+
+    @Test
     fun pressingEnterAfterNestedBulletItemContinuesNestedBulletList() {
         val state = MarkdownEditorState("  - item")
 

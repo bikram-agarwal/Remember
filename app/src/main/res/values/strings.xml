@@ -966,7 +966,6 @@
     <string name="dev_options_mode_subtitle">Disable to hide this page from Settings</string>
     <string name="dev_options_warning">These are developer tools, not real app features. Do not use unless you know what you\'re doing. Some actions permanently change app state.</string>
     <string name="dev_options_taps_remaining">%1$d more taps to enable developer options</string>
-    <string name="dev_options_settings_entry_label">Open developer options</string>
 
     <!-- Developer options: sections -->
     <string name="dev_options_section_data">Mock data</string>
