@@ -110,6 +110,7 @@ fun RememberNavGraph(
     launchFlow: MutableStateFlow<LaunchAction?>? = null,
     openSettingsRequest: Int = 0,
     openUpdateSheetRequest: Int = 0,
+    startPlayInAppUpdateRequest: Int = 0,
     updateBarState: UpdateChromeState = UpdateChromeState.Hidden,
     updateFabState: UpdateChromeState = UpdateChromeState.Hidden,
     onUpdateClick: () -> Unit = {},
@@ -357,6 +358,8 @@ fun RememberNavGraph(
                         onOpenHelp = { navController.navigate(Routes.HELP) },
                         onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
                         openUpdateSheetRequest = openUpdateSheetRequest + openSettingsUpdatesRequest,
+                        startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
+                        updateBarVisible = updateBarState != UpdateChromeState.Hidden,
                         highlightSectionKey = settingsHighlightSection,
                         onHighlightHandled = { settingsHighlightSection = null },
                     )

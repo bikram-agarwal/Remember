@@ -511,7 +511,7 @@ fun DevOptionsRoute(onBack: () -> Unit) {
                         DevActionRow(
                             label = stringResource(R.string.dev_options_notif_mock_update),
                             onClick = {
-                                rememberUpdateState.devReleaseMockArmUpdatePromoBanner()
+                                rememberUpdateState.devReleaseMockShowUpdateAvailable()
                                 onBack()
                             },
                         )

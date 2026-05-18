@@ -56,6 +56,7 @@ import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.theme.pillShape
 
 /**
  * Static "About" section. Includes the section header (no expand/collapse since the
@@ -178,7 +179,7 @@ private fun AboutSettingsBlock(
         }
     val iconShape = MaterialTheme.shapes.extraLarge
     val authorShape = MaterialTheme.shapes.large
-    val aboutPillShape = MaterialTheme.shapes.extraExtraLarge
+    val aboutPillShape = pillShape
     var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
 
     GroupedListColumn {

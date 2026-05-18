@@ -163,16 +163,6 @@ fun SwipeableRememberNoteCard(
                         .padding(horizontal = 16.dp),
                 contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
             ) {
-                // For MARK_DONE the FILL axis flips with completion state so the
-                // glyph itself reads done vs not-done at a glance:
-                //   active note  -> outlined check_circle (FILL=0) "Mark done"
-                //   completed    -> filled check_circle (FILL=1)   "Mark not done"
-                // All other actions ignore the flag.
-                val iconFilled =
-                    action == NoteSwipeAction.MARK_DONE &&
-                        noteCompleted ||
-                        action == NoteSwipeAction.TOGGLE_STAR &&
-                        noteStarred
                 val contentScale = 0.88f + 0.12f * revealProgress
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -186,7 +176,7 @@ fun SwipeableRememberNoteCard(
                     if (fromStart) {
                         RememberMaterialRoundedSymbol(
                             name = action.materialSymbolName,
-                            filled = iconFilled,
+                            filled = true,
                             size = 20.dp,
                             tint = tint,
                             weight = FontWeight.Medium,
@@ -206,7 +196,7 @@ fun SwipeableRememberNoteCard(
                         Spacer(Modifier.width(6.dp))
                         RememberMaterialRoundedSymbol(
                             name = action.materialSymbolName,
-                            filled = iconFilled,
+                            filled = true,
                             size = 20.dp,
                             tint = tint,
                             weight = FontWeight.Medium,
@@ -259,11 +249,6 @@ private fun NoteSwipeAction.revealTile(
     noteStarred: Boolean,
     onClick: () -> Unit,
 ): SwipeRevealTile {
-    val iconFilled =
-        this == NoteSwipeAction.MARK_DONE &&
-            noteCompleted ||
-            this == NoteSwipeAction.TOGGLE_STAR &&
-            noteStarred
     val labelRes =
         when (this) {
             NoteSwipeAction.EDIT -> R.string.swipe_action_open
@@ -287,7 +272,7 @@ private fun NoteSwipeAction.revealTile(
         symbolName = materialSymbolName,
         backgroundColor = semanticSwipeBackground(),
         contentColor = semanticSwipeIconTint(),
-        filled = iconFilled,
+        filled = true,
         onClick = onClick,
     )
 }

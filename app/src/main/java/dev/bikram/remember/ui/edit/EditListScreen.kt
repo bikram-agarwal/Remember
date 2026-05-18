@@ -80,8 +80,8 @@ import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.components.ArchivedBanner
-import dev.bikram.remember.ui.components.ArchivedBannerState
+import dev.bikram.remember.ui.components.EditorShelfNotice
+import dev.bikram.remember.ui.components.EditorShelfNoticeState
 import dev.bikram.remember.ui.components.NoteActionBottomBar
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.components.RememberIconButton
@@ -859,14 +859,14 @@ fun EditListScreen(
                 }
             }
             if (shelfState != NoteShelfState.ACTIVE) {
-                item(key = "archived_banner") {
+                item(key = "editor_shelf_notice") {
                     Spacer(Modifier.height(16.dp))
-                    ArchivedBanner(
+                    EditorShelfNotice(
                         state =
                             if (shelfState == NoteShelfState.TRASHED) {
-                                ArchivedBannerState.TRASHED
+                                EditorShelfNoticeState.TRASHED
                             } else {
-                                ArchivedBannerState.ARCHIVED
+                                EditorShelfNoticeState.ARCHIVED
                             },
                         modifier = Modifier.fillMaxWidth(),
                     )

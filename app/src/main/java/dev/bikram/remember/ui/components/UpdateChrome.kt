@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.RoundedPolygonShape
+import dev.bikram.remember.ui.theme.pillShape
 
 sealed interface UpdateChromeState {
     data object Hidden : UpdateChromeState
@@ -94,33 +95,33 @@ fun UpdateFloatingBar(
             UpdateChromeState.Hidden -> return
             UpdateChromeState.Available ->
                 Pair(
-                    stringResource(R.string.update_banner_available_title),
+                    stringResource(R.string.update_bar_available_title),
                     null,
                 )
             is UpdateChromeState.Downloading -> {
                 val progressLabel =
                     if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
-                        stringResource(R.string.play_update_banner_downloading)
+                        stringResource(R.string.play_update_bar_downloading)
                     } else {
                         val downloaded = Formatter.formatFileSize(context, state.bytesDownloaded)
                         val total = Formatter.formatFileSize(context, state.totalBytesToDownload)
-                        stringResource(R.string.play_update_banner_downloading_bytes, downloaded, total)
+                        stringResource(R.string.play_update_bar_downloading_bytes, downloaded, total)
                     }
                 Pair(
-                    stringResource(R.string.play_update_banner_downloading_title),
+                    stringResource(R.string.play_update_bar_downloading_title),
                     progressLabel,
                 )
             }
             UpdateChromeState.ReadyToInstall ->
                 Pair(
-                    stringResource(R.string.play_update_banner_install_title),
-                    stringResource(R.string.play_update_banner_install_subtitle),
+                    stringResource(R.string.play_update_bar_install_title),
+                    stringResource(R.string.play_update_bar_install_subtitle),
                 )
         }
 
     Surface(
         modifier = modifier,
-        shape = MaterialTheme.shapes.extraExtraLarge,
+        shape = pillShape,
         color = scheme.surfaceContainerHigh,
         tonalElevation = 3.dp,
         shadowElevation = 3.dp,
@@ -180,7 +181,7 @@ fun UpdateFloatingBar(
                                     contentColor = scheme.onPrimary,
                                 ),
                         ) {
-                            Text(stringResource(R.string.update_banner_available_action))
+                            Text(stringResource(R.string.update_bar_available_action))
                         }
                         val closeLabel = stringResource(R.string.main_fab_close)
                         RememberIconButton(
@@ -209,7 +210,7 @@ fun UpdateFloatingBar(
                                 ),
                         ) {
                             Text(
-                                text = stringResource(R.string.play_update_banner_install_action),
+                                text = stringResource(R.string.play_update_bar_install_action),
                                 maxLines = 1,
                             )
                         }

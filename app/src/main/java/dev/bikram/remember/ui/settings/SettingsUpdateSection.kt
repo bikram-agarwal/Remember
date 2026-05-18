@@ -21,7 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
@@ -58,6 +58,8 @@ import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.compactControlShape
+import dev.bikram.remember.ui.theme.pillShape
 import dev.bikram.remember.update.RememberUpdateInfo
 import kotlinx.coroutines.launch
 
@@ -136,7 +138,7 @@ internal fun UpdateCheckBottomSheetContent(
                                 Modifier
                                     .fillMaxWidth()
                                     .height(48.dp),
-                            shape = RoundedCornerShape(24.dp),
+                            shape = pillShape,
                         ) {
                             Text(
                                 text =
@@ -184,7 +186,7 @@ internal fun UpdateCheckBottomSheetContent(
             ChangelogUiState.Loading -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = scheme.surfaceContainerHigh,
                     contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
@@ -196,7 +198,7 @@ internal fun UpdateCheckBottomSheetContent(
                                 .fillMaxWidth()
                                 .height(120.dp)
                                 .padding(8.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = compactControlShape,
                         color = scheme.surfaceContainerLow,
                         contentColor = scheme.onSurface,
                     ) {
@@ -215,7 +217,7 @@ internal fun UpdateCheckBottomSheetContent(
                 val changelogPagerMaxHeight = maxSheetHeight * 0.68f
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = scheme.surfaceContainerHigh,
                     contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
@@ -227,7 +229,7 @@ internal fun UpdateCheckBottomSheetContent(
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(8.dp),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = compactControlShape,
                             color = scheme.surfaceContainerLow,
                             contentColor = scheme.onSurface,
                         ) {
@@ -258,7 +260,7 @@ internal fun UpdateCheckBottomSheetContent(
                                     modifier =
                                         Modifier
                                             .size(32.dp)
-                                            .clip(RoundedCornerShape(50))
+                                            .clip(CircleShape)
                                             .clickable(
                                                 enabled = canGoBack,
                                                 onClick = {
@@ -303,7 +305,7 @@ internal fun UpdateCheckBottomSheetContent(
                                     modifier =
                                         Modifier
                                             .size(32.dp)
-                                            .clip(RoundedCornerShape(50))
+                                            .clip(CircleShape)
                                             .clickable(
                                                 enabled = canGoForward,
                                                 onClick = {
@@ -334,7 +336,7 @@ internal fun UpdateCheckBottomSheetContent(
                                         .fillMaxWidth()
                                         .height(changelogPagerMaxHeight)
                                         .padding(horizontal = 8.dp, vertical = 2.dp),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = compactControlShape,
                                 color = scheme.surfaceContainerLow,
                                 contentColor = scheme.onSurface,
                             ) {
@@ -362,7 +364,7 @@ internal fun UpdateCheckBottomSheetContent(
             is ChangelogUiState.Failed -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = scheme.surfaceContainerHigh,
                     contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
@@ -373,7 +375,7 @@ internal fun UpdateCheckBottomSheetContent(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(8.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = compactControlShape,
                         color = scheme.surfaceContainerLow,
                         contentColor = scheme.onSurface,
                     ) {
@@ -421,7 +423,7 @@ private fun UpToDatePhoneIcon() {
 private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
     val scheme = MaterialTheme.colorScheme
     val buttonHeight = 48.dp
-    val shape = RoundedCornerShape(24.dp)
+    val shape = pillShape
     val label =
         when {
             downloadProgress == -1f -> stringResource(R.string.settings_installing)
@@ -619,7 +621,7 @@ private fun UpdateSheetChangelog(changelogState: ChangelogUiState) {
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 1.dp,

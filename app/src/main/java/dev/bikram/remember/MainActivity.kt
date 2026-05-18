@@ -226,6 +226,7 @@ private fun AppRoot(
     val context = LocalContext.current
     var openSettingsRequest by rememberSaveable { mutableIntStateOf(0) }
     var openUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
+    var startPlayInAppUpdateRequest by rememberSaveable { mutableIntStateOf(0) }
     var dismissedUpdateBarKey by rememberSaveable { mutableStateOf<String?>(null) }
     val currentLockState = lockState
 
@@ -296,11 +297,16 @@ private fun AppRoot(
                 launchFlow = launchFlow,
                 openSettingsRequest = openSettingsRequest,
                 openUpdateSheetRequest = openUpdateSheetRequest,
+                startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
                 updateBarState = updateBarState,
                 updateFabState = updateFabState,
                 onUpdateClick = {
                     openSettingsRequest += 1
-                    openUpdateSheetRequest += 1
+                    if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
+                        startPlayInAppUpdateRequest += 1
+                    } else {
+                        openUpdateSheetRequest += 1
+                    }
                 },
                 onDismissUpdateAvailable = { dismissedUpdateBarKey = updateKey },
                 onInstallUpdate = {

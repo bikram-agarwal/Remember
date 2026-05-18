@@ -588,17 +588,15 @@ private fun FloatingNavTabItem(
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier.padding(horizontal = if (selected) 6.dp else 0.dp),
         ) {
-            Box(modifier = Modifier.size(24.dp)) {
-                RememberMaterialRoundedSymbol(
-                    name = item.symbolName,
-                    size = 24.dp,
-                    tint = LocalContentColor.current,
-                    weight = FontWeight.Medium,
-                    // Selected tab renders from the FILL=1 subset; inactive tabs render from
-                    // the FILL=0 subset so the pill reads with standard tab semantics.
-                    filled = selected,
-                )
-            }
+            RememberMaterialRoundedSymbol(
+                name = item.symbolName,
+                size = 24.dp,
+                tint = LocalContentColor.current,
+                weight = FontWeight.Medium,
+                // Selected tab renders from the FILL=1 subset; inactive tabs render from
+                // the FILL=0 subset so the pill reads with standard tab semantics.
+                filled = selected,
+            )
             if (labelWidth > 4.dp) {
                 Spacer(Modifier.width(6.dp))
                 Text(

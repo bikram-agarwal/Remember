@@ -58,6 +58,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.swipeActionAccent
 
 private const val SWIPE_REVEAL_SLOT_COUNT = 3
 private const val SWIPE_REVEAL_TOTAL_SLOT_COUNT = SWIPE_REVEAL_SLOT_COUNT * 2
@@ -714,15 +715,7 @@ private fun fullSwipeSlotActions(
 private fun NoteSwipeAction.settingsSwipeTileColor(isDropTarget: Boolean = false): Color = settingsSwipeAccent().copy(alpha = if (isDropTarget) 0.2f else 0.14f)
 
 @Composable
-private fun NoteSwipeAction.settingsSwipeAccent(): Color =
-    when (this) {
-        NoteSwipeAction.EDIT -> Color(0xFF3F7AF6)
-        NoteSwipeAction.TRASH -> Color(0xFFE53935)
-        NoteSwipeAction.DUPLICATE -> Color(0xFF64748B)
-        NoteSwipeAction.TOGGLE_STAR -> Color(0xFFB88700)
-        NoteSwipeAction.ARCHIVE -> Color(0xFF5F6F82)
-        NoteSwipeAction.MARK_DONE -> Color(0xFF2E7D32)
-    }
+private fun NoteSwipeAction.settingsSwipeAccent(): Color = swipeActionAccent()
 
 @Composable
 private fun NoteSwipeAction.settingsSwipeIconContainerColor(): Color = settingsSwipeAccent()

@@ -76,8 +76,8 @@ import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.components.ArchivedBanner
-import dev.bikram.remember.ui.components.ArchivedBannerState
+import dev.bikram.remember.ui.components.EditorShelfNotice
+import dev.bikram.remember.ui.components.EditorShelfNoticeState
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.TagAccentEditorStrip
@@ -800,15 +800,15 @@ internal fun EditNoteScrollableContent(
         when (shelfState) {
             NoteShelfState.ARCHIVED -> {
                 Spacer(Modifier.height(16.dp))
-                ArchivedBanner(
-                    state = ArchivedBannerState.ARCHIVED,
+                EditorShelfNotice(
+                    state = EditorShelfNoticeState.ARCHIVED,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             NoteShelfState.TRASHED -> {
                 Spacer(Modifier.height(16.dp))
-                ArchivedBanner(
-                    state = ArchivedBannerState.TRASHED,
+                EditorShelfNotice(
+                    state = EditorShelfNoticeState.TRASHED,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

@@ -22,35 +22,18 @@ class RememberUpdateState
         private val _updateInfo = MutableStateFlow<RememberUpdateInfo?>(null)
         val updateInfo: StateFlow<RememberUpdateInfo?> = _updateInfo.asStateFlow()
 
-        private val _updatePromoBannerDismissedThisSession = MutableStateFlow(false)
-        val updatePromoBannerDismissedThisSession: StateFlow<Boolean> =
-            _updatePromoBannerDismissedThisSession.asStateFlow()
-
         private val _devReleasePlayBannerMockUiState =
             MutableStateFlow<PlayInAppUpdateBannerUiState>(PlayInAppUpdateBannerUiState.Hidden)
         val devReleasePlayBannerMockUiState: StateFlow<PlayInAppUpdateBannerUiState> =
             _devReleasePlayBannerMockUiState.asStateFlow()
         private var devReleasePlayBannerMockSequenceJob: Job? = null
-        private var devReleaseUpdatePromoMockArmed = false
         private val updateMocksAvailable = BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease"
 
         fun showUpdate(info: RememberUpdateInfo?) {
             _updateInfo.value = info
-            devReleaseUpdatePromoMockArmed = false
-            if (info != null) {
-                _updatePromoBannerDismissedThisSession.value = false
-            }
         }
 
-        fun dismissUpdatePromoBanner() {
-            _updatePromoBannerDismissedThisSession.value = true
-            if (devReleaseUpdatePromoMockArmed) {
-                _updateInfo.value = null
-                devReleaseUpdatePromoMockArmed = false
-            }
-        }
-
-        fun devReleaseMockArmUpdatePromoBanner() {
+        fun devReleaseMockShowUpdateAvailable() {
             if (!updateMocksAvailable || !BuildConfig.SHOW_UPDATES) return
             _updateInfo.value =
                 RememberUpdateInfo(
@@ -65,8 +48,6 @@ class RememberUpdateState
                         },
                     isDevReleaseMock = true,
                 )
-            devReleaseUpdatePromoMockArmed = true
-            _updatePromoBannerDismissedThisSession.value = false
         }
 
         fun devReleaseMockStartPlayUpdateBannerSequence() {
@@ -101,8 +82,6 @@ class RememberUpdateState
             _devReleasePlayBannerMockUiState.value = PlayInAppUpdateBannerUiState.Hidden
             if (_updateInfo.value?.isDevReleaseMock == true) {
                 _updateInfo.value = null
-                devReleaseUpdatePromoMockArmed = false
-                _updatePromoBannerDismissedThisSession.value = false
             }
             return true
         }

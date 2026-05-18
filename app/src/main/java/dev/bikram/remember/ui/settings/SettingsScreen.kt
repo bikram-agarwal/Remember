@@ -138,6 +138,8 @@ fun SettingsRoute(
     onOpenHelp: () -> Unit = {},
     onOpenDevOptions: () -> Unit = {},
     openUpdateSheetRequest: Int = 0,
+    startPlayInAppUpdateRequest: Int = 0,
+    updateBarVisible: Boolean = false,
     highlightSectionKey: String? = null,
     onHighlightHandled: () -> Unit = {},
 ) {
@@ -210,6 +212,14 @@ fun SettingsRoute(
         initialValue = UpdatePreferencesState(),
     )
     val globalUpdateInfo by rememberUpdateState.updateInfo.collectAsStateWithLifecycle(initialValue = null)
+    val realPlayBannerState by playInAppUpdateProgressController.bannerUiState.collectAsStateWithLifecycle()
+    val devReleaseMockPlayBannerState by rememberUpdateState.devReleasePlayBannerMockUiState.collectAsStateWithLifecycle()
+    val playBannerState =
+        if (devReleaseMockPlayBannerState != PlayInAppUpdateBannerUiState.Hidden) {
+            devReleaseMockPlayBannerState
+        } else {
+            realPlayBannerState
+        }
     val maxUpdateSheetHeight = (configuration.screenHeightDp * 0.85f).dp
 
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
@@ -235,6 +245,30 @@ fun SettingsRoute(
                     ).show()
             }
         }
+
+    var handledStartPlayInAppUpdateRequest by rememberSaveable { mutableStateOf(0) }
+    LaunchedEffect(startPlayInAppUpdateRequest) {
+        if (startPlayInAppUpdateRequest <= handledStartPlayInAppUpdateRequest ||
+            !BuildConfig.USE_PLAY_IN_APP_UPDATES
+        ) {
+            return@LaunchedEffect
+        }
+        handledStartPlayInAppUpdateRequest = startPlayInAppUpdateRequest
+        val hostActivity = context as? ComponentActivity
+        val started =
+            hostActivity != null &&
+                playInAppUpdateStarter.startUpdateIfPending(hostActivity, playInAppUpdateLauncher)
+        if (started) {
+            playInAppUpdateProgressController.onFlexibleUpdateFlowStarted()
+        } else {
+            Toast
+                .makeText(
+                    context,
+                    resources.getString(R.string.settings_play_in_app_update_failed),
+                    Toast.LENGTH_SHORT,
+                ).show()
+        }
+    }
 
     LaunchedEffect(globalUpdateInfo) {
         if (globalUpdateInfo != null && updateInfo == null) {
@@ -625,6 +659,19 @@ fun SettingsRoute(
             beginUpdateCheck()
         }
     }
+    LaunchedEffect(playBannerState, showUpdateSheet) {
+        if (!showUpdateSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
+        when (playBannerState) {
+            is PlayInAppUpdateBannerUiState.Downloading,
+            PlayInAppUpdateBannerUiState.ReadyToInstall,
+            -> {
+                showUpdateSheet = false
+                downloadProgress = null
+                updateSheetChangelog = ChangelogUiState.Hidden
+            }
+            PlayInAppUpdateBannerUiState.Hidden -> Unit
+        }
+    }
     val highlightSection = highlightSectionKey?.substringBefore(".")
     val highlightItem = highlightSectionKey?.substringAfter(".", "")?.takeIf { it.isNotEmpty() }
     var activeHighlightItem by remember { mutableStateOf<String?>(null) }
@@ -702,7 +749,6 @@ fun SettingsRoute(
                 showUpdateSheet = false
                 downloadProgress = null
                 updateSheetChangelog = ChangelogUiState.Hidden
-                val playBannerState = playInAppUpdateProgressController.bannerUiState.value
                 val blocksPendingPlayClear =
                     playBannerState is PlayInAppUpdateBannerUiState.Downloading ||
                         playBannerState is PlayInAppUpdateBannerUiState.ReadyToInstall
@@ -817,7 +863,8 @@ fun SettingsRoute(
     ) { padding ->
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
         val topInset = padding.calculateTopPadding() + 8.dp
-        val bottomPadding = pillInset + 24.dp
+        val floatingUpdateBarExtraHeight = if (updateBarVisible) 72.dp else 0.dp
+        val bottomPadding = pillInset + floatingUpdateBarExtraHeight + 24.dp
         val listContentPadding =
             remember(topInset, bottomPadding) {
                 PaddingValues(
