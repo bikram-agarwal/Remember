@@ -968,10 +968,17 @@
     <string name="dev_options_taps_remaining">%1$d more taps to enable developer options</string>
 
     <!-- Developer options: sections -->
+    <string name="dev_options_section_info">Info</string>
+    <string name="dev_options_section_overview">Overview</string>
+    <string name="dev_options_section_permissions_storage">Permissions &amp; storage</string>
+    <string name="dev_options_section_database">Database</string>
+    <string name="dev_options_section_mock_operations">Mock operations</string>
+    <string name="dev_options_section_workers">Workers &amp; scheduling</string>
     <string name="dev_options_section_data">Mock data</string>
     <string name="dev_options_section_notifications">Notification testing</string>
     <string name="dev_options_section_settings">Settings</string>
-    <string name="dev_options_section_db">Database inspection</string>
+    <string name="dev_options_section_reset">Reset</string>
+    <string name="dev_options_section_db">Database</string>
     <string name="dev_options_section_diagnostics">Diagnostic tools</string>
 
     <!-- Developer options: data population -->
@@ -994,18 +1001,52 @@
     <string name="dev_options_notif_mock_play">Mock PlayStore update flow</string>
 
     <!-- Developer options: settings rows -->
-    <string name="dev_options_open_notif_settings">Open notification settings</string>
-    <string name="dev_options_open_alarm_settings">Open alarms &amp; reminders settings</string>
-    <string name="dev_options_open_battery_settings">Open battery optimization settings</string>
+    <string name="dev_options_open_app_details">App details</string>
+    <string name="dev_options_open_notif_settings">Notification settings</string>
+    <string name="dev_options_open_alarm_settings">Alarms &amp; reminders settings</string>
+    <string name="dev_options_open_battery_settings">Battery optimization settings</string>
     <string name="dev_options_reset_skipped_update">Reset skipped update version</string>
     <string name="dev_options_reset_first_launch">Reset first-launch flag</string>
+    <string name="dev_options_clear_update_dedupe">Clear update notification dedupe</string>
+    <string name="dev_options_delete_cached_update_apk">Delete cached update APK</string>
     <string name="dev_options_toast_skipped_cleared">Skipped update version cleared</string>
     <string name="dev_options_toast_first_launch_reset">First-launch flag reset</string>
+    <string name="dev_options_toast_update_dedupe_cleared">Update notification dedupe cleared</string>
+    <string name="dev_options_toast_cached_update_apk_deleted">Cached update APK deleted</string>
+    <string name="dev_options_toast_no_cached_update_apk">No cached update APK found</string>
+    <string name="dev_options_sync_backup_worker">Sync scheduled backup worker</string>
+    <string name="dev_options_sync_update_worker">Sync update check worker</string>
+    <string name="dev_options_sync_trash_worker">Sync trash cleanup worker</string>
+    <string name="dev_options_toast_workers_synced">Worker schedule synced</string>
 
     <!-- Developer options: already unlocked -->
     <string name="dev_options_already_unlocked">No need. Developer options are already unlocked.</string>
 
-    <!-- Developer options: database inspection -->
+    <!-- Developer options: database -->
+    <string name="dev_options_info_version">Version</string>
+    <string name="dev_options_info_package">Package</string>
+    <string name="dev_options_info_variant">Variant</string>
+    <string name="dev_options_info_installer">Installer</string>
+    <string name="dev_options_info_android">Android</string>
+    <string name="dev_options_info_device">Device</string>
+    <string name="dev_options_info_target_sdk">Target SDK</string>
+    <string name="dev_options_info_database">Database</string>
+    <string name="dev_options_info_first_install">First install</string>
+    <string name="dev_options_info_last_update">Last update</string>
+    <string name="dev_options_info_notifications_enabled">Notifications enabled</string>
+    <string name="dev_options_info_exact_alarms">Exact alarms access</string>
+    <string name="dev_options_info_battery_optimization">Battery optimization</string>
+    <string name="dev_options_info_persisted_uri_grants">Persisted URI grants</string>
+    <string name="dev_options_info_backup_destinations">Backup destinations</string>
+    <string name="dev_options_info_files_free_space">Files free space</string>
+    <string name="dev_options_info_cache_free_space">Cache free space</string>
+    <string name="dev_options_android_format" translatable="false">%1$s (SDK %2$d)</string>
+    <string name="dev_options_device_format" translatable="false">%1$s %2$s</string>
+    <string name="dev_options_database_format" translatable="false">%1$s / v%2$d</string>
+    <string name="dev_options_persisted_uri_grants_format" translatable="false">%1$d total / %2$d read / %3$d write</string>
+    <string name="dev_options_value_unknown">unknown</string>
+    <string name="dev_options_value_ignored">ignored</string>
+    <string name="dev_options_value_active">active</string>
     <string name="dev_options_db_stat_version">Version</string>
     <string name="dev_options_db_stat_build">Build</string>
     <string name="dev_options_db_stat_room_schema">Room schema</string>
@@ -1026,18 +1067,18 @@
     <!-- Developer options: diagnostic tools -->
     <string name="dev_options_force_refresh">Force refresh widgets</string>
     <string name="dev_options_force_crash">Force crash</string>
-    <string name="dev_options_copy_diagnostics">Copy diagnostic dump</string>
-    <string name="dev_options_export_logs">Export logs</string>
-    <string name="dev_options_clear_logs">Clear logs</string>
+    <string name="dev_options_copy_diagnostics">Copy diagnostic logs</string>
+    <string name="dev_options_export_logs">Export diagnostic logs</string>
+    <string name="dev_options_clear_logs">Clear diagnostic logs</string>
     <string name="dev_options_toast_refresh">Refresh triggered</string>
     <string name="dev_options_toast_diagnostics_copied">Diagnostics copied to clipboard</string>
-    <string name="dev_options_toast_logs_cleared">Logs cleared</string>
+    <string name="dev_options_toast_logs_cleared">Diagnostic logs cleared</string>
     <string name="dev_options_export_logs_chooser">Export diagnostic log</string>
 
     <!-- Developer options: reset all -->
     <string name="dev_options_reset_all">Reset all preferences</string>
     <string name="dev_options_reset_all_title">Reset all preferences?</string>
-    <string name="dev_options_reset_all_message">All app settings will be reset to their defaults — theme, view options, gestures, reminders, quick capture, lock, backup, and update preferences.\n\nNotes, lists, and their metadata are not touched.\n\nTHIS IS NOT A MOCK. IT WILL ACTUALLY HAPPEN, WITH NO UNDO.</string>
+    <string name="dev_options_reset_all_message">This resets all preferences shown on the Settings page and hides Developer Options again.\n\nNotes, lists, and their metadata are not touched.\n\nTHIS IS NOT A MOCK. IT WILL ACTUALLY HAPPEN, WITH NO UNDO.</string>
     <string name="dev_options_reset_all_confirm">Reset</string>
     <string name="dev_options_toast_reset_done">All preferences reset</string>
 

@@ -90,6 +90,12 @@ class UpdatePrefs(
         }
     }
 
+    suspend fun clearUpdateLastNotifiedDedupeKey() {
+        context.updateDataStore.edit { prefs ->
+            prefs.remove(Keys.UPDATE_LAST_NOTIFIED_DEDUPE_KEY)
+        }
+    }
+
     suspend fun setSaveUpdateApkToDownloads(enabled: Boolean) {
         context.updateDataStore.edit { prefs ->
             prefs[Keys.SAVE_UPDATE_APK_TO_DOWNLOADS] = enabled
