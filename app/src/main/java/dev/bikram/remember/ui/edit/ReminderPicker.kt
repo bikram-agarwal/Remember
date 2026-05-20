@@ -100,6 +100,7 @@ import dev.bikram.remember.ui.components.RememberFilledTonalButton
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -674,7 +675,7 @@ internal fun CalendarPickerDialog(
                         .widthIn(min = 328.dp, max = 400.dp)
                         .wrapContentHeight()
                         .animateContentSize(
-                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                            animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec()),
                         ).padding(horizontal = 16.dp)
                         .clickable(
                             // Catch clicks on the surface so they don't leak to the dismiss background

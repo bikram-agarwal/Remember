@@ -93,6 +93,7 @@ import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 import dev.bikram.remember.ui.feedback.performRejectHaptic
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.tags.LocalTagColors
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 import java.util.Locale
 
@@ -126,9 +127,9 @@ fun TagEditorSheet(
     var editMode by rememberSaveable { mutableStateOf(false) }
     var editingTag by rememberSaveable { mutableStateOf<String?>(null) }
     val tagColorMap = LocalTagColors.current
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     val trimmedDraft = draftName.trim()
     fun currentDraftHexOrLastValid(): String =

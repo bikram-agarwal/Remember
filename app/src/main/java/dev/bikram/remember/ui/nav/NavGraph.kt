@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -12,6 +13,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -22,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -56,6 +59,7 @@ import dev.bikram.remember.ui.onboarding.OnboardingTitleScreen
 import dev.bikram.remember.ui.settings.DevOptionsRoute
 import dev.bikram.remember.ui.settings.SettingsRoute
 import dev.bikram.remember.ui.theme.LocalReducedMotion
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -128,6 +132,10 @@ fun RememberNavGraph(
     val currentOnboardingState = onboardingState
     val onboardingScope = rememberCoroutineScope()
     val reducedMotion = LocalReducedMotion.current
+    val navSpatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+    val navFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val navFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+    val devOptionsFadeSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     var historySection by rememberSaveable { mutableStateOf(HistorySection.ARCHIVE) }
     var historyVisibleItemCount by rememberSaveable { mutableIntStateOf(0) }
 
@@ -227,14 +235,24 @@ fun RememberNavGraph(
                 route = Routes.ONBOARDING_TITLE,
                 enterTransition = {
                     if (initialState.destination.route == Routes.ONBOARDING_PERMISSIONS) {
-                        slideInHorizontally { -it } + fadeIn()
+                        if (reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            slideInHorizontally(animationSpec = navSpatialSpec) { -it } +
+                                fadeIn(animationSpec = navFadeInSpec)
+                        }
                     } else {
                         null
                     }
                 },
                 exitTransition = {
                     if (targetState.destination.route == Routes.ONBOARDING_PERMISSIONS) {
-                        slideOutHorizontally { -it / 3 } + fadeOut()
+                        if (reducedMotion) {
+                            ExitTransition.None
+                        } else {
+                            slideOutHorizontally(animationSpec = navSpatialSpec) { -it / 3 } +
+                                fadeOut(animationSpec = navFadeOutSpec)
+                        }
                     } else {
                         null
                     }
@@ -251,7 +269,12 @@ fun RememberNavGraph(
                 route = Routes.ONBOARDING_PERMISSIONS,
                 enterTransition = {
                     if (initialState.destination.route == Routes.ONBOARDING_TITLE) {
-                        slideInHorizontally { it } + fadeIn()
+                        if (reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            slideInHorizontally(animationSpec = navSpatialSpec) { it } +
+                                fadeIn(animationSpec = navFadeInSpec)
+                        }
                     } else {
                         null
                     }
@@ -260,21 +283,36 @@ fun RememberNavGraph(
                     if (targetState.destination.route == Routes.ONBOARDING_TITLE ||
                         targetState.destination.route == Routes.NOTES
                     ) {
-                        slideOutHorizontally { -it / 3 } + fadeOut()
+                        if (reducedMotion) {
+                            ExitTransition.None
+                        } else {
+                            slideOutHorizontally(animationSpec = navSpatialSpec) { -it / 3 } +
+                                fadeOut(animationSpec = navFadeOutSpec)
+                        }
                     } else {
                         null
                     }
                 },
                 popEnterTransition = {
                     if (initialState.destination.route == Routes.ONBOARDING_TITLE) {
-                        slideInHorizontally { it } + fadeIn()
+                        if (reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            slideInHorizontally(animationSpec = navSpatialSpec) { it } +
+                                fadeIn(animationSpec = navFadeInSpec)
+                        }
                     } else {
                         null
                     }
                 },
                 popExitTransition = {
                     if (targetState.destination.route == Routes.ONBOARDING_TITLE) {
-                        slideOutHorizontally { it } + fadeOut()
+                        if (reducedMotion) {
+                            ExitTransition.None
+                        } else {
+                            slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
+                                fadeOut(animationSpec = navFadeOutSpec)
+                        }
                     } else {
                         null
                     }
@@ -344,10 +382,50 @@ fun RememberNavGraph(
 
             composable(
                 route = Routes.SETTINGS,
-                enterTransition = { primaryTabEnterTransition(reducedMotion) },
-                exitTransition = { primaryTabExitTransition(reducedMotion) },
-                popEnterTransition = { primaryTabEnterTransition(reducedMotion) },
-                popExitTransition = { primaryTabExitTransition(reducedMotion) },
+                enterTransition = {
+                    if (initialState.destination.route == Routes.DEV_OPTIONS) {
+                        if (reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            fadeIn(animationSpec = devOptionsFadeSpec)
+                        }
+                    } else {
+                        primaryTabEnterTransition(reducedMotion)
+                    }
+                },
+                exitTransition = {
+                    if (targetState.destination.route == Routes.DEV_OPTIONS) {
+                        if (reducedMotion) {
+                            ExitTransition.None
+                        } else {
+                            fadeOut(animationSpec = devOptionsFadeSpec)
+                        }
+                    } else {
+                        primaryTabExitTransition(reducedMotion)
+                    }
+                },
+                popEnterTransition = {
+                    if (initialState.destination.route == Routes.DEV_OPTIONS) {
+                        if (reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            fadeIn(animationSpec = devOptionsFadeSpec)
+                        }
+                    } else {
+                        primaryTabEnterTransition(reducedMotion)
+                    }
+                },
+                popExitTransition = {
+                    if (targetState.destination.route == Routes.DEV_OPTIONS) {
+                        if (reducedMotion) {
+                            ExitTransition.None
+                        } else {
+                            fadeOut(animationSpec = devOptionsFadeSpec)
+                        }
+                    } else {
+                        primaryTabExitTransition(reducedMotion)
+                    }
+                },
             ) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,
@@ -444,10 +522,38 @@ fun RememberNavGraph(
 
             composable(
                 route = Routes.HELP,
-                enterTransition = { slideInHorizontally { it } + fadeIn() },
-                exitTransition = { slideOutHorizontally { it } + fadeOut() },
-                popEnterTransition = { slideInHorizontally { it } + fadeIn() },
-                popExitTransition = { slideOutHorizontally { it } + fadeOut() },
+                enterTransition = {
+                    if (reducedMotion) {
+                        EnterTransition.None
+                    } else {
+                        slideInHorizontally(animationSpec = navSpatialSpec) { it } +
+                            fadeIn(animationSpec = navFadeInSpec)
+                    }
+                },
+                exitTransition = {
+                    if (reducedMotion) {
+                        ExitTransition.None
+                    } else {
+                        slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
+                            fadeOut(animationSpec = navFadeOutSpec)
+                    }
+                },
+                popEnterTransition = {
+                    if (reducedMotion) {
+                        EnterTransition.None
+                    } else {
+                        slideInHorizontally(animationSpec = navSpatialSpec) { it } +
+                            fadeIn(animationSpec = navFadeInSpec)
+                    }
+                },
+                popExitTransition = {
+                    if (reducedMotion) {
+                        ExitTransition.None
+                    } else {
+                        slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
+                            fadeOut(animationSpec = navFadeOutSpec)
+                    }
+                },
             ) {
                 HelpScreen(
                     onBack = { navController.popBackStack() },
@@ -465,10 +571,34 @@ fun RememberNavGraph(
 
             composable(
                 route = Routes.DEV_OPTIONS,
-                enterTransition = { fadeIn() },
-                exitTransition = { fadeOut() },
-                popEnterTransition = { fadeIn() },
-                popExitTransition = { fadeOut() },
+                enterTransition = {
+                    if (reducedMotion) {
+                        EnterTransition.None
+                    } else {
+                        fadeIn(animationSpec = devOptionsFadeSpec)
+                    }
+                },
+                exitTransition = {
+                    if (reducedMotion) {
+                        ExitTransition.None
+                    } else {
+                        fadeOut(animationSpec = devOptionsFadeSpec)
+                    }
+                },
+                popEnterTransition = {
+                    if (reducedMotion) {
+                        EnterTransition.None
+                    } else {
+                        fadeIn(animationSpec = devOptionsFadeSpec)
+                    }
+                },
+                popExitTransition = {
+                    if (reducedMotion) {
+                        ExitTransition.None
+                    } else {
+                        fadeOut(animationSpec = devOptionsFadeSpec)
+                    }
+                },
             ) {
                 androidx.compose.runtime.CompositionLocalProvider(
                     LocalSharedTransitionScope provides this@SharedTransitionLayout,

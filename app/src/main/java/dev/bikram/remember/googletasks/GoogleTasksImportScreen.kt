@@ -3,12 +3,19 @@ package dev.bikram.remember.googletasks
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -81,6 +88,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -98,6 +106,8 @@ import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.LocalReducedMotion
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
@@ -130,6 +140,9 @@ fun GoogleTasksImportRoute(
     val effect by vm.effects.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val uriHandler = LocalUriHandler.current
+    val reducedMotion = LocalReducedMotion.current
+    val methodPanelSpatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -335,24 +348,46 @@ fun GoogleTasksImportRoute(
                                 onBack()
                             },
                         )
-                    state.selectedMethod == ImportMethod.ManualImport && state.isFetching -> LoadingPanel()
-                    state.selectedMethod == ImportMethod.ManualImport ->
-                        TakeoutImportPanel(
-                            onOpenTakeout = { uriHandler.openUri(GOOGLE_TAKEOUT_URL) },
-                            onPickJson = pickJsonLauncher,
-                        )
-                    !state.connected && !state.isFetching ->
-                        SignedOutPanel(
-                            rememberedEmail = state.rememberedEmail,
-                            onConnect = vm::connect,
-                            onSwitchAccount = vm::switchAccount,
-                        )
-                    state.isFetching -> LoadingPanel()
-                    state.isEmpty ->
-                        EmptyPanel(
-                            accountEmail = state.accountEmail.orEmpty(),
-                            onSwitchAccount = vm::switchAccount,
-                        )
+                    else ->
+                        AnimatedContent(
+                            targetState = state.selectedMethod,
+                            modifier = Modifier.fillMaxSize(),
+                            transitionSpec = {
+                                if (reducedMotion) {
+                                    EnterTransition.None togetherWith ExitTransition.None
+                                } else {
+                                    val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                                    slideInHorizontally(animationSpec = methodPanelSpatialSpec) { width ->
+                                        direction * width
+                                    } togetherWith
+                                        slideOutHorizontally(animationSpec = methodPanelSpatialSpec) { width ->
+                                            -direction * width
+                                        }
+                                }.using(SizeTransform(clip = true))
+                            },
+                            label = "googleTasksImportMethodPanel",
+                        ) { selectedMethod ->
+                            when {
+                                selectedMethod == ImportMethod.ManualImport && state.isFetching -> LoadingPanel()
+                                selectedMethod == ImportMethod.ManualImport ->
+                                    TakeoutImportPanel(
+                                        onOpenTakeout = { uriHandler.openUri(GOOGLE_TAKEOUT_URL) },
+                                        onPickJson = pickJsonLauncher,
+                                    )
+                                !state.connected && !state.isFetching ->
+                                    SignedOutPanel(
+                                        rememberedEmail = state.rememberedEmail,
+                                        onConnect = vm::connect,
+                                        onSwitchAccount = vm::switchAccount,
+                                    )
+                                state.isFetching -> LoadingPanel()
+                                state.isEmpty ->
+                                    EmptyPanel(
+                                        accountEmail = state.accountEmail.orEmpty(),
+                                        onSwitchAccount = vm::switchAccount,
+                                    )
+                            }
+                        }
                 }
             }
         }
@@ -808,10 +843,26 @@ private fun LoadedPanel(
             modifier = Modifier.align(Alignment.BottomCenter),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            val sourceSheetSpatialSpec =
+                reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>())
+            val sourceSheetFadeInSpec =
+                reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+            val sourceSheetFadeOutSpec =
+                reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
             AnimatedVisibility(
                 visible = sourceSheetExpanded,
-                enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
-                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
+                enter =
+                    fadeIn(animationSpec = sourceSheetFadeInSpec) +
+                        expandVertically(
+                            animationSpec = sourceSheetSpatialSpec,
+                            expandFrom = Alignment.Bottom,
+                        ),
+                exit =
+                    fadeOut(animationSpec = sourceSheetFadeOutSpec) +
+                        shrinkVertically(
+                            animationSpec = sourceSheetSpatialSpec,
+                            shrinkTowards = Alignment.Bottom,
+                        ),
             ) {
                 SourcePopup(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
@@ -1194,8 +1245,14 @@ private fun GroupCard(
         }
     val allSelected = selectedInGroup == group.tasks.size && group.tasks.isNotEmpty()
     val anySelected = selectedInGroup > 0
+    val groupSpatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>())
+    val groupFloatSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
+    val groupFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val groupFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     val rotation by animateFloatAsState(
         targetValue = if (collapsed) 0f else 90f,
+        animationSpec = groupFloatSpec,
         label = "groupCardChevron",
     )
     val expandLabel = stringResource(R.string.google_tasks_import_group_expand_cd, group.list.title)
@@ -1220,8 +1277,12 @@ private fun GroupCard(
         )
         AnimatedVisibility(
             visible = !collapsed,
-            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+            enter =
+                fadeIn(animationSpec = groupFadeInSpec) +
+                    expandVertically(animationSpec = groupSpatialSpec, expandFrom = Alignment.Top),
+            exit =
+                fadeOut(animationSpec = groupFadeOutSpec) +
+                    shrinkVertically(animationSpec = groupSpatialSpec, shrinkTowards = Alignment.Top),
         ) {
             // Indent task cards 16dp from the left edge of the group header so they
             // visually nest under the group rather than sitting at the same level.
@@ -1408,6 +1469,7 @@ private fun ImportButtonGroup(
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val chevronRotation by animateFloatAsState(
         targetValue = if (sourceExpanded) 180f else 0f,
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
         label = "sourceChevron",
     )
     Column(
@@ -1721,6 +1783,7 @@ private fun ImportProgressInline(
         }
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
         label = "tasksImportProgress",
     )
     Surface(

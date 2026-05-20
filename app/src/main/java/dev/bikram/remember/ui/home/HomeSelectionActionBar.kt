@@ -30,6 +30,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -42,6 +43,10 @@ internal fun HomeSelectionActionBar(
     onTrashSelected: () -> Unit,
     bottomPadding: Dp,
 ) {
+    val spatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Box(
         modifier =
             Modifier
@@ -51,8 +56,12 @@ internal fun HomeSelectionActionBar(
     ) {
         AnimatedVisibility(
             visible = visible,
-            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+            enter =
+                expandVertically(animationSpec = spatialSpec, expandFrom = Alignment.Bottom) +
+                    fadeIn(animationSpec = fadeInSpec),
+            exit =
+                shrinkVertically(animationSpec = spatialSpec, shrinkTowards = Alignment.Bottom) +
+                    fadeOut(animationSpec = fadeOutSpec),
         ) {
             Surface(
                 shape = MaterialTheme.shapes.extraExtraLarge,

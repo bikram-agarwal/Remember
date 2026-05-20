@@ -68,6 +68,7 @@ import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -272,15 +273,17 @@ private fun HelpSubsectionCard(
     actions: List<HelpAction>,
     onOpenAppSection: (sectionKey: String) -> Unit,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>()
-    val dpSpatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>()
-    val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>())
+    val dpSpatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>())
+    val colorSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 90f else 0f,
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec()),
         label = "help_chevron_rotation",
     )
     val chevronContainerSize by animateDpAsState(

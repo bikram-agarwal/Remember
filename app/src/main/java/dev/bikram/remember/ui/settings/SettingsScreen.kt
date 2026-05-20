@@ -39,16 +39,15 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -107,7 +106,8 @@ import dev.bikram.remember.ui.nav.DevOptionsSharedBoundsKey
 import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
 import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
 import dev.bikram.remember.ui.theme.LocalThemeState
-import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
+import dev.bikram.remember.ui.theme.transparentTopAppBarColors
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
 import dev.bikram.remember.update.RememberUpdateInfo
 import dev.bikram.remember.update.RememberUpdateState
@@ -422,12 +422,10 @@ fun SettingsRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val topBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     val settingsScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = settingsListState,
-            additionalScrollEnabled = topBarState.collapsedFraction > 0f,
+            additionalScrollEnabled = true,
         )
     val blurStyle = rememberProgressiveBlurStyle()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -688,9 +686,7 @@ fun SettingsRoute(
                 onHighlightHandled()
                 return@LaunchedEffect
             }
-        topBarState.heightOffset = topBarState.heightOffsetLimit
         settingsListState.animateScrollToItem(index)
-        topBarState.heightOffset = topBarState.heightOffsetLimit
         if (highlightItem == null) {
             val highlightExpiresAtMillis = SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
             when (key) {
@@ -789,7 +785,6 @@ fun SettingsRoute(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         snackbarHost = {
             SnackbarHost(
@@ -799,14 +794,9 @@ fun SettingsRoute(
         },
         topBar = {
             Column(Modifier.fillMaxWidth()) {
-                LargeTopAppBar(
-                    colors = transparentLargeTopAppBarColors(),
-                    title = {
-                        Text(
-                            stringResource(R.string.settings_title),
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
+                TopAppBar(
+                    colors = transparentTopAppBarColors(),
+                    title = {},
                     actions = {
                         val openHelpLabel = stringResource(R.string.settings_open_help_cd)
                         RememberFilledTonalIconButton(
@@ -856,7 +846,6 @@ fun SettingsRoute(
                             )
                         }
                     },
-                    scrollBehavior = scrollBehavior,
                 )
             }
         },
@@ -1287,7 +1276,7 @@ private fun DevOptionsSettingsEntry(
 ) {
     val sharedScope = LocalSharedTransitionScope.current
     val navScope = LocalNavAnimatedVisibilityScope.current
-    val sharedBoundsSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
+    val sharedBoundsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Rect>())
     val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
     val sharedModifier =
         if (sharedScope != null && navScope != null) {

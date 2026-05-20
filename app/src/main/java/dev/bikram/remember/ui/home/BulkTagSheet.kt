@@ -71,6 +71,7 @@ import dev.bikram.remember.ui.edit.defaultTagColorHex
 import dev.bikram.remember.ui.edit.sanitizeTagNameInput
 import dev.bikram.remember.ui.edit.toTagHexFieldValue
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 
 /**
@@ -277,17 +278,25 @@ fun BulkTagSheet(
                 expanded = createExpanded,
                 onToggle = { createExpanded = !createExpanded },
             )
+            val createSpatialSpec =
+                reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>())
+            val createFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+            val createFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
             AnimatedVisibility(
                 visible = createExpanded,
-                enter = fadeIn() + expandVertically(),
-                exit = fadeOut() + shrinkVertically(),
+                enter =
+                    fadeIn(animationSpec = createFadeInSpec) +
+                        expandVertically(animationSpec = createSpatialSpec),
+                exit =
+                    fadeOut(animationSpec = createFadeOutSpec) +
+                        shrinkVertically(animationSpec = createSpatialSpec),
             ) {
                 Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
                             .padding(top = 12.dp)
-                            .animateContentSize(),
+                            .animateContentSize(animationSpec = createSpatialSpec),
                 ) {
                     // Name field + live preview in one row
                     Row(

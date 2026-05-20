@@ -85,23 +85,16 @@ fun Modifier.progressiveBlur(
 ): Modifier =
     composed {
         val surfaceContainer = MaterialTheme.colorScheme.surfaceContainer
+        val finalAlphaTop = if (blurRadius <= 0f) 1.0f else overlayAlpha
+        val finalAlphaBottom = if (blurRadius <= 0f) 1.0f else overlayAlphaBottom
+
         val overlayColorTop =
-            remember(surfaceContainer, overlayAlpha) {
-                surfaceContainer.copy(alpha = overlayAlpha)
+            remember(surfaceContainer, finalAlphaTop) {
+                surfaceContainer.copy(alpha = finalAlphaTop)
             }
         val overlayColorBottom =
-            remember(surfaceContainer, overlayAlphaBottom) {
-                surfaceContainer.copy(alpha = overlayAlphaBottom)
-            }
-        val topBrushColors = remember(overlayColorTop) { listOf(overlayColorTop, Color.Transparent) }
-        val bottomBrushColors = remember(overlayColorBottom) { listOf(Color.Transparent, overlayColorBottom) }
-        val topBrush =
-            remember(topBrushColors, topHeight) {
-                if (topHeight > 0f) {
-                    Brush.verticalGradient(colors = topBrushColors, endY = topHeight)
-                } else {
-                    null
-                }
+            remember(surfaceContainer, finalAlphaBottom) {
+                surfaceContainer.copy(alpha = finalAlphaBottom)
             }
 
         val blurModifier =
@@ -127,17 +120,42 @@ fun Modifier.progressiveBlur(
             if (showGradientOverlay) {
                 Modifier.drawWithContent {
                     drawContent()
-                    if (topBrush != null) {
-                        drawRect(brush = topBrush)
+                    if (topHeight > 0f) {
+                        val brush = if (blurRadius <= 0f) {
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.0f to overlayColorTop,
+                                    0.35f to overlayColorTop.copy(alpha = overlayColorTop.alpha * 0.9f),
+                                    1.0f to Color.Transparent,
+                                ),
+                                endY = topHeight,
+                            )
+                        } else {
+                            Brush.verticalGradient(
+                                colors = listOf(overlayColorTop, Color.Transparent),
+                                endY = topHeight,
+                            )
+                        }
+                        drawRect(brush = brush)
                     }
                     if (bottomHeight > 0f) {
-                        drawRect(
-                            brush =
-                                Brush.verticalGradient(
-                                    colors = bottomBrushColors,
-                                    startY = size.height - bottomHeight,
+                        val brush = if (blurRadius <= 0f) {
+                            Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.0f to Color.Transparent,
+                                    0.65f to overlayColorBottom.copy(alpha = overlayColorBottom.alpha * 0.9f),
+                                    1.0f to overlayColorBottom,
                                 ),
-                        )
+                                startY = size.height - bottomHeight,
+                                endY = size.height,
+                            )
+                        } else {
+                            Brush.verticalGradient(
+                                colors = listOf(Color.Transparent, overlayColorBottom),
+                                startY = size.height - bottomHeight,
+                            )
+                        }
+                        drawRect(brush = brush)
                     }
                 }
             } else {
@@ -162,26 +180,27 @@ val TopAppBarHeight = 56.dp
 @Composable
 fun rememberProgressiveBlurStyle(
     bottomExtra: androidx.compose.ui.unit.Dp = PillBottomBarHeight + PillBottomScrimExtra,
-    topExtra: androidx.compose.ui.unit.Dp = TopAppBarHeight * 2,
+    topExtra: androidx.compose.ui.unit.Dp = TopAppBarHeight,
     blurRadius: Float = 90f,
     overlayAlpha: Float = 0.36f,
     overlayAlphaBottom: Float = 0.48f,
 ): ProgressiveBlurStyle? {
     val enabled = LocalBlurBars.current
-    if (!enabled) return null
     val density = LocalDensity.current
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val topPx = with(density) { (statusBarInset + topExtra).toPx() }
     val bottomPx = with(density) { (navBarInset + bottomExtra).toPx() }
-    val radius = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) blurRadius else 0f
-    return remember(topPx, bottomPx, radius, overlayAlpha, overlayAlphaBottom) {
+    val radius = if (enabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) blurRadius else 0f
+    val finalOverlayAlpha = if (!enabled) (overlayAlpha + 0.15f).coerceAtMost(0.65f) else overlayAlpha
+    val finalOverlayAlphaBottom = if (!enabled) (overlayAlphaBottom + 0.15f).coerceAtMost(0.65f) else overlayAlphaBottom
+    return remember(topPx, bottomPx, radius, finalOverlayAlpha, finalOverlayAlphaBottom) {
         ProgressiveBlurStyle(
             topHeightPx = topPx,
             bottomHeightPx = bottomPx,
             blurRadius = radius,
-            overlayAlpha = overlayAlpha,
-            overlayAlphaBottom = overlayAlphaBottom,
+            overlayAlpha = finalOverlayAlpha,
+            overlayAlphaBottom = finalOverlayAlphaBottom,
         )
     }
 }

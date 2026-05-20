@@ -21,14 +21,13 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -82,7 +81,7 @@ import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.LocalSnackbarHostState
-import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import dev.bikram.remember.ui.theme.transparentTopAppBarColors
 import kotlinx.coroutines.launch
 
 @Composable
@@ -167,8 +166,6 @@ fun HomeScreen(
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
 ) {
-    val topBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var searchShouldRequestFocus by rememberSaveable { mutableStateOf(false) }
     var tagSheetOpen by rememberSaveable { mutableStateOf(false) }
@@ -188,7 +185,7 @@ fun HomeScreen(
     val listScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = listState,
-            additionalScrollEnabled = topBarState.collapsedFraction > 0f,
+            additionalScrollEnabled = true,
         )
     val filterControlScrollState = rememberScrollState()
     val blurStyle = rememberProgressiveBlurStyle()
@@ -306,7 +303,7 @@ fun HomeScreen(
                             }
                         }
                     }
-                }.nestedScroll(scrollBehavior.nestedScrollConnection),
+                },
         containerColor = Color.Transparent,
         bottomBar = {
             HomeSelectionActionBar(
@@ -321,20 +318,10 @@ fun HomeScreen(
         },
         topBar = {
             Column(Modifier.fillMaxWidth()) {
-                LargeTopAppBar(
-                    colors = transparentLargeTopAppBarColors(),
+                TopAppBar(
+                    colors = transparentTopAppBarColors(),
                     title = {
-                        // Selection mode swaps the title for the plain app name; the
-                        // selection action chrome lives in the `actions` slot. Otherwise
-                        // we hand the whole title row over to SearchableTopBarTitle, which
-                        // owns both the title-or-search-field swap AND the toggle button
-                        // so the search bar visually emerges from the button's left edge.
-                        if (state.inSelectionMode) {
-                            Text(
-                                text = stringResource(R.string.app_name),
-                                fontWeight = FontWeight.Bold,
-                            )
-                        } else {
+                        if (!state.inSelectionMode) {
                             SearchableTopBarTitle(
                                 searchOpen = searchOpen,
                                 requestSearchFocus = searchShouldRequestFocus,
@@ -394,12 +381,7 @@ fun HomeScreen(
                             }
                             Spacer(Modifier.width(4.dp))
                         }
-                        // Non-selection-mode actions live inside [SearchableTopBarTitle] so the
-                        // search bar can visually emerge from the toggle button on the right
-                        // edge of the title row instead of from the actions slot, which would
-                        // sit visually disconnected from where the user just tapped.
                     },
-                    scrollBehavior = scrollBehavior,
                 )
             }
         },

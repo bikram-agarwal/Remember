@@ -97,6 +97,7 @@ import dev.bikram.remember.ui.feedback.performRejectHaptic
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.colorSourceSpecFor
 import dev.bikram.remember.ui.theme.contrastingTextColor
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -214,9 +215,9 @@ private fun AppearanceStudioControls(
     onSaveCustomHex: (String) -> Unit,
     onPaletteStyleChange: (PaletteStyleOpt) -> Unit,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     Column(
         modifier =

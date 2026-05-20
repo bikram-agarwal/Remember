@@ -58,6 +58,7 @@ import dev.bikram.remember.ui.components.NoteCardUiModel
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
  * Top-bar title that doubles as the search entry point. Renders a single Row of:
@@ -85,10 +86,10 @@ internal fun SearchableTopBarTitle(
     onSearchFocusRequested: () -> Unit,
     onToggleSearch: () -> Unit,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val scaleIconSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+    val scaleIconSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -116,10 +117,7 @@ internal fun SearchableTopBarTitle(
                     onFocusRequested = onSearchFocusRequested,
                 )
             } else {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    fontWeight = FontWeight.Bold,
-                )
+                // Empty title placeholder to remove the big title
             }
         }
         // Toggle button stays in place at the End. The icon morphs between search and
@@ -238,7 +236,7 @@ internal fun SearchSectionPillDivider(
     muted: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = spatialSpec,

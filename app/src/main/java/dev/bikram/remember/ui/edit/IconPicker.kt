@@ -44,7 +44,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
@@ -109,6 +108,7 @@ import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -349,8 +349,8 @@ fun IconPicker(
                 // Slide horizontally in the natural reading direction of the tab order +
                 // a soft fade. Specs come from M3 Expressive's MotionScheme so the curve
                 // matches every other transition in the app (NoteActionBottomBar etc.).
-                val tabSpatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-                val tabEffectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+                val tabSpatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+                val tabEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
                 AnimatedContent(
                     targetState = selectedTab,
                     label = "iconPickerTabContent",
@@ -418,10 +418,10 @@ private fun IconPickerSearchTitleRow(
     onToggleSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val scaleIconSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+    val scaleIconSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     Row(
         modifier = modifier,
@@ -624,17 +624,20 @@ private fun StarredDoneButton(
     onClick: () -> Unit,
 ) {
     RememberTextButton(onClick = onClick) {
-        BadgedBox(
-            badge = {
-                Badge {
-                    Text(count.toString())
-                }
-            },
+        Box(
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 text = stringResource(R.string.common_save),
-                modifier = Modifier.padding(top = 4.dp, end = 16.dp),
+                modifier = Modifier.padding(end = 16.dp),
             )
+            Box(
+                modifier = Modifier.align(Alignment.TopEnd),
+            ) {
+                Badge {
+                    Text(count.toString())
+                }
+            }
         }
     }
 }
@@ -774,7 +777,7 @@ private fun IconPickerEmojiContent(
         remember(filteredEmojis, emojiSkinToneIndex) {
             collapseEmojiSkinToneVariants(filteredEmojis, emojiSkinToneIndex)
         }
-    val categoryFadeSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val categoryFadeSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val playTap = rememberPlayTapSound()
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -1478,13 +1481,15 @@ private fun EditStarredTile(
                     .tapSoundClickable(onClick = onClick)
                     .semantics { this.contentDescription = contentDescription },
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
                 RememberMaterialRoundedSymbol(
                     name = "edit",
                     size = 22.dp,
                     tint = MaterialTheme.colorScheme.primary,
                     weight = FontWeight.Medium,
-                    modifier = Modifier.size(22.dp),
                 )
             }
         }

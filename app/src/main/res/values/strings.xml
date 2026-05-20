@@ -16,7 +16,7 @@
 
     <!-- Onboarding permissions -->
     <string name="onboarding_permissions_title">Stay on top of everything</string>
-    <string name="onboarding_permissions_subtitle">Enable notifications so reminders appear \nright when you need them</string>
+    <string name="onboarding_permissions_subtitle">Two quick permissions so reminders appear \nright when you need them</string>
     <string name="onboarding_permissions_notifications_title">Notifications</string>
     <string name="onboarding_permissions_notifications_body">Required for reminder alerts, snooze actions, and quick capture</string>
     <string name="onboarding_permissions_reliable_title">Improve reliability</string>
@@ -24,6 +24,7 @@
     <string name="onboarding_permissions_status_recommended">Recommended</string>
     <string name="onboarding_permissions_status_optional">Optional</string>
     <string name="onboarding_permissions_enabled">Enabled</string>
+    <string name="onboarding_permissions_enabled_status">✓ Enabled</string>
     <string name="onboarding_permissions_allow_notifications">Enable notifications</string>
     <string name="onboarding_permissions_improve_reliability">Improve reliability</string>
     <string name="onboarding_permissions_change_anytime_footer">You can change these anytime in Settings</string>
@@ -616,11 +617,11 @@
         <item quantity="other">%1$d linked</item>
     </plurals>
     <string name="icon_picker_title">Pick an icon</string>
-    <string name="icon_picker_starred_selection_title">Choose starred</string>
+    <string name="icon_picker_starred_selection_title">Choose favorites</string>
     <string name="icon_picker_search_hint">Search icons and emojis</string>
-    <string name="icon_picker_starred">Starred</string>
-    <string name="icon_picker_add_starred_cd">Edit starred</string>
-    <string name="icon_picker_max_starred">Max 30 in Starred</string>
+    <string name="icon_picker_starred">Favorites</string>
+    <string name="icon_picker_add_starred_cd">Edit favorites</string>
+    <string name="icon_picker_max_starred">Max 30 favorites</string>
     <string name="icon_picker_results_heading">Matches</string>
     <string name="icon_picker_no_results">No icons match that search</string>
     <string name="icon_picker_tab_icons">Icons</string>

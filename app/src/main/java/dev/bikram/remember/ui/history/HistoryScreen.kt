@@ -1,11 +1,18 @@
 package dev.bikram.remember.ui.history
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -33,7 +40,6 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -41,8 +47,8 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,6 +69,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
@@ -93,8 +100,10 @@ import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.LocalSnackbarHostState
-import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
+import dev.bikram.remember.ui.theme.transparentTopAppBarColors
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -384,8 +393,6 @@ fun HistoryRoute(
     val selectedIds by vm.selectedIds.collectAsStateWithLifecycle()
     val archivedListState = rememberLazyListState()
     val trashedListState = rememberLazyListState()
-    val topBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     val blurStyle = rememberProgressiveBlurStyle()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pillInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
@@ -413,8 +420,15 @@ fun HistoryRoute(
     val listScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = listState,
-            additionalScrollEnabled = topBarState.collapsedFraction > 0f,
+            additionalScrollEnabled = true,
         )
+    val reducedMotion = LocalReducedMotion.current
+    val historySectionSpatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+    val historySectionFadeInSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val historySectionFadeOutSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     val selectableVisibleIds = remember(rows) { rows.map { row -> row.card.id }.toSet() }
     val inSelectionMode = selectedIds.isNotEmpty()
     val snackbarHostState = LocalSnackbarHostState.current
@@ -434,12 +448,6 @@ fun HistoryRoute(
     LaunchedEffect(section) { vm.clearSelection() }
     LaunchedEffect(selectableVisibleIds) { vm.pruneSelection(selectableVisibleIds) }
     LaunchedEffect(section, rows.size) { onVisibleItemCountChange(rows.size) }
-    LaunchedEffect(section, rows.isEmpty()) {
-        if (rows.isEmpty()) {
-            topBarState.heightOffset = 0f
-            topBarState.contentOffset = 0f
-        }
-    }
     LaunchedEffect(vm, snackbarHostState, context, undoLabel) {
         vm.events.collect { event ->
             when (event) {
@@ -461,7 +469,6 @@ fun HistoryRoute(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         bottomBar = {
             HistorySelectionActionBar(
@@ -480,14 +487,9 @@ fun HistoryRoute(
         },
         topBar = {
             Column(Modifier.fillMaxWidth()) {
-                LargeTopAppBar(
-                    colors = transparentLargeTopAppBarColors(),
-                    title = {
-                        Text(
-                            text = stringResource(R.string.main_tab_history),
-                            fontWeight = FontWeight.Bold,
-                        )
-                    },
+                TopAppBar(
+                    colors = transparentTopAppBarColors(),
+                    title = {},
                     actions = {
                         if (inSelectionMode) {
                             val cdSelectAll = stringResource(R.string.home_select_all)
@@ -529,7 +531,6 @@ fun HistoryRoute(
                             Spacer(Modifier.width(4.dp))
                         }
                     },
-                    scrollBehavior = scrollBehavior,
                 )
             }
         },
@@ -603,74 +604,128 @@ fun HistoryRoute(
                         )
                     }
                 }
-                if (section == HistorySection.TRASH && rows.isNotEmpty()) {
-                    RetentionNotice(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                    )
-                } else {
-                    Spacer(Modifier.height(12.dp))
-                }
-                if (rows.isNotEmpty()) {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding =
-                            PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = 4.dp,
-                                bottom = pillInset + 24.dp,
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        userScrollEnabled = listScrollEnabled,
-                    ) {
-                        items(
-                            items = rows,
-                            key = { row -> row.card.id },
-                            contentType = { if (section == HistorySection.TRASH) "trashedRow" else "archivedRow" },
-                        ) { row ->
-                            val noteId = row.card.id
-                            val isSelected = noteId in selectedIds
-                            HistorySwipeCard(
-                                model = row.card,
-                                section = section,
-                                daysLeft = vm.daysLeftInTrash(row.note).takeIf { section == HistorySection.TRASH },
-                                hapticEnabled = interactionState.hapticFeedbackEnabled,
-                                onOpenNote = {
-                                    if (inSelectionMode) {
-                                        vm.toggleSelection(noteId)
-                                    } else {
-                                        onOpenNote(row.note, false)
-                                    }
-                                },
-                                onRestore = { vm.restore(row.note) },
-                                onArchive = { vm.archiveFromTrash(row.note) },
-                                onDeleteForever = { pendingDeleteForeverNote = row.note },
-                                onUnarchive = { vm.unarchive(row.note) },
-                                onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
-                                selected = isSelected,
-                                onLongClick = { vm.toggleSelection(noteId) },
-                                swipeEnabled = !inSelectionMode,
+                AnimatedContent(
+                    targetState = section,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        if (reducedMotion) {
+                            EnterTransition.None togetherWith ExitTransition.None
+                        } else {
+                            val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                            (
+                                slideInHorizontally(animationSpec = historySectionSpatialSpec) { fullWidth ->
+                                    direction * fullWidth
+                                } + fadeIn(animationSpec = historySectionFadeInSpec)
+                            ) togetherWith (
+                                slideOutHorizontally(animationSpec = historySectionSpatialSpec) { fullWidth ->
+                                    -direction * fullWidth
+                                } + fadeOut(animationSpec = historySectionFadeOutSpec)
                             )
+                        }.using(SizeTransform(clip = false))
+                    },
+                    label = "historySectionContent",
+                ) { targetSection ->
+                    val targetItems =
+                        when (targetSection) {
+                            HistorySection.ARCHIVE -> archived
+                            HistorySection.TRASH -> trashed
+                        }
+                    val targetRows =
+                        remember(targetItems) {
+                            targetItems.map { noteWithItems ->
+                                HistoryNoteRow(
+                                    note = noteWithItems,
+                                    card = noteWithItems.toNoteCardUiModel(),
+                                )
+                            }
+                        }
+                    val targetListState =
+                        when (targetSection) {
+                            HistorySection.ARCHIVE -> archivedListState
+                            HistorySection.TRASH -> trashedListState
+                        }
+                    val targetListScrollEnabled =
+                        rememberContentOverflowScrollEnabled(
+                            listState = targetListState,
+                            additionalScrollEnabled = true,
+                        )
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        if (targetSection == HistorySection.TRASH && targetRows.isNotEmpty()) {
+                            RetentionNotice(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                            )
+                        } else {
+                            Spacer(Modifier.height(12.dp))
+                        }
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            if (targetRows.isNotEmpty()) {
+                                LazyColumn(
+                                    state = targetListState,
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentPadding =
+                                        PaddingValues(
+                                            start = 16.dp,
+                                            end = 16.dp,
+                                            top = 4.dp,
+                                            bottom = pillInset + 24.dp,
+                                        ),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    userScrollEnabled = targetListScrollEnabled,
+                                ) {
+                                    items(
+                                        items = targetRows,
+                                        key = { row -> row.card.id },
+                                        contentType = {
+                                            if (targetSection == HistorySection.TRASH) {
+                                                "trashedRow"
+                                            } else {
+                                                "archivedRow"
+                                            }
+                                        },
+                                    ) { row ->
+                                        val noteId = row.card.id
+                                        val isSelected = noteId in selectedIds
+                                        HistorySwipeCard(
+                                            model = row.card,
+                                            section = targetSection,
+                                            daysLeft =
+                                                vm
+                                                    .daysLeftInTrash(row.note)
+                                                    .takeIf { targetSection == HistorySection.TRASH },
+                                            hapticEnabled = interactionState.hapticFeedbackEnabled,
+                                            onOpenNote = {
+                                                if (inSelectionMode) {
+                                                    vm.toggleSelection(noteId)
+                                                } else {
+                                                    onOpenNote(row.note, false)
+                                                }
+                                            },
+                                            onRestore = { vm.restore(row.note) },
+                                            onArchive = { vm.archiveFromTrash(row.note) },
+                                            onDeleteForever = { pendingDeleteForeverNote = row.note },
+                                            onUnarchive = { vm.unarchive(row.note) },
+                                            onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
+                                            selected = isSelected,
+                                            onLongClick = { vm.toggleSelection(noteId) },
+                                            swipeEnabled = !inSelectionMode,
+                                        )
+                                    }
+                                }
+                            } else {
+                                EmptyState(
+                                    section = targetSection,
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.Center)
+                                            .padding(bottom = pillInset),
+                                )
+                            }
                         }
                     }
                 }
-            }
-            if (rows.isEmpty()) {
-                // Top padding pushes the centre below the LargeTopAppBar; bottom padding
-                // raises it above the floating pill bar. The two together let Alignment.Center
-                // land on the true midpoint of the visible viewport instead of the midpoint
-                // of the full Scaffold area.
-                EmptyState(
-                    section = section,
-                    modifier =
-                        Modifier
-                            .align(Alignment.Center)
-                            .padding(top = padding.calculateTopPadding(), bottom = pillInset),
-                )
             }
         }
     }
@@ -741,6 +796,10 @@ private fun HistorySelectionActionBar(
     onTrashSelected: () -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
 ) {
+    val spatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Box(
         modifier =
             Modifier
@@ -750,8 +809,12 @@ private fun HistorySelectionActionBar(
     ) {
         AnimatedVisibility(
             visible = visible,
-            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+            enter =
+                expandVertically(animationSpec = spatialSpec, expandFrom = Alignment.Bottom) +
+                    fadeIn(animationSpec = fadeInSpec),
+            exit =
+                shrinkVertically(animationSpec = spatialSpec, shrinkTowards = Alignment.Bottom) +
+                    fadeOut(animationSpec = fadeOutSpec),
         ) {
             Surface(
                 shape = MaterialTheme.shapes.extraExtraLarge,

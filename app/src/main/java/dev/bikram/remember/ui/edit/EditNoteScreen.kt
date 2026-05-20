@@ -52,6 +52,7 @@ import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.io.File
@@ -78,7 +79,7 @@ fun EditNoteRoute(
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
-    val sharedBoundsSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
+    val sharedBoundsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Rect>())
     val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
     val sharedModifier =
         if (sharedScope != null && navScope != null && noteId != null) {
@@ -375,8 +376,9 @@ fun EditNoteScreen(
                     actionBarVisible -> EditorBottomSlot.Action
                     else -> EditorBottomSlot.None
                 }
-            val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>()
-            val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+            val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+            val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+            val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
             // Stable callbacks - the MarkdownToolbar / action item rows are lambda-heavy
             // and re-allocating on every recomposition defeats their skippable-composable
             // optimization.
@@ -406,10 +408,10 @@ fun EditNoteScreen(
                 transitionSpec = {
                     (
                         slideInVertically(animationSpec = spatialSpec) { it } +
-                            fadeIn(animationSpec = effectsSpec)
+                            fadeIn(animationSpec = fadeInSpec)
                     ) togetherWith (
                         slideOutVertically(animationSpec = spatialSpec) { it } +
-                            fadeOut(animationSpec = effectsSpec)
+                            fadeOut(animationSpec = fadeOutSpec)
                     )
                 },
             ) { currentSlot ->

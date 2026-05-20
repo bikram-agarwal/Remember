@@ -40,11 +40,13 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 import dev.bikram.remember.ui.feedback.performSaveHaptic
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
  * Note/list action state. Exactly one of [archived]/[trashed] is expected to be true; when both
@@ -84,10 +86,13 @@ fun NoteActionBottomBar(
     onDeleteForever: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        enter = slideInVertically(animationSpec = spatialSpec, initialOffsetY = { it }) + fadeIn(animationSpec = fadeInSpec),
+        exit = slideOutVertically(animationSpec = spatialSpec, targetOffsetY = { it }) + fadeOut(animationSpec = fadeOutSpec),
         modifier = modifier,
     ) {
         NoteActionBottomBarContent(
@@ -271,7 +276,7 @@ private fun EditActionItem(
 ) {
     val hostView = LocalView.current
     val hapticEnabled = LocalHapticEnabled.current
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     Column(
         modifier =
             Modifier
@@ -338,8 +343,8 @@ private fun DoneActionItem(
 ) {
     val hostView = LocalView.current
     val hapticEnabled = LocalHapticEnabled.current
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val colorEffectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
+    val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
     var pulsing by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pulsing) 1.35f else 1f,
@@ -407,8 +412,8 @@ private fun StarActionItem(
 ) {
     val hostView = LocalView.current
     val hapticEnabled = LocalHapticEnabled.current
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val colorEffectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
+    val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
     var starPulsing by remember { mutableStateOf(false) }
     val starScale by animateFloatAsState(
         targetValue = if (starPulsing) 1.35f else 1f,

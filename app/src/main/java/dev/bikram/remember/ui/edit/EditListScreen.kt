@@ -89,6 +89,7 @@ import dev.bikram.remember.ui.components.TagAccentEditorStrip
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -160,7 +161,7 @@ fun EditListRoute(
 
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
-    val sharedBoundsSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
+    val sharedBoundsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Rect>())
     val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
     val sharedModifier =
         if (sharedScope != null && navScope != null && noteId != null) {
@@ -921,7 +922,7 @@ fun EditListScreen(
                             showDragHandleGutter = isEditMode,
                             modifier =
                                 Modifier.animateItem(
-                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                    placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                 ),
                         )
                     is ActiveEntry.Row -> {
@@ -931,7 +932,7 @@ fun EditListScreen(
                             key = item.localId,
                             modifier =
                                 Modifier.animateItem(
-                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                    placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                 ),
                         ) { isDragging ->
                             val focusRequester = remember(item.localId) { FocusRequester() }
@@ -999,7 +1000,7 @@ fun EditListScreen(
                             Modifier
                                 .fillMaxWidth()
                                 .animateItem(
-                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                    placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                 ).tapSoundClickable {
                                     expectingNewItem = true
                                     onAddItem()
@@ -1030,7 +1031,7 @@ fun EditListScreen(
                             Modifier
                                 .fillMaxWidth()
                                 .animateItem(
-                                    placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                    placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                 ).tapSoundClickable { showChecked = !showChecked }
                                 .padding(vertical = 8.dp),
                     ) {
@@ -1069,7 +1070,7 @@ fun EditListScreen(
                                     showDragHandleGutter = false,
                                     modifier =
                                         Modifier.animateItem(
-                                            placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                            placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                         ),
                                 )
                             is CompletedEntry.Row -> {
@@ -1111,7 +1112,7 @@ fun EditListScreen(
                                     onIndentChange = null,
                                     modifier =
                                         Modifier.animateItem(
-                                            placementSpec = MaterialTheme.motionScheme.slowSpatialSpec(),
+                                            placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                         ),
                                 )
                             }
@@ -1276,10 +1277,12 @@ private fun PictureHero(
                 .fillMaxWidth()
                 .height(220.dp),
     ) {
+        val heroFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+        val heroFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
         AnimatedVisibility(
             visible = !viewerOpen,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(animationSpec = heroFadeInSpec),
+            exit = fadeOut(animationSpec = heroFadeOutSpec),
         ) {
             val sharedModifier =
                 if (sharedScope != null) {

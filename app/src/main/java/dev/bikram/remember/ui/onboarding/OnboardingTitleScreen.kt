@@ -35,11 +35,14 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.AppIconImage
 import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
+import dev.bikram.remember.ui.theme.reducedMotionEnterTransition
 import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -65,17 +68,19 @@ fun OnboardingTitleScreen(
 
     val scheme = MaterialTheme.colorScheme
     val motionScheme = MaterialTheme.motionScheme
+    val enterSpatialSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec<IntOffset>())
+    val enterFadeSpec = reducedMotionAwareSpec(motionScheme.defaultEffectsSpec<Float>())
     val iconEnter =
-        remember(motionScheme) {
-            fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
-                slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { fullHeight ->
+        remember(enterSpatialSpec, enterFadeSpec) {
+            fadeIn(animationSpec = enterFadeSpec) +
+                slideInVertically(animationSpec = enterSpatialSpec) { fullHeight ->
                     fullHeight / 3
                 }
         }
     val blockEnter =
-        remember(motionScheme) {
-            fadeIn(animationSpec = motionScheme.defaultEffectsSpec()) +
-                slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { fullHeight ->
+        remember(enterSpatialSpec, enterFadeSpec) {
+            fadeIn(animationSpec = enterFadeSpec) +
+                slideInVertically(animationSpec = enterSpatialSpec) { fullHeight ->
                     fullHeight / 2
                 }
         }
@@ -89,7 +94,7 @@ fun OnboardingTitleScreen(
         AnimatedVisibility(
             visible = iconVisible,
             modifier = Modifier.align(Alignment.Center),
-            enter = iconEnter,
+            enter = reducedMotionEnterTransition(iconEnter),
         ) {
             Column(
                 modifier = Modifier.padding(horizontal = 32.dp),
@@ -104,7 +109,7 @@ fun OnboardingTitleScreen(
                 Spacer(Modifier.height(24.dp))
                 AnimatedVisibility(
                     visible = titleVisible,
-                    enter = blockEnter,
+                    enter = reducedMotionEnterTransition(blockEnter),
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(
@@ -131,7 +136,7 @@ fun OnboardingTitleScreen(
                 Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 120.dp),
-            enter = blockEnter,
+            enter = reducedMotionEnterTransition(blockEnter),
         ) {
             Surface(
                 shape = MaterialTheme.shapes.extraExtraLarge,
@@ -167,7 +172,7 @@ fun OnboardingTitleScreen(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
-            enter = blockEnter,
+            enter = reducedMotionEnterTransition(blockEnter),
         ) {
             RememberButton(
                 onClick = onLetsBegin,
@@ -182,7 +187,7 @@ fun OnboardingTitleScreen(
                     fontWeight = FontWeight.SemiBold,
                 )
                 RememberMaterialRoundedSymbol(
-                    name = "chevron_right",
+                    name = "arrow_forward",
                     tint = MaterialTheme.colorScheme.onPrimary,
                 )
             }

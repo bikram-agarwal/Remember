@@ -9,6 +9,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -54,7 +55,7 @@ import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.pillShape
 
@@ -148,6 +149,7 @@ private fun AboutSettingsBlock(
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
+    val playTap = rememberPlayTapSound()
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
     val profileUrl = stringResource(R.string.about_author_github_profile_url)
@@ -252,7 +254,14 @@ private fun AboutSettingsBlock(
                             Modifier
                                 .size(84.dp)
                                 .clip(iconShape)
-                                .tapSoundClickable(onClick = onOpenIntro),
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClick = {
+                                        playTap()
+                                        onOpenIntro()
+                                    },
+                                ),
                     )
                     Spacer(Modifier.width(20.dp))
                     AboutAuthorPhoto(

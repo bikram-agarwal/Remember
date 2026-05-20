@@ -45,6 +45,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -58,9 +59,10 @@ internal fun SettingsExpandableSection(
     content: @Composable () -> Unit,
 ) {
     val collapsed = sectionKey in collapsedSectionKeys
-    val spatialSpec = MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Column(modifier = modifier) {
         SettingsSectionHeader(
             materialSymbolName = materialSymbolName,
@@ -134,15 +136,15 @@ internal fun SettingsSectionHeader(
 ) {
     val rotation by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (collapsed) 0f else 90f,
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>(),
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
         label = "settings_section_chevron_rotation",
     )
     val contentDescriptionExpand = stringResource(R.string.section_expand_cd, title)
     val contentDescriptionCollapse = stringResource(R.string.section_collapse_cd, title)
     val headerInteractionSource = remember { MutableInteractionSource() }
     val playTap = rememberPlayTapSound()
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>()
-    val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>())
+    val colorSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
     val headerCorner by animateDpAsState(
         targetValue = if (collapsed) 28.dp else 4.dp,
         animationSpec = spatialSpec,

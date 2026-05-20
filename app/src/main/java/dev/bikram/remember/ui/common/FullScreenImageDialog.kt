@@ -36,6 +36,7 @@ import androidx.compose.ui.window.DialogProperties
 import coil3.compose.AsyncImage
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
  * Full-screen image viewer. When [onDelete] is non-null, a delete button is shown at the top-start
@@ -158,11 +159,12 @@ fun FullScreenHeroImageOverlay(
     // its container-transform partner (it would just fade out instead of shrinking
     // back into the inline hero).
     val effectiveSharedKey = sharedElementKey ?: retainedSharedKey
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     AnimatedVisibility(
         visible = visible && effectiveImageUri != null,
-        enter = fadeIn(animationSpec = effectsSpec),
-        exit = fadeOut(animationSpec = effectsSpec),
+        enter = fadeIn(animationSpec = fadeInSpec),
+        exit = fadeOut(animationSpec = fadeOutSpec),
         modifier = modifier,
     ) {
         val visibleImageUri = effectiveImageUri ?: return@AnimatedVisibility

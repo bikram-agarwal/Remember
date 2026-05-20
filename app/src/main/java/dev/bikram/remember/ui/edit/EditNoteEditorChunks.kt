@@ -83,6 +83,7 @@ import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.TagAccentEditorStrip
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.rememberExpressiveOverscrollEffect
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
@@ -507,7 +508,13 @@ internal fun EditNoteBottomBarSection(
                 Unit
             }
         }
-    AnimatedVisibility(visible = isEditMode) {
+    val formatFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val formatFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+    AnimatedVisibility(
+        visible = isEditMode,
+        enter = fadeIn(animationSpec = formatFadeInSpec),
+        exit = fadeOut(animationSpec = formatFadeOutSpec),
+    ) {
         EditNoteFormatBarContent(
             markdownEditorState = markdownEditorState,
             undoController = undoController,
@@ -942,10 +949,12 @@ private fun EditNotePictureHero(
                 .fillMaxWidth()
                 .aspectRatio(HERO_MASK_ASPECT_RATIO),
     ) {
+        val heroFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+        val heroFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
         AnimatedVisibility(
             visible = !viewerOpen,
-            enter = fadeIn(),
-            exit = fadeOut(),
+            enter = fadeIn(animationSpec = heroFadeInSpec),
+            exit = fadeOut(animationSpec = heroFadeOutSpec),
         ) {
             val sharedModifier =
                 if (sharedScope != null) {
