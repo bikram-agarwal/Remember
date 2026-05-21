@@ -181,6 +181,7 @@ fun EditNoteScreen(
     val trashed by vm.trashed.collectAsStateWithLifecycle()
     val starred by vm.starred.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
+    val attachments by vm.attachments.collectAsStateWithLifecycle()
     val hasUnsavedChanges by vm.hasUnsavedChanges.collectAsStateWithLifecycle()
     val shelfState =
         when {
@@ -192,6 +193,7 @@ fun EditNoteScreen(
 
     var isEditMode by remember(existing, forceEdit) { mutableStateOf(!existing || forceEdit) }
     var suppressBodyAutoFocusOnEdit by remember { mutableStateOf(false) }
+    var pendingTitleFocusOffset by remember { mutableStateOf<Int?>(null) }
     var markdownDisplayMode by rememberSaveable { mutableStateOf(MarkdownEditorDisplayMode.LivePreview) }
     // Force view mode on read-only shelves so pickers and the markdown editor don't accept edits.
     LaunchedEffect(readOnly) {
@@ -200,6 +202,7 @@ fun EditNoteScreen(
     LaunchedEffect(isEditMode) {
         if (!isEditMode) {
             suppressBodyAutoFocusOnEdit = false
+            pendingTitleFocusOffset = null
         }
     }
 
@@ -333,6 +336,7 @@ fun EditNoteScreen(
     // (outside edit mode) and the Save icon in the top bar (inside edit mode) so both code
     // paths show the same "Changes saved" toast.
     val context = androidx.compose.ui.platform.LocalContext.current
+    val launchAttachmentPicker = rememberAttachmentPicker(onAdd = vm::addAttachment)
     val saveAndExitEditMode: () -> Unit = {
         isEditMode = false
         appScope.launch {
@@ -367,6 +371,7 @@ fun EditNoteScreen(
                 readOnly = readOnly,
                 hasUnsavedChanges = hasUnsavedChanges,
                 markdownDisplayMode = markdownDisplayMode,
+                titleFocusOffset = pendingTitleFocusOffset,
                 onBack = handleNavigateUp,
                 onToggleMarkdownDisplayMode = {
                     markdownDisplayMode =
@@ -376,7 +381,16 @@ fun EditNoteScreen(
                             MarkdownEditorDisplayMode.MarkdownCode
                         }
                 },
+                onTitleTappedInViewMode = { titleOffset ->
+                    suppressBodyAutoFocusOnEdit = true
+                    pendingTitleFocusOffset = titleOffset
+                    isEditMode = true
+                },
+                onTitleFocusOffsetConsumed = {
+                    pendingTitleFocusOffset = null
+                },
                 onSave = saveAndExitEditMode,
+                onOpenIcon = { iconPickerOpen = true },
             )
         },
         bottomBar = {
@@ -583,10 +597,15 @@ fun EditNoteScreen(
             onViewPictureFull = { uri, revision ->
                 pictureViewer = uri to revision
             },
-            onOpenIcon = { iconPickerOpen = true },
             onOpenActions = { actionsPickerOpen = true },
             onOpenTags = { tagsPickerOpen = true },
-            onOpenAttachments = { attachmentsPickerOpen = true },
+            onOpenAttachments = {
+                if (attachments.isEmpty()) {
+                    launchAttachmentPicker()
+                } else {
+                    attachmentsPickerOpen = true
+                }
+            },
             onEnterEditModeAtOffset = { markdownOffset ->
                 suppressBodyAutoFocusOnEdit = true
                 markdownEditorState.focusAtOffsetAndShowKeyboard(markdownOffset)
@@ -653,7 +672,6 @@ fun EditNoteScreen(
             )
         }
         if (attachmentsPickerOpen) {
-            val attachments by vm.attachments.collectAsState()
             AttachmentsSheet(
                 attachments = attachments,
                 onDismiss = { attachmentsPickerOpen = false },

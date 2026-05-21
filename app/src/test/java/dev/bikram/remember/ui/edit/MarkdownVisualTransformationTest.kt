@@ -2,6 +2,7 @@ package dev.bikram.remember.ui.edit
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextStyle
 import dev.bikram.remember.ui.common.MarkdownStyler
 import org.junit.Assert.assertEquals
@@ -61,6 +62,32 @@ class MarkdownVisualTransformationTest {
         // So both isValidOpening and indexOfClosingMarker reject them.
         // It should render exactly as "* bold *"
         assertEquals("* bold *", text.text)
+    }
+
+    @Test
+    fun inlineLinksKeepLinkAnnotationsByDefault() {
+        val styler = testMarkdownStyler()
+        val text = styler.markdownInlineAnnotatedString("[site](example.com)")
+
+        val links = text.getLinkAnnotations(start = 0, end = text.length)
+
+        assertEquals("site", text.text)
+        assertEquals(1, links.size)
+        assertEquals("https://example.com", (links.single().item as LinkAnnotation.Url).url)
+    }
+
+    @Test
+    fun inlineLinksCanSuppressLinkAnnotationsForCustomGestureHandling() {
+        val styler = testMarkdownStyler()
+        val text =
+            styler.markdownInlineAnnotatedString(
+                source = "[site](example.com)",
+                includeLinkAnnotations = false,
+            )
+
+        assertEquals("site", text.text)
+        assertTrue(text.getLinkAnnotations(start = 0, end = text.length).isEmpty())
+        assertTrue(text.spanStyles.any { spanRange -> spanRange.start == 0 && spanRange.end == 4 })
     }
 }
 

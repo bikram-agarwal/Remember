@@ -486,10 +486,7 @@ internal class MarkdownEditorState(
         val selection = textFieldValue.selection
         val start = selection.min.coerceIn(0, text.length)
         val end = selection.max.coerceIn(start, text.length)
-        val firstLineStart =
-            text.lastIndexOf('\n', (start - 1).coerceAtLeast(0)).let { newlineIndex ->
-                if (newlineIndex < 0) 0 else newlineIndex + 1
-            }
+        val firstLineStart = text.lineStartBefore(start)
         val targetEnd = if (end > start) end else start
         val lines = mutableListOf<EditorLine>()
         var currentLineStart = firstLineStart
@@ -555,10 +552,7 @@ internal class MarkdownEditorState(
             if (!previousValue.text.startsWith(close, previousCursor)) {
                 return@forEach
             }
-            val lineStart =
-                previousValue.text.lastIndexOf('\n', (previousCursor - 1).coerceAtLeast(0)).let { lineBreakIndex ->
-                    if (lineBreakIndex < 0) 0 else lineBreakIndex + 1
-                }
+            val lineStart = previousValue.text.lineStartBefore(previousCursor)
             if (previousValue.text.substring(lineStart, previousCursor).lastIndexOf(open) < 0) {
                 return@forEach
             }
@@ -648,19 +642,13 @@ internal class MarkdownEditorState(
                 }
             }
 
-            val previousLineStart =
-                previousValue.text.lastIndexOf('\n', (previousCursor - 1).coerceAtLeast(0)).let { newlineIndex ->
-                    if (newlineIndex < 0) 0 else newlineIndex + 1
-                }
+            val previousLineStart = previousValue.text.lineStartBefore(previousCursor)
             val previousLineEnd =
                 previousValue.text.indexOf('\n', previousCursor).let { newlineIndex ->
                     if (newlineIndex < 0) previousValue.text.length else newlineIndex
                 }
             val previousLine = previousValue.text.substring(previousLineStart, previousLineEnd)
-            val currentLineStart =
-                text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { newlineIndex ->
-                    if (newlineIndex < 0) 0 else newlineIndex + 1
-                }
+            val currentLineStart = text.lineStartBefore(cursor)
             val currentLineEnd =
                 text.indexOf('\n', cursor).let { newlineIndex ->
                     if (newlineIndex < 0) text.length else newlineIndex
@@ -703,10 +691,7 @@ internal class MarkdownEditorState(
                 )
             }
         }
-        val lineStart =
-            text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { newlineIndex ->
-                if (newlineIndex < 0) 0 else newlineIndex + 1
-            }
+        val lineStart = text.lineStartBefore(cursor)
         val lineEnd =
             text.indexOf('\n', cursor).let { newlineIndex ->
                 if (newlineIndex < 0) text.length else newlineIndex
@@ -724,10 +709,7 @@ internal class MarkdownEditorState(
     }
 
     private fun isSentenceStartBefore(index: Int): Boolean {
-        val lineStart =
-            markdown.lastIndexOf('\n', (index - 1).coerceAtLeast(0)).let { newlineIndex ->
-                if (newlineIndex < 0) 0 else newlineIndex + 1
-            }
+        val lineStart = markdown.lineStartBefore(index)
         val currentLinePrefix = markdown.substring(lineStart, index)
         val prefixWithoutBlockMarker = currentLinePrefix.replaceFirst(MarkdownBlockPrefixRegex, "")
         if (prefixWithoutBlockMarker.isBlank()) {
@@ -738,10 +720,7 @@ internal class MarkdownEditorState(
     }
 
     private fun isCursorAfterEmptyHeadingPrefix(cursor: Int): Boolean {
-        val lineStart =
-            markdown.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { newlineIndex ->
-                if (newlineIndex < 0) 0 else newlineIndex + 1
-            }
+        val lineStart = markdown.lineStartBefore(cursor)
         return MarkdownEmptyHeadingPrefixRegex.matches(markdown.substring(lineStart, cursor))
     }
 
@@ -910,6 +889,16 @@ internal class MarkdownEditorState(
             return null
         }
         return NewlineInsertion(index = insertionIndex)
+    }
+
+    private fun String.lineStartBefore(cursor: Int): Int {
+        val boundedCursor = cursor.coerceIn(0, length)
+        if (boundedCursor == 0) {
+            return 0
+        }
+        return lastIndexOf('\n', boundedCursor - 1).let { newlineIndex ->
+            if (newlineIndex < 0) 0 else newlineIndex + 1
+        }
     }
 
     private fun continuationPrefixForLine(

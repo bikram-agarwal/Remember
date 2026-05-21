@@ -446,40 +446,39 @@ private fun TriStateTagChip(
     onCycle: () -> Unit,
 ) {
     val baseColor = color
-    val onBaseColor = TagPalette.textOn(baseColor)
 
     // All per-intent visual parameters resolved here so the layout block stays clean.
     val containerColor: Color
     val textColor: Color
     val iconColor: Color
-    val borderStroke: BorderStroke?
+    val dotColor: Color
     val textDecoration: TextDecoration
     val leadingIcon: String?
     val textWeight: FontWeight
     when (intent) {
         BulkTagIntent.NEUTRAL -> {
-            containerColor = baseColor.copy(alpha = 0.35f)
-            textColor = onBaseColor
-            iconColor = onBaseColor
-            borderStroke = null
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            iconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            dotColor = baseColor.copy(alpha = 0.4f)
             textDecoration = TextDecoration.None
             leadingIcon = null
             textWeight = FontWeight.Medium
         }
         BulkTagIntent.ADD -> {
-            containerColor = baseColor
-            textColor = onBaseColor
-            iconColor = onBaseColor
-            borderStroke = null
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            textColor = MaterialTheme.colorScheme.onSurface
+            iconColor = baseColor
+            dotColor = baseColor
             textDecoration = TextDecoration.None
             leadingIcon = "add"
             textWeight = FontWeight.SemiBold
         }
         BulkTagIntent.REMOVE -> {
-            containerColor = Color.Transparent
-            textColor = baseColor
-            iconColor = baseColor
-            borderStroke = BorderStroke(2.dp, baseColor)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            iconColor = baseColor.copy(alpha = 0.5f)
+            dotColor = baseColor.copy(alpha = 0.3f)
             textDecoration = TextDecoration.LineThrough
             leadingIcon = "close"
             textWeight = FontWeight.Medium
@@ -493,17 +492,7 @@ private fun TriStateTagChip(
             Modifier
                 .clip(CircleShape)
                 .background(containerColor)
-                .let { base ->
-                    if (borderStroke != null) {
-                        base.border(
-                            width = borderStroke.width,
-                            brush = borderStroke.brush,
-                            shape = CircleShape,
-                        )
-                    } else {
-                        base
-                    }
-                }.tapSoundClickable(onClick = onCycle)
+                .tapSoundClickable(onClick = onCycle)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         if (leadingIcon != null) {
@@ -514,6 +503,11 @@ private fun TriStateTagChip(
                 weight = FontWeight.Medium,
             )
         }
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(dotColor, CircleShape)
+        )
         Text(
             text = tag,
             style =

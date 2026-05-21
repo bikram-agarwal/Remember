@@ -3,7 +3,6 @@ package dev.bikram.remember.ui.edit
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -13,10 +12,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,7 +30,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -44,10 +44,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
-import dev.bikram.remember.ui.feedback.LocalHapticEnabled
-import dev.bikram.remember.ui.feedback.performLongPressHaptic
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 import kotlinx.coroutines.launch
 
 @Composable
@@ -57,16 +54,7 @@ fun AttachmentsSheet(
     onAdd: (uri: Uri, displayName: String, mimeType: String?) -> Unit,
     onRemove: (id: Long) -> Unit,
 ) {
-    val context = LocalContext.current
-    val pickDoc =
-        rememberDocumentPicker { uri ->
-            persistReadPermission(context, uri)
-            onAdd(
-                uri,
-                resolveDisplayName(context, uri),
-                resolveMimeType(context, uri),
-            )
-        }
+    val launchAttachmentPicker = rememberAttachmentPicker(onAdd = onAdd)
     AppBottomSheet(
         title = stringResource(R.string.options_attachments),
         subtitle = stringResource(R.string.attachments_subtitle),
@@ -90,7 +78,7 @@ fun AttachmentsSheet(
         }
         Spacer(Modifier.size(12.dp))
         RememberOutlinedButton(
-            onClick = { pickDoc.launch(arrayOf("*/*")) },
+            onClick = launchAttachmentPicker,
             modifier = Modifier.fillMaxWidth(),
         ) {
             RememberMaterialRoundedSymbol(name = "attach_file", weight = FontWeight.Medium)
@@ -100,7 +88,7 @@ fun AttachmentsSheet(
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AttachmentRow(
     attachment: NoteAttachmentEntity,
@@ -114,6 +102,7 @@ private fun AttachmentRow(
     val scope = rememberCoroutineScope()
     val motion = MaterialTheme.motionScheme
     var savingPulse by remember { mutableStateOf(false) }
+    var deleteConfirmOpen by remember { mutableStateOf(false) }
     val savingMix by animateFloatAsState(
         targetValue = if (savingPulse) 1f else 0f,
         animationSpec = motion.defaultEffectsSpec(),
@@ -139,9 +128,23 @@ private fun AttachmentRow(
         label = "attachmentRowPress",
     )
     val scaleFactor = 1f - (1f - 0.95f) * savingMix
-    val playTap = rememberPlayTapSound()
-    val hapticEnabled = LocalHapticEnabled.current
-    val hostView = LocalView.current
+    val saveToDownloads: () -> Unit = {
+        scope.launch {
+            savingPulse = true
+            val start = System.currentTimeMillis()
+            copyUriIntoDownloads(
+                context,
+                sourceUri,
+                attachment.displayName,
+                attachment.mimeType,
+            )
+            val elapsed = System.currentTimeMillis() - start
+            if (elapsed < 400) {
+                kotlinx.coroutines.delay(400 - elapsed)
+            }
+            savingPulse = false
+        }
+    }
     Surface(
         shape = rowShape,
         color = rowBackground,
@@ -150,30 +153,11 @@ private fun AttachmentRow(
                 .fillMaxWidth()
                 .scale(scaleFactor)
                 .clip(rowShape)
-                .tapSoundCombinedClickable(
+                .tapSoundClickable(
                     interactionSource = rowInteractionSource,
                     indication = androidx.compose.material3.ripple(),
                     onClick = {
-                        playTap()
                         openUriWithChooser(context, sourceUri, attachment.mimeType)
-                    },
-                    onLongClick = {
-                        if (hapticEnabled) hostView.performLongPressHaptic()
-                        scope.launch {
-                            savingPulse = true
-                            val start = System.currentTimeMillis()
-                            copyUriIntoDownloads(
-                                context,
-                                sourceUri,
-                                attachment.displayName,
-                                attachment.mimeType,
-                            )
-                            val elapsed = System.currentTimeMillis() - start
-                            if (elapsed < 400) {
-                                kotlinx.coroutines.delay(400 - elapsed)
-                            }
-                            savingPulse = false
-                        }
                     },
                 ),
     ) {
@@ -208,8 +192,17 @@ private fun AttachmentRow(
                     storedInApp = AppMediaStorage.isAppStoredMediaUri(context, attachment.uri),
                 )
             }
+            val cdDownload = stringResource(R.string.common_download)
+            RememberIconButton(onClick = saveToDownloads) {
+                RememberMaterialRoundedSymbol(
+                    name = "download",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.semantics { contentDescription = cdDownload },
+                )
+            }
             val cdRemove = stringResource(R.string.common_remove)
-            RememberIconButton(onClick = onRemove) {
+            RememberIconButton(onClick = { deleteConfirmOpen = true }) {
                 RememberMaterialRoundedSymbol(
                     name = "delete_outline",
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -218,5 +211,26 @@ private fun AttachmentRow(
                 )
             }
         }
+    }
+    if (deleteConfirmOpen) {
+        AlertDialog(
+            onDismissRequest = { deleteConfirmOpen = false },
+            title = { Text(stringResource(R.string.attachments_delete_confirm_title)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        deleteConfirmOpen = false
+                        onRemove()
+                    },
+                ) {
+                    Text(stringResource(R.string.common_yes))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteConfirmOpen = false }) {
+                    Text(stringResource(R.string.common_no))
+                }
+            },
+        )
     }
 }

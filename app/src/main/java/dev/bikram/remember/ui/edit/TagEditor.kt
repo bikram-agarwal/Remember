@@ -693,29 +693,28 @@ private fun TagSheetIntentChip(
     intent: TagSheetChipIntent,
     onClick: () -> Unit,
 ) {
-    val contentColor = TagPalette.textOn(color)
     val containerColor: Color
     val textColor: Color
     val iconColor: Color
-    val borderStroke: BorderStroke?
+    val dotColor: Color
     val textDecoration: TextDecoration
     val leadingIcon: String
     val textWeight: FontWeight
     when (intent) {
         TagSheetChipIntent.ADD -> {
-            containerColor = color
-            textColor = contentColor
-            iconColor = contentColor
-            borderStroke = null
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+            textColor = MaterialTheme.colorScheme.onSurface
+            iconColor = color
+            dotColor = color
             textDecoration = TextDecoration.None
             leadingIcon = "add"
             textWeight = FontWeight.SemiBold
         }
         TagSheetChipIntent.REMOVE -> {
-            containerColor = Color.Transparent
-            textColor = color
-            iconColor = color
-            borderStroke = BorderStroke(2.dp, color)
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            iconColor = color.copy(alpha = 0.5f)
+            dotColor = color.copy(alpha = 0.3f)
             textDecoration = TextDecoration.LineThrough
             leadingIcon = "close"
             textWeight = FontWeight.Medium
@@ -729,17 +728,7 @@ private fun TagSheetIntentChip(
             Modifier
                 .clip(CircleShape)
                 .background(containerColor)
-                .let { baseModifier ->
-                    if (borderStroke != null) {
-                        baseModifier.border(
-                            width = borderStroke.width,
-                            brush = borderStroke.brush,
-                            shape = CircleShape,
-                        )
-                    } else {
-                        baseModifier
-                    }
-                }.tapSoundClickable(onClick = onClick)
+                .tapSoundClickable(onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         RememberMaterialRoundedSymbol(
@@ -747,6 +736,11 @@ private fun TagSheetIntentChip(
             size = 14.dp,
             tint = iconColor,
             weight = FontWeight.Medium,
+        )
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(dotColor, CircleShape)
         )
         Text(
             text = tag,
@@ -894,7 +888,8 @@ internal fun EditableTagHexChip(
 ) {
     val view = LocalView.current
     val hapticEnabled = LocalHapticEnabled.current
-    val contentColor = TagPalette.textOn(color)
+    val contentColor = MaterialTheme.colorScheme.onSurface
+    val containerColor = MaterialTheme.colorScheme.surfaceVariant
     val textStyle =
         MaterialTheme.typography.labelLarge.copy(
             color = contentColor,
@@ -914,17 +909,24 @@ internal fun EditableTagHexChip(
     }
 
     if (!editing) {
-        Box(
+        Row(
             modifier =
                 modifier
                     .height(FieldHeight)
                     .width(TagHexChipWidth)
                     .clip(shape)
-                    .background(color)
+                    .background(containerColor)
                     .tapSoundClickable(onClick = onStartEditing)
-                    .padding(horizontal = 16.dp),
-            contentAlignment = Alignment.Center,
+                    .padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center,
         ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .background(color, CircleShape)
+            )
+            Spacer(Modifier.width(6.dp))
             Text(
                 text = hex,
                 style = textStyle,
@@ -935,21 +937,28 @@ internal fun EditableTagHexChip(
         return
     }
 
-    Box(
+    Row(
         modifier =
             modifier
                 .height(FieldHeight)
                 .width(TagHexChipWidth)
                 .onGloballyPositioned { onBoundsChange(it.boundsInRoot()) }
                 .clip(shape)
-                .background(color)
+                .background(containerColor)
                 .border(
                     width = 1.dp,
                     color = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f),
                     shape = shape,
-                ).padding(horizontal = 14.dp),
-        contentAlignment = Alignment.Center,
+                ).padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
     ) {
+        Box(
+            modifier = Modifier
+                .size(8.dp)
+                .background(color, CircleShape)
+        )
+        Spacer(Modifier.width(6.dp))
         BasicTextField(
             value = draft.toPrefixedTagHexFieldValue(),
             onValueChange = { value ->
@@ -962,7 +971,7 @@ internal fun EditableTagHexChip(
             },
             modifier =
                 Modifier
-                    .fillMaxWidth()
+                    .weight(1f)
                     .focusRequester(focusRequester)
                     .onFocusChanged { state ->
                         if (state.isFocused) {

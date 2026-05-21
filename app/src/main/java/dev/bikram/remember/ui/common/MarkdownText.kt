@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -57,14 +58,19 @@ internal fun MarkdownText(
     overflow: TextOverflow = TextOverflow.Clip,
     onChecklistToggle: ((lineIndex: Int, checked: Boolean) -> Unit)? = null,
     onTextTap: ((MarkdownTextTap) -> Unit)? = null,
+    onTextLongPress: ((MarkdownTextTap) -> Unit)? = null,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)? = null,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)? = null,
 ) {
     val styler = rememberMarkdownStyler(style)
+    val includeLinkAnnotations = onLinkClick == null && onLinkLongPress == null
     if (maxLines != Int.MAX_VALUE) {
         val preview =
-            remember(markdown, styler) {
-                styler.markdownPreviewAnnotatedString(markdown = markdown)
+            remember(markdown, styler, includeLinkAnnotations) {
+                styler.markdownPreviewAnnotatedString(
+                    markdown = markdown,
+                    includeLinkAnnotations = includeLinkAnnotations,
+                )
             }
         MarkdownInlineText(
             text = preview,
@@ -75,6 +81,7 @@ internal fun MarkdownText(
             source = markdown,
             sourceOffset = 0,
             onTextTap = onTextTap,
+            onTextLongPress = onTextLongPress,
             onLinkClick = onLinkClick,
             onLinkLongPress = onLinkLongPress,
         )
@@ -106,7 +113,9 @@ internal fun MarkdownText(
                     lineContentOffsets = quoteLineContentOffsets,
                     style = style,
                     styler = styler,
+                    includeLinkAnnotations = includeLinkAnnotations,
                     onTextTap = onTextTap,
+                    onTextLongPress = onTextLongPress,
                     onLinkClick = onLinkClick,
                     onLinkLongPress = onLinkLongPress,
                 )
@@ -127,6 +136,7 @@ internal fun MarkdownText(
                     style = style,
                     styler = styler,
                     onTextTap = onTextTap,
+                    onTextLongPress = onTextLongPress,
                 )
             } else {
                 MarkdownLine(
@@ -135,8 +145,10 @@ internal fun MarkdownText(
                     lineStartOffset = lineStartOffsets.getOrElse(lineIndex) { markdown.length },
                     style = style,
                     styler = styler,
+                    includeLinkAnnotations = includeLinkAnnotations,
                     onChecklistToggle = onChecklistToggle,
                     onTextTap = onTextTap,
+                    onTextLongPress = onTextLongPress,
                     onLinkClick = onLinkClick,
                     onLinkLongPress = onLinkLongPress,
                 )
@@ -153,8 +165,10 @@ private fun MarkdownLine(
     lineStartOffset: Int,
     style: TextStyle,
     styler: MarkdownStyler,
+    includeLinkAnnotations: Boolean,
     onChecklistToggle: ((lineIndex: Int, checked: Boolean) -> Unit)?,
     onTextTap: ((MarkdownTextTap) -> Unit)?,
+    onTextLongPress: ((MarkdownTextTap) -> Unit)?,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)?,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)?,
 ) {
@@ -163,11 +177,17 @@ private fun MarkdownLine(
         val headingLevel = headingMatch.groupValues[1].length
         val contentRange = headingMatch.groups[2]?.range
         MarkdownInlineText(
-            text = styler.markdownInlineAnnotatedString(headingMatch.groupValues[2]),
+            text =
+                styler.markdownInlineAnnotatedString(
+                    source = headingMatch.groupValues[2],
+                    includeLinkAnnotations = includeLinkAnnotations,
+                ),
             style = styler.headingTextStyle(headingLevel = headingLevel),
+            modifier = Modifier.fillMaxWidth(),
             source = headingMatch.groupValues[2],
             sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
             onTextTap = onTextTap,
+            onTextLongPress = onTextLongPress,
             onLinkClick = onLinkClick,
             onLinkLongPress = onLinkLongPress,
         )
@@ -197,12 +217,17 @@ private fun MarkdownLine(
             Spacer(Modifier.width(8.dp))
             val contentRange = checklistMatch.groups[3]?.range
             MarkdownInlineText(
-                text = styler.markdownInlineAnnotatedString(checklistMatch.groupValues[3]),
+                text =
+                    styler.markdownInlineAnnotatedString(
+                        source = checklistMatch.groupValues[3],
+                        includeLinkAnnotations = includeLinkAnnotations,
+                    ),
                 style = style,
                 modifier = Modifier.weight(1f),
                 source = checklistMatch.groupValues[3],
                 sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
                 onTextTap = onTextTap,
+                onTextLongPress = onTextLongPress,
                 onLinkClick = onLinkClick,
                 onLinkLongPress = onLinkLongPress,
             )
@@ -223,12 +248,17 @@ private fun MarkdownLine(
             Spacer(Modifier.width(8.dp))
             val contentRange = bulletMatch.groups[2]?.range
             MarkdownInlineText(
-                text = styler.markdownInlineAnnotatedString(bulletMatch.groupValues[2]),
+                text =
+                    styler.markdownInlineAnnotatedString(
+                        source = bulletMatch.groupValues[2],
+                        includeLinkAnnotations = includeLinkAnnotations,
+                    ),
                 style = style,
                 modifier = Modifier.weight(1f),
                 source = bulletMatch.groupValues[2],
                 sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
                 onTextTap = onTextTap,
+                onTextLongPress = onTextLongPress,
                 onLinkClick = onLinkClick,
                 onLinkLongPress = onLinkLongPress,
             )
@@ -249,12 +279,17 @@ private fun MarkdownLine(
             Spacer(Modifier.width(8.dp))
             val contentRange = numberedMatch.groups[3]?.range
             MarkdownInlineText(
-                text = styler.markdownInlineAnnotatedString(numberedMatch.groupValues[3]),
+                text =
+                    styler.markdownInlineAnnotatedString(
+                        source = numberedMatch.groupValues[3],
+                        includeLinkAnnotations = includeLinkAnnotations,
+                    ),
                 style = style,
                 modifier = Modifier.weight(1f),
                 source = numberedMatch.groupValues[3],
                 sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
                 onTextTap = onTextTap,
+                onTextLongPress = onTextLongPress,
                 onLinkClick = onLinkClick,
                 onLinkLongPress = onLinkLongPress,
             )
@@ -263,11 +298,17 @@ private fun MarkdownLine(
     }
 
     MarkdownInlineText(
-        text = styler.markdownInlineAnnotatedString(line),
+        text =
+            styler.markdownInlineAnnotatedString(
+                source = line,
+                includeLinkAnnotations = includeLinkAnnotations,
+            ),
         style = style,
+        modifier = Modifier.fillMaxWidth(),
         source = line,
         sourceOffset = lineStartOffset,
         onTextTap = onTextTap,
+        onTextLongPress = onTextLongPress,
         onLinkClick = onLinkClick,
         onLinkLongPress = onLinkLongPress,
     )
@@ -283,6 +324,7 @@ private fun MarkdownInlineText(
     source: String = text.text,
     sourceOffset: Int = 0,
     onTextTap: ((MarkdownTextTap) -> Unit)? = null,
+    onTextLongPress: ((MarkdownTextTap) -> Unit)? = null,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)? = null,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)? = null,
 ) {
@@ -295,8 +337,8 @@ private fun MarkdownInlineText(
             ).build()
         }
     val interactionModifier =
-        if (onTextTap != null || onLinkClick != null || onLinkLongPress != null) {
-            Modifier.pointerInput(inlineInteractionMap, onTextTap, onLinkClick, onLinkLongPress) {
+        if (onTextTap != null || onTextLongPress != null || onLinkClick != null || onLinkLongPress != null) {
+            Modifier.pointerInput(inlineInteractionMap, onTextTap, onTextLongPress, onLinkClick, onLinkLongPress) {
                 detectTapGestures(
                     onTap = { tapOffset ->
                         val visibleOffset =
@@ -315,10 +357,10 @@ private fun MarkdownInlineText(
                             textLayoutResult
                                 ?.getOffsetForPosition(pressOffset)
                                 ?: return@detectTapGestures
-                        val linkInteraction =
-                            inlineInteractionMap.interactionAt(visibleOffset) as? MarkdownInlineInteraction.Link
-                        if (linkInteraction != null) {
-                            onLinkLongPress?.invoke(linkInteraction.link)
+                        when (val interaction = inlineInteractionMap.interactionAt(visibleOffset)) {
+                            is MarkdownInlineInteraction.Link -> onLinkLongPress?.invoke(interaction.link)
+                            is MarkdownInlineInteraction.Text ->
+                                onTextLongPress?.invoke(MarkdownTextTap(interaction.markdownOffset))
                         }
                     },
                 )
@@ -342,12 +384,17 @@ private fun MarkdownQuoteBlock(
     lineContentOffsets: List<Int>,
     style: TextStyle,
     styler: MarkdownStyler,
+    includeLinkAnnotations: Boolean,
     onTextTap: ((MarkdownTextTap) -> Unit)?,
+    onTextLongPress: ((MarkdownTextTap) -> Unit)?,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)?,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)?,
 ) {
     Row(
-        modifier = Modifier.height(IntrinsicSize.Min),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -359,21 +406,30 @@ private fun MarkdownQuoteBlock(
                     .background(styler.quoteBarColor),
         )
         Column(
-            modifier = Modifier.padding(start = 12.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             lines.forEachIndexed { quoteLineIndex, quoteLine ->
                 val lineStartOffset = lineContentOffsets.getOrElse(quoteLineIndex) { 0 }
                 MarkdownInlineText(
-                    text = styler.markdownInlineAnnotatedString(quoteLine),
+                    text =
+                        styler.markdownInlineAnnotatedString(
+                            source = quoteLine,
+                            includeLinkAnnotations = includeLinkAnnotations,
+                        ),
                     style =
                         style.copy(
                             color = styler.quoteColor,
                             fontStyle = FontStyle.Italic,
                         ),
+                    modifier = Modifier.fillMaxWidth(),
                     source = quoteLine,
                     sourceOffset = lineStartOffset,
                     onTextTap = onTextTap,
+                    onTextLongPress = onTextLongPress,
                     onLinkClick = onLinkClick,
                     onLinkLongPress = onLinkLongPress,
                 )
@@ -389,11 +445,13 @@ private fun MarkdownCodeBlock(
     style: TextStyle,
     styler: MarkdownStyler,
     onTextTap: ((MarkdownTextTap) -> Unit)?,
+    onTextLongPress: ((MarkdownTextTap) -> Unit)?,
 ) {
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     Surface(
         color = styler.codeBackground,
         shape = MaterialTheme.shapes.small,
+        modifier = Modifier.fillMaxWidth(),
     ) {
         Text(
             text = code,
@@ -404,16 +462,28 @@ private fun MarkdownCodeBlock(
                 ),
             modifier =
                 Modifier
+                    .fillMaxWidth()
                     .padding(horizontal = 12.dp, vertical = 8.dp)
-                    .pointerInput(code, sourceOffset, onTextTap) {
-                        val textTapHandler = onTextTap ?: return@pointerInput
-                        detectTapGestures { tapOffset ->
-                            val visibleOffset =
-                                textLayoutResult
-                                    ?.getOffsetForPosition(tapOffset)
-                                    ?: return@detectTapGestures
-                            textTapHandler(MarkdownTextTap(sourceOffset + visibleOffset))
+                    .pointerInput(code, sourceOffset, onTextTap, onTextLongPress) {
+                        if (onTextTap == null && onTextLongPress == null) {
+                            return@pointerInput
                         }
+                        detectTapGestures(
+                            onTap = { tapOffset ->
+                                val visibleOffset =
+                                    textLayoutResult
+                                        ?.getOffsetForPosition(tapOffset)
+                                        ?: return@detectTapGestures
+                                onTextTap?.invoke(MarkdownTextTap(sourceOffset + visibleOffset))
+                            },
+                            onLongPress = { pressOffset ->
+                                val visibleOffset =
+                                    textLayoutResult
+                                        ?.getOffsetForPosition(pressOffset)
+                                        ?: return@detectTapGestures
+                                onTextLongPress?.invoke(MarkdownTextTap(sourceOffset + visibleOffset))
+                            },
+                        )
                     },
             onTextLayout = { textLayoutResult = it },
         )

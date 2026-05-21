@@ -50,6 +50,7 @@
     <string name="common_no">No</string>
     <string name="common_add">Add</string>
     <string name="common_remove">Remove</string>
+    <string name="common_download">Download</string>
     <string name="common_clear">Clear</string>
     <string name="common_back">Back</string>
     <string name="common_move_to_trash">Move to trash</string>
@@ -57,9 +58,9 @@
     <string name="app_picker_nothing_available">Nothing available</string>
     <string name="edit_note_title_existing">Untitled</string>
     <string name="edit_note_body_placeholder">Type your note…</string>
-    <string name="edit_note_empty_view_hint">Tap Edit to start writing</string>
+    <string name="edit_note_empty_view_hint">Tap here to start writing</string>
     <string name="edit_list_empty_view_title">Empty list</string>
-    <string name="edit_list_empty_view_hint">Tap Edit to start writing</string>
+    <string name="edit_list_empty_view_hint">Tap here to start writing</string>
     <string name="common_empty">Empty</string>
     <string name="common_empty_note">Empty note</string>
     <string name="common_empty_list">Empty list</string>
@@ -374,6 +375,7 @@
 
     <!-- Editor options row -->
     <string name="options_icon">Icon</string>
+    <string name="options_icon_cd">Change icon</string>
     <string name="options_icon_default_note">Note</string>
     <string name="options_icon_default_checklist">Checklist</string>
     <string name="options_tags">Tags</string>
@@ -381,6 +383,10 @@
     <string name="options_actions">Notification action</string>
     <string name="options_importance">Importance</string>
     <string name="options_visibility">Visibility</string>
+    <string name="options_behavior">Behavior</string>
+    <string name="options_behavior_subtitle">How this note\'s notification appears and behaves</string>
+    <string name="options_behavior_visibility_label">Visibility: %1$s</string>
+    <string name="options_behavior_importance_label">Importance: %1$s</string>
     <string name="options_picture">Picture</string>
     <string name="options_picture_none">No picture</string>
     <string name="options_picture_attached">Attached</string>
@@ -407,7 +413,7 @@
     <string name="visibility_default">Default</string>
     <string name="visibility_default_description">Show title and content.</string>
     <string name="visibility_private">Private</string>
-    <string name="visibility_private_description">Show title; redact content.</string>
+    <string name="visibility_private_description">Show title, redact content.</string>
     <string name="visibility_secret">Secret</string>
     <string name="visibility_secret_description">Redact all info. Don\'t show in widgets.</string>
 
@@ -608,6 +614,7 @@
     <!-- Attachments and pickers -->
     <string name="attachments_subtitle">Attach any file — PDFs, docs, audio, video</string>
     <string name="attachments_add">Add attachment</string>
+    <string name="attachments_delete_confirm_title">Permanently delete this attachment?</string>
     <string name="media_storage_stored_in_app">Stored in app</string>
     <string name="media_storage_linked_original">Linked original</string>
     <string name="media_storage_linked_original_hint">Linked media may stop working if the original file is moved, deleted, or permission is lost</string>

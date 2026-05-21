@@ -6,6 +6,7 @@ import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,7 +25,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -53,18 +53,20 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -376,10 +378,44 @@ private fun EditListTopBarSection(
     sharedNoteId: Long?,
     sharedTransitionActive: Boolean,
     titleFocusRequester: FocusRequester,
+    titleFocusOffset: Int?,
     onTitleChange: (String) -> Unit,
     onBack: () -> Unit,
+    onTitleTappedInViewMode: (Int) -> Unit,
+    onTitleFocusOffsetConsumed: () -> Unit,
+    onOpenIcon: () -> Unit,
     onSave: () -> Unit,
 ) {
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var titleFieldValue by remember {
+        mutableStateOf(TextFieldValue(text = title, selection = TextRange(title.length)))
+    }
+    LaunchedEffect(title) {
+        if (title != titleFieldValue.text) {
+            val selection = titleFieldValue.selection
+            titleFieldValue =
+                TextFieldValue(
+                    text = title,
+                    selection =
+                        TextRange(
+                            start = selection.start.coerceIn(0, title.length),
+                            end = selection.end.coerceIn(0, title.length),
+                        ),
+                )
+        }
+    }
+    LaunchedEffect(isEditMode, readOnly, titleFocusOffset) {
+        val offset = titleFocusOffset
+        if (isEditMode && !readOnly && offset != null) {
+            val boundedOffset = offset.coerceIn(0, title.length)
+            titleFieldValue = TextFieldValue(text = title, selection = TextRange(boundedOffset))
+            delay(80)
+            titleFocusRequester.requestFocus()
+            keyboardController?.show()
+            onTitleFocusOffsetConsumed()
+        }
+    }
+
     Box {
         LargeTopAppBar(
             colors = transparentLargeTopAppBarColors(),
@@ -416,39 +452,24 @@ private fun EditListTopBarSection(
                             .fillMaxWidth()
                             .alpha(if (sharedTransitionActive) 0f else 1f),
                 ) {
-                    when (val headerIcon = resolveNoteIcon(iconKey, NoteKind.LIST)) {
-                        is NoteIcon.Symbol ->
-                            RememberMaterialRoundedSymbol(
-                                name = headerIcon.name,
-                                size = iconSize,
-                                tint = MaterialTheme.colorScheme.primary,
-                                weight = FontWeight.Medium,
-                            )
-                        is NoteIcon.Drawable ->
-                            Icon(
-                                painterResource(headerIcon.resId),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(iconSize),
-                            )
-                        is NoteIcon.Emoji ->
-                            Text(
-                                text = headerIcon.text,
-                                style = titleStyle.copy(fontSize = iconSize.value.sp),
-                            )
-                        NoteIcon.ListPlaceholder, NoteIcon.NotePlaceholder ->
-                            RememberMaterialRoundedSymbol(
-                                name = DEFAULT_LIST_HEADER_SYMBOL,
-                                size = iconSize,
-                                tint = MaterialTheme.colorScheme.primary,
-                                weight = FontWeight.Medium,
-                            )
-                    }
+                    EditorHeaderIcon(
+                        iconKey = iconKey,
+                        kind = NoteKind.LIST,
+                        iconSize = iconSize,
+                        onClick = if (readOnly) null else onOpenIcon,
+                    )
                     Spacer(Modifier.width(iconGap))
                     if ((isEditMode && !readOnly) || title.isEmpty()) {
                         BasicTextField(
-                            value = title,
-                            onValueChange = { if (it.length <= 80) onTitleChange(it) },
+                            value = titleFieldValue,
+                            onValueChange = {
+                                if (it.text.length <= 80) {
+                                    titleFieldValue = it
+                                    if (it.text != title) {
+                                        onTitleChange(it.text)
+                                    }
+                                }
+                            },
                             textStyle = titleStyle,
                             enabled = !readOnly,
                             keyboardOptions =
@@ -478,11 +499,28 @@ private fun EditListTopBarSection(
                             },
                         )
                     } else {
+                        var titleLayout by remember(title) { mutableStateOf<TextLayoutResult?>(null) }
                         androidx.compose.foundation.text.selection.SelectionContainer {
                             Text(
                                 text = title,
                                 style = titleStyle,
-                                modifier = Modifier.fillMaxWidth(),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                onTextLayout = { titleLayout = it },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .pointerInput(readOnly, titleLayout) {
+                                            if (!readOnly) {
+                                                detectTapGestures { tapOffset ->
+                                                    val offset =
+                                                        titleLayout
+                                                            ?.getOffsetForPosition(tapOffset)
+                                                            ?: title.length
+                                                    onTitleTappedInViewMode(offset)
+                                                }
+                                            }
+                                        },
                             )
                         }
                     }
@@ -610,13 +648,14 @@ fun EditListScreen(
         rememberHeroImagePickThenCopy { uriString, copiedFile ->
             pendingHeroSession = uriString to copiedFile
         }
+    val launchAttachmentPicker = rememberAttachmentPicker(onAdd = onAddAttachment)
     var pictureViewer by remember { mutableStateOf<Pair<String, Long>?>(null) }
 
     val titlePlaceholder =
         if (existing) {
-            stringResource(R.string.edit_list_title_new)
-        } else {
             stringResource(R.string.common_title)
+        } else {
+            stringResource(R.string.edit_list_title_new)
         }
     val blurStyle =
         rememberProgressiveBlurStyle(
@@ -635,8 +674,14 @@ fun EditListScreen(
 
     var isEditMode by remember(existing, forceEdit) { mutableStateOf(!existing || forceEdit) }
     var pendingFocusItemId by remember { mutableStateOf<Long?>(null) }
+    var pendingTitleFocusOffset by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(readOnly) {
         if (readOnly && isEditMode) isEditMode = false
+    }
+    LaunchedEffect(isEditMode) {
+        if (!isEditMode) {
+            pendingTitleFocusOffset = null
+        }
     }
 
     val newListTitleFocus = remember { FocusRequester() }
@@ -729,8 +774,17 @@ fun EditListScreen(
                 sharedNoteId = sharedNoteId,
                 sharedTransitionActive = sharedTransitionActive,
                 titleFocusRequester = newListTitleFocus,
+                titleFocusOffset = pendingTitleFocusOffset,
                 onTitleChange = onTitleChange,
                 onBack = onNavigateUp,
+                onTitleTappedInViewMode = { titleOffset ->
+                    pendingTitleFocusOffset = titleOffset
+                    isEditMode = true
+                },
+                onTitleFocusOffsetConsumed = {
+                    pendingTitleFocusOffset = null
+                },
+                onOpenIcon = { iconPickerOpen = true },
                 onSave = saveAndExitEditMode,
             )
         },
@@ -1185,8 +1239,6 @@ fun EditListScreen(
                     importance = importance,
                     visibility = visibility,
                     pictureUri = pictureUri,
-                    iconKey = iconKey,
-                    isChecklist = true,
                     actions = actions,
                     tags = tags,
                     attachments = attachments,
@@ -1194,10 +1246,20 @@ fun EditListScreen(
                     onSetImportance = if (readOnly) ({ _ -> }) else onImportanceChange,
                     onSetVisibility = if (readOnly) ({ _ -> }) else onVisibilityChange,
                     onOpenPicture = if (readOnly) ({}) else launchHeroImagePick,
-                    onOpenIcon = if (readOnly) ({}) else ({ iconPickerOpen = true }),
                     onOpenActions = if (readOnly) ({}) else ({ actionsPickerOpen = true }),
                     onOpenTags = if (readOnly) ({}) else ({ tagsPickerOpen = true }),
-                    onOpenAttachments = if (readOnly) ({}) else ({ attachmentsPickerOpen = true }),
+                    onOpenAttachments =
+                        if (readOnly) {
+                            {}
+                        } else {
+                            {
+                                if (attachments.isEmpty()) {
+                                    launchAttachmentPicker()
+                                } else {
+                                    attachmentsPickerOpen = true
+                                }
+                            }
+                        },
                     readOnly = readOnly,
                     starred = starred,
                 )

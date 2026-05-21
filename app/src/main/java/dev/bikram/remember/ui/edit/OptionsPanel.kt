@@ -14,7 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -50,6 +51,7 @@ import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.feedback.tapSoundClickable
@@ -67,8 +69,6 @@ fun OptionsPanel(
     importance: Importance,
     visibility: NoteVisibility,
     pictureUri: String?,
-    iconKey: String?,
-    isChecklist: Boolean,
     actions: List<NoteAction>,
     tags: List<String>,
     attachments: List<NoteAttachmentEntity>,
@@ -76,22 +76,20 @@ fun OptionsPanel(
     onSetImportance: (Importance) -> Unit,
     onSetVisibility: (NoteVisibility) -> Unit,
     onOpenPicture: () -> Unit,
-    onOpenIcon: () -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
     modifier: Modifier = Modifier,
-    // When true (archived / trashed), the Importance row's internal bottom-sheet trigger is
+    // When true (archived / trashed), the Behavior row's internal bottom-sheet trigger is
     // suppressed. Every OTHER row already no-ops through its caller-provided `onOpen*` lambda
-    // when read-only, but Importance owns its own sheet so the gate has to live here.
+    // when read-only, but Behavior owns its own sheet so the gate has to live here.
     readOnly: Boolean = false,
     // Mirrors the starred-card visual treatment from the Home/History grid: a subtle yellow
     // wash on the panel surface plus a tilted watermark star at the top-end. Keeps the
     // starred cue consistent when the user opens a starred note or list into the editor.
     starred: Boolean = false,
 ) {
-    var importanceOpen by rememberSaveable { mutableStateOf(false) }
-    var visibilityOpen by rememberSaveable { mutableStateOf(false) }
+    var behaviorOpen by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val storedAttachmentCount =
         attachments.count { attachment ->
@@ -170,9 +168,10 @@ fun OptionsPanel(
                     OptionCell(
                         symbolName = "alarm",
                         title = stringResource(R.string.options_reminder),
-                        summary = reminderSummary(reminderAt, recurrence),
+                        summary = "",
                         onClick = onOpenReminder,
                         modifier = Modifier.fillMaxWidth(),
+                        summaryContent = { ReminderOptionSummary(reminderAt, recurrence) },
                     )
                     OptionCell(
                         symbolName = actions.firstOrNull()?.type?.materialSymbolName() ?: "bolt",
@@ -180,6 +179,14 @@ fun OptionsPanel(
                         summary = actionsSummary(actions),
                         onClick = onOpenActions,
                         modifier = Modifier.fillMaxWidth(),
+                    )
+                    OptionCell(
+                        symbolName = "visibility",
+                        title = stringResource(R.string.options_behavior),
+                        summary = "",
+                        onClick = if (readOnly) null else ({ behaviorOpen = true }),
+                        modifier = Modifier.fillMaxWidth(),
+                        summaryContent = { BehaviorOptionSummary(visibility, importance) },
                     )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -206,77 +213,24 @@ fun OptionsPanel(
                             modifier = Modifier.weight(1f),
                         )
                     }
-                    LazyRow(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        item {
-                            OptionPill(
-                                symbolName = "emoji_symbols",
-                                label = stringResource(R.string.options_icon),
-                                value =
-                                    iconLabelFor(iconKey)
-                                        ?: stringResource(
-                                            if (isChecklist) {
-                                                R.string.options_icon_default_checklist
-                                            } else {
-                                                R.string.options_icon_default_note
-                                            },
-                                        ),
-                                onClick = onOpenIcon,
-                            )
-                        }
-                        item {
-                            OptionPill(
-                                symbolName = "priority_high",
-                                label = stringResource(R.string.options_importance),
-                                value = importance.label(),
-                                onClick = if (readOnly) null else ({ importanceOpen = true }),
-                            )
-                        }
-                        item {
-                            OptionPill(
-                                symbolName = "visibility",
-                                label = stringResource(R.string.options_visibility),
-                                value = visibility.label(),
-                                onClick = if (readOnly) null else ({ visibilityOpen = true }),
-                            )
-                        }
-                    }
                 }
             }
         }
     }
 
-    if (visibilityOpen) {
-        ChoiceSheet(
-            title = stringResource(R.string.options_visibility),
-            options =
-                NoteVisibility.entries.map {
-                    ChoiceOption(it, it.label(), it.description())
-                },
-            selected = visibility,
-            onPick = {
-                onSetVisibility(it)
-                visibilityOpen = false
+    if (behaviorOpen) {
+        BehaviorSheet(
+            visibility = visibility,
+            importance = importance,
+            onConfirm = { nextVisibility, nextImportance ->
+                if (nextVisibility != visibility) {
+                    onSetVisibility(nextVisibility)
+                }
+                if (nextImportance != importance) {
+                    onSetImportance(nextImportance)
+                }
             },
-            onDismiss = { visibilityOpen = false },
-        )
-    }
-    if (importanceOpen) {
-        ChoiceSheet(
-            title = stringResource(R.string.options_importance),
-            options =
-                Importance.entries.map {
-                    ChoiceOption(it, it.label(), it.description())
-                },
-            selected = importance,
-            onPick = {
-                onSetImportance(it)
-                importanceOpen = false
-            },
-            onDismiss = { importanceOpen = false },
+            onDismiss = { behaviorOpen = false },
         )
     }
 }
@@ -334,6 +288,95 @@ private fun OptionRow(
  * clips its content to the rounded shape, so the click ripple stays inside the card.
  */
 @Composable
+private fun DotSeparatedSummary(
+    parts: List<String>,
+    modifier: Modifier = Modifier,
+) {
+    val summaryColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val bodyStyle = MaterialTheme.typography.bodySmall
+    val dotFontSize = bodyStyle.fontSize * 1.45f
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        parts.forEachIndexed { index, part ->
+            if (index > 0) {
+                Text(
+                    text = "·",
+                    style =
+                        bodyStyle.copy(
+                            fontSize = dotFontSize,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = bodyStyle.lineHeight,
+                        ),
+                    color = summaryColor.copy(alpha = 0.9f),
+                    modifier = Modifier.padding(horizontal = 4.dp),
+                    maxLines = 1,
+                )
+            }
+            Text(
+                text = part,
+                style = bodyStyle,
+                color = summaryColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = false,
+                modifier =
+                    if (index == parts.lastIndex) {
+                        Modifier.weight(1f, fill = false)
+                    } else {
+                        Modifier
+                    },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ReminderOptionSummary(
+    reminderAt: Long?,
+    recurrence: RecurrenceRule?,
+) {
+    if (reminderAt == null) {
+        Text(
+            text = stringResource(R.string.common_none),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        return
+    }
+    val datePart = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(reminderAt))
+    val rule = recurrence?.sanitized()
+    val recurrenceLabel = rule?.let { compactRecurrenceLabel(it) }.orEmpty()
+    if (recurrenceLabel.isEmpty()) {
+        Text(
+            text = datePart,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    } else {
+        DotSeparatedSummary(listOf(datePart, recurrenceLabel))
+    }
+}
+
+@Composable
+private fun BehaviorOptionSummary(
+    visibility: NoteVisibility,
+    importance: Importance,
+) {
+    DotSeparatedSummary(
+        listOf(
+            stringResource(R.string.options_behavior_visibility_label, visibility.label()),
+            stringResource(R.string.options_behavior_importance_label, importance.label()),
+        ),
+    )
+}
+
+@Composable
 private fun OptionCell(
     symbolName: String,
     title: String,
@@ -376,7 +419,13 @@ private fun OptionCell(
                 weight = FontWeight.Medium,
             )
             Spacer(Modifier.size(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
+                verticalArrangement = Arrangement.Center,
+            ) {
                 Text(
                     title,
                     style = MaterialTheme.typography.titleSmall,
@@ -385,7 +434,7 @@ private fun OptionCell(
                     overflow = TextOverflow.Ellipsis,
                 )
                 if (summaryContent != null) {
-                    Spacer(Modifier.size(4.dp))
+                    Spacer(Modifier.size(2.dp))
                     summaryContent()
                 } else {
                     Text(
@@ -398,55 +447,6 @@ private fun OptionCell(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun OptionPill(
-    symbolName: String,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-) {
-    val shape = MaterialTheme.shapes.small
-    val containerColor = MaterialTheme.colorScheme.secondaryContainer
-    val contentColor = MaterialTheme.colorScheme.onSecondaryContainer
-    Row(
-        modifier =
-            modifier
-                .background(containerColor, shape)
-                .border(0.dp, Color.Transparent, shape)
-                .let {
-                    if (onClick != null) {
-                        it.clip(shape).tapSoundClickable(onClick = onClick)
-                    } else {
-                        it
-                    }
-                }.padding(horizontal = 8.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
-    ) {
-        RememberMaterialRoundedSymbol(
-            name = symbolName,
-            size = 14.dp,
-            tint = contentColor.copy(alpha = 0.72f),
-            weight = FontWeight.Medium,
-        )
-        Text(
-            text = "$label:",
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor.copy(alpha = 0.72f),
-            fontWeight = FontWeight.Medium,
-            softWrap = false,
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
-            fontWeight = FontWeight.SemiBold,
-            softWrap = false,
-        )
     }
 }
 
@@ -637,48 +637,104 @@ private data class ChoiceOption<T>(
 )
 
 @Composable
-private fun <T> ChoiceSheet(
-    title: String,
-    options: List<ChoiceOption<T>>,
-    selected: T,
-    onPick: (T) -> Unit,
+private fun BehaviorSheet(
+    visibility: NoteVisibility,
+    importance: Importance,
+    onConfirm: (NoteVisibility, Importance) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    var draftVisibility by remember(visibility) { mutableStateOf(visibility) }
+    var draftImportance by remember(importance) { mutableStateOf(importance) }
+
     AppBottomSheet(
-        title = title,
+        title = stringResource(R.string.options_behavior),
+        subtitle = stringResource(R.string.options_behavior_subtitle),
         onDismiss = onDismiss,
         actions = {
-            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
-        },
-    ) {
-        options.forEach { option ->
             Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .tapSoundClickable { onPick(option.value) }
-                        .padding(vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RadioButton(
-                    selected = option.value == selected,
-                    onClick = { onPick(option.value) },
-                )
-                Spacer(Modifier.size(8.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        option.label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    Text(
-                        option.description,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                RememberTextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+                RememberButton(
+                    onClick = {
+                        onConfirm(draftVisibility, draftImportance)
+                        onDismiss()
+                    },
+                ) {
+                    Text(stringResource(R.string.common_done))
                 }
             }
+        },
+    ) {
+        ChoiceSectionHeader(stringResource(R.string.options_visibility))
+        NoteVisibility.entries.forEach { option ->
+            ChoiceOptionRow(
+                option = ChoiceOption(option, option.label(), option.description()),
+                selected = draftVisibility,
+                onSelect = { draftVisibility = it },
+            )
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = 12.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+        )
+        ChoiceSectionHeader(stringResource(R.string.options_importance))
+        Importance.entries.forEach { option ->
+            ChoiceOptionRow(
+                option = ChoiceOption(option, option.label(), option.description()),
+                selected = draftImportance,
+                onSelect = { draftImportance = it },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ChoiceSectionHeader(title: String) {
+    Text(
+        text = title.uppercase(),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.SemiBold,
+        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun <T> ChoiceOptionRow(
+    option: ChoiceOption<T>,
+    selected: T,
+    onSelect: (T) -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .tapSoundClickable { onSelect(option.value) }
+                .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RadioButton(
+            selected = option.value == selected,
+            onClick = { onSelect(option.value) },
+        )
+        Spacer(Modifier.size(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                option.label,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                option.description,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -709,22 +765,10 @@ private fun NoteVisibility.description(): String =
         },
     )
 
-@Composable
-private fun reminderSummary(
-    reminderAt: Long?,
-    recurrence: RecurrenceRule?,
-): String {
-    if (reminderAt == null) return stringResource(R.string.common_none)
-    val datePart = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(reminderAt))
-    val rule = recurrence?.sanitized() ?: return datePart
-    val recurrenceLabel = compactRecurrenceLabel(rule)
-    return if (recurrenceLabel.isEmpty()) datePart else "$datePart  |  $recurrenceLabel"
-}
-
 /**
- * Short, human-readable recurrence label for the reminder pill summary line. Mirrors
+ * Short, human-readable recurrence label for the reminder option summary line. Mirrors
  * the long-form summary the picker emits but keeps it to one or two words ("Daily",
- * "Every 3 weeks", "Monthly") so the pill stays compact.
+ * "Every 3 weeks", "Monthly") so the cell stays compact.
  */
 @Composable
 private fun compactRecurrenceLabel(rule: RecurrenceRule): String {

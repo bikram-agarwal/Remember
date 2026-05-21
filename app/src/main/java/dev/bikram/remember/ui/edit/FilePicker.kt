@@ -97,6 +97,27 @@ fun rememberDocumentPicker(onPicked: (Uri) -> Unit): ActivityResultLauncher<Arra
         if (uri != null) onPicked(uri)
     }
 
+@Composable
+fun rememberAttachmentPicker(
+    onAdd: (uri: Uri, displayName: String, mimeType: String?) -> Unit,
+): () -> Unit {
+    val context = LocalContext.current
+    val pickDoc =
+        rememberDocumentPicker { uri ->
+            persistReadPermission(context, uri)
+            onAdd(
+                uri,
+                resolveDisplayName(context, uri),
+                resolveMimeType(context, uri),
+            )
+        }
+    return remember(pickDoc) {
+        {
+            pickDoc.launch(arrayOf("*/*"))
+        }
+    }
+}
+
 fun persistReadPermission(
     context: Context,
     uri: Uri,

@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,7 +36,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -60,21 +60,23 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -305,8 +307,12 @@ internal fun EditNoteTopBarSection(
     readOnly: Boolean,
     hasUnsavedChanges: Boolean,
     markdownDisplayMode: MarkdownEditorDisplayMode,
+    titleFocusOffset: Int?,
     onBack: () -> Unit,
     onToggleMarkdownDisplayMode: () -> Unit,
+    onTitleTappedInViewMode: (Int) -> Unit,
+    onTitleFocusOffsetConsumed: () -> Unit,
+    onOpenIcon: () -> Unit,
     onSave: (() -> Unit)? = null,
 ) {
     val title by vm.title.collectAsStateWithLifecycle()
@@ -318,11 +324,39 @@ internal fun EditNoteTopBarSection(
 
     val newNoteTitleFocus = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    var titleFieldValue by remember {
+        mutableStateOf(TextFieldValue(text = title, selection = TextRange(title.length)))
+    }
+    LaunchedEffect(title) {
+        if (title != titleFieldValue.text) {
+            val selection = titleFieldValue.selection
+            titleFieldValue =
+                TextFieldValue(
+                    text = title,
+                    selection =
+                        TextRange(
+                            start = selection.start.coerceIn(0, title.length),
+                            end = selection.end.coerceIn(0, title.length),
+                        ),
+                )
+        }
+    }
     LaunchedEffect(existing, isEditMode, readOnly) {
         if (!existing && isEditMode && !readOnly) {
             delay(80)
             newNoteTitleFocus.requestFocus()
             keyboardController?.show()
+        }
+    }
+    LaunchedEffect(existing, isEditMode, readOnly, titleFocusOffset) {
+        val offset = titleFocusOffset
+        if (existing && isEditMode && !readOnly && offset != null) {
+            val boundedOffset = offset.coerceIn(0, title.length)
+            titleFieldValue = TextFieldValue(text = title, selection = TextRange(boundedOffset))
+            delay(80)
+            newNoteTitleFocus.requestFocus()
+            keyboardController?.show()
+            onTitleFocusOffsetConsumed()
         }
     }
 
@@ -348,39 +382,24 @@ internal fun EditNoteTopBarSection(
                             .fillMaxWidth()
                             .alpha(if (sharedTransitionActive) 0f else 1f),
                 ) {
-                    when (val headerIcon = resolveNoteIcon(iconKey, NoteKind.NOTE)) {
-                        is NoteIcon.Symbol ->
-                            RememberMaterialRoundedSymbol(
-                                name = headerIcon.name,
-                                size = iconSize,
-                                tint = MaterialTheme.colorScheme.primary,
-                                weight = FontWeight.Medium,
-                            )
-                        is NoteIcon.Drawable ->
-                            Icon(
-                                painterResource(headerIcon.resId),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(iconSize),
-                            )
-                        is NoteIcon.Emoji ->
-                            Text(
-                                text = headerIcon.text,
-                                style = titleStyle.copy(fontSize = iconSize.value.sp),
-                            )
-                        NoteIcon.ListPlaceholder, NoteIcon.NotePlaceholder ->
-                            RememberMaterialRoundedSymbol(
-                                name = DEFAULT_NOTE_HEADER_SYMBOL,
-                                size = iconSize,
-                                tint = MaterialTheme.colorScheme.primary,
-                                weight = FontWeight.Medium,
-                            )
-                    }
+                    EditorHeaderIcon(
+                        iconKey = iconKey,
+                        kind = NoteKind.NOTE,
+                        iconSize = iconSize,
+                        onClick = if (readOnly) null else onOpenIcon,
+                    )
                     Spacer(Modifier.width(iconGap))
                     if ((isEditMode && !readOnly) || title.isEmpty()) {
                         BasicTextField(
-                            value = title,
-                            onValueChange = { if (it.length <= 80) vm.setTitle(it) },
+                            value = titleFieldValue,
+                            onValueChange = {
+                                if (it.text.length <= 80) {
+                                    titleFieldValue = it
+                                    if (it.text != title) {
+                                        vm.setTitle(it.text)
+                                    }
+                                }
+                            },
                             textStyle = titleStyle,
                             enabled = !readOnly,
                             keyboardOptions =
@@ -410,11 +429,28 @@ internal fun EditNoteTopBarSection(
                             },
                         )
                     } else {
+                        var titleLayout by remember(title) { mutableStateOf<TextLayoutResult?>(null) }
                         SelectionContainer {
                             Text(
                                 text = title,
                                 style = titleStyle,
-                                modifier = Modifier.fillMaxWidth(),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                onTextLayout = { titleLayout = it },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .pointerInput(readOnly, titleLayout) {
+                                            if (!readOnly) {
+                                                detectTapGestures { tapOffset ->
+                                                    val offset =
+                                                        titleLayout
+                                                            ?.getOffsetForPosition(tapOffset)
+                                                            ?: title.length
+                                                    onTitleTappedInViewMode(offset)
+                                                }
+                                            }
+                                        },
                             )
                         }
                     }
@@ -709,33 +745,31 @@ internal fun EditNoteMarkdownEditorSection(
             )
         }
     } else {
-        SelectionContainer {
-            MarkdownText(
-                markdown = markdownEditorState.markdown,
-                style =
-                    MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurface,
-                    ),
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 140.dp),
-                onChecklistToggle = { lineIndex, checked ->
-                    val updatedMarkdown = markdownEditorState.markdown.withChecklistLineToggled(lineIndex, checked)
-                    markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
-                    onMarkdownChanged(updatedMarkdown)
-                },
-                onTextTap = { tap ->
-                    onEnterEditModeAtOffset(tap.markdownOffset)
-                },
-                onLinkClick = { link ->
-                    runCatching { uriHandler.openUri(link.url) }
-                },
-                onLinkLongPress = { link ->
-                    linkActions = link
-                },
-            )
-        }
+        MarkdownText(
+            markdown = markdownEditorState.markdown,
+            style =
+                MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 140.dp),
+            onChecklistToggle = { lineIndex, checked ->
+                val updatedMarkdown = markdownEditorState.markdown.withChecklistLineToggled(lineIndex, checked)
+                markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
+                onMarkdownChanged(updatedMarkdown)
+            },
+            onTextTap = { tap ->
+                onEnterEditModeAtOffset(tap.markdownOffset)
+            },
+            onLinkClick = { link ->
+                runCatching { uriHandler.openUri(link.url) }
+            },
+            onLinkLongPress = { link ->
+                linkActions = link
+            },
+        )
     }
 
     linkActions?.let { link ->
@@ -869,7 +903,6 @@ internal fun EditNoteScrollableContent(
     onOpenReminder: () -> Unit,
     onOpenPicture: () -> Unit,
     onViewPictureFull: (String, Long) -> Unit,
-    onOpenIcon: () -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
@@ -959,7 +992,6 @@ internal fun EditNoteScrollableContent(
             readOnly = readOnly,
             onOpenReminder = if (readOnly) ({}) else onOpenReminder,
             onOpenPicture = if (readOnly) ({}) else onOpenPicture,
-            onOpenIcon = if (readOnly) ({}) else onOpenIcon,
             onOpenActions = if (readOnly) ({}) else onOpenActions,
             onOpenTags = if (readOnly) ({}) else onOpenTags,
             onOpenAttachments = if (readOnly) ({}) else onOpenAttachments,
@@ -1000,7 +1032,6 @@ private fun OptionsPanelSection(
     readOnly: Boolean,
     onOpenReminder: () -> Unit,
     onOpenPicture: () -> Unit,
-    onOpenIcon: () -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
@@ -1010,7 +1041,6 @@ private fun OptionsPanelSection(
     val importance by vm.importance.collectAsStateWithLifecycle()
     val visibility by vm.visibility.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
-    val iconKey by vm.iconKey.collectAsStateWithLifecycle()
     val actions by vm.actions.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
     val attachments by vm.attachments.collectAsStateWithLifecycle()
@@ -1022,8 +1052,6 @@ private fun OptionsPanelSection(
         importance = importance,
         visibility = visibility,
         pictureUri = pictureUri,
-        iconKey = iconKey,
-        isChecklist = false,
         actions = actions,
         tags = tags,
         attachments = attachments,
@@ -1031,7 +1059,6 @@ private fun OptionsPanelSection(
         onSetImportance = if (readOnly) ({ _ -> }) else vm::setImportance,
         onSetVisibility = if (readOnly) ({ _ -> }) else vm::setVisibility,
         onOpenPicture = onOpenPicture,
-        onOpenIcon = onOpenIcon,
         onOpenActions = onOpenActions,
         onOpenTags = onOpenTags,
         onOpenAttachments = onOpenAttachments,

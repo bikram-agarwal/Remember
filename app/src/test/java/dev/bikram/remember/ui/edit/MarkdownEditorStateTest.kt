@@ -39,6 +39,17 @@ class MarkdownEditorStateTest {
     }
 
     @Test
+    fun backspaceAtStartOfLeadingNewlineDoesNotCrash() {
+        val state = MarkdownEditorState("\n")
+        state.update(TextFieldValue("\n", selection = TextRange(0)))
+
+        state.update(TextFieldValue("", selection = TextRange(0)))
+
+        assertEquals("", state.markdown)
+        assertEquals(TextRange(0), state.textFieldValue.selection)
+    }
+
+    @Test
     fun boldWithSelectionInsideExistingBoldMarkersRemovesMarkers() {
         val state = MarkdownEditorState("**Test**")
         state.update(TextFieldValue("**Test**", selection = TextRange(2, 6)))
