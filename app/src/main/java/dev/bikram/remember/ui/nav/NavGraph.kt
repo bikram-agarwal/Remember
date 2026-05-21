@@ -5,7 +5,6 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -24,8 +23,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavBackStackEntry
@@ -231,446 +230,446 @@ fun RememberNavGraph(
                 startDestination = lockedStartDestination,
                 modifier = Modifier.fillMaxSize(),
             ) {
-            composable(
-                route = Routes.ONBOARDING_TITLE,
-                enterTransition = {
-                    if (initialState.destination.route == Routes.ONBOARDING_PERMISSIONS) {
-                        if (reducedMotion) {
-                            EnterTransition.None
+                composable(
+                    route = Routes.ONBOARDING_TITLE,
+                    enterTransition = {
+                        if (initialState.destination.route == Routes.ONBOARDING_PERMISSIONS) {
+                            if (reducedMotion) {
+                                EnterTransition.None
+                            } else {
+                                slideInHorizontally(animationSpec = navSpatialSpec) { -it } +
+                                    fadeIn(animationSpec = navFadeInSpec)
+                            }
                         } else {
-                            slideInHorizontally(animationSpec = navSpatialSpec) { -it } +
-                                fadeIn(animationSpec = navFadeInSpec)
+                            null
                         }
-                    } else {
-                        null
-                    }
-                },
-                exitTransition = {
-                    if (targetState.destination.route == Routes.ONBOARDING_PERMISSIONS) {
-                        if (reducedMotion) {
-                            ExitTransition.None
-                        } else {
-                            slideOutHorizontally(animationSpec = navSpatialSpec) { -it / 3 } +
-                                fadeOut(animationSpec = navFadeOutSpec)
-                        }
-                    } else {
-                        null
-                    }
-                },
-            ) {
-                OnboardingTitleScreen(
-                    onLetsBegin = {
-                        navController.navigate(Routes.ONBOARDING_PERMISSIONS)
                     },
-                )
-            }
+                    exitTransition = {
+                        if (targetState.destination.route == Routes.ONBOARDING_PERMISSIONS) {
+                            if (reducedMotion) {
+                                ExitTransition.None
+                            } else {
+                                slideOutHorizontally(animationSpec = navSpatialSpec) { -it / 3 } +
+                                    fadeOut(animationSpec = navFadeOutSpec)
+                            }
+                        } else {
+                            null
+                        }
+                    },
+                ) {
+                    OnboardingTitleScreen(
+                        onLetsBegin = {
+                            navController.navigate(Routes.ONBOARDING_PERMISSIONS)
+                        },
+                    )
+                }
 
-            composable(
-                route = Routes.ONBOARDING_PERMISSIONS,
-                enterTransition = {
-                    if (initialState.destination.route == Routes.ONBOARDING_TITLE) {
-                        if (reducedMotion) {
-                            EnterTransition.None
+                composable(
+                    route = Routes.ONBOARDING_PERMISSIONS,
+                    enterTransition = {
+                        if (initialState.destination.route == Routes.ONBOARDING_TITLE) {
+                            if (reducedMotion) {
+                                EnterTransition.None
+                            } else {
+                                slideInHorizontally(animationSpec = navSpatialSpec) { it } +
+                                    fadeIn(animationSpec = navFadeInSpec)
+                            }
                         } else {
-                            slideInHorizontally(animationSpec = navSpatialSpec) { it } +
-                                fadeIn(animationSpec = navFadeInSpec)
+                            null
                         }
-                    } else {
-                        null
-                    }
-                },
-                exitTransition = {
-                    if (targetState.destination.route == Routes.ONBOARDING_TITLE ||
-                        targetState.destination.route == Routes.NOTES
+                    },
+                    exitTransition = {
+                        if (targetState.destination.route == Routes.ONBOARDING_TITLE ||
+                            targetState.destination.route == Routes.NOTES
+                        ) {
+                            if (reducedMotion) {
+                                ExitTransition.None
+                            } else {
+                                slideOutHorizontally(animationSpec = navSpatialSpec) { -it / 3 } +
+                                    fadeOut(animationSpec = navFadeOutSpec)
+                            }
+                        } else {
+                            null
+                        }
+                    },
+                    popEnterTransition = {
+                        if (initialState.destination.route == Routes.ONBOARDING_TITLE) {
+                            if (reducedMotion) {
+                                EnterTransition.None
+                            } else {
+                                slideInHorizontally(animationSpec = navSpatialSpec) { it } +
+                                    fadeIn(animationSpec = navFadeInSpec)
+                            }
+                        } else {
+                            null
+                        }
+                    },
+                    popExitTransition = {
+                        if (targetState.destination.route == Routes.ONBOARDING_TITLE) {
+                            if (reducedMotion) {
+                                ExitTransition.None
+                            } else {
+                                slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
+                                    fadeOut(animationSpec = navFadeOutSpec)
+                            }
+                        } else {
+                            null
+                        }
+                    },
+                ) {
+                    OnboardingPermissionsScreen(
+                        onContinue = {
+                            onboardingScope.launch {
+                                onboardingPrefs.markIntroSeen()
+                                navController.navigate(Routes.NOTES) {
+                                    popUpTo(navController.graph.id) {
+                                        inclusive = true
+                                    }
+                                }
+                            }
+                        },
+                    )
+                }
+
+                composable(Routes.EXTERNAL_LAUNCH) {
+                    Box(modifier = Modifier.fillMaxSize())
+                }
+
+                composable(
+                    route = Routes.NOTES,
+                    enterTransition = { primaryTabEnterTransition(reducedMotion) },
+                    exitTransition = { primaryTabExitTransition(reducedMotion) },
+                    popEnterTransition = { primaryTabEnterTransition(reducedMotion) },
+                    popExitTransition = { primaryTabExitTransition(reducedMotion) },
+                ) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalNavAnimatedVisibilityScope provides this@composable,
                     ) {
-                        if (reducedMotion) {
-                            ExitTransition.None
-                        } else {
-                            slideOutHorizontally(animationSpec = navSpatialSpec) { -it / 3 } +
-                                fadeOut(animationSpec = navFadeOutSpec)
-                        }
-                    } else {
-                        null
+                        HomeRoute(
+                            interactionPrefs = interactionPrefs,
+                            closeRevealRequest = closeNotesRevealRequest,
+                            onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
+                            onCreateNote = { navController.navigate(Routes.editNote(null)) },
+                            onCreateList = { navController.navigate(Routes.editList(null)) },
+                        )
                     }
-                },
-                popEnterTransition = {
-                    if (initialState.destination.route == Routes.ONBOARDING_TITLE) {
+                }
+
+                composable(
+                    route = Routes.HISTORY,
+                    enterTransition = { primaryTabEnterTransition(reducedMotion) },
+                    exitTransition = { primaryTabExitTransition(reducedMotion) },
+                    popEnterTransition = { primaryTabEnterTransition(reducedMotion) },
+                    popExitTransition = { primaryTabExitTransition(reducedMotion) },
+                ) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalNavAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        HistoryRoute(
+                            interactionPrefs = interactionPrefs,
+                            section = historySection,
+                            onSectionChange = { selectedSection -> historySection = selectedSection },
+                            onVisibleItemCountChange = { visibleItemCount ->
+                                historyVisibleItemCount = visibleItemCount
+                            },
+                            onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
+                        )
+                    }
+                }
+
+                composable(
+                    route = Routes.SETTINGS,
+                    enterTransition = {
+                        if (initialState.destination.route == Routes.DEV_OPTIONS) {
+                            if (reducedMotion) {
+                                EnterTransition.None
+                            } else {
+                                fadeIn(animationSpec = devOptionsFadeSpec)
+                            }
+                        } else {
+                            primaryTabEnterTransition(reducedMotion)
+                        }
+                    },
+                    exitTransition = {
+                        if (targetState.destination.route == Routes.DEV_OPTIONS) {
+                            if (reducedMotion) {
+                                ExitTransition.None
+                            } else {
+                                fadeOut(animationSpec = devOptionsFadeSpec)
+                            }
+                        } else {
+                            primaryTabExitTransition(reducedMotion)
+                        }
+                    },
+                    popEnterTransition = {
+                        if (initialState.destination.route == Routes.DEV_OPTIONS) {
+                            if (reducedMotion) {
+                                EnterTransition.None
+                            } else {
+                                fadeIn(animationSpec = devOptionsFadeSpec)
+                            }
+                        } else {
+                            primaryTabEnterTransition(reducedMotion)
+                        }
+                    },
+                    popExitTransition = {
+                        if (targetState.destination.route == Routes.DEV_OPTIONS) {
+                            if (reducedMotion) {
+                                ExitTransition.None
+                            } else {
+                                fadeOut(animationSpec = devOptionsFadeSpec)
+                            }
+                        } else {
+                            primaryTabExitTransition(reducedMotion)
+                        }
+                    },
+                ) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalNavAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        SettingsRoute(
+                            onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                            onOpenHelp = { navController.navigate(Routes.HELP) },
+                            onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
+                            openUpdateSheetRequest = openUpdateSheetRequest + openSettingsUpdatesRequest,
+                            startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
+                            updateBarVisible = updateBarState != UpdateChromeState.Hidden,
+                            highlightSectionKey = settingsHighlightSection,
+                            onHighlightHandled = { settingsHighlightSection = null },
+                        )
+                    }
+                }
+
+                composable(
+                    route = "${Routes.EDIT_NOTE}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
+                    arguments =
+                        listOf(
+                            navArgument(Routes.ARG_ID) {
+                                type = NavType.LongType
+                                defaultValue = -1L
+                            },
+                            navArgument(Routes.ARG_PREFILL) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(Routes.ARG_FORCE_EDIT) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                            navArgument(Routes.ARG_EXIT_ON_BACK) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                        ),
+                ) { entry ->
+                    val context = LocalContext.current
+                    val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
+                    val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
+                    val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
+                    val onBack = {
+                        if (exitOnBack) {
+                            val activity = context as? Activity
+                            if (activity != null) {
+                                activity.finish()
+                            } else {
+                                navController.popBackStack()
+                                Unit
+                            }
+                        } else {
+                            navController.popBackStack()
+                            Unit
+                        }
+                    }
+                    val onNavigateUp = {
+                        if (exitOnBack) {
+                            navController.navigate(Routes.NOTES) {
+                                popUpTo(navController.graph.id) {
+                                    inclusive = true
+                                }
+                                launchSingleTop = true
+                            }
+                        } else {
+                            navController.popBackStack()
+                            Unit
+                        }
+                    }
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalNavAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        EditNoteRoute(
+                            appScope = appScope,
+                            noteId = id.takeIf { it > 0 },
+                            forceEdit = forceEdit,
+                            onBack = onBack,
+                            onNavigateUp = onNavigateUp,
+                        )
+                    }
+                }
+
+                composable(Routes.GOOGLE_TASKS_IMPORT) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalNavAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        GoogleTasksImportRoute(onBack = { navController.popBackStack() })
+                    }
+                }
+
+                composable(
+                    route = Routes.HELP,
+                    enterTransition = {
                         if (reducedMotion) {
                             EnterTransition.None
                         } else {
                             slideInHorizontally(animationSpec = navSpatialSpec) { it } +
                                 fadeIn(animationSpec = navFadeInSpec)
                         }
-                    } else {
-                        null
-                    }
-                },
-                popExitTransition = {
-                    if (targetState.destination.route == Routes.ONBOARDING_TITLE) {
+                    },
+                    exitTransition = {
                         if (reducedMotion) {
                             ExitTransition.None
                         } else {
                             slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
                                 fadeOut(animationSpec = navFadeOutSpec)
                         }
-                    } else {
-                        null
+                    },
+                    popEnterTransition = {
+                        if (reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            slideInHorizontally(animationSpec = navSpatialSpec) { it } +
+                                fadeIn(animationSpec = navFadeInSpec)
+                        }
+                    },
+                    popExitTransition = {
+                        if (reducedMotion) {
+                            ExitTransition.None
+                        } else {
+                            slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
+                                fadeOut(animationSpec = navFadeOutSpec)
+                        }
+                    },
+                ) {
+                    HelpScreen(
+                        onBack = { navController.popBackStack() },
+                        onOpenAppSection = { sectionKey ->
+                            settingsHighlightSection = sectionKey
+                            val returnedToExistingSettings =
+                                navController.popBackStack(Routes.SETTINGS, inclusive = false)
+                            if (!returnedToExistingSettings) {
+                                openMainTab(MainTab.Settings)
+                            }
+                        },
+                        helpVm = helpVm,
+                    )
+                }
+
+                composable(
+                    route = Routes.DEV_OPTIONS,
+                    enterTransition = {
+                        if (reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            fadeIn(animationSpec = devOptionsFadeSpec)
+                        }
+                    },
+                    exitTransition = {
+                        if (reducedMotion) {
+                            ExitTransition.None
+                        } else {
+                            fadeOut(animationSpec = devOptionsFadeSpec)
+                        }
+                    },
+                    popEnterTransition = {
+                        if (reducedMotion) {
+                            EnterTransition.None
+                        } else {
+                            fadeIn(animationSpec = devOptionsFadeSpec)
+                        }
+                    },
+                    popExitTransition = {
+                        if (reducedMotion) {
+                            ExitTransition.None
+                        } else {
+                            fadeOut(animationSpec = devOptionsFadeSpec)
+                        }
+                    },
+                ) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalNavAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        DevOptionsRoute(onBack = { navController.popBackStack() })
                     }
-                },
-            ) {
-                OnboardingPermissionsScreen(
-                    onContinue = {
-                        onboardingScope.launch {
-                            onboardingPrefs.markIntroSeen()
+                }
+
+                composable(
+                    route = "${Routes.EDIT_LIST}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
+                    arguments =
+                        listOf(
+                            navArgument(Routes.ARG_ID) {
+                                type = NavType.LongType
+                                defaultValue = -1L
+                            },
+                            navArgument(Routes.ARG_FORCE_EDIT) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                            navArgument(Routes.ARG_EXIT_ON_BACK) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                        ),
+                ) { entry ->
+                    val context = LocalContext.current
+                    val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
+                    val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
+                    val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
+                    val onBack = {
+                        if (exitOnBack) {
+                            val activity = context as? Activity
+                            if (activity != null) {
+                                activity.finish()
+                            } else {
+                                navController.popBackStack()
+                                Unit
+                            }
+                        } else {
+                            navController.popBackStack()
+                            Unit
+                        }
+                    }
+                    val onNavigateUp = {
+                        if (exitOnBack) {
                             navController.navigate(Routes.NOTES) {
                                 popUpTo(navController.graph.id) {
                                     inclusive = true
                                 }
+                                launchSingleTop = true
                             }
-                        }
-                    },
-                )
-            }
-
-            composable(Routes.EXTERNAL_LAUNCH) {
-                Box(modifier = Modifier.fillMaxSize())
-            }
-
-            composable(
-                route = Routes.NOTES,
-                enterTransition = { primaryTabEnterTransition(reducedMotion) },
-                exitTransition = { primaryTabExitTransition(reducedMotion) },
-                popEnterTransition = { primaryTabEnterTransition(reducedMotion) },
-                popExitTransition = { primaryTabExitTransition(reducedMotion) },
-            ) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable,
-                ) {
-                    HomeRoute(
-                        interactionPrefs = interactionPrefs,
-                        closeRevealRequest = closeNotesRevealRequest,
-                        onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
-                        onCreateNote = { navController.navigate(Routes.editNote(null)) },
-                        onCreateList = { navController.navigate(Routes.editList(null)) },
-                    )
-                }
-            }
-
-            composable(
-                route = Routes.HISTORY,
-                enterTransition = { primaryTabEnterTransition(reducedMotion) },
-                exitTransition = { primaryTabExitTransition(reducedMotion) },
-                popEnterTransition = { primaryTabEnterTransition(reducedMotion) },
-                popExitTransition = { primaryTabExitTransition(reducedMotion) },
-            ) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable,
-                ) {
-                    HistoryRoute(
-                        interactionPrefs = interactionPrefs,
-                        section = historySection,
-                        onSectionChange = { selectedSection -> historySection = selectedSection },
-                        onVisibleItemCountChange = { visibleItemCount ->
-                            historyVisibleItemCount = visibleItemCount
-                        },
-                        onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
-                    )
-                }
-            }
-
-            composable(
-                route = Routes.SETTINGS,
-                enterTransition = {
-                    if (initialState.destination.route == Routes.DEV_OPTIONS) {
-                        if (reducedMotion) {
-                            EnterTransition.None
-                        } else {
-                            fadeIn(animationSpec = devOptionsFadeSpec)
-                        }
-                    } else {
-                        primaryTabEnterTransition(reducedMotion)
-                    }
-                },
-                exitTransition = {
-                    if (targetState.destination.route == Routes.DEV_OPTIONS) {
-                        if (reducedMotion) {
-                            ExitTransition.None
-                        } else {
-                            fadeOut(animationSpec = devOptionsFadeSpec)
-                        }
-                    } else {
-                        primaryTabExitTransition(reducedMotion)
-                    }
-                },
-                popEnterTransition = {
-                    if (initialState.destination.route == Routes.DEV_OPTIONS) {
-                        if (reducedMotion) {
-                            EnterTransition.None
-                        } else {
-                            fadeIn(animationSpec = devOptionsFadeSpec)
-                        }
-                    } else {
-                        primaryTabEnterTransition(reducedMotion)
-                    }
-                },
-                popExitTransition = {
-                    if (targetState.destination.route == Routes.DEV_OPTIONS) {
-                        if (reducedMotion) {
-                            ExitTransition.None
-                        } else {
-                            fadeOut(animationSpec = devOptionsFadeSpec)
-                        }
-                    } else {
-                        primaryTabExitTransition(reducedMotion)
-                    }
-                },
-            ) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable,
-                ) {
-                    SettingsRoute(
-                        onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
-                        onOpenHelp = { navController.navigate(Routes.HELP) },
-                        onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
-                        openUpdateSheetRequest = openUpdateSheetRequest + openSettingsUpdatesRequest,
-                        startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
-                        updateBarVisible = updateBarState != UpdateChromeState.Hidden,
-                        highlightSectionKey = settingsHighlightSection,
-                        onHighlightHandled = { settingsHighlightSection = null },
-                    )
-                }
-            }
-
-            composable(
-                route = "${Routes.EDIT_NOTE}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
-                arguments =
-                    listOf(
-                        navArgument(Routes.ARG_ID) {
-                            type = NavType.LongType
-                            defaultValue = -1L
-                        },
-                        navArgument(Routes.ARG_PREFILL) {
-                            type = NavType.StringType
-                            defaultValue = ""
-                        },
-                        navArgument(Routes.ARG_FORCE_EDIT) {
-                            type = NavType.BoolType
-                            defaultValue = false
-                        },
-                        navArgument(Routes.ARG_EXIT_ON_BACK) {
-                            type = NavType.BoolType
-                            defaultValue = false
-                        },
-                    ),
-            ) { entry ->
-                val context = LocalContext.current
-                val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
-                val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
-                val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
-                val onBack = {
-                    if (exitOnBack) {
-                        val activity = context as? Activity
-                        if (activity != null) {
-                            activity.finish()
                         } else {
                             navController.popBackStack()
                             Unit
                         }
-                    } else {
-                        navController.popBackStack()
-                        Unit
                     }
-                }
-                val onNavigateUp = {
-                    if (exitOnBack) {
-                        navController.navigate(Routes.NOTES) {
-                            popUpTo(navController.graph.id) {
-                                inclusive = true
-                            }
-                            launchSingleTop = true
-                        }
-                    } else {
-                        navController.popBackStack()
-                        Unit
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalNavAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        EditListRoute(
+                            appScope = appScope,
+                            noteId = id.takeIf { it > 0 },
+                            forceEdit = forceEdit,
+                            onBack = onBack,
+                            onNavigateUp = onNavigateUp,
+                        )
                     }
-                }
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable,
-                ) {
-                    EditNoteRoute(
-                        appScope = appScope,
-                        noteId = id.takeIf { it > 0 },
-                        forceEdit = forceEdit,
-                        onBack = onBack,
-                        onNavigateUp = onNavigateUp,
-                    )
                 }
             }
-
-            composable(Routes.GOOGLE_TASKS_IMPORT) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable,
-                ) {
-                    GoogleTasksImportRoute(onBack = { navController.popBackStack() })
-                }
-            }
-
-            composable(
-                route = Routes.HELP,
-                enterTransition = {
-                    if (reducedMotion) {
-                        EnterTransition.None
-                    } else {
-                        slideInHorizontally(animationSpec = navSpatialSpec) { it } +
-                            fadeIn(animationSpec = navFadeInSpec)
-                    }
-                },
-                exitTransition = {
-                    if (reducedMotion) {
-                        ExitTransition.None
-                    } else {
-                        slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
-                            fadeOut(animationSpec = navFadeOutSpec)
-                    }
-                },
-                popEnterTransition = {
-                    if (reducedMotion) {
-                        EnterTransition.None
-                    } else {
-                        slideInHorizontally(animationSpec = navSpatialSpec) { it } +
-                            fadeIn(animationSpec = navFadeInSpec)
-                    }
-                },
-                popExitTransition = {
-                    if (reducedMotion) {
-                        ExitTransition.None
-                    } else {
-                        slideOutHorizontally(animationSpec = navSpatialSpec) { it } +
-                            fadeOut(animationSpec = navFadeOutSpec)
-                    }
-                },
-            ) {
-                HelpScreen(
-                    onBack = { navController.popBackStack() },
-                    onOpenAppSection = { sectionKey ->
-                        settingsHighlightSection = sectionKey
-                        val returnedToExistingSettings =
-                            navController.popBackStack(Routes.SETTINGS, inclusive = false)
-                        if (!returnedToExistingSettings) {
-                            openMainTab(MainTab.Settings)
-                        }
-                    },
-                    helpVm = helpVm,
-                )
-            }
-
-            composable(
-                route = Routes.DEV_OPTIONS,
-                enterTransition = {
-                    if (reducedMotion) {
-                        EnterTransition.None
-                    } else {
-                        fadeIn(animationSpec = devOptionsFadeSpec)
-                    }
-                },
-                exitTransition = {
-                    if (reducedMotion) {
-                        ExitTransition.None
-                    } else {
-                        fadeOut(animationSpec = devOptionsFadeSpec)
-                    }
-                },
-                popEnterTransition = {
-                    if (reducedMotion) {
-                        EnterTransition.None
-                    } else {
-                        fadeIn(animationSpec = devOptionsFadeSpec)
-                    }
-                },
-                popExitTransition = {
-                    if (reducedMotion) {
-                        ExitTransition.None
-                    } else {
-                        fadeOut(animationSpec = devOptionsFadeSpec)
-                    }
-                },
-            ) {
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable,
-                ) {
-                    DevOptionsRoute(onBack = { navController.popBackStack() })
-                }
-            }
-
-            composable(
-                route = "${Routes.EDIT_LIST}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
-                arguments =
-                    listOf(
-                        navArgument(Routes.ARG_ID) {
-                            type = NavType.LongType
-                            defaultValue = -1L
-                        },
-                        navArgument(Routes.ARG_FORCE_EDIT) {
-                            type = NavType.BoolType
-                            defaultValue = false
-                        },
-                        navArgument(Routes.ARG_EXIT_ON_BACK) {
-                            type = NavType.BoolType
-                            defaultValue = false
-                        },
-                    ),
-            ) { entry ->
-                val context = LocalContext.current
-                val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
-                val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
-                val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
-                val onBack = {
-                    if (exitOnBack) {
-                        val activity = context as? Activity
-                        if (activity != null) {
-                            activity.finish()
-                        } else {
-                            navController.popBackStack()
-                            Unit
-                        }
-                    } else {
-                        navController.popBackStack()
-                        Unit
-                    }
-                }
-                val onNavigateUp = {
-                    if (exitOnBack) {
-                        navController.navigate(Routes.NOTES) {
-                            popUpTo(navController.graph.id) {
-                                inclusive = true
-                            }
-                            launchSingleTop = true
-                        }
-                    } else {
-                        navController.popBackStack()
-                        Unit
-                    }
-                }
-                androidx.compose.runtime.CompositionLocalProvider(
-                    LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                    LocalNavAnimatedVisibilityScope provides this@composable,
-                ) {
-                    EditListRoute(
-                        appScope = appScope,
-                        noteId = id.takeIf { it > 0 },
-                        forceEdit = forceEdit,
-                        onBack = onBack,
-                        onNavigateUp = onNavigateUp,
-                    )
-                }
-            }
-        }
         }
 
         val scaffoldTab = currentMainTab ?: latestMainTab

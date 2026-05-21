@@ -1,5 +1,10 @@
 package dev.bikram.remember.ui.edit
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -42,8 +47,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,7 +60,10 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -71,16 +81,18 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.HERO_MASK_ASPECT_RATIO
 import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.common.MarkdownLinkInteraction
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.EditorShelfNotice
 import dev.bikram.remember.ui.components.EditorShelfNoticeState
 import dev.bikram.remember.ui.components.NoteShelfState
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.components.TagAccentEditorStrip
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.rememberExpressiveOverscrollEffect
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -635,8 +647,14 @@ internal fun EditNoteMarkdownEditorSection(
     assignedTags: List<String>,
     onMarkdownChanged: (String) -> Unit,
     onAddTag: (String, String) -> Unit,
+    onEnterEditModeAtOffset: (Int) -> Unit,
+    onEnterEditModeSelectingRange: (Int, Int) -> Unit,
 ) {
     val bodyEmpty = markdownEditorState.markdown.isEmpty()
+    var linkActions by remember { mutableStateOf<MarkdownLinkInteraction?>(null) }
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    val uriHandler = LocalUriHandler.current
 
     LaunchedEffect(isEditMode, autoFocusBodyOnEdit, markdownEditorState) {
         if (!isEditMode || !autoFocusBodyOnEdit) return@LaunchedEffect
@@ -670,7 +688,10 @@ internal fun EditNoteMarkdownEditorSection(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 140.dp),
+                    .heightIn(min = 140.dp)
+                    .tapSoundClickable {
+                        onEnterEditModeAtOffset(markdownEditorState.markdown.length)
+                    },
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
@@ -704,8 +725,102 @@ internal fun EditNoteMarkdownEditorSection(
                     markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
                     onMarkdownChanged(updatedMarkdown)
                 },
+                onTextTap = { tap ->
+                    onEnterEditModeAtOffset(tap.markdownOffset)
+                },
+                onLinkClick = { link ->
+                    runCatching { uriHandler.openUri(link.url) }
+                },
+                onLinkLongPress = { link ->
+                    linkActions = link
+                },
             )
         }
+    }
+
+    linkActions?.let { link ->
+        LinkActionsSheet(
+            link = link,
+            onDismiss = { linkActions = null },
+            onOpen = {
+                runCatching { uriHandler.openUri(link.url) }
+                linkActions = null
+            },
+            onCopy = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(
+                    ClipData.newPlainText(resources.getString(R.string.clipboard_link_label), link.url),
+                )
+                Toast
+                    .makeText(context, resources.getString(R.string.toast_about_link_copied), Toast.LENGTH_SHORT)
+                    .show()
+                linkActions = null
+            },
+            onEditText = {
+                onEnterEditModeSelectingRange(link.textStartOffset, link.textEndOffset)
+                linkActions = null
+            },
+            onShare = {
+                val shareIntent =
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, link.url)
+                    }
+                context.startActivity(
+                    Intent.createChooser(
+                        shareIntent,
+                        resources.getString(R.string.share_chooser_generic),
+                    ),
+                )
+                linkActions = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun LinkActionsSheet(
+    link: MarkdownLinkInteraction,
+    onDismiss: () -> Unit,
+    onOpen: () -> Unit,
+    onCopy: () -> Unit,
+    onEditText: () -> Unit,
+    onShare: () -> Unit,
+) {
+    AppBottomSheet(
+        title = stringResource(R.string.edit_link_actions_title),
+        subtitle = link.url,
+        onDismiss = onDismiss,
+        scrollable = false,
+    ) {
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_link_action_open)) },
+            onClick = onOpen,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "open_in_new", weight = FontWeight.Medium)
+            },
+        )
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_link_action_copy)) },
+            onClick = onCopy,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "content_copy", weight = FontWeight.Medium)
+            },
+        )
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_link_action_edit_text)) },
+            onClick = onEditText,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "edit", weight = FontWeight.Medium)
+            },
+        )
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_link_action_share)) },
+            onClick = onShare,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "share", weight = FontWeight.Medium)
+            },
+        )
     }
 }
 
@@ -748,6 +863,7 @@ internal fun EditNoteScrollableContent(
     isEditMode: Boolean,
     markdownDisplayMode: MarkdownEditorDisplayMode,
     existing: Boolean,
+    autoFocusBodyOnEdit: Boolean,
     shelfState: NoteShelfState,
     pictureViewerOpen: Boolean,
     onOpenReminder: () -> Unit,
@@ -757,6 +873,8 @@ internal fun EditNoteScrollableContent(
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
+    onEnterEditModeAtOffset: (Int) -> Unit,
+    onEnterEditModeSelectingRange: (Int, Int) -> Unit,
     scrollState: ScrollState = rememberScrollState(),
     scrollEnabled: Boolean = true,
 ) {
@@ -795,10 +913,8 @@ internal fun EditNoteScrollableContent(
                 .padding(horizontal = horizontalPadding),
     ) {
         Spacer(Modifier.height(padding.calculateTopPadding()))
-        // Order: tag color strip -> hero image -> shelf banner -> body. The banner sits right
-        // above the note body so the "why is this disabled" hint is adjacent to the content it
-        // gates, not buried at the top of the scroll above decorative chrome.
-        TagAccentEditorStrip(tags = assignedTags)
+        // Order: hero image -> shelf banner -> body. The banner sits right above the note body
+        // so the "why is this disabled" hint is adjacent to the content it gates.
         PictureHeroSection(
             vm = vm,
             viewerOpen = pictureViewerOpen,
@@ -828,12 +944,14 @@ internal fun EditNoteScrollableContent(
             bodyPlaceholder = bodyPlaceholder,
             isEditMode = isEditMode && !readOnly,
             existing = existing,
-            autoFocusBodyOnEdit = existing,
+            autoFocusBodyOnEdit = autoFocusBodyOnEdit,
             scrollState = scrollState,
             displayMode = markdownDisplayMode,
             assignedTags = assignedTags,
             onMarkdownChanged = vm::setBody,
             onAddTag = vm::addTag,
+            onEnterEditModeAtOffset = onEnterEditModeAtOffset,
+            onEnterEditModeSelectingRange = onEnterEditModeSelectingRange,
         )
         Spacer(Modifier.height(24.dp))
         OptionsPanelSection(

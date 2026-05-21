@@ -46,7 +46,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -61,7 +60,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
@@ -102,7 +100,7 @@ import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
-import dev.bikram.remember.ui.nav.DevOptionsSharedBoundsKey
+import dev.bikram.remember.ui.nav.DEV_OPTIONS_SHARED_BOUNDS_KEY
 import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
 import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
 import dev.bikram.remember.ui.theme.LocalThemeState
@@ -427,7 +425,7 @@ fun SettingsRoute(
             listState = settingsListState,
             additionalScrollEnabled = true,
         )
-    val blurStyle = rememberProgressiveBlurStyle()
+    val blurStyle = rememberProgressiveBlurStyle(blurTop = false)
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pillInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
     val fetchRawChangelog = {
@@ -1282,7 +1280,7 @@ private fun DevOptionsSettingsEntry(
         if (sharedScope != null && navScope != null) {
             with(sharedScope) {
                 Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(key = DevOptionsSharedBoundsKey),
+                    sharedContentState = rememberSharedContentState(key = DEV_OPTIONS_SHARED_BOUNDS_KEY),
                     animatedVisibilityScope = navScope,
                     boundsTransform = sharedBoundsTransform,
                 )

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -224,6 +225,7 @@ private fun AppRoot(
             realPlayBannerState
         }
     val context = LocalContext.current
+    val activity = LocalActivity.current as? FragmentActivity
     var openSettingsRequest by rememberSaveable { mutableIntStateOf(0) }
     var openUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
     var startPlayInAppUpdateRequest by rememberSaveable { mutableIntStateOf(0) }
@@ -244,13 +246,15 @@ private fun AppRoot(
             verify = { pin -> lockPrefs.verify(pin) },
         )
     } else {
-        InAppRatingAutoPromptHost(
-            onboardingState = onboardingState,
-            updateState = updatePreferencesState,
-            activity = LocalContext.current as FragmentActivity,
-            updatePrefs = updatePrefs,
-            appReviewLauncher = appReviewLauncher,
-        )
+        activity?.let { fragmentActivity ->
+            InAppRatingAutoPromptHost(
+                onboardingState = onboardingState,
+                updateState = updatePreferencesState,
+                activity = fragmentActivity,
+                updatePrefs = updatePrefs,
+                appReviewLauncher = appReviewLauncher,
+            )
+        }
         androidx.compose.runtime.CompositionLocalProvider(
             dev.bikram.remember.ui.theme.LocalSnackbarHostState provides snackbarHostState,
         ) {

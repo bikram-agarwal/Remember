@@ -172,6 +172,10 @@ internal fun UpdateCheckBottomSheetContent(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        Spacer(Modifier.height(12.dp))
+                        RememberOutlinedButton(onClick = onCheckAgain) {
+                            Text(stringResource(R.string.settings_check_for_updates))
+                        }
                     }
                 }
             }

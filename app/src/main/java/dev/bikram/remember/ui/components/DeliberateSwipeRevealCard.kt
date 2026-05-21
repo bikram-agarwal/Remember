@@ -186,7 +186,7 @@ data class SwipeRevealTile(
     val symbolName: String,
     val backgroundColor: Color,
     val contentColor: Color,
-    val filled: Boolean = true,
+    val filled: Boolean = false,
     val onClick: () -> Unit,
 )
 

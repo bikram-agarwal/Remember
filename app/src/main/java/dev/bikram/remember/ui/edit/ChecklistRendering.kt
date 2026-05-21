@@ -37,6 +37,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 /**
  * A synthetic, non-persisted header that stands in for the real parent row when a child has been
@@ -106,6 +107,7 @@ internal fun ChecklistRow(
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onNext: () -> Unit = {},
+    onTextTap: (() -> Unit)? = null,
     /**
      * Horizontal drag callback. `+1` means the user dragged right past the indent threshold
      * (request to nest under the previous top-level sibling). `-1` means the user dragged left
@@ -302,7 +304,14 @@ internal fun ChecklistRow(
                             },
                         textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
                     ),
-                modifier = Modifier.weight(1f),
+                modifier =
+                    if (onTextTap != null) {
+                        Modifier
+                            .weight(1f)
+                            .tapSoundClickable(onClick = onTextTap)
+                    } else {
+                        Modifier.weight(1f)
+                    },
             )
         }
     }

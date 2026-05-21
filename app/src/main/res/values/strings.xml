@@ -216,6 +216,11 @@
     <string name="cd_switch_to_markdown_code">Switch to markdown code</string>
     <string name="cd_reorder_drag_handle">Reorder</string>
     <string name="edit_remove_picture_cd">Remove picture</string>
+    <string name="edit_link_actions_title">Link</string>
+    <string name="edit_link_action_open">Open</string>
+    <string name="edit_link_action_copy">Copy link</string>
+    <string name="edit_link_action_edit_text">Edit link text</string>
+    <string name="edit_link_action_share">Share</string>
 
     <!-- Editor bottom bar and archived state -->
     <string name="edit_bottom_bar_edit">Edit</string>
@@ -961,7 +966,6 @@
     <!-- Developer options -->
     <string name="dev_options_title">Developer options</string>
     <string name="dev_options_back_cd">Back</string>
-    <string name="dev_options_mode_label">Developer mode</string>
     <string name="dev_options_mode_subtitle">Disable to hide this page from Settings</string>
     <string name="dev_options_warning">These are developer tools, not real app features. Do not use unless you know what you\'re doing. Some actions permanently change app state.</string>
     <string name="dev_options_taps_remaining">%1$d more taps to enable developer options</string>
@@ -978,7 +982,7 @@
     <string name="dev_options_section_settings">Settings</string>
     <string name="dev_options_section_reset">Reset</string>
     <string name="dev_options_section_db">Database</string>
-    <string name="dev_options_section_diagnostics">Diagnostic tools</string>
+    <string name="dev_options_section_diagnostics">Diagnostics</string>
 
     <!-- Developer options: data population -->
     <string name="dev_options_create_mock_notes">Create mock notes</string>

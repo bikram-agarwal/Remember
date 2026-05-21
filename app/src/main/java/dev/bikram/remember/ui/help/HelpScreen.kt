@@ -38,6 +38,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -46,6 +47,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
@@ -82,23 +84,45 @@ fun HelpScreen(
     val searchQuery by helpVm.searchQuery.collectAsStateWithLifecycle()
     val filteredSections by helpVm.filteredSections.collectAsStateWithLifecycle()
 
-    val allSubsectionKeys = remember(filteredSections) {
-        filteredSections.flatMap { s -> s.subsections.map { "${s.title}/${it.title}" } }
-    }
+    val allSubsectionKeys =
+        remember(filteredSections) {
+            filteredSections.flatMap { s -> s.subsections.map { "${s.title}/${it.title}" } }
+        }
     val allExpanded = allSubsectionKeys.isNotEmpty() && allSubsectionKeys.all { it in expandedKeys }
 
     val topBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
-    val blurStyle = rememberProgressiveBlurStyle(bottomExtra = 0.dp)
-    val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
+    val listState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = helpVm.scrollIndex,
+            initialFirstVisibleItemScrollOffset = helpVm.scrollOffset,
+        )
+    val density = LocalDensity.current
+    val topAlphaMultiplier by remember(listState) {
+        derivedStateOf {
+            val collapsedFraction = scrollBehavior.state.collapsedFraction
+            if (listState.firstVisibleItemIndex > 0) {
+                collapsedFraction
+            } else {
+                val offsetPx = listState.firstVisibleItemScrollOffset.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                val scrollFraction = (offsetPx / thresholdPx).coerceIn(0f, 1f)
+                collapsedFraction * scrollFraction
+            }
+        }
+    }
+    val blurStyle =
+        rememberProgressiveBlurStyle(
+            bottomExtra = 0.dp,
+            topExtra = 76.dp,
+            topBlurProgressPower = 1.1f,
+        )
+    val blurMod =
+        blurStyle?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier)
+            ?: Modifier
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val lifecycleOwner = LocalLifecycleOwner.current
-
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = helpVm.scrollIndex,
-        initialFirstVisibleItemScrollOffset = helpVm.scrollOffset,
-    )
     DisposableEffect(Unit) {
         onDispose { helpVm.saveScrollState(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
     }
@@ -147,8 +171,11 @@ fun HelpScreen(
                         )
                     RememberFilledTonalIconButton(
                         onClick = {
-                            if (allExpanded) helpVm.collapseAll(allSubsectionKeys)
-                            else helpVm.expandAll(allSubsectionKeys)
+                            if (allExpanded) {
+                                helpVm.collapseAll(allSubsectionKeys)
+                            } else {
+                                helpVm.expandAll(allSubsectionKeys)
+                            }
                         },
                         modifier = Modifier.semantics { contentDescription = expandCollapseLabel },
                         tooltipLabel = expandCollapseLabel,

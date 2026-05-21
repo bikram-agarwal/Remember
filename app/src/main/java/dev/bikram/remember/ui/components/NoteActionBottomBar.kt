@@ -85,6 +85,7 @@ fun NoteActionBottomBar(
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,
     modifier: Modifier = Modifier,
+    showEditAction: Boolean = true,
 ) {
     val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
     val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
@@ -110,6 +111,7 @@ fun NoteActionBottomBar(
             onTrash = onTrash,
             onRestore = onRestore,
             onDeleteForever = onDeleteForever,
+            showEditAction = showEditAction,
         )
     }
 }
@@ -140,6 +142,7 @@ fun NoteActionBottomBarContent(
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,
     modifier: Modifier = Modifier,
+    showEditAction: Boolean = true,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -158,19 +161,21 @@ fun NoteActionBottomBarContent(
         ) {
             when (shelfState) {
                 NoteShelfState.ACTIVE -> {
-                    EditActionItem(isEditMode = isEditMode, onClick = onToggleEdit)
+                    if (showEditAction) {
+                        EditActionItem(isEditMode = isEditMode, onClick = onToggleEdit)
+                    }
                     StarActionItem(starred = starred, onClick = onToggleStar)
                     if (existing) {
-                        // Mark done / not done. Filled check_circle when completed,
-                        // outlined when active, so the toggle state reads at a glance.
-                        // Label flips to match: "Mark done" vs "Mark not done".
-                        DoneActionItem(completed = completed, onClick = onToggleCompleted)
                         ActionItem(
                             icon = "notifications",
                             label = stringResource(R.string.edit_bottom_bar_notification),
                             onClick = onNotification,
                             modifier = Modifier.width(72.dp),
                         )
+                        // Mark done / not done. Filled check_circle when completed,
+                        // outlined when active, so the toggle state reads at a glance.
+                        // Label flips to match: "Mark done" vs "Mark not done".
+                        DoneActionItem(completed = completed, onClick = onToggleCompleted)
                         ActionItem(
                             icon = "archive",
                             label = stringResource(R.string.edit_bottom_bar_archive),

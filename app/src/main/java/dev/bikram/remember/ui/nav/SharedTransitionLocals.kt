@@ -10,4 +10,4 @@ val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { nu
 
 val LocalNavAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
 
-internal const val DevOptionsSharedBoundsKey = "settings-dev-options-container"
+internal const val DEV_OPTIONS_SHARED_BOUNDS_KEY = "settings-dev-options-container"

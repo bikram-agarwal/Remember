@@ -132,6 +132,7 @@ fun TagEditorSheet(
     val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     val trimmedDraft = draftName.trim()
+
     fun currentDraftHexOrLastValid(): String =
         if (hexEditing && hexDraft.text.length == 6) {
             normalizeHex("#${hexDraft.text}") ?: lastValidHex

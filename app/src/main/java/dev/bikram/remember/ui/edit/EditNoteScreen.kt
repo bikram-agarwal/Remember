@@ -49,7 +49,6 @@ import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import dev.bikram.remember.ui.components.NoteActionBottomBarContent
 import dev.bikram.remember.ui.components.NoteShelfState
-import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -129,6 +128,21 @@ fun EditNoteScreen(
 ) {
     val topBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
+    val contentScrollState = rememberScrollState()
+    val density = LocalDensity.current
+    val topAlphaMultiplier by remember(contentScrollState) {
+        derivedStateOf {
+            val collapsedFraction = scrollBehavior.state.collapsedFraction
+            if (contentScrollState.value <= 0) {
+                0f
+            } else {
+                val offsetPx = contentScrollState.value.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                val scrollFraction = (offsetPx / thresholdPx).coerceIn(0f, 1f)
+                collapsedFraction * scrollFraction
+            }
+        }
+    }
 
     var reminderPickerOpen by rememberSaveable { mutableStateOf(false) }
     var iconPickerOpen by rememberSaveable { mutableStateOf(false) }
@@ -153,8 +167,15 @@ fun EditNoteScreen(
         }
     val bodyPlaceholder = stringResource(R.string.edit_note_body_placeholder)
 
-    val blurStyle = rememberProgressiveBlurStyle(bottomExtra = PillBottomBarHeight * 0)
-    val blurMod = remember(blurStyle) { blurStyle?.applyToFullBleedLayer() ?: Modifier }
+    val blurStyle =
+        rememberProgressiveBlurStyle(
+            bottomExtra = 0.dp,
+            topExtra = 68.dp,
+            topBlurProgressPower = 1.1f,
+        )
+    val blurMod =
+        blurStyle?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier)
+            ?: Modifier
 
     val archived by vm.archived.collectAsStateWithLifecycle()
     val trashed by vm.trashed.collectAsStateWithLifecycle()
@@ -170,10 +191,16 @@ fun EditNoteScreen(
     val readOnly = shelfState != NoteShelfState.ACTIVE
 
     var isEditMode by remember(existing, forceEdit) { mutableStateOf(!existing || forceEdit) }
+    var suppressBodyAutoFocusOnEdit by remember { mutableStateOf(false) }
     var markdownDisplayMode by rememberSaveable { mutableStateOf(MarkdownEditorDisplayMode.LivePreview) }
     // Force view mode on read-only shelves so pickers and the markdown editor don't accept edits.
     LaunchedEffect(readOnly) {
         if (readOnly && isEditMode) isEditMode = false
+    }
+    LaunchedEffect(isEditMode) {
+        if (!isEditMode) {
+            suppressBodyAutoFocusOnEdit = false
+        }
     }
 
     val markdownEditorState = remember(editorNoteKey) { MarkdownEditorState() }
@@ -253,7 +280,6 @@ fun EditNoteScreen(
     // Hoisted scroll state so the bottom action bar can hide on scroll-down and re-show on
     // scroll-up. Also keyed off IME visibility so the rich-text toolbar has the stage alone
     // when the keyboard is open.
-    val contentScrollState = rememberScrollState()
     var bottomBarVisible by remember { mutableStateOf(true) }
 
     // Force-show the bar whenever content is scrolled to the very top, regardless of any
@@ -295,7 +321,6 @@ fun EditNoteScreen(
             }
         }
 
-    val density = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
 
     // Edit mode replaces the action bar: the rich-text formatting toolbar takes the bottom
@@ -530,6 +555,7 @@ fun EditNoteScreen(
                                 }
                             },
                             onDeleteForever = { deleteForeverConfirmOpen = true },
+                            showEditAction = false,
                         )
                     // Empty slot keeps Scaffold's bottomBar measure stable during the
                     // exit animation of whichever bar was previously visible.
@@ -549,6 +575,7 @@ fun EditNoteScreen(
             isEditMode = isEditMode,
             markdownDisplayMode = markdownDisplayMode,
             existing = existing,
+            autoFocusBodyOnEdit = existing && !suppressBodyAutoFocusOnEdit,
             shelfState = shelfState,
             pictureViewerOpen = pictureViewer != null,
             onOpenReminder = { reminderPickerOpen = true },
@@ -560,6 +587,16 @@ fun EditNoteScreen(
             onOpenActions = { actionsPickerOpen = true },
             onOpenTags = { tagsPickerOpen = true },
             onOpenAttachments = { attachmentsPickerOpen = true },
+            onEnterEditModeAtOffset = { markdownOffset ->
+                suppressBodyAutoFocusOnEdit = true
+                markdownEditorState.focusAtOffsetAndShowKeyboard(markdownOffset)
+                isEditMode = true
+            },
+            onEnterEditModeSelectingRange = { startOffset, endOffset ->
+                suppressBodyAutoFocusOnEdit = true
+                markdownEditorState.focusRangeAndShowKeyboard(startOffset, endOffset)
+                isEditMode = true
+            },
             scrollState = contentScrollState,
             scrollEnabled = !markdownSelectionActive,
         )

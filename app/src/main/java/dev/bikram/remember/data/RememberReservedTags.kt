@@ -12,6 +12,5 @@ object RememberReservedTags {
 
     fun userVisibleTags(tags: List<String>): List<String> = tags.filterNot { it == STARRED }
 
-    fun isSuggestionReserved(tag: String): Boolean =
-        tag.equals(STARRED, ignoreCase = true) || tag.equals(MOCK, ignoreCase = true)
+    fun isSuggestionReserved(tag: String): Boolean = tag.equals(STARRED, ignoreCase = true) || tag.equals(MOCK, ignoreCase = true)
 }

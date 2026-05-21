@@ -14,9 +14,9 @@ import dev.bikram.remember.ui.common.MarkdownQuoteLineRegex
 import dev.bikram.remember.ui.common.MarkdownStyler
 
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
-private const val LivePreviewUncheckedChecklistMarker = "\u2610 "
-private const val LivePreviewCheckedChecklistMarker = "\u2611 "
-private const val LivePreviewQuoteMarker = "| "
+private const val LIVE_PREVIEW_UNCHECKED_CHECKLIST_MARKER = "\u2610 "
+private const val LIVE_PREVIEW_CHECKED_CHECKLIST_MARKER = "\u2611 "
+private const val LIVE_PREVIEW_QUOTE_MARKER = "| "
 
 internal class MarkdownVisualTransformation(
     private val styler: MarkdownStyler,
@@ -155,11 +155,11 @@ private class MarkdownPreviewTransformationBuilder(
             val contentStartIndex = lineStartIndex + match.groups[3]!!.range.first
             insertedTextBeforeSourceIndex[lineStartIndex] =
                 match.groupValues[1] +
-                    if (checked) {
-                        LivePreviewCheckedChecklistMarker
-                    } else {
-                        LivePreviewUncheckedChecklistMarker
-                    }
+                if (checked) {
+                    LIVE_PREVIEW_CHECKED_CHECKLIST_MARKER
+                } else {
+                    LIVE_PREVIEW_UNCHECKED_CHECKLIST_MARKER
+                }
             hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)
             return
@@ -183,7 +183,7 @@ private class MarkdownPreviewTransformationBuilder(
 
         MarkdownQuoteLineRegex.matchEntire(line)?.let { match ->
             val contentStartIndex = lineStartIndex + match.groups[1]!!.range.first
-            insertedTextBeforeSourceIndex[lineStartIndex] = LivePreviewQuoteMarker
+            insertedTextBeforeSourceIndex[lineStartIndex] = LIVE_PREVIEW_QUOTE_MARKER
             hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             styleRanges.add(MarkdownStyleRange(contentStartIndex, lineEndIndex, styler.quoteSpanStyle))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)

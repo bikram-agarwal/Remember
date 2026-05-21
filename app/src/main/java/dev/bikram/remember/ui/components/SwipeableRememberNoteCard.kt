@@ -148,6 +148,12 @@ fun SwipeableRememberNoteCard(
         onSwipeEndToStart = { onSwipeAction(note, swipeEnd) },
         backgroundContent = { fromStart, revealProgress ->
             val action = if (fromStart) swipeStart else swipeEnd
+            val actionIconFilled =
+                when (action) {
+                    NoteSwipeAction.TOGGLE_STAR -> noteStarred
+                    NoteSwipeAction.MARK_DONE -> noteCompleted
+                    else -> false
+                }
             val backgroundColor by animateColorAsState(
                 targetValue = action.semanticSwipeBackground(),
                 animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec()),
@@ -176,7 +182,7 @@ fun SwipeableRememberNoteCard(
                     if (fromStart) {
                         RememberMaterialRoundedSymbol(
                             name = action.materialSymbolName,
-                            filled = true,
+                            filled = actionIconFilled,
                             size = 20.dp,
                             tint = tint,
                             weight = FontWeight.Medium,
@@ -196,7 +202,7 @@ fun SwipeableRememberNoteCard(
                         Spacer(Modifier.width(6.dp))
                         RememberMaterialRoundedSymbol(
                             name = action.materialSymbolName,
-                            filled = true,
+                            filled = actionIconFilled,
                             size = 20.dp,
                             tint = tint,
                             weight = FontWeight.Medium,
@@ -272,7 +278,12 @@ private fun NoteSwipeAction.revealTile(
         symbolName = materialSymbolName,
         backgroundColor = semanticSwipeBackground(),
         contentColor = semanticSwipeIconTint(),
-        filled = true,
+        filled =
+            when (this) {
+                NoteSwipeAction.TOGGLE_STAR -> noteStarred
+                NoteSwipeAction.MARK_DONE -> noteCompleted
+                else -> false
+            },
         onClick = onClick,
     )
 }

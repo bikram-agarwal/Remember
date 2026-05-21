@@ -85,7 +85,6 @@ import dev.bikram.remember.ui.components.EditorShelfNoticeState
 import dev.bikram.remember.ui.components.NoteActionBottomBar
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.components.TagAccentEditorStrip
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
@@ -532,6 +531,7 @@ private fun EditListTopBarSection(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun EditListScreen(
     title: String,
@@ -612,8 +612,18 @@ fun EditListScreen(
         }
     var pictureViewer by remember { mutableStateOf<Pair<String, Long>?>(null) }
 
-    val titlePlaceholder = if (existing) stringResource(R.string.edit_list_title_new) else stringResource(R.string.edit_list_title_new)
-    val blurStyle = rememberProgressiveBlurStyle(bottomExtra = 0.dp)
+    val titlePlaceholder =
+        if (existing) {
+            stringResource(R.string.edit_list_title_new)
+        } else {
+            stringResource(R.string.common_title)
+        }
+    val blurStyle =
+        rememberProgressiveBlurStyle(
+            bottomExtra = 0.dp,
+            topExtra = 68.dp,
+            topBlurProgressPower = 1.1f,
+        )
 
     val shelfState =
         when {
@@ -624,6 +634,7 @@ fun EditListScreen(
     val readOnly = shelfState != NoteShelfState.ACTIVE
 
     var isEditMode by remember(existing, forceEdit) { mutableStateOf(!existing || forceEdit) }
+    var pendingFocusItemId by remember { mutableStateOf<Long?>(null) }
     LaunchedEffect(readOnly) {
         if (readOnly && isEditMode) isEditMode = false
     }
@@ -742,10 +753,26 @@ fun EditListScreen(
                 onTrash = onTrash,
                 onRestore = onRestore,
                 onDeleteForever = { deleteForeverConfirmOpen = true },
+                showEditAction = false,
             )
         },
     ) { padding ->
-        val blurMod = blurStyle?.applyToFullBleedLayer() ?: Modifier
+        val topAlphaMultiplier by remember(lazyListStateForVisibility) {
+            derivedStateOf {
+                val collapsedFraction = scrollBehavior.state.collapsedFraction
+                if (lazyListStateForVisibility.firstVisibleItemIndex > 0) {
+                    collapsedFraction
+                } else {
+                    val offsetPx = lazyListStateForVisibility.firstVisibleItemScrollOffset.toFloat()
+                    val thresholdPx = with(density) { 24.dp.toPx() }
+                    val scrollFraction = (offsetPx / thresholdPx).coerceIn(0f, 1f)
+                    collapsedFraction * scrollFraction
+                }
+            }
+        }
+        val blurMod =
+            blurStyle?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier)
+                ?: Modifier
         val focusRequesters = remember { mutableMapOf<Long, FocusRequester>() }
         var previousItemCount by remember { mutableIntStateOf(items.size) }
         var expectingNewItem by remember { mutableStateOf(false) }
@@ -758,6 +785,15 @@ fun EditListScreen(
                 expectingNewItem = false
             }
             previousItemCount = items.size
+        }
+        LaunchedEffect(isEditMode, pendingFocusItemId, readOnly) {
+            val itemId = pendingFocusItemId
+            if (isEditMode && itemId != null && !readOnly) {
+                delay(80)
+                focusRequesters[itemId]?.requestFocus()
+                keyboardController?.show()
+                pendingFocusItemId = null
+            }
         }
 
         // ---------------------------------------------------------------------------------
@@ -841,12 +877,8 @@ fun EditListScreen(
             item(key = "top_padding") {
                 Spacer(Modifier.height(padding.calculateTopPadding()))
             }
-            // Order: tag color strip -> hero image -> shelf banner -> list items. The banner
-            // sits right above the list body so the "why is this read-only" hint is adjacent
-            // to the items it gates, not buried above decorative chrome.
-            item(key = "tag_strip") {
-                TagAccentEditorStrip(tags = tags)
-            }
+            // Order: hero image -> shelf banner -> list items. The banner sits right above the
+            // list body so the "why is this read-only" hint is adjacent to the items it gates.
             if (pictureUri != null) {
                 item(key = "picture_hero") {
                     Spacer(Modifier.height(16.dp))
@@ -883,7 +915,13 @@ fun EditListScreen(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .height(140.dp),
+                                .height(140.dp)
+                                .tapSoundClickable(
+                                    enabled = !readOnly,
+                                    onClick = {
+                                        isEditMode = true
+                                    },
+                                ),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {
                         Text(
@@ -963,6 +1001,15 @@ fun EditListScreen(
                                                 onAddItem()
                                             }
                                         )
+                                    },
+                                onTextTap =
+                                    if (readOnly) {
+                                        null
+                                    } else {
+                                        {
+                                            pendingFocusItemId = item.localId
+                                            isEditMode = true
+                                        }
                                     },
                                 onIndentChange =
                                     if (readOnly) {
@@ -1108,6 +1155,15 @@ fun EditListScreen(
                                                     onAddItem()
                                                 }
                                             )
+                                        },
+                                    onTextTap =
+                                        if (readOnly) {
+                                            null
+                                        } else {
+                                            {
+                                                pendingFocusItemId = item.localId
+                                                isEditMode = true
+                                            }
                                         },
                                     onIndentChange = null,
                                     modifier =

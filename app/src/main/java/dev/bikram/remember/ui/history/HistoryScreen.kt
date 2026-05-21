@@ -30,7 +30,9 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -47,11 +49,10 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -60,8 +61,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -71,6 +72,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -103,7 +105,6 @@ import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.LocalSnackbarHostState
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
-import dev.bikram.remember.ui.theme.transparentTopAppBarColors
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -118,6 +119,15 @@ import kotlin.math.max
 
 /** Which shelf the user is viewing. */
 enum class HistorySection { ARCHIVE, TRASH }
+
+/** Toolbar row below the status bar (Archive / Trash toggles). */
+private val HistoryTopBarContentHeight = 48.dp
+
+/** Extra progressive-blur band past the toggle bottoms so scroll content fades under them. */
+private val HistoryTopBarBlurBelowExtra = 20.dp
+
+/** Softer top blur curve so strength reaches the Archive / Trash row (default 2.5 is mostly status-bar only). */
+private const val HISTORY_TOP_BLUR_PROGRESS_POWER = 1.1f
 
 /**
  * One-shot events emitted by [HistoryViewModel] for the UI layer to react to.
@@ -393,10 +403,15 @@ fun HistoryRoute(
     val selectedIds by vm.selectedIds.collectAsStateWithLifecycle()
     val archivedListState = rememberLazyListState()
     val trashedListState = rememberLazyListState()
-    val blurStyle = rememberProgressiveBlurStyle()
+    val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val topBarInset = statusBarInset + HistoryTopBarContentHeight
+    val blurStyle =
+        rememberProgressiveBlurStyle(
+            topExtra = HistoryTopBarContentHeight + HistoryTopBarBlurBelowExtra,
+            topBlurProgressPower = HISTORY_TOP_BLUR_PROGRESS_POWER,
+        )
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pillInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
-    val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
 
     val items =
         when (section) {
@@ -417,6 +432,20 @@ fun HistoryRoute(
             HistorySection.ARCHIVE -> archivedListState
             HistorySection.TRASH -> trashedListState
         }
+    val density = LocalDensity.current
+    val topAlphaMultiplier by remember(listState) {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                val offsetPx = listState.firstVisibleItemScrollOffset.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                (offsetPx / thresholdPx).coerceIn(0f, 1f)
+            }
+        }
+    }
+    val listBlurMod =
+        blurStyle?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
     val listScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = listState,
@@ -474,7 +503,11 @@ fun HistoryRoute(
             HistorySelectionActionBar(
                 visible = inSelectionMode,
                 section = section,
+                selectedCount = selectedIds.size,
+                selectableVisibleIds = selectableVisibleIds,
                 onClearSelection = vm::clearSelection,
+                onSelectAll = { vm.selectNotes(selectableVisibleIds) },
+                onUnselectAll = vm::clearSelection,
                 onRestoreSelected = vm::restoreSelected,
                 onArchiveSelected = vm::archiveSelectedFromTrash,
                 // Permanent delete is gated by a confirmation sheet; the actual VM
@@ -485,248 +518,157 @@ fun HistoryRoute(
                 bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
             )
         },
-        topBar = {
-            Column(Modifier.fillMaxWidth()) {
-                TopAppBar(
-                    colors = transparentTopAppBarColors(),
-                    title = {},
-                    actions = {
-                        if (inSelectionMode) {
-                            val cdSelectAll = stringResource(R.string.home_select_all)
-                            Box(modifier = Modifier.size(48.dp)) {
-                                RememberFilledTonalIconButton(
-                                    onClick = { vm.selectNotes(selectableVisibleIds) },
-                                    enabled = selectableVisibleIds.isNotEmpty(),
-                                    modifier = Modifier.align(Alignment.Center),
-                                ) {
-                                    RememberMaterialRoundedSymbol(
-                                        name = "select_all",
-                                        weight = FontWeight.Medium,
-                                        modifier = Modifier.semantics { contentDescription = cdSelectAll },
-                                    )
-                                }
-                                Badge(
+    ) {
+        // Blur only on the scroll layer (Home pattern). Top bar sits above so scrim/blur do not
+        // paint over the toggles; list contentPadding lets rows scroll under the transparent bar.
+        Box(modifier = Modifier.fillMaxSize()) {
+            AnimatedContent(
+                targetState = section,
+                modifier = Modifier.fillMaxSize(),
+                transitionSpec = {
+                    if (reducedMotion) {
+                        EnterTransition.None togetherWith ExitTransition.None
+                    } else {
+                        val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                        (
+                            slideInHorizontally(animationSpec = historySectionSpatialSpec) { fullWidth ->
+                                direction * fullWidth
+                            } + fadeIn(animationSpec = historySectionFadeInSpec)
+                        ) togetherWith (
+                            slideOutHorizontally(animationSpec = historySectionSpatialSpec) { fullWidth ->
+                                -direction * fullWidth
+                            } + fadeOut(animationSpec = historySectionFadeOutSpec)
+                        )
+                    }.using(SizeTransform(clip = false))
+                },
+                label = "historySectionContent",
+            ) { targetSection ->
+                val targetItems =
+                    when (targetSection) {
+                        HistorySection.ARCHIVE -> archived
+                        HistorySection.TRASH -> trashed
+                    }
+                val targetRows =
+                    remember(targetItems) {
+                        targetItems.map { noteWithItems ->
+                            HistoryNoteRow(
+                                note = noteWithItems,
+                                card = noteWithItems.toNoteCardUiModel(),
+                            )
+                        }
+                    }
+                val targetListState =
+                    when (targetSection) {
+                        HistorySection.ARCHIVE -> archivedListState
+                        HistorySection.TRASH -> trashedListState
+                    }
+                val targetListScrollEnabled =
+                    rememberContentOverflowScrollEnabled(
+                        listState = targetListState,
+                        additionalScrollEnabled = true,
+                    )
+                val listTopPadding =
+                    remember(targetSection, targetRows.isNotEmpty()) {
+                        if (targetRows.isEmpty()) {
+                            topBarInset
+                        } else if (targetSection == HistorySection.TRASH) {
+                            topBarInset + 4.dp
+                        } else {
+                            topBarInset + 12.dp
+                        }
+                    }
+                if (targetRows.isNotEmpty()) {
+                    LazyColumn(
+                        state = targetListState,
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .then(listBlurMod),
+                        contentPadding =
+                            PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = listTopPadding,
+                                bottom = pillInset + 24.dp,
+                            ),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        userScrollEnabled = targetListScrollEnabled,
+                    ) {
+                        if (targetSection == HistorySection.TRASH) {
+                            item(key = "retention_notice", contentType = "retention") {
+                                RetentionNotice(
                                     modifier =
                                         Modifier
-                                            .align(Alignment.BottomStart)
-                                            .offset(x = 2.dp, y = (-2).dp),
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                                ) {
-                                    Text(
-                                        text = selectedIds.size.toString(),
-                                        style = MaterialTheme.typography.labelSmall,
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.width(6.dp))
-                            val cdUnselectAll = stringResource(R.string.home_unselect_all)
-                            RememberFilledTonalIconButton(onClick = vm::clearSelection) {
-                                RememberMaterialRoundedSymbol(
-                                    name = "deselect",
-                                    weight = FontWeight.Medium,
-                                    modifier = Modifier.semantics { contentDescription = cdUnselectAll },
+                                            .fillMaxWidth()
+                                            .padding(
+                                                top = HistoryTopBarBlurBelowExtra,
+                                                bottom = 12.dp,
+                                            ),
                                 )
                             }
-                            Spacer(Modifier.width(4.dp))
                         }
-                    },
-                )
+                        items(
+                            items = targetRows,
+                            key = { row -> row.card.id },
+                            contentType = {
+                                if (targetSection == HistorySection.TRASH) {
+                                    "trashedRow"
+                                } else {
+                                    "archivedRow"
+                                }
+                            },
+                        ) { row ->
+                            val noteId = row.card.id
+                            val isSelected = noteId in selectedIds
+                            HistorySwipeCard(
+                                model = row.card,
+                                section = targetSection,
+                                daysLeft =
+                                    vm
+                                        .daysLeftInTrash(row.note)
+                                        .takeIf { targetSection == HistorySection.TRASH },
+                                hapticEnabled = interactionState.hapticFeedbackEnabled,
+                                onOpenNote = {
+                                    if (inSelectionMode) {
+                                        vm.toggleSelection(noteId)
+                                    } else {
+                                        onOpenNote(row.note, false)
+                                    }
+                                },
+                                onRestore = { vm.restore(row.note) },
+                                onArchive = { vm.archiveFromTrash(row.note) },
+                                onDeleteForever = { pendingDeleteForeverNote = row.note },
+                                onUnarchive = { vm.unarchive(row.note) },
+                                onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
+                                selected = isSelected,
+                                onLongClick = { vm.toggleSelection(noteId) },
+                                swipeEnabled = !inSelectionMode,
+                            )
+                        }
+                    }
+                } else {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .then(listBlurMod),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        EmptyState(
+                            section = targetSection,
+                            modifier = Modifier.padding(top = topBarInset, bottom = pillInset),
+                        )
+                    }
+                }
             }
-        },
-    ) { padding ->
-        // The Box fills the full Scaffold area so the progressive blur (which fades content
-        // near the very top of the screen, behind the LargeTopAppBar) sees the same bounds
-        // it always has - applying blur here, not on the inner Column, keeps the fade band
-        // anchored to the top of the screen instead of riding down on top of the toggle.
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .then(blurMod),
-        ) {
-            Column(
+            HistoryScreenTopBar(
+                section = section,
+                onSectionChange = onSectionChange,
                 modifier =
                     Modifier
-                        .fillMaxSize()
-                        .padding(top = padding.calculateTopPadding() + 4.dp),
-            ) {
-                val sectionButtonColors =
-                    ToggleButtonDefaults.toggleButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        contentColor = MaterialTheme.colorScheme.onSurface,
-                        checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                        checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                val entries = HistorySection.entries
-                val labels = entries.map { entry -> entry.label() }
-                val shapes =
-                    entries.mapIndexed { index, _ ->
-                        when (index) {
-                            0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                            entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                            else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                        }
-                    }
-                ButtonGroup(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-                    overflowIndicator = { menuState ->
-                        ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
-                    },
-                ) {
-                    entries.forEachIndexed { index, entry ->
-                        val label = labels[index]
-                        customItem(
-                            buttonGroupContent = {
-                                RememberToggleButton(
-                                    checked = section == entry,
-                                    onCheckedChange = { checked -> if (checked) onSectionChange(entry) },
-                                    modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
-                                    shapes = shapes[index],
-                                    colors = sectionButtonColors,
-                                ) {
-                                    Text(label)
-                                }
-                            },
-                            menuContent = { menuState ->
-                                RememberDropdownMenuItem(
-                                    text = { Text(label) },
-                                    onClick = {
-                                        onSectionChange(entry)
-                                        menuState.dismiss()
-                                    },
-                                )
-                            },
-                        )
-                    }
-                }
-                AnimatedContent(
-                    targetState = section,
-                    modifier = Modifier.fillMaxSize(),
-                    transitionSpec = {
-                        if (reducedMotion) {
-                            EnterTransition.None togetherWith ExitTransition.None
-                        } else {
-                            val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                            (
-                                slideInHorizontally(animationSpec = historySectionSpatialSpec) { fullWidth ->
-                                    direction * fullWidth
-                                } + fadeIn(animationSpec = historySectionFadeInSpec)
-                            ) togetherWith (
-                                slideOutHorizontally(animationSpec = historySectionSpatialSpec) { fullWidth ->
-                                    -direction * fullWidth
-                                } + fadeOut(animationSpec = historySectionFadeOutSpec)
-                            )
-                        }.using(SizeTransform(clip = false))
-                    },
-                    label = "historySectionContent",
-                ) { targetSection ->
-                    val targetItems =
-                        when (targetSection) {
-                            HistorySection.ARCHIVE -> archived
-                            HistorySection.TRASH -> trashed
-                        }
-                    val targetRows =
-                        remember(targetItems) {
-                            targetItems.map { noteWithItems ->
-                                HistoryNoteRow(
-                                    note = noteWithItems,
-                                    card = noteWithItems.toNoteCardUiModel(),
-                                )
-                            }
-                        }
-                    val targetListState =
-                        when (targetSection) {
-                            HistorySection.ARCHIVE -> archivedListState
-                            HistorySection.TRASH -> trashedListState
-                        }
-                    val targetListScrollEnabled =
-                        rememberContentOverflowScrollEnabled(
-                            listState = targetListState,
-                            additionalScrollEnabled = true,
-                        )
-                    Column(modifier = Modifier.fillMaxSize()) {
-                        if (targetSection == HistorySection.TRASH && targetRows.isNotEmpty()) {
-                            RetentionNotice(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
-                        } else {
-                            Spacer(Modifier.height(12.dp))
-                        }
-                        Box(modifier = Modifier.fillMaxSize()) {
-                            if (targetRows.isNotEmpty()) {
-                                LazyColumn(
-                                    state = targetListState,
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentPadding =
-                                        PaddingValues(
-                                            start = 16.dp,
-                                            end = 16.dp,
-                                            top = 4.dp,
-                                            bottom = pillInset + 24.dp,
-                                        ),
-                                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                                    userScrollEnabled = targetListScrollEnabled,
-                                ) {
-                                    items(
-                                        items = targetRows,
-                                        key = { row -> row.card.id },
-                                        contentType = {
-                                            if (targetSection == HistorySection.TRASH) {
-                                                "trashedRow"
-                                            } else {
-                                                "archivedRow"
-                                            }
-                                        },
-                                    ) { row ->
-                                        val noteId = row.card.id
-                                        val isSelected = noteId in selectedIds
-                                        HistorySwipeCard(
-                                            model = row.card,
-                                            section = targetSection,
-                                            daysLeft =
-                                                vm
-                                                    .daysLeftInTrash(row.note)
-                                                    .takeIf { targetSection == HistorySection.TRASH },
-                                            hapticEnabled = interactionState.hapticFeedbackEnabled,
-                                            onOpenNote = {
-                                                if (inSelectionMode) {
-                                                    vm.toggleSelection(noteId)
-                                                } else {
-                                                    onOpenNote(row.note, false)
-                                                }
-                                            },
-                                            onRestore = { vm.restore(row.note) },
-                                            onArchive = { vm.archiveFromTrash(row.note) },
-                                            onDeleteForever = { pendingDeleteForeverNote = row.note },
-                                            onUnarchive = { vm.unarchive(row.note) },
-                                            onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
-                                            selected = isSelected,
-                                            onLongClick = { vm.toggleSelection(noteId) },
-                                            swipeEnabled = !inSelectionMode,
-                                        )
-                                    }
-                                }
-                            } else {
-                                EmptyState(
-                                    section = targetSection,
-                                    modifier =
-                                        Modifier
-                                            .align(Alignment.Center)
-                                            .padding(bottom = pillInset),
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+                        .align(Alignment.TopCenter)
+                        .zIndex(2f),
+            )
         }
     }
 
@@ -788,7 +730,11 @@ fun HistoryRoute(
 private fun HistorySelectionActionBar(
     visible: Boolean,
     section: HistorySection,
+    selectedCount: Int,
+    selectableVisibleIds: Set<Long>,
     onClearSelection: () -> Unit,
+    onSelectAll: () -> Unit,
+    onUnselectAll: () -> Unit,
     onRestoreSelected: () -> Unit,
     onArchiveSelected: () -> Unit,
     onDeleteForeverSelected: () -> Unit,
@@ -824,6 +770,15 @@ private fun HistorySelectionActionBar(
             ) {
                 val exitLabel = stringResource(R.string.home_select_exit_cd)
                 val exitInteractionSource = remember { MutableInteractionSource() }
+                val exitColors =
+                    IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                val cdSelectAll = stringResource(R.string.home_select_all)
+                val selectAllInteractionSource = remember { MutableInteractionSource() }
+                val cdUnselectAll = stringResource(R.string.home_unselect_all)
+                val unselectAllInteractionSource = remember { MutableInteractionSource() }
                 val restoreLabel = stringResource(R.string.edit_bottom_bar_restore)
                 val cdRestore = stringResource(R.string.edit_bottom_bar_restore_cd)
                 val restoreInteractionSource = remember { MutableInteractionSource() }
@@ -857,6 +812,7 @@ private fun HistorySelectionActionBar(
                                 modifier = Modifier.animateWidth(exitInteractionSource),
                                 interactionSource = exitInteractionSource,
                                 tooltipLabel = exitLabel,
+                                colors = exitColors,
                             ) {
                                 RememberMaterialRoundedSymbol(
                                     name = "close",
@@ -870,6 +826,76 @@ private fun HistorySelectionActionBar(
                                 text = { Text(exitLabel) },
                                 onClick = {
                                     onClearSelection()
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
+                    customItem(
+                        buttonGroupContent = {
+                            Box(modifier = Modifier.size(48.dp)) {
+                                RememberFilledTonalIconButton(
+                                    onClick = onSelectAll,
+                                    enabled = selectableVisibleIds.isNotEmpty(),
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.Center)
+                                            .animateWidth(selectAllInteractionSource),
+                                    interactionSource = selectAllInteractionSource,
+                                    tooltipLabel = cdSelectAll,
+                                ) {
+                                    RememberMaterialRoundedSymbol(
+                                        name = "select_all",
+                                        weight = FontWeight.Medium,
+                                        modifier = Modifier.semantics { contentDescription = cdSelectAll },
+                                    )
+                                }
+                                Badge(
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomStart)
+                                            .offset(x = 2.dp, y = (-2).dp),
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ) {
+                                    Text(
+                                        text = selectedCount.toString(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
+                        },
+                        menuContent = { menuState ->
+                            RememberDropdownMenuItem(
+                                text = { Text(cdSelectAll) },
+                                onClick = {
+                                    onSelectAll()
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
+                    customItem(
+                        buttonGroupContent = {
+                            RememberFilledTonalIconButton(
+                                onClick = onUnselectAll,
+                                enabled = selectedCount > 0,
+                                modifier = Modifier.animateWidth(unselectAllInteractionSource),
+                                interactionSource = unselectAllInteractionSource,
+                                tooltipLabel = cdUnselectAll,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "deselect",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = cdUnselectAll },
+                                )
+                            }
+                        },
+                        menuContent = { menuState ->
+                            RememberDropdownMenuItem(
+                                text = { Text(cdUnselectAll) },
+                                onClick = {
+                                    onUnselectAll()
                                     menuState.dismiss()
                                 },
                             )
@@ -1236,6 +1262,93 @@ private fun EmptyState(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun HistoryScreenTopBar(
+    section: HistorySection,
+    onSectionChange: (HistorySection) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(Color.Transparent)
+                .windowInsetsPadding(WindowInsets.statusBars)
+                .height(HistoryTopBarContentHeight)
+                .padding(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HistorySectionToggleGroup(
+            section = section,
+            onSectionChange = onSectionChange,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun HistorySectionToggleGroup(
+    section: HistorySection,
+    onSectionChange: (HistorySection) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val sectionButtonColors =
+        ToggleButtonDefaults.toggleButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    val entries = HistorySection.entries
+    val labels = entries.map { entry -> entry.label() }
+    val shapes =
+        entries.mapIndexed { index, _ ->
+            when (index) {
+                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            }
+        }
+    ButtonGroup(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
+    ) {
+        entries.forEachIndexed { index, entry ->
+            val label = labels[index]
+            customItem(
+                buttonGroupContent = {
+                    RememberToggleButton(
+                        checked = section == entry,
+                        onCheckedChange = { checked -> if (checked) onSectionChange(entry) },
+                        modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+                        shapes = shapes[index],
+                        colors = sectionButtonColors,
+                    ) {
+                        Text(label)
+                    }
+                },
+                menuContent = { menuState ->
+                    RememberDropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onSectionChange(entry)
+                            menuState.dismiss()
+                        },
+                    )
+                },
+            )
+        }
     }
 }
 

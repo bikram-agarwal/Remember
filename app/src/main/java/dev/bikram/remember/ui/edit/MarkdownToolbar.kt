@@ -115,7 +115,7 @@ internal fun MarkdownToolbar(
         },
     ) {
         if (onUndo != null) {
-            MarkdownToolbarIconButton(
+            markdownToolbarIconButton(
                 symbolName = "undo",
                 contentDescription = undoLabel,
                 enabled = canUndo,
@@ -124,7 +124,7 @@ internal fun MarkdownToolbar(
             )
         }
         if (onRedo != null) {
-            MarkdownToolbarIconButton(
+            markdownToolbarIconButton(
                 symbolName = "redo",
                 contentDescription = redoLabel,
                 enabled = canRedo,
@@ -133,32 +133,32 @@ internal fun MarkdownToolbar(
             )
         }
 
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "format_bold",
             contentDescription = boldLabel,
             colors = colors,
             onClick = state::toggleBold,
         )
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "format_italic",
             contentDescription = italicLabel,
             colors = colors,
             onClick = state::toggleItalic,
         )
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "format_underlined",
             contentDescription = underlineLabel,
             colors = colors,
             onClick = state::toggleUnderline,
         )
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "format_strikethrough",
             contentDescription = strikethroughLabel,
             colors = colors,
             onClick = state::toggleStrikethrough,
         )
 
-        HeadingButton(
+        headingButton(
             label = headingOneLabel,
             contentDescription = headingOneContentDescription,
             active = activeHeading == 1,
@@ -166,7 +166,7 @@ internal fun MarkdownToolbar(
             colors = colors,
             activeColors = activeColors,
         )
-        HeadingButton(
+        headingButton(
             label = headingTwoLabel,
             contentDescription = headingTwoContentDescription,
             active = activeHeading == 2,
@@ -174,7 +174,7 @@ internal fun MarkdownToolbar(
             colors = colors,
             activeColors = activeColors,
         )
-        HeadingButton(
+        headingButton(
             label = headingThreeLabel,
             contentDescription = headingThreeContentDescription,
             active = activeHeading == 3,
@@ -183,44 +183,44 @@ internal fun MarkdownToolbar(
             activeColors = activeColors,
         )
 
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "format_list_bulleted",
             contentDescription = bulletListLabel,
             colors = if (isBulletList) activeColors else colors,
             onClick = state::applyBulletList,
         )
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "format_list_numbered",
             contentDescription = numberedListLabel,
             colors = if (isNumberedList) activeColors else colors,
             onClick = state::applyNumberedList,
         )
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "checklist",
             contentDescription = checklistLabel,
             colors = if (isChecklist) activeColors else colors,
             onClick = state::applyChecklist,
         )
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "format_quote",
             contentDescription = quoteLabel,
             colors = if (isQuote) activeColors else colors,
             onClick = state::applyQuote,
         )
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "code",
             contentDescription = inlineCodeLabel,
             colors = colors,
             onClick = state::toggleInlineCode,
         )
-        MarkdownToolbarTextButton(
+        markdownToolbarTextButton(
             label = "```",
             contentDescription = codeBlockLabel,
             colors = colors,
             onClick = state::applyCodeBlock,
             fontFamily = FontFamily.Monospace,
         )
-        MarkdownToolbarIconButton(
+        markdownToolbarIconButton(
             symbolName = "add_link",
             contentDescription = linkLabel,
             colors = if (cursorInLink) activeColors else colors,
@@ -229,7 +229,7 @@ internal fun MarkdownToolbar(
     }
 }
 
-private fun ButtonGroupScope.MarkdownToolbarIconButton(
+private fun ButtonGroupScope.markdownToolbarIconButton(
     symbolName: String,
     contentDescription: String,
     colors: IconButtonColors,
@@ -266,7 +266,7 @@ private fun ButtonGroupScope.MarkdownToolbarIconButton(
     )
 }
 
-private fun ButtonGroupScope.MarkdownToolbarTextButton(
+private fun ButtonGroupScope.markdownToolbarTextButton(
     label: String,
     contentDescription: String,
     colors: IconButtonColors,
@@ -303,7 +303,7 @@ private fun ButtonGroupScope.MarkdownToolbarTextButton(
     )
 }
 
-private fun ButtonGroupScope.HeadingButton(
+private fun ButtonGroupScope.headingButton(
     label: String,
     contentDescription: String,
     active: Boolean,

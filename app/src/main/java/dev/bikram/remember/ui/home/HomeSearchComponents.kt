@@ -11,6 +11,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -177,7 +178,11 @@ internal fun InlineSearchField(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = MaterialTheme.shapes.extraLargeIncreased,
+                ).background(
                     MaterialTheme.colorScheme.surfaceContainerHigh,
                     MaterialTheme.shapes.extraLargeIncreased,
                 ).padding(horizontal = 16.dp, vertical = 8.dp),

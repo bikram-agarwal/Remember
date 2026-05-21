@@ -97,7 +97,7 @@ class ActionReceiver : BroadcastReceiver() {
 
         val intent: Intent =
             when (action.type) {
-                ActionType.CALL_NUMBER -> callIntent(context, action.details)
+                ActionType.CALL_NUMBER -> callIntent(action.details)
                 ActionType.SEND_MESSAGE -> Intent(Intent.ACTION_SENDTO, "smsto:${action.details}".toUri())
                 ActionType.SEND_EMAIL -> Intent(Intent.ACTION_SENDTO, "mailto:${action.details}".toUri())
                 ActionType.GET_DIRECTIONS -> Intent(Intent.ACTION_VIEW, "geo:0,0?q=${Uri.encode(action.details)}".toUri())
@@ -114,7 +114,7 @@ class ActionReceiver : BroadcastReceiver() {
                         },
                         action.title.ifBlank { context.getString(R.string.share_chooser_generic) },
                     )
-                ActionType.COPY_TO_CLIPBOARD, ActionType.MARK_AS_DONE, ActionType.SNOOZE, ActionType.SHARE_CONTENT -> return false
+                ActionType.COPY_TO_CLIPBOARD, ActionType.MARK_AS_DONE, ActionType.SNOOZE -> return false
             }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(intent)
@@ -133,7 +133,6 @@ class ActionReceiver : BroadcastReceiver() {
     }
 
     private fun callIntent(
-        context: Context,
         number: String,
     ): Intent = Intent(Intent.ACTION_DIAL, "tel:$number".toUri())
 

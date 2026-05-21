@@ -39,6 +39,7 @@ private val MarkdownPartialBlockPrefixRegex = Regex("""^\s*(#{1,3}|- \[[ xX]?\]?
 private const val BODY_AUTO_FOCUS_MAX_CHARS = 280
 private const val BODY_AUTO_FOCUS_MAX_PARAGRAPHS = 6
 
+@Suppress("LargeClass")
 @Stable
 internal class MarkdownEditorState(
     initialMarkdown: String = "",
@@ -172,6 +173,31 @@ internal class MarkdownEditorState(
 
     fun focusAtEndAndShowKeyboard() {
         textFieldValue = textFieldValue.copy(selection = TextRange(markdown.length))
+        selectionRevision++
+        focusRequestRevision++
+    }
+
+    fun focusAtOffsetAndShowKeyboard(markdownOffset: Int) {
+        val boundedOffset = markdownOffset.coerceIn(0, markdown.length)
+        textFieldValue = textFieldValue.copy(selection = TextRange(boundedOffset))
+        selectionRevision++
+        focusRequestRevision++
+    }
+
+    fun focusRangeAndShowKeyboard(
+        startOffset: Int,
+        endOffset: Int,
+    ) {
+        val boundedStartOffset = startOffset.coerceIn(0, markdown.length)
+        val boundedEndOffset = endOffset.coerceIn(0, markdown.length)
+        textFieldValue =
+            textFieldValue.copy(
+                selection =
+                    TextRange(
+                        start = min(boundedStartOffset, boundedEndOffset),
+                        end = max(boundedStartOffset, boundedEndOffset),
+                    ),
+            )
         selectionRevision++
         focusRequestRevision++
     }
@@ -553,6 +579,7 @@ internal class MarkdownEditorState(
         return this
     }
 
+    @Suppress("NestedBlockDepth")
     private fun TextFieldValue.withEmptyMarkdownWrapperRemoved(previousValue: TextFieldValue): TextFieldValue {
         if (text.length >= previousValue.text.length || !selection.collapsed) {
             return this

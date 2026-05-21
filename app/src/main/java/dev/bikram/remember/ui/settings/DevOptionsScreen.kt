@@ -16,34 +16,39 @@ import android.provider.Settings
 import android.widget.Toast
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MediumTopAppBar
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,12 +59,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
@@ -80,7 +90,7 @@ import dev.bikram.remember.reminders.ReminderReceiver
 import dev.bikram.remember.reminders.ReminderScheduler
 import dev.bikram.remember.trash.RememberTrashSweepWork
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
@@ -89,10 +99,9 @@ import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
-import dev.bikram.remember.ui.nav.DevOptionsSharedBoundsKey
+import dev.bikram.remember.ui.nav.DEV_OPTIONS_SHARED_BOUNDS_KEY
 import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
 import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
-import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import dev.bikram.remember.update.UpdateCheckWorkScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -115,6 +124,10 @@ private data class DbStats(
     val attachLinkedCount: Int,
 )
 
+private class DeveloperTriggeredCrashException(
+    message: String,
+) : RuntimeException(message)
+
 private const val REMEMBER_DATABASE_NAME = "remember.db"
 private const val REMEMBER_DATABASE_VERSION = 1
 
@@ -122,12 +135,19 @@ private object DevOptionsScreenSessionState {
     var firstVisibleItemIndex = 0
     var firstVisibleItemScrollOffset = 0
     var infoCollapsed = true
+    var settingsCollapsed = false
+    var mockOperationsCollapsed = false
+    var workersCollapsed = false
+    var diagnosticsCollapsed = false
+    var resetCollapsed = false
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun DevOptionsRoute(onBack: () -> Unit) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    val resources = LocalResources.current
     val deps =
         remember(context) {
             EntryPointAccessors.fromApplication(
@@ -164,6 +184,20 @@ fun DevOptionsRoute(onBack: () -> Unit) {
     var dbStats by remember { mutableStateOf<DbStats?>(null) }
     var showResetPrefsConfirm by remember { mutableStateOf(false) }
     var infoCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.infoCollapsed) }
+    var settingsCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.settingsCollapsed) }
+    var mockOperationsCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.mockOperationsCollapsed) }
+    var workersCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.workersCollapsed) }
+    var diagnosticsCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.diagnosticsCollapsed) }
+    var resetCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.resetCollapsed) }
+    var developerModeHeaderHeightPx by remember { mutableStateOf(0) }
+    val developerModeHeaderHeight = with(density) { developerModeHeaderHeightPx.toDp() }
+    val allDevOptionsSectionsCollapsed =
+        infoCollapsed &&
+            settingsCollapsed &&
+            mockOperationsCollapsed &&
+            workersCollapsed &&
+            diagnosticsCollapsed &&
+            resetCollapsed
     val lazyListState =
         rememberLazyListState(
             initialFirstVisibleItemIndex = DevOptionsScreenSessionState.firstVisibleItemIndex,
@@ -224,9 +258,25 @@ fun DevOptionsRoute(onBack: () -> Unit) {
         }
     }
 
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-    val blurStyle = rememberProgressiveBlurStyle(bottomExtra = 0.dp)
-    val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
+    val blurStyle =
+        rememberProgressiveBlurStyle(
+            bottomExtra = 0.dp,
+            topExtra = 96.dp,
+            topBlurProgressPower = 1.1f,
+        )
+    val topAlphaMultiplier by remember {
+        derivedStateOf {
+            if (lazyListState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                val offsetPx = lazyListState.firstVisibleItemScrollOffset.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                (offsetPx / thresholdPx).coerceIn(0f, 1f)
+            }
+        }
+    }
+    val blurMod =
+        blurStyle?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
     val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp
     val sharedScope = LocalSharedTransitionScope.current
     val navScope = LocalNavAnimatedVisibilityScope.current
@@ -236,7 +286,7 @@ fun DevOptionsRoute(onBack: () -> Unit) {
         if (sharedScope != null && navScope != null) {
             with(sharedScope) {
                 Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(key = DevOptionsSharedBoundsKey),
+                    sharedContentState = rememberSharedContentState(key = DEV_OPTIONS_SHARED_BOUNDS_KEY),
                     animatedVisibilityScope = navScope,
                     boundsTransform = sharedBoundsTransform,
                 )
@@ -268,7 +318,7 @@ fun DevOptionsRoute(onBack: () -> Unit) {
                             devModePrefs.setEnabled(false)
                         }
                         showResetPrefsConfirm = false
-                        Toast.makeText(context, context.getString(R.string.dev_options_toast_reset_done), Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_reset_done), Toast.LENGTH_SHORT).show()
                         onBack()
                     },
                 ) { Text(stringResource(R.string.dev_options_reset_all_confirm), color = MaterialTheme.colorScheme.error) }
@@ -284,422 +334,459 @@ fun DevOptionsRoute(onBack: () -> Unit) {
     Scaffold(
         modifier =
             sharedModifier
-                .fillMaxSize()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .fillMaxSize(),
         containerColor = Color.Transparent,
-        topBar = {
-            MediumTopAppBar(
-                colors = transparentLargeTopAppBarColors(),
-                title = { Text(stringResource(R.string.dev_options_title), fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    RememberIconButton(
-                        onClick = onBack,
-                        tooltipLabel = stringResource(R.string.dev_options_back_cd),
-                    ) {
-                        RememberMaterialRoundedSymbol(name = "arrow_back", size = 22.dp)
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
+        contentWindowInsets = WindowInsets.statusBars.only(WindowInsetsSides.Top),
     ) { padding ->
-        LazyColumn(
-            state = lazyListState,
-            modifier = Modifier.then(blurMod),
-            contentPadding =
-                PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = padding.calculateTopPadding() + 8.dp,
-                    bottom = bottomPadding,
-                ),
-            verticalArrangement = Arrangement.spacedBy(0.dp),
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .consumeWindowInsets(padding),
         ) {
-            // Dev mode toggle
-            item(key = "dev_mode_toggle") {
-                GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
-                    GroupedListItem(position = GroupPosition.ONLY) {
+            LazyColumn(
+                state = lazyListState,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .then(blurMod),
+                contentPadding =
+                    PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = developerModeHeaderHeight + 8.dp,
+                        bottom = bottomPadding,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                // Warning banner
+                item(key = "warning") {
+                    Surface(
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
                         Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.Top,
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(stringResource(R.string.dev_options_mode_label), style = MaterialTheme.typography.bodyLarge)
-                                Text(
-                                    stringResource(R.string.dev_options_mode_subtitle),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            }
-                            Switch(
-                                checked = isEnabled,
-                                onCheckedChange = { enabled ->
-                                    scope.launch { devModePrefs.setEnabled(enabled) }
-                                    if (!enabled) onBack()
-                                },
+                            RememberMaterialRoundedSymbol(
+                                name = "warning",
+                                size = 18.dp,
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                            )
+                            Text(
+                                stringResource(R.string.dev_options_warning),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
                             )
                         }
                     }
+                    Spacer(Modifier.height(24.dp))
                 }
-                Spacer(Modifier.height(8.dp))
-            }
 
-            // Warning banner
-            item(key = "warning") {
-                Surface(
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.Top,
+                // Info
+                item(key = "info") {
+                    val unknown = stringResource(R.string.dev_options_value_unknown)
+                    SettingsExpandableSection(
+                        sectionKey = "dev_options_info",
+                        materialSymbolName = "info",
+                        title = stringResource(R.string.dev_options_section_info),
+                        collapsedSectionKeys = if (infoCollapsed) setOf("dev_options_info") else emptySet(),
+                        onCollapsedSectionKeysChange = { collapsedKeys ->
+                            infoCollapsed = "dev_options_info" in collapsedKeys
+                            DevOptionsScreenSessionState.infoCollapsed = infoCollapsed
+                        },
                     ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "warning",
-                            size = 18.dp,
-                            tint = MaterialTheme.colorScheme.onErrorContainer,
+                        DevInfoCard(
+                            title = stringResource(R.string.dev_options_section_overview),
+                            rows =
+                                listOf(
+                                    stringResource(R.string.dev_options_info_version) to
+                                        stringResource(R.string.dev_options_db_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                                    stringResource(R.string.dev_options_info_package) to context.packageName,
+                                    stringResource(R.string.dev_options_info_variant) to
+                                        stringResource(R.string.dev_options_db_build_format, BuildConfig.FLAVOR, BuildConfig.BUILD_TYPE),
+                                    stringResource(R.string.dev_options_info_installer) to (installerPackage ?: unknown),
+                                    stringResource(R.string.dev_options_info_device) to
+                                        stringResource(R.string.dev_options_device_format, Build.MANUFACTURER, Build.MODEL),
+                                    stringResource(R.string.dev_options_info_android) to
+                                        stringResource(R.string.dev_options_android_format, Build.VERSION.RELEASE, Build.VERSION.SDK_INT),
+                                    stringResource(R.string.dev_options_info_target_sdk) to context.applicationInfo.targetSdkVersion.toString(),
+                                    stringResource(R.string.dev_options_info_database) to
+                                        stringResource(R.string.dev_options_database_format, REMEMBER_DATABASE_NAME, REMEMBER_DATABASE_VERSION),
+                                    stringResource(R.string.dev_options_info_first_install) to
+                                        (packageInfo?.firstInstallTime?.let(::formatInstallTime) ?: unknown),
+                                    stringResource(R.string.dev_options_info_last_update) to
+                                        (packageInfo?.lastUpdateTime?.let(::formatInstallTime) ?: unknown),
+                                ),
                         )
-                        Text(
-                            stringResource(R.string.dev_options_warning),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onErrorContainer,
+                        Spacer(Modifier.height(8.dp))
+                        DevInfoCard(
+                            title = stringResource(R.string.dev_options_section_permissions_storage),
+                            rows = permissionsAndStorageRows(context, backupState),
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        val stats = dbStats
+                        DevInfoCard(
+                            title = stringResource(R.string.dev_options_section_database),
+                            rows =
+                                if (stats != null) {
+                                    buildList {
+                                        add(stringResource(R.string.dev_options_db_stat_active_notes) to stats.active.toString())
+                                        add(stringResource(R.string.dev_options_db_stat_archived) to stats.archived.toString())
+                                        add(stringResource(R.string.dev_options_db_stat_trash) to stats.trashed.toString())
+                                        add(stringResource(R.string.dev_options_db_stat_images_stored) to countWithOptionalSize(context, stats.heroStoredCount, stats.heroStoredBytes))
+                                        if (stats.heroLinkedCount > 0) add(stringResource(R.string.dev_options_db_stat_images_linked) to stats.heroLinkedCount.toString())
+                                        add(stringResource(R.string.dev_options_db_stat_attachments_stored) to countWithOptionalSize(context, stats.attachStoredCount, stats.attachStoredBytes))
+                                        if (stats.attachLinkedCount > 0) add(stringResource(R.string.dev_options_db_stat_attachments_linked) to stats.attachLinkedCount.toString())
+                                        add(stringResource(R.string.dev_options_db_stat_file_size) to formatBytes(stats.fileSizeBytes))
+                                        add(stringResource(R.string.dev_options_info_cache_free_space) to formatBytes(context.cacheDir.freeSpace))
+                                        add(stringResource(R.string.dev_options_info_files_free_space) to formatBytes(context.filesDir.freeSpace))
+                                    }
+                                } else {
+                                    listOf(stringResource(R.string.dev_options_db_stat_active_notes) to unknown)
+                                },
                         )
                     }
+                    Spacer(Modifier.height(24.dp))
                 }
-                Spacer(Modifier.height(24.dp))
-            }
 
-            // Info
-            item(key = "info") {
-                val unknown = stringResource(R.string.dev_options_value_unknown)
-                SettingsExpandableSection(
-                    sectionKey = "dev_options_info",
-                    materialSymbolName = "info",
-                    title = stringResource(R.string.dev_options_section_info),
-                    collapsedSectionKeys = if (infoCollapsed) setOf("dev_options_info") else emptySet(),
-                    onCollapsedSectionKeysChange = { collapsedKeys ->
-                        infoCollapsed = "dev_options_info" in collapsedKeys
-                        DevOptionsScreenSessionState.infoCollapsed = infoCollapsed
-                    },
-                ) {
-                    DevInfoCard(
-                        title = stringResource(R.string.dev_options_section_overview),
-                        rows =
+                // Settings
+                item(key = "settings") {
+                    DevActionSection(
+                        iconName = "settings",
+                        title = stringResource(R.string.dev_options_section_settings),
+                        sectionKey = "dev_options_settings",
+                        collapsed = settingsCollapsed,
+                        onCollapsedChange = { collapsed ->
+                            settingsCollapsed = collapsed
+                            DevOptionsScreenSessionState.settingsCollapsed = collapsed
+                        },
+                        actions =
                             listOf(
-                                stringResource(R.string.dev_options_info_version) to
-                                    stringResource(R.string.dev_options_db_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
-                                stringResource(R.string.dev_options_info_package) to context.packageName,
-                                stringResource(R.string.dev_options_info_variant) to
-                                    stringResource(R.string.dev_options_db_build_format, BuildConfig.FLAVOR, BuildConfig.BUILD_TYPE),
-                                stringResource(R.string.dev_options_info_installer) to (installerPackage ?: unknown),
-                                stringResource(R.string.dev_options_info_device) to
-                                    stringResource(R.string.dev_options_device_format, Build.MANUFACTURER, Build.MODEL),
-                                stringResource(R.string.dev_options_info_android) to
-                                    stringResource(R.string.dev_options_android_format, Build.VERSION.RELEASE, Build.VERSION.SDK_INT),
-                                stringResource(R.string.dev_options_info_target_sdk) to context.applicationInfo.targetSdkVersion.toString(),
-                                stringResource(R.string.dev_options_info_database) to
-                                    stringResource(R.string.dev_options_database_format, REMEMBER_DATABASE_NAME, REMEMBER_DATABASE_VERSION),
-                                stringResource(R.string.dev_options_info_first_install) to
-                                    (packageInfo?.firstInstallTime?.let(::formatInstallTime) ?: unknown),
-                                stringResource(R.string.dev_options_info_last_update) to
-                                    (packageInfo?.lastUpdateTime?.let(::formatInstallTime) ?: unknown),
+                                DevAction(stringResource(R.string.dev_options_open_app_details)) {
+                                    context.startActivity(appDetailsIntent(context))
+                                },
+                                DevAction(stringResource(R.string.dev_options_open_notif_settings)) {
+                                    context.startActivity(notifSettingsIntent(context))
+                                },
+                                DevAction(stringResource(R.string.dev_options_open_alarm_settings)) {
+                                    context.startActivity(alarmsAndRemindersIntent(context))
+                                },
+                                DevAction(stringResource(R.string.dev_options_open_battery_settings)) {
+                                    context.startActivity(batteryIntent())
+                                },
                             ),
                     )
-                    Spacer(Modifier.height(8.dp))
-                    DevInfoCard(
-                        title = stringResource(R.string.dev_options_section_permissions_storage),
-                        rows = permissionsAndStorageRows(context, backupState),
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    val stats = dbStats
-                    DevInfoCard(
-                        title = stringResource(R.string.dev_options_section_database),
-                        rows =
-                            if (stats != null) {
-                                buildList {
-                                    add(stringResource(R.string.dev_options_db_stat_active_notes) to stats.active.toString())
-                                    add(stringResource(R.string.dev_options_db_stat_archived) to stats.archived.toString())
-                                    add(stringResource(R.string.dev_options_db_stat_trash) to stats.trashed.toString())
-                                    add(stringResource(R.string.dev_options_db_stat_images_stored) to countWithOptionalSize(context, stats.heroStoredCount, stats.heroStoredBytes))
-                                    if (stats.heroLinkedCount > 0) add(stringResource(R.string.dev_options_db_stat_images_linked) to stats.heroLinkedCount.toString())
-                                    add(stringResource(R.string.dev_options_db_stat_attachments_stored) to countWithOptionalSize(context, stats.attachStoredCount, stats.attachStoredBytes))
-                                    if (stats.attachLinkedCount > 0) add(stringResource(R.string.dev_options_db_stat_attachments_linked) to stats.attachLinkedCount.toString())
-                                    add(stringResource(R.string.dev_options_db_stat_file_size) to formatBytes(stats.fileSizeBytes))
-                                    add(stringResource(R.string.dev_options_info_cache_free_space) to formatBytes(context.cacheDir.freeSpace))
-                                    add(stringResource(R.string.dev_options_info_files_free_space) to formatBytes(context.filesDir.freeSpace))
-                                }
-                            } else {
-                                listOf(stringResource(R.string.dev_options_db_stat_active_notes) to unknown)
-                            },
-                    )
+                    Spacer(Modifier.height(24.dp))
                 }
-                Spacer(Modifier.height(24.dp))
-            }
 
-            // Settings
-            item(key = "settings") {
-                DevActionSection(
-                    iconName = "settings",
-                    title = stringResource(R.string.dev_options_section_settings),
-                    actions =
-                        listOf(
-                            DevAction(stringResource(R.string.dev_options_open_app_details)) {
-                                context.startActivity(appDetailsIntent(context))
-                            },
-                            DevAction(stringResource(R.string.dev_options_open_notif_settings)) {
-                                context.startActivity(notifSettingsIntent(context))
-                            },
-                            DevAction(stringResource(R.string.dev_options_open_alarm_settings)) {
-                                context.startActivity(alarmsAndRemindersIntent(context))
-                            },
-                            DevAction(stringResource(R.string.dev_options_open_battery_settings)) {
-                                context.startActivity(batteryIntent())
-                            },
-                        ),
-                )
-                Spacer(Modifier.height(24.dp))
-            }
-
-            // Mock operations
-            item(key = "mock_operations") {
-                SettingsStaticSectionHeader(materialSymbolName = "experiment", title = stringResource(R.string.dev_options_section_mock_operations))
-                Spacer(Modifier.height(8.dp))
-                GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
-                    GroupedListItem(position = GroupPosition.FIRST) {
-                        DevActionRow(
-                            label = if (hasMockNotes) stringResource(R.string.dev_options_mock_notes_already_exist) else stringResource(R.string.dev_options_create_mock_notes),
-                            enabled = !hasMockNotes,
-                            onClick = {
-                                scope.launch(Dispatchers.IO) {
-                                    val count = createMockNotes(context, noteRepository)
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(context, context.getString(R.string.dev_options_toast_mock_created, count), Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_clear_mock_data),
-                            enabled = hasMockNotes,
-                            onClick = {
-                                scope.launch(Dispatchers.IO) {
-                                    deleteMockNotes(noteRepository)
-                                    withContext(Dispatchers.Main) {
-                                        Toast.makeText(context, context.getString(R.string.dev_options_toast_mock_cleared), Toast.LENGTH_SHORT).show()
-                                    }
-                                }
-                            },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                        NotificationButtonGrid(context = context, noteRepository = noteRepository, scope = scope)
-                    }
-                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_notif_overdue),
-                            onClick = { fireNotifOverdue(context, noteRepository, reminderPrefs, scope) },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_notif_mock_update),
-                            onClick = {
-                                rememberUpdateState.devReleaseMockShowUpdateAvailable()
-                                onBack()
-                            },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.LAST) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_notif_mock_play),
-                            onClick = {
-                                rememberUpdateState.devReleaseMockStartPlayUpdateBannerSequence()
-                                onBack()
-                            },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
-            }
-
-            // Workers
-            item(key = "workers") {
-                DevActionSection(
-                    iconName = "work_history",
-                    title = stringResource(R.string.dev_options_section_workers),
-                    actions =
-                        listOf(
-                            DevAction(stringResource(R.string.dev_options_sync_backup_worker)) {
-                                scope.launch {
-                                    RememberBackupWork.updateSchedule(context, backupPrefs.snapshot())
-                                    Toast.makeText(context, context.getString(R.string.dev_options_toast_workers_synced), Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            DevAction(stringResource(R.string.dev_options_sync_update_worker)) {
-                                scope.launch {
-                                    UpdateCheckWorkScheduler(context.applicationContext, updatePrefs).syncFromPreferences()
-                                    Toast.makeText(context, context.getString(R.string.dev_options_toast_workers_synced), Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                            DevAction(stringResource(R.string.dev_options_sync_trash_worker)) {
-                                RememberTrashSweepWork.ensureScheduled(context)
-                                Toast.makeText(context, context.getString(R.string.dev_options_toast_workers_synced), Toast.LENGTH_SHORT).show()
-                            },
-                        ),
-                )
-                Spacer(Modifier.height(24.dp))
-            }
-
-            // Diagnostic tools
-            item(key = "diag_header") {
-                SettingsStaticSectionHeader(materialSymbolName = "bug_report", title = stringResource(R.string.dev_options_section_diagnostics))
-                Spacer(Modifier.height(8.dp))
-            }
-            item(key = "diag_content") {
-                GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
-                    GroupedListItem(position = GroupPosition.FIRST) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_force_refresh),
-                            onClick = {
-                                scope.launch { notesWidgetUpdater.refreshAll() }
-                                Toast.makeText(context, context.getString(R.string.dev_options_toast_refresh), Toast.LENGTH_SHORT).show()
-                            },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_force_crash),
-                            onClick = { Handler(Looper.getMainLooper()).post { throw RuntimeException("Developer-triggered crash") } },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_copy_diagnostics),
-                            onClick = {
-                                DiagnosticLog.record(context, "Diagnostic dump copied from Developer options")
-                                val file = DiagnosticLog.createShareFile(context)
-                                val text = runCatching { file.readText() }.getOrElse { "Failed to read diagnostic log" }
-                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                clipboard.setPrimaryClip(ClipData.newPlainText("Diagnostics", text))
-                                Toast.makeText(context, context.getString(R.string.dev_options_toast_diagnostics_copied), Toast.LENGTH_SHORT).show()
-                            },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_export_logs),
-                            onClick = {
-                                DiagnosticLog.record(context, "Diagnostic log exported from Developer options")
-                                val diagnosticsFile = DiagnosticLog.createShareFile(context)
-                                val diagnosticsUri =
-                                    FileProvider.getUriForFile(
-                                        context,
-                                        "${context.packageName}.fileprovider",
-                                        diagnosticsFile,
-                                    )
-                                val shareIntent =
-                                    Intent(Intent.ACTION_SEND).apply {
-                                        setDataAndType(diagnosticsUri, "text/plain")
-                                        putExtra(Intent.EXTRA_STREAM, diagnosticsUri)
-                                        putExtra(Intent.EXTRA_TITLE, diagnosticsFile.name)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                        clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, diagnosticsUri)
-                                    }
-                                runCatching { context.startActivity(Intent.createChooser(shareIntent, context.getString(R.string.dev_options_export_logs_chooser))) }
-                            },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.LAST) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_clear_logs),
-                            onClick = {
-                                java.io.File(context.filesDir, "diagnostics/remember-diagnostics.log").delete()
-                                Toast.makeText(context, context.getString(R.string.dev_options_toast_logs_cleared), Toast.LENGTH_SHORT).show()
-                            },
-                        )
-                    }
-                }
-                Spacer(Modifier.height(24.dp))
-            }
-
-            // Reset
-            item(key = "reset") {
-                SettingsStaticSectionHeader(materialSymbolName = "restart_alt", title = stringResource(R.string.dev_options_section_reset))
-                Spacer(Modifier.height(8.dp))
-                GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
-                    GroupedListItem(position = GroupPosition.FIRST) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_reset_first_launch),
-                            onClick = {
-                                scope.launch { onboardingPrefs.resetIntroSeen() }
-                                Toast.makeText(context, context.getString(R.string.dev_options_toast_first_launch_reset), Toast.LENGTH_SHORT).show()
-                            },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_reset_skipped_update),
-                            onClick = {
-                                scope.launch { updatePrefs.clearGithubReleaseAck() }
-                                Toast.makeText(context, context.getString(R.string.dev_options_toast_skipped_cleared), Toast.LENGTH_SHORT).show()
-                            },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_clear_update_dedupe),
-                            onClick = {
-                                scope.launch { updatePrefs.clearUpdateLastNotifiedDedupeKey() }
-                                Toast.makeText(context, context.getString(R.string.dev_options_toast_update_dedupe_cleared), Toast.LENGTH_SHORT).show()
-                            },
-                        )
-                    }
-                    GroupedListItem(position = GroupPosition.LAST) {
-                        DevActionRow(
-                            label = stringResource(R.string.dev_options_delete_cached_update_apk),
-                            onClick = {
-                                scope.launch {
-                                    val deleted =
-                                        withContext(Dispatchers.IO) {
-                                            java.io.File(context.cacheDir, REMEMBER_UPDATE_APK_CACHE_NAME).delete()
+                // Mock operations
+                item(key = "mock_operations") {
+                    SettingsExpandableSection(
+                        sectionKey = "dev_options_mock_operations",
+                        materialSymbolName = "experiment",
+                        title = stringResource(R.string.dev_options_section_mock_operations),
+                        collapsedSectionKeys = if (mockOperationsCollapsed) setOf("dev_options_mock_operations") else emptySet(),
+                        onCollapsedSectionKeysChange = { collapsedKeys ->
+                            mockOperationsCollapsed = "dev_options_mock_operations" in collapsedKeys
+                            DevOptionsScreenSessionState.mockOperationsCollapsed = mockOperationsCollapsed
+                        },
+                    ) {
+                        GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
+                            GroupedListItem(position = GroupPosition.FIRST) {
+                                DevActionRow(
+                                    label = if (hasMockNotes) stringResource(R.string.dev_options_mock_notes_already_exist) else stringResource(R.string.dev_options_create_mock_notes),
+                                    enabled = !hasMockNotes,
+                                    onClick = {
+                                        scope.launch(Dispatchers.IO) {
+                                            val count = createMockNotes(context, noteRepository)
+                                            withContext(Dispatchers.Main) {
+                                                Toast.makeText(context, resources.getString(R.string.dev_options_toast_mock_created, count), Toast.LENGTH_SHORT).show()
+                                            }
                                         }
-                                    val message =
-                                        if (deleted) {
-                                            R.string.dev_options_toast_cached_update_apk_deleted
-                                        } else {
-                                            R.string.dev_options_toast_no_cached_update_apk
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_clear_mock_data),
+                                    enabled = hasMockNotes,
+                                    onClick = {
+                                        scope.launch(Dispatchers.IO) {
+                                            deleteMockNotes(noteRepository)
+                                            withContext(Dispatchers.Main) {
+                                                Toast.makeText(context, resources.getString(R.string.dev_options_toast_mock_cleared), Toast.LENGTH_SHORT).show()
+                                            }
                                         }
-                                    Toast.makeText(context, context.getString(message), Toast.LENGTH_SHORT).show()
-                                }
-                            },
-                        )
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                NotificationButtonGrid(context = context, noteRepository = noteRepository, scope = scope)
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_notif_overdue),
+                                    onClick = { fireNotifOverdue(context, noteRepository, reminderPrefs, scope) },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_notif_mock_update),
+                                    onClick = {
+                                        rememberUpdateState.devReleaseMockShowUpdateAvailable()
+                                        onBack()
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.LAST) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_notif_mock_play),
+                                    onClick = {
+                                        rememberUpdateState.devReleaseMockStartPlayUpdateBannerSequence()
+                                        onBack()
+                                    },
+                                )
+                            }
+                        }
                     }
+                    Spacer(Modifier.height(24.dp))
                 }
-                Spacer(Modifier.height(8.dp))
-                Button(
-                    onClick = { showResetPrefsConfirm = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                            contentColor = MaterialTheme.colorScheme.onError,
-                        ),
-                    shape = MaterialTheme.shapes.large,
-                ) {
-                    Text(
-                        text = stringResource(R.string.dev_options_reset_all),
-                        fontWeight = FontWeight.Medium,
+
+                // Workers
+                item(key = "workers") {
+                    DevActionSection(
+                        iconName = "work_history",
+                        title = stringResource(R.string.dev_options_section_workers),
+                        sectionKey = "dev_options_workers",
+                        collapsed = workersCollapsed,
+                        onCollapsedChange = { collapsed ->
+                            workersCollapsed = collapsed
+                            DevOptionsScreenSessionState.workersCollapsed = collapsed
+                        },
+                        actions =
+                            listOf(
+                                DevAction(stringResource(R.string.dev_options_sync_backup_worker)) {
+                                    scope.launch {
+                                        RememberBackupWork.updateSchedule(context, backupPrefs.snapshot())
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_workers_synced), Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                DevAction(stringResource(R.string.dev_options_sync_update_worker)) {
+                                    scope.launch {
+                                        UpdateCheckWorkScheduler(context.applicationContext, updatePrefs).syncFromPreferences()
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_workers_synced), Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                DevAction(stringResource(R.string.dev_options_sync_trash_worker)) {
+                                    RememberTrashSweepWork.ensureScheduled(context)
+                                    Toast.makeText(context, resources.getString(R.string.dev_options_toast_workers_synced), Toast.LENGTH_SHORT).show()
+                                },
+                            ),
                     )
+                    Spacer(Modifier.height(24.dp))
                 }
-                Spacer(Modifier.height(24.dp))
+
+                // Diagnostic tools
+                item(key = "diagnostics") {
+                    SettingsExpandableSection(
+                        sectionKey = "dev_options_diagnostics",
+                        materialSymbolName = "bug_report",
+                        title = stringResource(R.string.dev_options_section_diagnostics),
+                        collapsedSectionKeys = if (diagnosticsCollapsed) setOf("dev_options_diagnostics") else emptySet(),
+                        onCollapsedSectionKeysChange = { collapsedKeys ->
+                            diagnosticsCollapsed = "dev_options_diagnostics" in collapsedKeys
+                            DevOptionsScreenSessionState.diagnosticsCollapsed = diagnosticsCollapsed
+                        },
+                    ) {
+                        GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
+                            GroupedListItem(position = GroupPosition.FIRST) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_force_refresh),
+                                    onClick = {
+                                        scope.launch { notesWidgetUpdater.refreshAll() }
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_refresh), Toast.LENGTH_SHORT).show()
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_force_crash),
+                                    onClick = {
+                                        Handler(Looper.getMainLooper()).post {
+                                            throw DeveloperTriggeredCrashException("Developer-triggered crash")
+                                        }
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_copy_diagnostics),
+                                    onClick = {
+                                        DiagnosticLog.record(context, "Diagnostic dump copied from Developer options")
+                                        val file = DiagnosticLog.createShareFile(context)
+                                        val text = runCatching { file.readText() }.getOrElse { "Failed to read diagnostic log" }
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                        clipboard.setPrimaryClip(ClipData.newPlainText("Diagnostics", text))
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_diagnostics_copied), Toast.LENGTH_SHORT).show()
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_export_logs),
+                                    onClick = {
+                                        DiagnosticLog.record(context, "Diagnostic log exported from Developer options")
+                                        val diagnosticsFile = DiagnosticLog.createShareFile(context)
+                                        val diagnosticsUri =
+                                            FileProvider.getUriForFile(
+                                                context,
+                                                "${context.packageName}.fileprovider",
+                                                diagnosticsFile,
+                                            )
+                                        val shareIntent =
+                                            Intent(Intent.ACTION_SEND).apply {
+                                                setDataAndType(diagnosticsUri, "text/plain")
+                                                putExtra(Intent.EXTRA_STREAM, diagnosticsUri)
+                                                putExtra(Intent.EXTRA_TITLE, diagnosticsFile.name)
+                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, diagnosticsUri)
+                                            }
+                                        runCatching { context.startActivity(Intent.createChooser(shareIntent, resources.getString(R.string.dev_options_export_logs_chooser))) }
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.LAST) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_clear_logs),
+                                    onClick = {
+                                        java.io.File(context.filesDir, "diagnostics/remember-diagnostics.log").delete()
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_logs_cleared), Toast.LENGTH_SHORT).show()
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
+
+                // Reset
+                item(key = "reset") {
+                    SettingsExpandableSection(
+                        sectionKey = "dev_options_reset",
+                        materialSymbolName = "restart_alt",
+                        title = stringResource(R.string.dev_options_section_reset),
+                        collapsedSectionKeys = if (resetCollapsed) setOf("dev_options_reset") else emptySet(),
+                        onCollapsedSectionKeysChange = { collapsedKeys ->
+                            resetCollapsed = "dev_options_reset" in collapsedKeys
+                            DevOptionsScreenSessionState.resetCollapsed = resetCollapsed
+                        },
+                    ) {
+                        GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
+                            GroupedListItem(position = GroupPosition.FIRST) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_reset_first_launch),
+                                    onClick = {
+                                        scope.launch { onboardingPrefs.resetIntroSeen() }
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_first_launch_reset), Toast.LENGTH_SHORT).show()
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_reset_skipped_update),
+                                    onClick = {
+                                        scope.launch { updatePrefs.clearGithubReleaseAck() }
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_skipped_cleared), Toast.LENGTH_SHORT).show()
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_clear_update_dedupe),
+                                    onClick = {
+                                        scope.launch { updatePrefs.clearUpdateLastNotifiedDedupeKey() }
+                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_update_dedupe_cleared), Toast.LENGTH_SHORT).show()
+                                    },
+                                )
+                            }
+                            GroupedListItem(position = GroupPosition.LAST) {
+                                DevActionRow(
+                                    label = stringResource(R.string.dev_options_delete_cached_update_apk),
+                                    onClick = {
+                                        scope.launch {
+                                            val deleted =
+                                                withContext(Dispatchers.IO) {
+                                                    java.io.File(context.cacheDir, REMEMBER_UPDATE_APK_CACHE_NAME).delete()
+                                                }
+                                            val message =
+                                                if (deleted) {
+                                                    R.string.dev_options_toast_cached_update_apk_deleted
+                                                } else {
+                                                    R.string.dev_options_toast_no_cached_update_apk
+                                                }
+                                            Toast.makeText(context, resources.getString(message), Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { showResetPrefsConfirm = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.error,
+                                    contentColor = MaterialTheme.colorScheme.onError,
+                                ),
+                            shape = MaterialTheme.shapes.large,
+                        ) {
+                            Text(
+                                text = stringResource(R.string.dev_options_reset_all),
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(24.dp))
+                }
             }
+
+            DevDeveloperModeHeader(
+                developerOptionsEnabled = isEnabled,
+                topPadding = padding.calculateTopPadding(),
+                allSectionsCollapsed = allDevOptionsSectionsCollapsed,
+                onNavigateBack = onBack,
+                onToggleAllSections = {
+                    val collapsed = !allDevOptionsSectionsCollapsed
+                    infoCollapsed = collapsed
+                    settingsCollapsed = collapsed
+                    mockOperationsCollapsed = collapsed
+                    workersCollapsed = collapsed
+                    diagnosticsCollapsed = collapsed
+                    resetCollapsed = collapsed
+                    DevOptionsScreenSessionState.infoCollapsed = collapsed
+                    DevOptionsScreenSessionState.settingsCollapsed = collapsed
+                    DevOptionsScreenSessionState.mockOperationsCollapsed = collapsed
+                    DevOptionsScreenSessionState.workersCollapsed = collapsed
+                    DevOptionsScreenSessionState.diagnosticsCollapsed = collapsed
+                    DevOptionsScreenSessionState.resetCollapsed = collapsed
+                },
+                onDeveloperOptionsEnabledChange = { enabled ->
+                    scope.launch { devModePrefs.setEnabled(enabled) }
+                    if (!enabled) onBack()
+                },
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .zIndex(1f)
+                        .onSizeChanged { size ->
+                            developerModeHeaderHeightPx = size.height
+                        },
+            )
         }
     }
 }
@@ -711,16 +798,126 @@ private data class DevAction(
 )
 
 @Composable
+private fun DevDeveloperModeHeader(
+    developerOptionsEnabled: Boolean,
+    topPadding: androidx.compose.ui.unit.Dp,
+    allSectionsCollapsed: Boolean,
+    onNavigateBack: () -> Unit,
+    onToggleAllSections: () -> Unit,
+    onDeveloperOptionsEnabledChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Box(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .background(Color.Transparent)
+                .padding(
+                    start = 4.dp,
+                    top = topPadding + 8.dp,
+                    end = 4.dp,
+                    bottom = 8.dp,
+                ),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RememberFilledTonalIconButton(
+                onClick = onNavigateBack,
+                shape = CircleShape,
+                tooltipLabel = stringResource(R.string.dev_options_back_cd),
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name = "arrow_back",
+                    size = 22.dp,
+                )
+            }
+            DevDeveloperModeCard(
+                developerOptionsEnabled = developerOptionsEnabled,
+                onDeveloperOptionsEnabledChange = onDeveloperOptionsEnabledChange,
+                modifier = Modifier.weight(1f),
+            )
+            val expandCollapseAllLabel =
+                stringResource(
+                    if (allSectionsCollapsed) {
+                        R.string.settings_expand_all_sections_cd
+                    } else {
+                        R.string.settings_collapse_all_sections_cd
+                    },
+                )
+            RememberFilledTonalIconButton(
+                onClick = onToggleAllSections,
+                modifier =
+                    Modifier.semantics {
+                        contentDescription = expandCollapseAllLabel
+                    },
+                shape = CircleShape,
+                tooltipLabel = expandCollapseAllLabel,
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name = if (allSectionsCollapsed) "unfold_more" else "unfold_less",
+                    size = 22.dp,
+                    weight = FontWeight.Medium,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DevDeveloperModeCard(
+    developerOptionsEnabled: Boolean,
+    onDeveloperOptionsEnabledChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    GroupedListColumn(modifier = modifier.fillMaxWidth()) {
+        GroupedListItem(
+            position = GroupPosition.ONLY,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.dev_options_title),
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = stringResource(R.string.dev_options_mode_subtitle),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Switch(
+                    checked = developerOptionsEnabled,
+                    onCheckedChange = onDeveloperOptionsEnabledChange,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun NotificationButtonGrid(
     context: Context,
     noteRepository: NoteRepository,
     scope: CoroutineScope,
 ) {
+    val lowNotificationTitle = stringResource(R.string.dev_options_test_notif_low_title)
+    val defaultNotificationTitle = stringResource(R.string.dev_options_test_notif_default_title)
+    val highNotificationTitle = stringResource(R.string.dev_options_test_notif_high_title)
     val labels =
         listOf(
-            stringResource(R.string.dev_options_notif_low) to { fireNotifWithNote(context, noteRepository, scope, context.getString(R.string.dev_options_test_notif_low_title), Importance.LOW) },
-            stringResource(R.string.dev_options_notif_default) to { fireNotifWithNote(context, noteRepository, scope, context.getString(R.string.dev_options_test_notif_default_title), Importance.DEFAULT) },
-            stringResource(R.string.dev_options_notif_high) to { fireNotifWithNote(context, noteRepository, scope, context.getString(R.string.dev_options_test_notif_high_title), Importance.HIGH) },
+            stringResource(R.string.dev_options_notif_low) to { fireNotifWithNote(context, noteRepository, scope, lowNotificationTitle, Importance.LOW) },
+            stringResource(R.string.dev_options_notif_default) to { fireNotifWithNote(context, noteRepository, scope, defaultNotificationTitle, Importance.DEFAULT) },
+            stringResource(R.string.dev_options_notif_high) to { fireNotifWithNote(context, noteRepository, scope, highNotificationTitle, Importance.HIGH) },
             stringResource(R.string.dev_options_notif_big_picture) to { fireNotifBigPicture(context, noteRepository, scope) },
             stringResource(R.string.dev_options_notif_big_text) to { fireNotifBigText(context, noteRepository, scope) },
             stringResource(R.string.dev_options_notif_summary) to { fireTestSummary(context) },
@@ -744,18 +941,29 @@ private fun NotificationButtonGrid(
 private fun DevActionSection(
     iconName: String,
     title: String,
+    sectionKey: String,
+    collapsed: Boolean,
+    onCollapsedChange: (Boolean) -> Unit,
     actions: List<DevAction>,
 ) {
-    SettingsStaticSectionHeader(materialSymbolName = iconName, title = title)
-    Spacer(Modifier.height(8.dp))
-    GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
-        actions.forEachIndexed { index, action ->
-            GroupedListItem(position = groupPositionFor(index, actions.size)) {
-                DevActionRow(
-                    label = action.label,
-                    enabled = action.enabled,
-                    onClick = action.onClick,
-                )
+    SettingsExpandableSection(
+        sectionKey = sectionKey,
+        materialSymbolName = iconName,
+        title = title,
+        collapsedSectionKeys = if (collapsed) setOf(sectionKey) else emptySet(),
+        onCollapsedSectionKeysChange = { collapsedKeys ->
+            onCollapsedChange(sectionKey in collapsedKeys)
+        },
+    ) {
+        GroupedListColumn(modifier = Modifier.fillMaxWidth()) {
+            actions.forEachIndexed { index, action ->
+                GroupedListItem(position = groupPositionFor(index, actions.size)) {
+                    DevActionRow(
+                        label = action.label,
+                        enabled = action.enabled,
+                        onClick = action.onClick,
+                    )
+                }
             }
         }
     }

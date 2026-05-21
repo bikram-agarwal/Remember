@@ -197,8 +197,8 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val inlineCodeClose = source.indexOf('`', currentIndex + 1)
-            if (source.startsWith("`", currentIndex) && inlineCodeClose > currentIndex) {
+            val inlineCodeClose = source.indexOfClosingMarker("`", currentIndex + 1)
+            if (source.startsWith("`", currentIndex) && source.isValidOpening(currentIndex, 1) && inlineCodeClose > currentIndex) {
                 withStyle(inlineCodeSpanStyle) {
                     append(source.substring(currentIndex + 1, inlineCodeClose))
                 }
@@ -215,8 +215,8 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val strikeClose = source.indexOf("~~", currentIndex + 2)
-            if (source.startsWith("~~", currentIndex) && strikeClose > currentIndex) {
+            val strikeClose = source.indexOfClosingMarker("~~", currentIndex + 2)
+            if (source.startsWith("~~", currentIndex) && source.isValidOpening(currentIndex, 2) && strikeClose > currentIndex) {
                 withStyle(strikethroughSpanStyle) {
                     appendInlineMarkdown(source = source.substring(currentIndex + 2, strikeClose))
                 }
@@ -224,8 +224,8 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val boldItalicClose = source.indexOf("***", currentIndex + 3)
-            if (source.startsWith("***", currentIndex) && boldItalicClose > currentIndex) {
+            val boldItalicClose = source.indexOfClosingMarker("***", currentIndex + 3)
+            if (source.startsWith("***", currentIndex) && source.isValidOpening(currentIndex, 3) && boldItalicClose > currentIndex) {
                 withStyle(boldSpanStyle) {
                     withStyle(italicSpanStyle) {
                         appendInlineMarkdown(source = source.substring(currentIndex + 3, boldItalicClose))
@@ -235,8 +235,8 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val boldClose = source.indexOf("**", currentIndex + 2)
-            if (source.startsWith("**", currentIndex) && boldClose > currentIndex) {
+            val boldClose = source.indexOfClosingMarker("**", currentIndex + 2)
+            if (source.startsWith("**", currentIndex) && source.isValidOpening(currentIndex, 2) && boldClose > currentIndex) {
                 withStyle(boldSpanStyle) {
                     appendInlineMarkdown(source = source.substring(currentIndex + 2, boldClose))
                 }
@@ -244,8 +244,8 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val italicClose = source.indexOf('*', currentIndex + 1)
-            if (source.startsWith("*", currentIndex) && italicClose > currentIndex) {
+            val italicClose = source.indexOfClosingMarker("*", currentIndex + 1)
+            if (source.startsWith("*", currentIndex) && source.isValidOpening(currentIndex, 1) && italicClose > currentIndex) {
                 withStyle(italicSpanStyle) {
                     appendInlineMarkdown(source = source.substring(currentIndex + 1, italicClose))
                 }
@@ -461,4 +461,32 @@ private fun String.withHttpScheme(): String {
         return this
     }
     return "https://$this"
+}
+
+private fun String.indexOfClosingMarker(
+    marker: String,
+    startIndex: Int,
+): Int {
+    var index = indexOf(marker, startIndex)
+    while (index != -1) {
+        val markerChar = marker[0]
+        val hasPrecedingMarkerChar = index > 0 && this[index - 1] == markerChar
+        val hasFollowingMarkerChar = index + marker.length < length && this[index + marker.length] == markerChar
+        if (!hasPrecedingMarkerChar && !hasFollowingMarkerChar) {
+            val prevChar = getOrNull(index - 1)
+            if (prevChar != null && !prevChar.isWhitespace()) {
+                return index
+            }
+        }
+        index = indexOf(marker, index + 1)
+    }
+    return -1
+}
+
+private fun String.isValidOpening(
+    index: Int,
+    markerLength: Int,
+): Boolean {
+    val nextChar = getOrNull(index + markerLength)
+    return nextChar != null && !nextChar.isWhitespace()
 }

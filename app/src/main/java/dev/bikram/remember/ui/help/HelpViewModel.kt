@@ -30,15 +30,21 @@ class HelpViewModel
         private val keywordMap: Map<String, Set<String>> =
             context.assets.open("HELP_KEYWORDS.txt").bufferedReader().use { reader ->
                 buildMap {
-                    reader.lineSequence()
+                    reader
+                        .lineSequence()
                         .map { it.trim() }
                         .filter { it.isNotEmpty() && !it.startsWith("#") }
                         .forEach { line ->
                             val arrow = line.indexOf("->")
                             if (arrow < 0) return@forEach
                             val phrase = line.substring(0, arrow).trim().lowercase()
-                            val titles = line.substring(arrow + 2).split("|")
-                                .map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+                            val titles =
+                                line
+                                    .substring(arrow + 2)
+                                    .split("|")
+                                    .map { it.trim() }
+                                    .filter { it.isNotEmpty() }
+                                    .toSet()
                             if (phrase.isNotEmpty() && titles.isNotEmpty()) {
                                 put(phrase, titles)
                             }
@@ -61,15 +67,19 @@ class HelpViewModel
                     } else {
                         val q = query.trim().lowercase()
                         // Keyword map: collect all subsection titles matched by any phrase in the query
-                        val keywordHits: Set<String> = keywordMap.entries
-                            .filter { (phrase, _) -> q.contains(phrase) }
-                            .flatMapTo(mutableSetOf()) { (_, titles) -> titles }
-                        val tokens = q.split(Regex("\\s+"))
-                            .filter { it.length >= 3 && it !in searchStopwords }
+                        val keywordHits: Set<String> =
+                            keywordMap.entries
+                                .filter { (phrase, _) -> q.contains(phrase) }
+                                .flatMapTo(mutableSetOf()) { (_, titles) -> titles }
+                        val tokens =
+                            q
+                                .split(Regex("\\s+"))
+                                .filter { it.length >= 3 && it !in searchStopwords }
                         sections.mapNotNull { section ->
-                            val matching = section.subsections.filter { sub ->
-                                sub.title in keywordHits || subsectionMatchesQuery(sub, q, tokens)
-                            }
+                            val matching =
+                                section.subsections.filter { sub ->
+                                    sub.title in keywordHits || subsectionMatchesQuery(sub, q, tokens)
+                                }
                             if (matching.isEmpty()) null else section.copy(subsections = matching)
                         }
                     }
@@ -80,7 +90,10 @@ class HelpViewModel
         var scrollOffset: Int = 0
             private set
 
-        fun setExpanded(key: String, expanded: Boolean) {
+        fun setExpanded(
+            key: String,
+            expanded: Boolean,
+        ) {
             _expandedKeys.value =
                 if (expanded) _expandedKeys.value + key else _expandedKeys.value - key
         }
@@ -97,7 +110,10 @@ class HelpViewModel
             _searchQuery.value = query
         }
 
-        fun saveScrollState(index: Int, offset: Int) {
+        fun saveScrollState(
+            index: Int,
+            offset: Int,
+        ) {
             scrollIndex = index
             scrollOffset = offset
         }
@@ -121,11 +137,40 @@ class HelpViewModel
         }
 
         companion object {
-            private val searchStopwords = setOf(
-                "not", "the", "and", "for", "are", "but", "can", "how", "why",
-                "its", "you", "was", "has", "did", "this", "that", "with",
-                "have", "will", "your", "any", "all", "also", "from", "into",
-                "when", "then", "than", "them", "they", "just", "been",
-            )
+            private val searchStopwords =
+                setOf(
+                    "not",
+                    "the",
+                    "and",
+                    "for",
+                    "are",
+                    "but",
+                    "can",
+                    "how",
+                    "why",
+                    "its",
+                    "you",
+                    "was",
+                    "has",
+                    "did",
+                    "this",
+                    "that",
+                    "with",
+                    "have",
+                    "will",
+                    "your",
+                    "any",
+                    "all",
+                    "also",
+                    "from",
+                    "into",
+                    "when",
+                    "then",
+                    "than",
+                    "them",
+                    "they",
+                    "just",
+                    "been",
+                )
         }
     }

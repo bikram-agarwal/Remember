@@ -135,7 +135,7 @@ fun MainTabScaffold(
             githubRepoForSourceLink.isNotEmpty() -> "https://github.com/$githubRepoForSourceLink/releases/latest"
             else -> playStoreListingUrl
         }
-    val shareText = context.getString(R.string.about_share_text, shareUrl)
+    val shareText = stringResource(R.string.about_share_text, shareUrl)
     val shareChooserTitle = stringResource(R.string.main_share_chooser_title)
 
     // Back handling: when the FAB speed dial is open, back closes it first. Tab route

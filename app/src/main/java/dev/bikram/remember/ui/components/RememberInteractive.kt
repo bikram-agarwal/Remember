@@ -348,14 +348,17 @@ fun RememberOutlinedButton(
     content: @Composable RowScope.() -> Unit,
 ) {
     val playTap = rememberPlayTapSound()
-    val resolvedBorder = border ?: BorderStroke(
-        width = 1.dp,
-        color = if (enabled) {
-            androidx.compose.material3.MaterialTheme.colorScheme.primary
-        } else {
-            androidx.compose.material3.MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-        },
-    )
+    val resolvedBorder =
+        border ?: BorderStroke(
+            width = 1.dp,
+            color =
+                if (enabled) {
+                    androidx.compose.material3.MaterialTheme.colorScheme.primary
+                } else {
+                    androidx.compose.material3.MaterialTheme.colorScheme.onSurface
+                        .copy(alpha = 0.12f)
+                },
+        )
     OutlinedButton(
         onClick = {
             playTap()

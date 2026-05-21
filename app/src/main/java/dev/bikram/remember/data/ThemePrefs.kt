@@ -168,14 +168,19 @@ class ThemePrefs(
     suspend fun setActiveCustomSeed(hex: String) {
         val normalized = normalizeHex(hex) ?: return
         context.themePrefsDataStore.edit { p ->
+            val storedSeeds = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty())
             val matchedStored =
-                decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty())
+                storedSeeds
                     .firstOrNull { stored ->
                         normalizeHex(stored) == normalized
                     }
-                    ?: return@edit
-            val matchedNorm = normalizeHex(matchedStored) ?: return@edit
-            p[Keys.ACTIVE_CUSTOM_SEED] = matchedNorm
+            if (matchedStored == null) {
+                p[Keys.CUSTOM_SEEDS] = encodeSeeds(storedSeeds + normalized)
+            }
+            p[Keys.ACTIVE_CUSTOM_SEED] =
+                matchedStored?.let { stored ->
+                    normalizeHex(stored) ?: stored
+                } ?: normalized
             p[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
         }
     }

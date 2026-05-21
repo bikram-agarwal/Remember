@@ -660,11 +660,11 @@ private fun PermissionStatusCard(
                             )
                     },
                     label = "permissionCardAction",
-                ) {
+                ) { currentActionEnabled ->
                     if (primaryAction) {
                         RememberButton(
                             onClick = onAction,
-                            enabled = actionEnabled,
+                            enabled = currentActionEnabled,
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.extraExtraLarge,
                             contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
@@ -684,7 +684,7 @@ private fun PermissionStatusCard(
                     } else {
                         RememberButton(
                             onClick = onAction,
-                            enabled = actionEnabled,
+                            enabled = currentActionEnabled,
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.extraExtraLarge,
                             contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
