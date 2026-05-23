@@ -53,12 +53,13 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -92,8 +93,6 @@ import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.LocalHapticEnabled
-import dev.bikram.remember.ui.feedback.performRejectHaptic
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.colorSourceSpecFor
 import dev.bikram.remember.ui.theme.contrastingTextColor
@@ -558,9 +557,8 @@ private fun EditableHexValue(
     onStopEditing: () -> Unit,
     onBoundsChange: (Rect?) -> Unit,
 ) {
-    val view = LocalView.current
-    val hapticEnabled = LocalHapticEnabled.current
     val shape = CircleShape
+    val haptic = LocalHapticFeedback.current
     val textStyle =
         MaterialTheme.typography.labelMedium.copy(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -618,8 +616,8 @@ private fun EditableHexValue(
                 val acceptedValue = value.acceptPrefixedHexInput()
                 if (acceptedValue != null) {
                     onDraftChange(acceptedValue)
-                } else if (hapticEnabled) {
-                    view.performRejectHaptic()
+                } else {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
             },
             modifier =

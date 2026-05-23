@@ -106,7 +106,6 @@ import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
@@ -778,7 +777,6 @@ private fun IconPickerEmojiContent(
             collapseEmojiSkinToneVariants(filteredEmojis, emojiSkinToneIndex)
         }
     val categoryFadeSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
-    val playTap = rememberPlayTapSound()
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -792,7 +790,6 @@ private fun IconPickerEmojiContent(
                     FilterChip(
                         selected = selectedCategoryKey == EMOJI_STARRED_CATEGORY_KEY,
                         onClick = {
-                            playTap()
                             onCategorySelected(EMOJI_STARRED_CATEGORY_KEY)
                         },
                         label = { Text(stringResource(R.string.icon_picker_starred)) },
@@ -807,7 +804,6 @@ private fun IconPickerEmojiContent(
                     FilterChip(
                         selected = category.key == selectedCategoryKey,
                         onClick = {
-                            playTap()
                             onCategorySelected(category.key)
                         },
                         label = { Text(stringResource(category.labelRes)) },

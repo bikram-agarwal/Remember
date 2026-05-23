@@ -2,7 +2,6 @@ package dev.bikram.remember.data
 
 import android.content.Context
 import androidx.compose.runtime.Immutable
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -16,7 +15,6 @@ import org.json.JSONObject
 
 @Immutable
 data class InteractionState(
-    val hapticFeedbackEnabled: Boolean = true,
     val swipeGestureMode: SwipeGestureMode = SwipeGestureMode.REVEAL_ACTIONS,
     val swipeStartToEnd: NoteSwipeAction = NoteSwipeAction.EDIT,
     val swipeEndToStart: NoteSwipeAction = NoteSwipeAction.TRASH,
@@ -41,7 +39,6 @@ class InteractionPrefs(
     private val context: Context,
 ) {
     private object Keys {
-        val HAPTIC = booleanPreferencesKey("haptic_feedback_enabled")
         val SWIPE_GESTURE_MODE = stringPreferencesKey("swipe_gesture_mode")
         val SWIPE_START_TO_END = stringPreferencesKey("swipe_start_to_end")
         val SWIPE_END_TO_START = stringPreferencesKey("swipe_end_to_start")
@@ -56,7 +53,6 @@ class InteractionPrefs(
     val state: Flow<InteractionState> =
         context.interactionDataStore.data.map { prefs ->
             InteractionState(
-                hapticFeedbackEnabled = prefs[Keys.HAPTIC] ?: true,
                 swipeGestureMode =
                     prefs[Keys.SWIPE_GESTURE_MODE]
                         ?.let { runCatching { SwipeGestureMode.valueOf(it) }.getOrNull() }
@@ -89,10 +85,6 @@ class InteractionPrefs(
                     ),
             )
         }
-
-    suspend fun setHapticFeedbackEnabled(enabled: Boolean) {
-        context.interactionDataStore.edit { it[Keys.HAPTIC] = enabled }
-    }
 
     suspend fun setSwipeGestureMode(mode: SwipeGestureMode) {
         context.interactionDataStore.edit { it[Keys.SWIPE_GESTURE_MODE] = mode.name }
@@ -143,7 +135,6 @@ class InteractionPrefs(
     suspend fun exportForBackup(): JSONObject {
         val prefs = context.interactionDataStore.data.first()
         return JSONObject().apply {
-            put(Keys.HAPTIC.name, prefs[Keys.HAPTIC] ?: true)
             put(Keys.SWIPE_GESTURE_MODE.name, prefs[Keys.SWIPE_GESTURE_MODE] ?: SwipeGestureMode.REVEAL_ACTIONS.name)
             put(Keys.SWIPE_START_TO_END.name, prefs[Keys.SWIPE_START_TO_END].orEmpty())
             put(Keys.SWIPE_END_TO_START.name, prefs[Keys.SWIPE_END_TO_START].orEmpty())
@@ -159,9 +150,6 @@ class InteractionPrefs(
     suspend fun importFromBackup(json: JSONObject?) {
         if (json == null || json.length() == 0) return
         context.interactionDataStore.edit { mutable ->
-            if (json.has(Keys.HAPTIC.name) && !json.isNull(Keys.HAPTIC.name)) {
-                mutable[Keys.HAPTIC] = json.getBoolean(Keys.HAPTIC.name)
-            }
             if (json.has(Keys.SWIPE_GESTURE_MODE.name) && !json.isNull(Keys.SWIPE_GESTURE_MODE.name)) {
                 mutable[Keys.SWIPE_GESTURE_MODE] = json.getString(Keys.SWIPE_GESTURE_MODE.name)
             }

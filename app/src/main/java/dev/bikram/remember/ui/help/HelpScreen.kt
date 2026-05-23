@@ -66,7 +66,6 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
@@ -327,7 +326,6 @@ private fun HelpSubsectionCard(
     val contentDescriptionExpand = stringResource(R.string.section_expand_cd, subsection.title)
     val contentDescriptionCollapse = stringResource(R.string.section_collapse_cd, subsection.title)
     val interactionSource = remember { MutableInteractionSource() }
-    val playTap = rememberPlayTapSound()
 
     GroupedListItem(position = groupPosition) {
         Column {
@@ -342,7 +340,6 @@ private fun HelpSubsectionCard(
                             interactionSource = interactionSource,
                             indication = LocalIndication.current,
                         ) {
-                            playTap()
                             onToggle()
                         }.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,

@@ -962,30 +962,6 @@ fun SettingsRoute(
                 }
             }
 
-            item(key = "haptics") {
-                SettingsExpandableSection(
-                    sectionKey = "haptics",
-                    materialSymbolName = "vibration",
-                    title = stringResource(R.string.settings_haptics_section),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                ) {
-                    GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.ONLY) {
-                            SettingsToggleRow(
-                                materialSymbolName = "vibration",
-                                title = stringResource(R.string.settings_haptic_feedback),
-                                subtitle = stringResource(R.string.settings_haptic_feedback_desc),
-                                checked = interactionState.hapticFeedbackEnabled,
-                                onCheckedChange = { enabled ->
-                                    scope.launch { interactionPrefs.setHapticFeedbackEnabled(enabled) }
-                                },
-                            )
-                        }
-                    }
-                }
-            }
-
             item(key = "security") {
                 Column(
                     modifier =

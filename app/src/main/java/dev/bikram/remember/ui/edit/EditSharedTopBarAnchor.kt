@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 
 @Composable
 internal fun ExpandedEditorSharedTopBarAnchor(
@@ -108,7 +107,6 @@ internal fun EditorHeaderIcon(
     onClick: (() -> Unit)? = null,
 ) {
     val iconContentDescription = stringResource(R.string.options_icon_cd)
-    val playTap = rememberPlayTapSound()
     val iconInteractionSource = remember { MutableInteractionSource() }
     val interactiveModifier =
         modifier.let { baseModifier ->
@@ -118,11 +116,9 @@ internal fun EditorHeaderIcon(
                         interactionSource = iconInteractionSource,
                         indication = null,
                         onClick = {
-                            playTap()
                             onClick()
                         },
-                    )
-                    .semantics { contentDescription = iconContentDescription }
+                    ).semantics { contentDescription = iconContentDescription }
             } else {
                 baseModifier
             }

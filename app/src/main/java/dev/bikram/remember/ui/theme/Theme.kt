@@ -8,8 +8,6 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
-import android.view.SoundEffectConstants
-import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -32,35 +30,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemeState
-import dev.bikram.remember.ui.feedback.LocalHapticEnabled
-import dev.bikram.remember.ui.feedback.LocalTapSound
 
 val LocalIsDark = staticCompositionLocalOf { false }
-
-private const val MIN_TAP_SOUND_SPACING_MS = 85L
-
-private class TapSoundPlayer(
-    private val view: View,
-) {
-    private var tapSoundReady = true
-
-    fun play() {
-        if (!tapSoundReady) return
-        tapSoundReady = false
-        view.playSoundEffect(SoundEffectConstants.CLICK)
-        view.handler?.postDelayed(
-            {
-                tapSoundReady = true
-            },
-            MIN_TAP_SOUND_SPACING_MS,
-        ) ?: run {
-            tapSoundReady = true
-        }
-    }
-}
 
 /**
  * Pass [paintBackground] = false when the host activity is translucent (e.g. the snooze
@@ -72,7 +45,6 @@ private class TapSoundPlayer(
 @Composable
 fun RememberTheme(
     themeState: ThemeState = ThemeState(),
-    interactionState: InteractionState = InteractionState(),
     paintBackground: Boolean = true,
     content: @Composable () -> Unit,
 ) {
@@ -99,19 +71,6 @@ fun RememberTheme(
         )
 
     val view = LocalView.current
-    LaunchedEffect(view) {
-        view.isSoundEffectsEnabled = true
-        var walkContext: android.content.Context? = view.context
-        var hostingActivity: android.app.Activity? = null
-        while (walkContext != null) {
-            if (walkContext is android.app.Activity) {
-                hostingActivity = walkContext
-                break
-            }
-            walkContext = (walkContext as? android.content.ContextWrapper)?.baseContext
-        }
-        hostingActivity?.window?.decorView?.isSoundEffectsEnabled = true
-    }
     LaunchedEffect(view, darkTheme) {
         if (view.isInEditMode) return@LaunchedEffect
         val window = (view.context as? android.app.Activity)?.window ?: return@LaunchedEffect
@@ -121,11 +80,6 @@ fun RememberTheme(
         }
     }
 
-    val playTapSound =
-        remember(view) {
-            TapSoundPlayer(view)::play
-        }
-
     CompositionLocalProvider(
         LocalIsDark provides darkTheme,
         LocalUseGradient provides effectiveUseGradient,
@@ -133,8 +87,6 @@ fun RememberTheme(
         LocalBlurBars provides themeState.blurBars,
         LocalUseEnhancedShading provides themeState.useEnhancedShading,
         LocalThemeState provides themeState,
-        LocalTapSound provides playTapSound,
-        LocalHapticEnabled provides interactionState.hapticFeedbackEnabled,
         LocalReducedMotion provides reducedMotion,
     ) {
         MaterialExpressiveTheme(

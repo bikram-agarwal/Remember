@@ -29,7 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberOutlinedButton
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 
@@ -118,11 +117,9 @@ internal fun SettingsInfoDropdown(
     iconTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
-    val playTap = rememberPlayTapSound()
     Box(modifier = modifier) {
         IconButton(
             onClick = {
-                playTap()
                 menuExpanded = true
             },
             modifier = Modifier.size(32.dp),
@@ -174,7 +171,6 @@ internal fun BackupFolderPickerItem(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
 ) {
-    val playTap = rememberPlayTapSound()
     Row(
         modifier =
             Modifier
@@ -198,7 +194,6 @@ internal fun BackupFolderPickerItem(
         }
         Spacer(Modifier.width(16.dp))
         RememberOutlinedButton(onClick = {
-            playTap()
             onClick()
         }) {
             RememberMaterialRoundedSymbol(

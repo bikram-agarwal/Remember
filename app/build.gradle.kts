@@ -66,12 +66,12 @@ val hasReleaseSigning =
 extensions.configure<ApplicationExtension>("android") {
     val rememberApplicationId = "dev.bikram.remember"
     namespace = rememberApplicationId
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = rememberApplicationId
         minSdk = 31
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 80
         versionName = "0.8.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -175,6 +175,17 @@ detekt {
 
 ktlint {
     android.set(true)
+    version.set("1.8.0")
+}
+
+configurations.named("detekt") {
+    resolutionStrategy {
+        force(
+            "io.github.detekt.sarif4k:sarif4k:0.7.0",
+            "io.github.detekt.sarif4k:sarif4k-jvm:0.7.0",
+            "io.github.oshai:kotlin-logging:8.0.03",
+        )
+    }
 }
 
 dependencies {

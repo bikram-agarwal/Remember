@@ -77,7 +77,6 @@ import dev.bikram.remember.ui.components.UpdateFloatingBar
 import dev.bikram.remember.ui.components.UpdateFloatingFab
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.history.HistorySection
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
@@ -633,7 +632,6 @@ private fun MainFabSlot(
 ) {
     when (tab) {
         MainTab.Notes -> {
-            val playTap = rememberPlayTapSound()
             val createDescription = stringResource(R.string.main_fab_create)
             val closeDescription = stringResource(R.string.main_fab_close)
             val description = if (fabExpanded) closeDescription else createDescription
@@ -674,7 +672,6 @@ private fun MainFabSlot(
                     ToggleFloatingActionButton(
                         checked = fabExpanded,
                         onCheckedChange = {
-                            playTap()
                             onToggleNotesFab()
                         },
                         modifier =

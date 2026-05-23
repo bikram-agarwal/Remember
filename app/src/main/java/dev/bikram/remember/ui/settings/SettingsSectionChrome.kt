@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberSwitch
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
@@ -142,7 +141,6 @@ internal fun SettingsSectionHeader(
     val contentDescriptionExpand = stringResource(R.string.section_expand_cd, title)
     val contentDescriptionCollapse = stringResource(R.string.section_collapse_cd, title)
     val headerInteractionSource = remember { MutableInteractionSource() }
-    val playTap = rememberPlayTapSound()
     val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>())
     val colorSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
     val headerCorner by animateDpAsState(
@@ -218,7 +216,6 @@ internal fun SettingsSectionHeader(
                 interactionSource = headerInteractionSource,
                 indication = null,
             ) {
-                playTap()
                 onToggle()
             }.padding(
                 horizontal = safeHorizontalPadding,

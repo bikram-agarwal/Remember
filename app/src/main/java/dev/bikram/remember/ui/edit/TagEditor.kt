@@ -7,7 +7,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -55,12 +54,13 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -89,8 +89,6 @@ import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.components.parseHexColor
-import dev.bikram.remember.ui.feedback.LocalHapticEnabled
-import dev.bikram.remember.ui.feedback.performRejectHaptic
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -738,9 +736,10 @@ private fun TagSheetIntentChip(
             weight = FontWeight.Medium,
         )
         Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(dotColor, CircleShape)
+            modifier =
+                Modifier
+                    .size(8.dp)
+                    .background(dotColor, CircleShape),
         )
         Text(
             text = tag,
@@ -886,8 +885,6 @@ internal fun EditableTagHexChip(
     onBoundsChange: (Rect?) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val view = LocalView.current
-    val hapticEnabled = LocalHapticEnabled.current
     val contentColor = MaterialTheme.colorScheme.onSurface
     val containerColor = MaterialTheme.colorScheme.surfaceVariant
     val textStyle =
@@ -898,6 +895,7 @@ internal fun EditableTagHexChip(
         )
     val shape = CircleShape
     val focusRequester = remember { FocusRequester() }
+    val haptic = LocalHapticFeedback.current
     var hadFocus by remember(editing) { mutableStateOf(false) }
 
     LaunchedEffect(editing) {
@@ -922,9 +920,10 @@ internal fun EditableTagHexChip(
             horizontalArrangement = Arrangement.Center,
         ) {
             Box(
-                modifier = Modifier
-                    .size(8.dp)
-                    .background(color, CircleShape)
+                modifier =
+                    Modifier
+                        .size(8.dp)
+                        .background(color, CircleShape),
             )
             Spacer(Modifier.width(6.dp))
             Text(
@@ -954,9 +953,10 @@ internal fun EditableTagHexChip(
         horizontalArrangement = Arrangement.Center,
     ) {
         Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(color, CircleShape)
+            modifier =
+                Modifier
+                    .size(8.dp)
+                    .background(color, CircleShape),
         )
         Spacer(Modifier.width(6.dp))
         BasicTextField(
@@ -965,8 +965,8 @@ internal fun EditableTagHexChip(
                 val acceptedValue = value.acceptPrefixedTagHexInput()
                 if (acceptedValue != null) {
                     onDraftChange(acceptedValue)
-                } else if (hapticEnabled) {
-                    view.performRejectHaptic()
+                } else {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
             },
             modifier =

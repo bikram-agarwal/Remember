@@ -43,7 +43,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
@@ -497,28 +496,7 @@ fun HistoryRoute(
         }
     }
 
-    Scaffold(
-        containerColor = Color.Transparent,
-        bottomBar = {
-            HistorySelectionActionBar(
-                visible = inSelectionMode,
-                section = section,
-                selectedCount = selectedIds.size,
-                selectableVisibleIds = selectableVisibleIds,
-                onClearSelection = vm::clearSelection,
-                onSelectAll = { vm.selectNotes(selectableVisibleIds) },
-                onUnselectAll = vm::clearSelection,
-                onRestoreSelected = vm::restoreSelected,
-                onArchiveSelected = vm::archiveSelectedFromTrash,
-                // Permanent delete is gated by a confirmation sheet; the actual VM
-                // call only fires after the user taps Delete in that sheet.
-                onDeleteForeverSelected = { bulkDeleteForeverOpen = true },
-                onUnarchiveSelected = vm::unarchiveSelected,
-                onTrashSelected = vm::moveSelectedArchivedToTrash,
-                bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
-            )
-        },
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         // Blur only on the scroll layer (Home pattern). Top bar sits above so scrim/blur do not
         // paint over the toggles; list contentPadding lets rows scroll under the transparent bar.
         Box(modifier = Modifier.fillMaxSize()) {
@@ -627,7 +605,6 @@ fun HistoryRoute(
                                     vm
                                         .daysLeftInTrash(row.note)
                                         .takeIf { targetSection == HistorySection.TRASH },
-                                hapticEnabled = interactionState.hapticFeedbackEnabled,
                                 onOpenNote = {
                                     if (inSelectionMode) {
                                         vm.toggleSelection(noteId)
@@ -670,6 +647,24 @@ fun HistoryRoute(
                         .zIndex(2f),
             )
         }
+        HistorySelectionActionBar(
+            visible = inSelectionMode,
+            section = section,
+            selectedCount = selectedIds.size,
+            selectableVisibleIds = selectableVisibleIds,
+            onClearSelection = vm::clearSelection,
+            onSelectAll = { vm.selectNotes(selectableVisibleIds) },
+            onUnselectAll = vm::clearSelection,
+            onRestoreSelected = vm::restoreSelected,
+            onArchiveSelected = vm::archiveSelectedFromTrash,
+            // Permanent delete is gated by a confirmation sheet; the actual VM
+            // call only fires after the user taps Delete in that sheet.
+            onDeleteForeverSelected = { bulkDeleteForeverOpen = true },
+            onUnarchiveSelected = vm::unarchiveSelected,
+            onTrashSelected = vm::moveSelectedArchivedToTrash,
+            bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
     }
 
     pendingDeleteForeverNote?.let { noteToDelete ->
@@ -741,6 +736,7 @@ private fun HistorySelectionActionBar(
     onUnarchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
     bottomPadding: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
 ) {
     val spatialSpec =
         reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>())
@@ -748,7 +744,7 @@ private fun HistorySelectionActionBar(
     val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Box(
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .padding(bottom = bottomPadding),
         contentAlignment = Alignment.Center,
@@ -1068,7 +1064,6 @@ private fun HistorySwipeCard(
     model: NoteCardUiModel,
     section: HistorySection,
     daysLeft: Int?,
-    hapticEnabled: Boolean,
     onOpenNote: () -> Unit,
     onRestore: () -> Unit,
     onArchive: () -> Unit,
@@ -1165,7 +1160,6 @@ private fun HistorySwipeCard(
         startActions = startActions,
         endActions = endActions,
         cardShape = MaterialTheme.shapes.medium,
-        hapticEnabled = hapticEnabled,
         modifier = Modifier.fillMaxWidth(),
     ) {
         Box(Modifier.fillMaxWidth()) {

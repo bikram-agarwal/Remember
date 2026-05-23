@@ -11,11 +11,11 @@ kotlin {
 
 extensions.configure<TestExtension>("android") {
     namespace = "dev.bikram.remember.baselineprofile"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 30
-        targetSdk = 36
+        targetSdk = 37
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

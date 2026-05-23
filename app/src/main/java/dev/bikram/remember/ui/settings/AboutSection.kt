@@ -55,7 +55,6 @@ import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.pillShape
 
@@ -149,7 +148,6 @@ private fun AboutSettingsBlock(
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
-    val playTap = rememberPlayTapSound()
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
     val profileUrl = stringResource(R.string.about_author_github_profile_url)
@@ -258,7 +256,6 @@ private fun AboutSettingsBlock(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null,
                                     onClick = {
-                                        playTap()
                                         onOpenIntro()
                                     },
                                 ),

@@ -729,11 +729,8 @@
     <string name="help_search_placeholder">Search</string>
     <string name="help_no_results">No results</string>
 
-    <!-- Settings: haptics, notifications, swipe -->
-    <string name="settings_haptics_section">Haptics</string>
+    <!-- Settings: notifications, swipe -->
     <string name="settings_notifications_section">Notifications</string>
-    <string name="settings_haptic_feedback">Haptic feedback</string>
-    <string name="settings_haptic_feedback_desc">Light vibration when passing a swipe threshold</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_desc">Reminders and system alerts</string>
     <string name="settings_keep_reminders_until_done">Keep reminder notifications until done</string>

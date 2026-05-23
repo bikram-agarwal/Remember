@@ -24,7 +24,25 @@ What to run at each stage of the development loop.
 | Play Store-only source or build config | `.\gradlew.bat :app:compilePlaystoreDebugKotlin` |
 | Android API, manifest, permissions, resources, or Gradle config | `.\gradlew.bat :app:lintGithubDebug` |
 | R8 / resource shrinking | `.\gradlew.bat :app:assembleGithubDevRelease` |
+| Dependency upgrade sweep | `.\gradlew.bat checkDependencyUpdates` |
+| Formatting cleanup before rechecking | `.\gradlew.bat :app:ktlintFormat` |
 | Lint issue intentionally fixed or suppressed | `.\gradlew.bat :app:updateLintBaseline` — run once, after the code is already correct |
+
+---
+
+## Formatting And Dependency Maintenance
+
+Use these when the task is maintenance-focused rather than part of every edit loop.
+
+| Task | Commands |
+| --- | --- |
+| Check dependency upgrades | `.\gradlew.bat checkDependencyUpdates` |
+| See raw dependency-updates output | `.\gradlew.bat --no-parallel --no-configuration-cache dependencyUpdates` |
+| Format app Kotlin sources | `.\gradlew.bat :app:ktlintFormat` |
+| Format only main app sources | `.\gradlew.bat :app:ktlintMainSourceSetFormat` |
+| Recheck formatting | `.\gradlew.bat :app:ktlintCheck` |
+
+After running a formatter, inspect the diff before keeping the result. Ktlint can touch nearby files that already had style drift, so only keep formatting changes that belong with the current task.
 
 ---
 
@@ -59,6 +77,8 @@ What to run at each stage of the development loop.
 | `:app:testPlaystoreDebugUnitTest` | Runs Play Store debug unit tests |
 | `:app:ktlintMainSourceSetCheck` | Formatting check for main sources only — fast |
 | `:app:ktlintCheck` | Formatting check across all configured source sets |
+| `:app:ktlintMainSourceSetFormat` | Applies ktlint formatting to main sources only |
+| `:app:ktlintFormat` | Applies ktlint formatting across all configured app source sets |
 | `:app:detekt` | Static analysis |
 | `:app:lintGithubDebug` | Full Android lint for the Github debug variant |
 | `:app:lintVitalGithubDevRelease` | Release-vital lint — used in release candidate checks |
@@ -71,6 +91,7 @@ What to run at each stage of the development loop.
 | `:app:uninstallGithubDebug` | Removes Github debug from the connected device |
 | `:app:uninstallPlaystoreDebug` | Removes Play Store debug from the connected device |
 | `checkDependencyUpdates` | Reports available stable dependency updates |
+| `dependencyUpdates` | Raw dependency-updates report; use the flags above for this project |
 | `tasks` | Lists common Gradle tasks |
 | `tasks --all` | Lists every generated task — output is noisy |
 

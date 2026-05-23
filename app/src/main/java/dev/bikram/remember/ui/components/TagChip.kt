@@ -175,9 +175,10 @@ fun TagChipFilled(
             )
         } else {
             Box(
-                modifier = Modifier
-                    .size(if (compact) 6.dp else 8.dp)
-                    .background(color, CircleShape)
+                modifier =
+                    Modifier
+                        .size(if (compact) 6.dp else 8.dp)
+                        .background(color, CircleShape),
             )
         }
         Text(

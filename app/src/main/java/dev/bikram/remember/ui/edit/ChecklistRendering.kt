@@ -128,18 +128,16 @@ internal fun ChecklistRow(
     val animatedIndent by androidx.compose.animation.core
         .animateDpAsState(depthIndent, label = "checklistDepthIndent")
 
-    // Haptics + RTL awareness for the gesture surfaces below.
     val haptic = LocalHapticFeedback.current
-    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
-    // Fire a haptic tick when the user starts a vertical reorder drag (the library transitions
-    // `isDragging` from false to true at drag-start). Matches the feel of the indent gesture
-    // below so both reorder directions are physically acknowledged.
     LaunchedEffect(isDragging) {
         if (isDragging) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
     }
+
+    // RTL awareness for the gesture surfaces below.
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
     // Drag-to-indent gesture: accumulates horizontal movement during a single drag and fires the
     // callback once when a threshold (48.dp ~= fingertip width) is crossed. We only fire once per
