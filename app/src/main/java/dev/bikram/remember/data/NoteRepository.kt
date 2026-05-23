@@ -10,7 +10,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -133,12 +132,7 @@ class NoteRepository(
         return if (fts.isEmpty()) {
             flowOf(emptyList())
         } else {
-            combine(
-                noteDao.searchNotes(fts).flowOn(ioDispatcher),
-                noteDao.observeActive().flowOn(ioDispatcher),
-            ) { ftsMatches, activeNotes ->
-                mergeSearchMatches(ftsMatches, activeNotes, query)
-            }
+            noteDao.searchNotes(fts).flowOn(ioDispatcher)
         }.flowOn(defaultDispatcher)
     }
 
@@ -148,12 +142,7 @@ class NoteRepository(
         return if (fts.isEmpty()) {
             flowOf(emptyList())
         } else {
-            combine(
-                noteDao.searchArchived(fts).flowOn(ioDispatcher),
-                noteDao.observeArchived().flowOn(ioDispatcher),
-            ) { ftsMatches, archivedNotes ->
-                mergeSearchMatches(ftsMatches, archivedNotes, query)
-            }
+            noteDao.searchArchived(fts).flowOn(ioDispatcher)
         }.flowOn(defaultDispatcher)
     }
 
@@ -163,33 +152,8 @@ class NoteRepository(
         return if (fts.isEmpty()) {
             flowOf(emptyList())
         } else {
-            combine(
-                noteDao.searchTrashed(fts).flowOn(ioDispatcher),
-                noteDao.observeTrashed().flowOn(ioDispatcher),
-            ) { ftsMatches, trashedNotes ->
-                mergeSearchMatches(ftsMatches, trashedNotes, query)
-            }
+            noteDao.searchTrashed(fts).flowOn(ioDispatcher)
         }.flowOn(defaultDispatcher)
-    }
-
-    private fun mergeSearchMatches(
-        ftsMatches: List<NoteWithItems>,
-        scopedNotes: List<NoteWithItems>,
-        query: String,
-    ): List<NoteWithItems> {
-        val mergedById = LinkedHashMap<Long, NoteWithItems>()
-        ftsMatches.forEach { noteWithItems ->
-            mergedById[noteWithItems.note.id] = noteWithItems
-        }
-
-        val textFilter = NotesFilter(text = query)
-        scopedNotes
-            .filter { noteWithItems -> textFilter.matches(noteWithItems) }
-            .forEach { noteWithItems ->
-                mergedById.putIfAbsent(noteWithItems.note.id, noteWithItems)
-            }
-
-        return mergedById.values.toList()
     }
 
     suspend fun createNote(
@@ -218,6 +182,7 @@ class NoteRepository(
                     locked = options.locked,
                     iconKey = options.iconKey,
                     actions = options.actions,
+                    actionsText = actionsSearchText(options.actions),
                     tags = options.tags,
                     recurrence = options.recurrence?.sanitized(),
                 ),
@@ -235,12 +200,14 @@ class NoteRepository(
         options: NoteOptions = NoteOptions(),
     ): Long {
         val now = clock()
+        val validItems = items.map { it.trim() }.filter { it.isNotEmpty() }
         val id =
             noteDao.insert(
                 NoteEntity(
                     kind = NoteKind.LIST,
                     title = title,
                     body = "",
+                    checklistText = checklistSearchText(validItems),
                     colorIndex = colorIndex,
                     starred = false,
                     trashed = false,
@@ -254,12 +221,12 @@ class NoteRepository(
                     locked = options.locked,
                     iconKey = options.iconKey,
                     actions = options.actions,
+                    actionsText = actionsSearchText(options.actions),
                     tags = options.tags,
                     recurrence = options.recurrence?.sanitized(),
                 ),
             )
         tagRepository?.replaceTagsForNote(id, options.tags)
-        val validItems = items.map { it.trim() }.filter { it.isNotEmpty() }
         if (validItems.isNotEmpty()) {
             itemDao.insertAll(
                 validItems.mapIndexed { index, text ->
@@ -301,6 +268,7 @@ class NoteRepository(
                 locked = options.locked,
                 iconKey = options.iconKey,
                 actions = options.actions,
+                actionsText = actionsSearchText(options.actions),
                 tags = options.tags,
                 recurrence = options.recurrence?.sanitized(),
                 completedAt =
@@ -333,6 +301,11 @@ class NoteRepository(
                     existing.copy(
                         title = title,
                         colorIndex = colorIndex,
+                        checklistText = checklistSearchText(
+                            items
+                                .sortedBy { item -> item.sortOrder }
+                                .map { item -> item.text },
+                        ),
                         updatedAt = clock(),
                         reminderAt = options.reminderAt,
                         importance = options.importance,
@@ -342,6 +315,7 @@ class NoteRepository(
                         locked = options.locked,
                         iconKey = options.iconKey,
                         actions = options.actions,
+                        actionsText = actionsSearchText(options.actions),
                         tags = options.tags,
                         recurrence = options.recurrence?.sanitized(),
                         completedAt =
@@ -705,6 +679,7 @@ class NoteRepository(
                     mimeType = mimeType,
                 ),
             )
+        refreshAttachmentSearchText(noteId)
         postWriteBookkeeping(includeSummary = false)
         return attachmentId
     }
@@ -719,7 +694,19 @@ class NoteRepository(
         attachments: List<NoteAttachmentEntity>,
         suppressReminderSchedule: Boolean = false,
     ): Long {
-        val noteId = noteDao.insert(note)
+        val noteId =
+            noteDao.insert(
+                note.copy(
+                    checklistText =
+                        checklistSearchText(
+                            items
+                                .sortedBy { item -> item.sortOrder }
+                                .map { item -> item.text },
+                        ),
+                    attachmentText = attachmentSearchText(attachments),
+                    actionsText = actionsSearchText(note.actions),
+                ),
+            )
         tagRepository?.replaceTagsForNote(noteId, note.tags)
         if (items.isNotEmpty()) {
             // Backup rows carry stable pre-export ids so parentId pointers can be remapped
@@ -824,8 +811,20 @@ class NoteRepository(
     suspend fun removeAttachment(id: Long) {
         val removedAttachment = attachmentDao.getById(id)
         attachmentDao.deleteById(id)
+        removedAttachment?.noteId?.let { noteId -> refreshAttachmentSearchText(noteId) }
         cleanupUnreferencedMedia(listOfNotNull(removedAttachment?.uri))
         postWriteBookkeeping(includeSummary = false)
+    }
+
+    private suspend fun refreshAttachmentSearchText(noteId: Long) {
+        val existing = noteDao.get(noteId)?.note ?: return
+        val attachments = attachmentDao.attachmentsFor(noteId)
+        noteDao.update(
+            existing.copy(
+                attachmentText = attachmentSearchText(attachments),
+                updatedAt = clock(),
+            ),
+        )
     }
 
     private suspend fun cleanupUnreferencedMedia(mediaUris: List<String>) {

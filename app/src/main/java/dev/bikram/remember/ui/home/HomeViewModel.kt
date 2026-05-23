@@ -215,6 +215,14 @@ class HomeViewModel
             }
         }
 
+        private fun visibleSelectedIdsSnapshot(): Set<Long> {
+            val pruned = state.value.selectedIds
+            if (pruned != selectedIds.value) {
+                selectedIds.value = pruned
+            }
+            return pruned
+        }
+
         fun clearSelection() {
             selectedIds.value = persistentSetOf()
         }
@@ -293,7 +301,7 @@ class HomeViewModel
         private var lastBulkAction: BulkUndoableAction? = null
 
         fun markSelectedDone() {
-            val noteIds = selectedIds.value
+            val noteIds = visibleSelectedIdsSnapshot()
             if (noteIds.isEmpty()) return
             // Filter out already-completed rows so undo only flips the rows we actually
             // touched. Done as a snapshot before the bulk call so we don't race with
@@ -317,7 +325,7 @@ class HomeViewModel
         }
 
         fun archiveSelected() {
-            val noteIds = selectedIds.value
+            val noteIds = visibleSelectedIdsSnapshot()
             if (noteIds.isEmpty()) return
             val ids = noteIds.toSet()
             viewModelScope.launch {
@@ -330,7 +338,7 @@ class HomeViewModel
         }
 
         fun trashSelected() {
-            val noteIds = selectedIds.value
+            val noteIds = visibleSelectedIdsSnapshot()
             if (noteIds.isEmpty()) return
             val ids = noteIds.toSet()
             viewModelScope.launch {
@@ -381,7 +389,7 @@ class HomeViewModel
             removeTags: Set<String>,
             newTagColors: Map<String, String> = emptyMap(),
         ) {
-            val noteIds = selectedIds.value.toList()
+            val noteIds = visibleSelectedIdsSnapshot().toList()
             if (noteIds.isEmpty()) return
             val additions = addTags - removeTags
             viewModelScope.launch {

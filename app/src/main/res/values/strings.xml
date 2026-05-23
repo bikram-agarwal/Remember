@@ -223,7 +223,6 @@
     <string name="edit_link_action_copy">Copy link</string>
     <string name="edit_link_action_edit_text">Edit link text</string>
     <string name="edit_link_action_share">Share</string>
-
     <!-- Editor bottom bar and archived state -->
     <string name="edit_bottom_bar_edit">Edit</string>
     <string name="edit_bottom_bar_done">Done</string>

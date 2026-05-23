@@ -45,7 +45,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -58,11 +57,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -1260,7 +1261,6 @@ private fun GroupCard(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         GroupHeaderCard(
             title = group.list.title,
@@ -1287,7 +1287,7 @@ private fun GroupCard(
             // Indent task cards 16dp from the left edge of the group header so they
             // visually nest under the group rather than sitting at the same level.
             Column(
-                modifier = Modifier.padding(start = 16.dp, top = 2.dp),
+                modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 group.tasks.forEach { wrapper ->
@@ -1786,6 +1786,7 @@ private fun ImportProgressInline(
         animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
         label = "tasksImportProgress",
     )
+    val useFlatCompletedWave = completed && animatedProgress >= 0.95f
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
@@ -1826,19 +1827,19 @@ private fun ImportProgressInline(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
-            if (completed) {
-                LinearProgressIndicator(
-                    progress = { 1f },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f),
-                )
-            } else {
+            key(useFlatCompletedWave) {
                 LinearWavyProgressIndicator(
                     progress = { animatedProgress },
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f),
+                    amplitude = { indicatorProgress ->
+                        if (useFlatCompletedWave) {
+                            0f
+                        } else {
+                            WavyProgressIndicatorDefaults.indicatorAmplitude(indicatorProgress)
+                        }
+                    },
                 )
             }
             if (completed) {

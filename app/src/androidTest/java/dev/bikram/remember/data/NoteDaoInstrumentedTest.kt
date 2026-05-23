@@ -3,6 +3,7 @@ package dev.bikram.remember.data
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -102,6 +103,100 @@ class NoteDaoInstrumentedTest {
             val searchResults = database.noteDao().searchNotes("alpha*").first()
 
             assertEquals(listOf(matchingNoteId), searchResults.map { noteWithItems -> noteWithItems.note.id })
+        }
+
+    @Test
+    fun fts_search_matches_checklist_item_text() =
+        runBlocking {
+            val repository =
+                NoteRepository(
+                    noteDao = database.noteDao(),
+                    itemDao = database.checklistItemDao(),
+                    attachmentDao = database.attachmentDao(),
+                    clock = { 1L },
+                    database = database,
+                    ioDispatcher = Dispatchers.Unconfined,
+                    defaultDispatcher = Dispatchers.Unconfined,
+                )
+            val matchingNoteId =
+                repository.createList(
+                    title = "Groceries",
+                    colorIndex = 0,
+                    items = listOf("Almond milk"),
+                )
+
+            val searchResults = database.noteDao().searchNotes("almond*").first()
+
+            assertEquals(listOf(matchingNoteId), searchResults.map { noteWithItems -> noteWithItems.note.id })
+        }
+
+    @Test
+    fun fts_search_matches_attachment_display_name() =
+        runBlocking {
+            val repository =
+                NoteRepository(
+                    noteDao = database.noteDao(),
+                    itemDao = database.checklistItemDao(),
+                    attachmentDao = database.attachmentDao(),
+                    clock = { 1L },
+                    database = database,
+                    ioDispatcher = Dispatchers.Unconfined,
+                    defaultDispatcher = Dispatchers.Unconfined,
+                )
+            val noteId =
+                repository.createNote(
+                    title = "Receipts",
+                    body = "",
+                    colorIndex = 0,
+                )
+            repository.addAttachment(
+                noteId = noteId,
+                uri = "content://remember/attachments/receipt.pdf",
+                displayName = "Hotel invoice.pdf",
+                mimeType = "application/pdf",
+            )
+
+            val searchResults = database.noteDao().searchNotes("invoice*").first()
+
+            assertEquals(listOf(noteId), searchResults.map { noteWithItems -> noteWithItems.note.id })
+        }
+
+    @Test
+    fun fts_search_matches_action_title_and_details() =
+        runBlocking {
+            val repository =
+                NoteRepository(
+                    noteDao = database.noteDao(),
+                    itemDao = database.checklistItemDao(),
+                    attachmentDao = database.attachmentDao(),
+                    clock = { 1L },
+                    database = database,
+                    ioDispatcher = Dispatchers.Unconfined,
+                    defaultDispatcher = Dispatchers.Unconfined,
+                )
+            val noteId =
+                repository.createNote(
+                    title = "Contacts",
+                    body = "",
+                    colorIndex = 0,
+                    options =
+                        NoteOptions(
+                            actions =
+                                listOf(
+                                    NoteAction(
+                                        type = ActionType.CALL_NUMBER,
+                                        title = "Call plumber",
+                                        details = "555-0100",
+                                    ),
+                                ),
+                        ),
+                )
+
+            val titleMatches = database.noteDao().searchNotes("plumber*").first()
+            val detailsMatches = database.noteDao().searchNotes("555*").first()
+
+            assertEquals(listOf(noteId), titleMatches.map { noteWithItems -> noteWithItems.note.id })
+            assertEquals(listOf(noteId), detailsMatches.map { noteWithItems -> noteWithItems.note.id })
         }
 
     @Test
