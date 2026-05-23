@@ -576,7 +576,7 @@ private class MarkdownInlineInteractionBuilder(
                 continue
             }
 
-            val inlineCodeClose = sourceSegment.indexOfClosingMarker("`", currentIndex + 1)
+            val inlineCodeClose = sourceSegment.indexOfMarkdownClosingMarker("`", currentIndex + 1)
             if (sourceSegment.startsWith("`", currentIndex) && sourceSegment.isValidOpening(currentIndex, 1) && inlineCodeClose > currentIndex) {
                 appendPlainTextRange(
                     rangeStart = currentIndex + 1,
@@ -597,7 +597,7 @@ private class MarkdownInlineInteractionBuilder(
                 continue
             }
 
-            val strikeClose = sourceSegment.indexOfClosingMarker("~~", currentIndex + 2)
+            val strikeClose = sourceSegment.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
             if (sourceSegment.startsWith("~~", currentIndex) && sourceSegment.isValidOpening(currentIndex, 2) && strikeClose > currentIndex) {
                 appendInlineMarkdown(
                     sourceSegment = sourceSegment.substring(currentIndex + 2, strikeClose),
@@ -607,7 +607,7 @@ private class MarkdownInlineInteractionBuilder(
                 continue
             }
 
-            val boldItalicClose = sourceSegment.indexOfClosingMarker("***", currentIndex + 3)
+            val boldItalicClose = sourceSegment.indexOfMarkdownClosingMarker("***", currentIndex + 3)
             if (sourceSegment.startsWith("***", currentIndex) && sourceSegment.isValidOpening(currentIndex, 3) && boldItalicClose > currentIndex) {
                 appendInlineMarkdown(
                     sourceSegment = sourceSegment.substring(currentIndex + 3, boldItalicClose),
@@ -617,7 +617,7 @@ private class MarkdownInlineInteractionBuilder(
                 continue
             }
 
-            val boldClose = sourceSegment.indexOfClosingMarker("**", currentIndex + 2)
+            val boldClose = sourceSegment.indexOfMarkdownClosingMarker("**", currentIndex + 2)
             if (sourceSegment.startsWith("**", currentIndex) && sourceSegment.isValidOpening(currentIndex, 2) && boldClose > currentIndex) {
                 appendInlineMarkdown(
                     sourceSegment = sourceSegment.substring(currentIndex + 2, boldClose),
@@ -627,7 +627,7 @@ private class MarkdownInlineInteractionBuilder(
                 continue
             }
 
-            val italicClose = sourceSegment.indexOfClosingMarker("*", currentIndex + 1)
+            val italicClose = sourceSegment.indexOfMarkdownClosingMarker("*", currentIndex + 1)
             if (sourceSegment.startsWith("*", currentIndex) && sourceSegment.isValidOpening(currentIndex, 1) && italicClose > currentIndex) {
                 appendInlineMarkdown(
                     sourceSegment = sourceSegment.substring(currentIndex + 1, italicClose),
@@ -671,26 +671,6 @@ private fun String.withHttpScheme(): String =
     } else {
         "https://$this"
     }
-
-private fun String.indexOfClosingMarker(
-    marker: String,
-    startIndex: Int,
-): Int {
-    var index = indexOf(marker, startIndex)
-    while (index != -1) {
-        val markerChar = marker[0]
-        val hasPrecedingMarkerChar = index > 0 && this[index - 1] == markerChar
-        val hasFollowingMarkerChar = index + marker.length < length && this[index + marker.length] == markerChar
-        if (!hasPrecedingMarkerChar && !hasFollowingMarkerChar) {
-            val prevChar = getOrNull(index - 1)
-            if (prevChar != null && !prevChar.isWhitespace()) {
-                return index
-            }
-        }
-        index = indexOf(marker, index + 1)
-    }
-    return -1
-}
 
 private fun String.isValidOpening(
     index: Int,

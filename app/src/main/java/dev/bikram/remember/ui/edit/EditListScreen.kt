@@ -45,7 +45,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -376,7 +375,6 @@ private fun EditListTopBarSection(
     readOnly: Boolean,
     hasUnsavedChanges: Boolean,
     sharedNoteId: Long?,
-    sharedTransitionActive: Boolean,
     titleFocusRequester: FocusRequester,
     titleFocusOffset: Int?,
     onTitleChange: (String) -> Unit,
@@ -449,8 +447,7 @@ private fun EditListTopBarSection(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier =
                         Modifier
-                            .fillMaxWidth()
-                            .alpha(if (sharedTransitionActive) 0f else 1f),
+                            .fillMaxWidth(),
                 ) {
                     EditorHeaderIcon(
                         iconKey = iconKey,
@@ -553,17 +550,6 @@ private fun EditListTopBarSection(
                 }
             },
             scrollBehavior = scrollBehavior,
-        )
-        ExpandedEditorSharedTopBarAnchor(
-            sharedNoteId = sharedNoteId,
-            title = title,
-            fallbackTitle = titlePlaceholder,
-            iconKey = iconKey,
-            isChecklist = true,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
         )
     }
 }
@@ -743,11 +729,6 @@ fun EditListScreen(
     // still gates it so the bar slides out when the keyboard appears.
     val actionBarVisible = bottomBarVisible && !isEditMode && !imeVisible
 
-    val sharedTransitionActive =
-        dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
-            ?.isTransitionActive == true &&
-            sharedNoteId != null
-
     // Save path for the top-bar Save icon (only visible while in edit mode): flips edit
     // mode off AND asks the route-level callback to flush the VM and flash the toast so
     // users get feedback that their Save tap did something beyond dismissing the toolbar.
@@ -772,7 +753,6 @@ fun EditListScreen(
                 readOnly = readOnly,
                 hasUnsavedChanges = hasUnsavedChanges,
                 sharedNoteId = sharedNoteId,
-                sharedTransitionActive = sharedTransitionActive,
                 titleFocusRequester = newListTitleFocus,
                 titleFocusOffset = pendingTitleFocusOffset,
                 onTitleChange = onTitleChange,

@@ -337,6 +337,7 @@ fun EditNoteScreen(
     // paths show the same "Changes saved" toast.
     val context = androidx.compose.ui.platform.LocalContext.current
     val launchAttachmentPicker = rememberAttachmentPicker(onAdd = vm::addAttachment)
+    val hasPersistedEditorRow = existing || persistedForToolbar
     val saveAndExitEditMode: () -> Unit = {
         isEditMode = false
         appScope.launch {
@@ -365,7 +366,7 @@ fun EditNoteScreen(
                 vm = vm,
                 scrollBehavior = scrollBehavior,
                 titlePlaceholder = titlePlaceholder,
-                existing = existing,
+                existing = hasPersistedEditorRow,
                 sharedNoteId = sharedNoteId,
                 isEditMode = isEditMode,
                 readOnly = readOnly,
@@ -588,8 +589,8 @@ fun EditNoteScreen(
             bodyPlaceholder = bodyPlaceholder,
             isEditMode = isEditMode,
             markdownDisplayMode = markdownDisplayMode,
-            existing = existing,
-            autoFocusBodyOnEdit = existing && !suppressBodyAutoFocusOnEdit,
+            existing = hasPersistedEditorRow,
+            autoFocusBodyOnEdit = hasPersistedEditorRow && !suppressBodyAutoFocusOnEdit,
             shelfState = shelfState,
             pictureViewerOpen = pictureViewer != null,
             onOpenReminder = { reminderPickerOpen = true },
@@ -608,11 +609,13 @@ fun EditNoteScreen(
             },
             onEnterEditModeAtOffset = { markdownOffset ->
                 suppressBodyAutoFocusOnEdit = true
+                pendingTitleFocusOffset = null
                 markdownEditorState.focusAtOffsetAndShowKeyboard(markdownOffset)
                 isEditMode = true
             },
             onEnterEditModeSelectingRange = { startOffset, endOffset ->
                 suppressBodyAutoFocusOnEdit = true
+                pendingTitleFocusOffset = null
                 markdownEditorState.focusRangeAndShowKeyboard(startOffset, endOffset)
                 isEditMode = true
             },

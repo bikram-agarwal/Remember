@@ -54,7 +54,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
@@ -317,10 +316,6 @@ internal fun EditNoteTopBarSection(
 ) {
     val title by vm.title.collectAsStateWithLifecycle()
     val iconKey by vm.iconKey.collectAsStateWithLifecycle()
-    val sharedTransitionActive =
-        dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
-            ?.isTransitionActive == true &&
-            sharedNoteId != null
 
     val newNoteTitleFocus = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -379,8 +374,7 @@ internal fun EditNoteTopBarSection(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier =
                         Modifier
-                            .fillMaxWidth()
-                            .alpha(if (sharedTransitionActive) 0f else 1f),
+                            .fillMaxWidth(),
                 ) {
                     EditorHeaderIcon(
                         iconKey = iconKey,
@@ -389,7 +383,7 @@ internal fun EditNoteTopBarSection(
                         onClick = if (readOnly) null else onOpenIcon,
                     )
                     Spacer(Modifier.width(iconGap))
-                    if ((isEditMode && !readOnly) || title.isEmpty()) {
+                    if (isEditMode && !readOnly) {
                         BasicTextField(
                             value = titleFieldValue,
                             onValueChange = {
@@ -429,11 +423,20 @@ internal fun EditNoteTopBarSection(
                             },
                         )
                     } else {
-                        var titleLayout by remember(title) { mutableStateOf<TextLayoutResult?>(null) }
+                        val displayTitle = title.ifEmpty { titlePlaceholder }
+                        val displayTitleStyle =
+                            if (title.isEmpty()) {
+                                titleStyle.copy(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                )
+                            } else {
+                                titleStyle
+                            }
+                        var titleLayout by remember(displayTitle) { mutableStateOf<TextLayoutResult?>(null) }
                         SelectionContainer {
                             Text(
-                                text = title,
-                                style = titleStyle,
+                                text = displayTitle,
+                                style = displayTitleStyle,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 onTextLayout = { titleLayout = it },
@@ -444,9 +447,13 @@ internal fun EditNoteTopBarSection(
                                             if (!readOnly) {
                                                 detectTapGestures { tapOffset ->
                                                     val offset =
-                                                        titleLayout
-                                                            ?.getOffsetForPosition(tapOffset)
-                                                            ?: title.length
+                                                        if (title.isEmpty()) {
+                                                            0
+                                                        } else {
+                                                            titleLayout
+                                                                ?.getOffsetForPosition(tapOffset)
+                                                                ?: title.length
+                                                        }
                                                     onTitleTappedInViewMode(offset)
                                                 }
                                             }
@@ -509,17 +516,6 @@ internal fun EditNoteTopBarSection(
                 }
             },
             scrollBehavior = scrollBehavior,
-        )
-        ExpandedEditorSharedTopBarAnchor(
-            sharedNoteId = sharedNoteId,
-            title = title,
-            fallbackTitle = titlePlaceholder,
-            iconKey = iconKey,
-            isChecklist = false,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
         )
     }
 }

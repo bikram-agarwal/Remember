@@ -30,6 +30,7 @@ detekt = "2.0.0-alpha.3"
 ktlintGradle = "14.2.0"
 profileInstaller = "1.4.1"
 reorderable = "3.1.0"
+splashscreen = "1.2.0"
 junit4 = "4.13.2"
 gradleVersionsPlugin = "0.54.0"
 
@@ -74,6 +75,7 @@ play-services-auth = { group = "com.google.android.gms", name = "play-services-a
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "androidxCredentials" }
 androidx-credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "androidxCredentials" }
 androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profileinstaller", version.ref = "profileInstaller" }
+androidx-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "splashscreen" }
 androidx-room-testing = { group = "androidx.room", name = "room-testing", version.ref = "room" }
 androidx-test-ext-junit = { group = "androidx.test.ext", name = "junit", version.ref = "androidxTestExtJunit" }
 androidx-test-runner = { group = "androidx.test", name = "runner", version.ref = "androidxTestRunner" }

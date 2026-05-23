@@ -222,7 +222,7 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val inlineCodeClose = source.indexOfClosingMarker("`", currentIndex + 1)
+            val inlineCodeClose = source.indexOfMarkdownClosingMarker("`", currentIndex + 1)
             if (source.startsWith("`", currentIndex) && source.isValidOpening(currentIndex, 1) && inlineCodeClose > currentIndex) {
                 withStyle(inlineCodeSpanStyle) {
                     append(source.substring(currentIndex + 1, inlineCodeClose))
@@ -243,7 +243,7 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val strikeClose = source.indexOfClosingMarker("~~", currentIndex + 2)
+            val strikeClose = source.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
             if (source.startsWith("~~", currentIndex) && source.isValidOpening(currentIndex, 2) && strikeClose > currentIndex) {
                 withStyle(strikethroughSpanStyle) {
                     appendInlineMarkdown(
@@ -255,7 +255,7 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val boldItalicClose = source.indexOfClosingMarker("***", currentIndex + 3)
+            val boldItalicClose = source.indexOfMarkdownClosingMarker("***", currentIndex + 3)
             if (source.startsWith("***", currentIndex) && source.isValidOpening(currentIndex, 3) && boldItalicClose > currentIndex) {
                 withStyle(boldSpanStyle) {
                     withStyle(italicSpanStyle) {
@@ -269,7 +269,7 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val boldClose = source.indexOfClosingMarker("**", currentIndex + 2)
+            val boldClose = source.indexOfMarkdownClosingMarker("**", currentIndex + 2)
             if (source.startsWith("**", currentIndex) && source.isValidOpening(currentIndex, 2) && boldClose > currentIndex) {
                 withStyle(boldSpanStyle) {
                     appendInlineMarkdown(
@@ -281,7 +281,7 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val italicClose = source.indexOfClosingMarker("*", currentIndex + 1)
+            val italicClose = source.indexOfMarkdownClosingMarker("*", currentIndex + 1)
             if (source.startsWith("*", currentIndex) && source.isValidOpening(currentIndex, 1) && italicClose > currentIndex) {
                 withStyle(italicSpanStyle) {
                     appendInlineMarkdown(
@@ -501,26 +501,6 @@ private fun String.withHttpScheme(): String {
         return this
     }
     return "https://$this"
-}
-
-private fun String.indexOfClosingMarker(
-    marker: String,
-    startIndex: Int,
-): Int {
-    var index = indexOf(marker, startIndex)
-    while (index != -1) {
-        val markerChar = marker[0]
-        val hasPrecedingMarkerChar = index > 0 && this[index - 1] == markerChar
-        val hasFollowingMarkerChar = index + marker.length < length && this[index + marker.length] == markerChar
-        if (!hasPrecedingMarkerChar && !hasFollowingMarkerChar) {
-            val prevChar = getOrNull(index - 1)
-            if (prevChar != null && !prevChar.isWhitespace()) {
-                return index
-            }
-        }
-        index = indexOf(marker, index + 1)
-    }
-    return -1
 }
 
 private fun String.isValidOpening(

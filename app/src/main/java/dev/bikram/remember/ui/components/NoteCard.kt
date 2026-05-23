@@ -182,30 +182,6 @@ fun NoteCard(
         } else {
             Modifier
         }
-    val sharedTitleModifier =
-        if (sharedScope != null && navScope != null) {
-            with(sharedScope) {
-                Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(key = "note-title-${model.id}"),
-                    animatedVisibilityScope = navScope,
-                    boundsTransform = sharedBoundsTransform,
-                )
-            }
-        } else {
-            Modifier
-        }
-    val sharedIconModifier =
-        if (sharedScope != null && navScope != null) {
-            with(sharedScope) {
-                Modifier.sharedElement(
-                    sharedContentState = rememberSharedContentState(key = "note-icon-${model.id}"),
-                    animatedVisibilityScope = navScope,
-                    boundsTransform = sharedBoundsTransform,
-                )
-            }
-        } else {
-            Modifier
-        }
 
     // Selection and Completed progresses are both Animatables (initialized at 0 +
     // LaunchedEffect that animates to the current target) instead of
@@ -384,7 +360,7 @@ fun NoteCard(
                                     size = 18.dp,
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.then(sharedIconModifier).alpha(0.75f),
+                                    modifier = Modifier.alpha(0.75f),
                                 )
                             is NoteIcon.Drawable ->
                                 Icon(
@@ -394,14 +370,13 @@ fun NoteCard(
                                     modifier =
                                         Modifier
                                             .size(18.dp)
-                                            .then(sharedIconModifier)
                                             .alpha(0.75f),
                                 )
                             is NoteIcon.Emoji ->
                                 Text(
                                     text = headerIcon.text,
                                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
-                                    modifier = Modifier.then(sharedIconModifier).alpha(0.85f),
+                                    modifier = Modifier.alpha(0.85f),
                                 )
                             NoteIcon.ListPlaceholder ->
                                 RememberMaterialRoundedSymbol(
@@ -409,7 +384,7 @@ fun NoteCard(
                                     size = 18.dp,
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
+                                    modifier = Modifier.alpha(0.65f),
                                 )
                             NoteIcon.NotePlaceholder ->
                                 RememberMaterialRoundedSymbol(
@@ -417,11 +392,11 @@ fun NoteCard(
                                     size = 18.dp,
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
+                                    modifier = Modifier.alpha(0.65f),
                                 )
                         }
                         Spacer(Modifier.width(8.dp))
-                        Box(modifier = Modifier.weight(1f).then(sharedTitleModifier)) {
+                        Box(modifier = Modifier.weight(1f)) {
                             Text(
                                 text =
                                     model.title.ifBlank {

@@ -40,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
+import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
@@ -441,6 +442,7 @@ private fun OptionCell(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
+                        softWrap = false,
                     )
                 }
             }
@@ -796,11 +798,31 @@ private fun compactRecurrenceLabel(rule: RecurrenceRule): String {
 private fun actionsSummary(actions: List<NoteAction>): String =
     when (actions.size) {
         0 -> stringResource(R.string.common_none)
-        1 ->
-            actions[0].title.ifBlank {
-                pluralStringResource(R.plurals.options_actions_count, 1, 1)
+        1 -> {
+            val action = actions[0]
+            if (action.type == ActionType.OPEN_LINK) {
+                action.details.cleanLinkForOptionsSummary()
+            } else {
+                action.title.ifBlank {
+                    pluralStringResource(R.plurals.options_actions_count, 1, 1)
+                }
             }
+        }
         else -> pluralStringResource(R.plurals.options_actions_count, actions.size, actions.size)
+    }
+
+private fun String.cleanLinkForOptionsSummary(): String =
+    trim()
+        .removePrefixIgnoreCase("https://")
+        .removePrefixIgnoreCase("http://")
+        .removePrefixIgnoreCase("www.")
+        .trimEnd('/')
+
+private fun String.removePrefixIgnoreCase(prefix: String): String =
+    if (startsWith(prefix, ignoreCase = true)) {
+        drop(prefix.length)
+    } else {
+        this
     }
 
 @Composable

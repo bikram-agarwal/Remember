@@ -230,6 +230,7 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.androidx.profileinstaller)
+    implementation(libs.androidx.splashscreen)
     debugImplementation(libs.androidx.ui.tooling)
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)

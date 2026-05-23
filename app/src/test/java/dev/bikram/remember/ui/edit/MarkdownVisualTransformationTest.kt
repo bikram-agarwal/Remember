@@ -65,6 +65,15 @@ class MarkdownVisualTransformationTest {
     }
 
     @Test
+    fun closingMarkerFollowedByWhitespaceIsTreatedAsFormatting() {
+        val styler = testMarkdownStyler()
+
+        assertEquals("bold", styler.markdownInlineAnnotatedString("*bold*").text)
+        assertEquals("bold next", styler.markdownInlineAnnotatedString("*bold* next").text)
+        assertEquals("code next", styler.markdownInlineAnnotatedString("`code` next").text)
+    }
+
+    @Test
     fun inlineLinksKeepLinkAnnotationsByDefault() {
         val styler = testMarkdownStyler()
         val text = styler.markdownInlineAnnotatedString("[site](example.com)")
