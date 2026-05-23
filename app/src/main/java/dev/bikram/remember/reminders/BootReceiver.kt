@@ -52,7 +52,7 @@ class BootReceiver : BroadcastReceiver() {
                 all.forEach { item ->
                     val at = item.note.reminderAt ?: return@forEach
                     if (at > now) {
-                        reminderScheduler.schedule(item.note.id, at)
+                        reminderScheduler.schedule(item.note.id, at, item.note.importance)
                     } else if (item.note.completedAt == null) {
                         ReminderReceiver.showNotification(
                             context = context,

@@ -85,6 +85,7 @@ import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.BulkUndoableAction
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
+import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.EmptyArchiveIllustration
 import dev.bikram.remember.ui.components.EmptyTrashIllustration
 import dev.bikram.remember.ui.components.MultiActionSwipeRevealCard
@@ -461,6 +462,7 @@ fun HistoryRoute(
     val inSelectionMode = selectedIds.isNotEmpty()
     val snackbarHostState = LocalSnackbarHostState.current
     val context = LocalContext.current
+    val notificationsAllowed = rememberNotificationsAllowed()
     val undoLabel = stringResource(R.string.bulk_action_undo)
     // Confirmation sheet state for the selection-mode delete-forever path. Permanent
     // delete has no undo so the user has to confirm explicitly before any rows go.
@@ -620,6 +622,7 @@ fun HistoryRoute(
                                 selected = isSelected,
                                 onLongClick = { vm.toggleSelection(noteId) },
                                 swipeEnabled = !inSelectionMode,
+                                reminderNotificationsAllowed = notificationsAllowed,
                             )
                         }
                     }
@@ -1073,6 +1076,7 @@ private fun HistorySwipeCard(
     selected: Boolean = false,
     onLongClick: (() -> Unit)? = null,
     swipeEnabled: Boolean = true,
+    reminderNotificationsAllowed: Boolean = true,
 ) {
     if (!swipeEnabled) {
         Box(Modifier.fillMaxWidth()) {
@@ -1081,6 +1085,7 @@ private fun HistorySwipeCard(
                 onClick = onOpenNote,
                 selected = selected,
                 onLongClick = onLongClick,
+                reminderNotificationsAllowed = reminderNotificationsAllowed,
             )
             if (daysLeft != null) {
                 TrashDaysLeftBadge(
@@ -1168,6 +1173,7 @@ private fun HistorySwipeCard(
                 onClick = onOpenNote,
                 selected = selected,
                 onLongClick = onLongClick,
+                reminderNotificationsAllowed = reminderNotificationsAllowed,
             )
             if (daysLeft != null) {
                 TrashDaysLeftBadge(

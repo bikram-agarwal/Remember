@@ -17,6 +17,8 @@ import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.Visibility
 import dev.bikram.remember.diagnostics.DiagnosticLog
+import dev.bikram.remember.notifications.canPostNotifications
+import dev.bikram.remember.notifications.postNotificationIfAllowed
 import dev.bikram.remember.ui.edit.iconEmojiPayload
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
@@ -108,13 +110,17 @@ class ReminderScheduler(
         notes: List<NoteWithItems>,
         nowMillis: Long,
     ) {
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val sortedNotes =
             notes
                 .filter { noteWithItems -> noteWithItems.note.reminderAt != null }
                 .sortedBy { noteWithItems -> noteWithItems.note.reminderAt }
         if (sortedNotes.isEmpty()) {
             cancelSummaryNotification()
+            return
+        }
+        if (!canPostNotifications(context)) {
+            cancelSummaryNotification()
+            DiagnosticLog.record(context, "Reminder summary notification skipped: notifications are not allowed")
             return
         }
 
@@ -154,7 +160,12 @@ class ReminderScheduler(
                 .setSilent(true)
                 .setOnlyAlertOnce(true)
                 .build()
-        notificationManager.notify(SUMMARY_NOTIFICATION_ID, notification)
+        postNotificationIfAllowed(
+            context = context,
+            notificationId = SUMMARY_NOTIFICATION_ID,
+            notification = notification,
+            source = "Reminder summary",
+        )
     }
 
     private fun summaryLine(

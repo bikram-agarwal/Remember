@@ -43,6 +43,7 @@
     <string name="notification_channel_reminder_summary">Reminder summary</string>
     <string name="notification_channel_reminder_summary_desc">Persistent silent reminder summary</string>
     <string name="common_cancel">Cancel</string>
+    <string name="common_enable">Enable</string>
     <string name="common_save">Save</string>
     <string name="common_done">Done</string>
     <string name="common_ok">OK</string>
@@ -501,6 +502,12 @@
     <string name="reminder_notification_hidden_title">Reminder</string>
     <string name="reminder_notification_hidden_body">Tap to view</string>
     <string name="reminder_summary_title">Reminders</string>
+    <string name="main_reminder_notifications_disabled">Notifications are disabled</string>
+    <plurals name="main_reminders_due_this_week">
+        <item quantity="one">%1$d reminder due this week</item>
+        <item quantity="other">%1$d reminders due this week</item>
+    </plurals>
+    <string name="main_alert_fab_label">Alerts</string>
     <plurals name="reminder_summary_count">
         <item quantity="one">%1$d due or upcoming</item>
         <item quantity="other">%1$d due or upcoming</item>
@@ -651,6 +658,7 @@
     <string name="reminder_time_input_mode">Type time with keyboard</string>
     <string name="reminder_time_dial_mode">Pick time with clock dial</string>
     <string name="reminder_pick_time">Set time</string>
+    <string name="reminder_pick_date">Set date</string>
     <string name="share_chooser_generic">Share</string>
     <string name="action_receiver_run_error">Couldn\'t run action: %1$s</string>
 
@@ -771,7 +779,7 @@
     <string name="swipe_action_toggle_star">Star</string>
     <string name="swipe_action_unstar">Unstar</string>
     <string name="swipe_action_mark_done">Mark done</string>
-    <string name="swipe_action_mark_not_done">Mark not done</string>
+    <string name="swipe_action_mark_not_done">Mark undone</string>
 
     <!-- Google Tasks import screen -->
     <string name="google_tasks_import_tasks_title">Import tasks</string>
@@ -936,12 +944,11 @@
     <string name="notification_update_available_text">Version %1$s is ready to install</string>
     <string name="update_bar_available_title">App update available</string>
     <string name="update_bar_available_action">Check</string>
-    <string name="update_fab_label">Update</string>
     <string name="play_update_bar_downloading_title">Downloading update</string>
     <string name="play_update_bar_downloading">from Play Store…</string>
     <string name="play_update_bar_downloading_bytes">%1$s of %2$s</string>
-    <string name="play_update_bar_install_title">Ready to install</string>
-    <string name="play_update_bar_install_subtitle">Restart to use the new version</string>
+    <string name="play_update_bar_install_title">New version ready</string>
+    <string name="play_update_bar_install_subtitle">Restart to apply</string>
     <string name="play_update_bar_install_action">Install &amp; restart</string>
     <string name="settings_share_diagnostics">Share diagnostic log</string>
     <string name="settings_share_diagnostics_subtitle">Share app version, device info, app log, and last crash stack</string>

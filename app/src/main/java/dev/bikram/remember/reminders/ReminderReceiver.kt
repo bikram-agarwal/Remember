@@ -1,6 +1,5 @@
 package dev.bikram.remember.reminders
 
-import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -27,6 +26,9 @@ import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.Visibility
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.di.ApplicationScope
+import dev.bikram.remember.diagnostics.DiagnosticLog
+import dev.bikram.remember.notifications.canPostNotifications
+import dev.bikram.remember.notifications.postNotificationIfAllowed
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.edit.iconEmojiPayload
 import kotlinx.coroutines.CoroutineScope
@@ -100,7 +102,11 @@ class ReminderReceiver : BroadcastReceiver() {
         ) {
             if (note.trashed) return
 
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (!canPostNotifications(context)) {
+                DiagnosticLog.record(context, "Reminder notification skipped for noteId=${note.id}: notifications are not allowed")
+                return
+            }
+
             val channelId =
                 when (note.importance) {
                     Importance.LOW -> ReminderScheduler.CHANNEL_ID_LOW
@@ -171,7 +177,12 @@ class ReminderReceiver : BroadcastReceiver() {
             builder.addAction(actionButton(context, note.id, 1, snoozeAction, shareText))
             builder.addAction(actionButton(context, note.id, 2, markDoneAction, shareText))
 
-            nm.notify(ReminderScheduler.pendingRequestCodeForNote(note.id), builder.build())
+            postNotificationIfAllowed(
+                context = context,
+                notificationId = ReminderScheduler.pendingRequestCodeForNote(note.id),
+                notification = builder.build(),
+                source = "Reminder noteId=${note.id}",
+            )
         }
 
         private fun decodeNotificationHeroBitmap(

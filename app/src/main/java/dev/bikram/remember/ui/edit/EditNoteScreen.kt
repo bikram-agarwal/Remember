@@ -41,12 +41,13 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
+import dev.bikram.remember.notifications.canPostNotifications
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
+import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.NoteActionBottomBarContent
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
@@ -151,6 +152,7 @@ fun EditNoteScreen(
     var attachmentsPickerOpen by rememberSaveable { mutableStateOf(false) }
     var notificationPermissionSheetOpen by rememberSaveable { mutableStateOf(false) }
     var deleteForeverConfirmOpen by rememberSaveable { mutableStateOf(false) }
+    val notificationsAllowed = rememberNotificationsAllowed()
 
     var pendingHeroSession by remember { mutableStateOf<Pair<String, File?>?>(null) }
     val launchHeroImagePick =
@@ -506,7 +508,7 @@ fun EditNoteScreen(
                                 onBack()
                             },
                             onNotification = {
-                                if (NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                                if (canPostNotifications(context)) {
                                     appScope.launch { vm.fireNotification(context, untitledName) }
                                 } else {
                                     notificationPermissionSheetOpen = true
@@ -593,7 +595,10 @@ fun EditNoteScreen(
             autoFocusBodyOnEdit = hasPersistedEditorRow && !suppressBodyAutoFocusOnEdit,
             shelfState = shelfState,
             pictureViewerOpen = pictureViewer != null,
-            onOpenReminder = { reminderPickerOpen = true },
+            onOpenReminder = {
+                reminderPickerOpen = true
+            },
+            notificationsAllowed = notificationsAllowed,
             onOpenPicture = launchHeroImagePick,
             onViewPictureFull = { uri, revision ->
                 pictureViewer = uri to revision

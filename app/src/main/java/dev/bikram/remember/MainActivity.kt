@@ -258,22 +258,6 @@ private fun AppRoot(
             val currentUpdateInfo = updateInfo
             val updateKey = currentUpdateInfo?.notificationDedupeKey()
             val updateAvailable = BuildConfig.SHOW_UPDATES && currentUpdateInfo != null
-            val updateFabState =
-                when (val currentPlayState = playBannerState) {
-                    is PlayInAppUpdateBannerUiState.Downloading ->
-                        UpdateChromeState.Downloading(
-                            bytesDownloaded = currentPlayState.bytesDownloaded,
-                            totalBytesToDownload = currentPlayState.totalBytesToDownload,
-                            indeterminateProgress = currentPlayState.indeterminateProgress,
-                        )
-                    PlayInAppUpdateBannerUiState.ReadyToInstall -> UpdateChromeState.ReadyToInstall
-                    PlayInAppUpdateBannerUiState.Hidden ->
-                        if (updateAvailable) {
-                            UpdateChromeState.Available
-                        } else {
-                            UpdateChromeState.Hidden
-                        }
-                }
             val updateBarState =
                 when (val currentPlayState = playBannerState) {
                     is PlayInAppUpdateBannerUiState.Downloading ->
@@ -298,10 +282,15 @@ private fun AppRoot(
                 launchFlow = launchFlow,
                 openSettingsRequest = openSettingsRequest,
                 openUpdateSheetRequest = openUpdateSheetRequest,
+                onOpenUpdateSheetRequestHandled = { openUpdateSheetRequest = 0 },
                 startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
+                onStartPlayInAppUpdateRequestHandled = { startPlayInAppUpdateRequest = 0 },
+                onUpdateCheckStarted = { dismissedUpdateBarKey = null },
                 updateBarState = updateBarState,
-                updateFabState = updateFabState,
                 onUpdateClick = {
+                    if (updateBarState == UpdateChromeState.Available) {
+                        dismissedUpdateBarKey = updateKey
+                    }
                     openSettingsRequest += 1
                     if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
                         startPlayInAppUpdateRequest += 1

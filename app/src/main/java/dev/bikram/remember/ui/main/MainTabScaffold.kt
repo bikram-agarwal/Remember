@@ -1,7 +1,14 @@
 package dev.bikram.remember.ui.main
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -36,7 +43,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
@@ -62,24 +69,27 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.graphics.shapes.Morph
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.notifications.appNotificationSettingsIntent
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
+import dev.bikram.remember.ui.components.AlertChromeSummary
+import dev.bikram.remember.ui.components.AlertFloatingActionButtonMenu
 import dev.bikram.remember.ui.components.RememberFloatingActionButton
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.UpdateChromeState
-import dev.bikram.remember.ui.components.UpdateFloatingBar
-import dev.bikram.remember.ui.components.UpdateFloatingFab
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.history.HistorySection
-import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
+import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
+import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.RoundedPolygonShape
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -102,6 +112,7 @@ enum class MainTab(
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalMaterial3AdaptiveNavigationSuiteApi::class,
+    ExperimentalSharedTransitionApi::class,
 )
 @Composable
 fun MainTabScaffold(
@@ -115,10 +126,13 @@ fun MainTabScaffold(
     historySection: HistorySection,
     historyVisibleItemCount: Int,
     updateBarState: UpdateChromeState,
-    updateFabState: UpdateChromeState,
     onUpdateClick: () -> Unit,
     onDismissUpdateAvailable: () -> Unit,
     onInstallUpdate: () -> Unit,
+    alertSummary: AlertChromeSummary,
+    blockedReminderCount: Int,
+    alertBarsExpanded: Boolean,
+    onAlertBarsExpandedChange: (Boolean) -> Unit,
     content: @Composable (closeRevealRequest: Int) -> Unit,
 ) {
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
@@ -136,20 +150,49 @@ fun MainTabScaffold(
         }
     val shareText = stringResource(R.string.about_share_text, shareUrl)
     val shareChooserTitle = stringResource(R.string.main_share_chooser_title)
+    val navAnimatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+    val chromeTargetVisible =
+        navAnimatedVisibilityScope?.transition?.targetState == EnterExitState.Visible
+    val effectiveChromeVisible = chromeVisible && (navAnimatedVisibilityScope == null || chromeTargetVisible)
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val chromeOverlayModifier =
+        if (sharedTransitionScope != null) {
+            with(sharedTransitionScope) {
+                Modifier.renderInSharedTransitionScopeOverlay(zIndexInOverlay = 10f)
+            }
+        } else {
+            Modifier
+        }
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            // The global permission state is refreshed by rememberNotificationsAllowed.
+        }
+    val enableReminderNotifications = {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            context.startActivity(appNotificationSettingsIntent(context))
+        }
+    }
 
     // Back handling: when the FAB speed dial is open, back closes it first. Tab route
     // back behavior is owned by Navigation Compose so predictive back can preview it.
-    RememberPredictiveBackHandler(enabled = chromeVisible && fabExpanded) { fabExpanded = false }
+    RememberPredictiveBackHandler(enabled = effectiveChromeVisible && fabExpanded) { fabExpanded = false }
+    RememberPredictiveBackHandler(enabled = effectiveChromeVisible && alertBarsExpanded && !fabExpanded) {
+        onAlertBarsExpandedChange(false)
+    }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(chromeVisible, currentTab) {
+    LaunchedEffect(effectiveChromeVisible, currentTab) {
         // Switching tabs collapses the speed dial so the captured FAB bounds do not
         // briefly point at a stale location while the new tab's FAB rebinds.
-        if (!chromeVisible || currentTab != MainTab.Notes) fabExpanded = false
+        if (!effectiveChromeVisible || currentTab != MainTab.Notes) fabExpanded = false
     }
-
     val navigationSuiteType =
-        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfoV2())
     val useAdaptiveNavigationRail = navigationSuiteType != NavigationSuiteType.NavigationBar
     val mainContent: @Composable () -> Unit = {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -158,7 +201,7 @@ fun MainTabScaffold(
             // Scrim covers the page (not the toolbar / FAB) when the speed dial is open.
             // Tapping the scrim collapses the menu, matching standard speed-dial dismiss.
             AnimatedVisibility(
-                visible = chromeVisible && fabExpanded && currentTab == MainTab.Notes,
+                visible = effectiveChromeVisible && ((fabExpanded && currentTab == MainTab.Notes) || alertBarsExpanded),
                 enter = fadeIn(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
                 exit = fadeOut(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
                 modifier = Modifier.fillMaxSize(),
@@ -167,27 +210,16 @@ fun MainTabScaffold(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .tapSoundClickable(onClick = { fabExpanded = false }),
+                            .tapSoundClickable(
+                                onClick = {
+                                    fabExpanded = false
+                                    onAlertBarsExpandedChange(false)
+                                },
+                            ),
                 )
             }
 
-            if (chromeVisible) {
-                UpdateFloatingBar(
-                    state = updateBarState,
-                    onCheckClick = onUpdateClick,
-                    onDismissAvailable = onDismissUpdateAvailable,
-                    onInstallClick = onInstallUpdate,
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(horizontal = 16.dp)
-                            .padding(bottom = PillBottomBarHeight + 28.dp),
-                )
-            }
-
-            if (chromeVisible) {
+            if (effectiveChromeVisible) {
                 // Bottom strip. Pill mode (phones) re-uses the original CenteredPillWithSideFab
                 // layout so the FAB visually attaches to the pill at the same position as
                 // before; the layout's measure logic clamps its reported height to the FAB's
@@ -195,10 +227,37 @@ fun MainTabScaffold(
                 // wrapper grows upward beyond the strip's reported bounds without pushing the
                 // pill. Rail mode is unaffected - the FAB sits in its own BottomEnd box.
                 if (useAdaptiveNavigationRail) {
+                    if (alertSummary.count > 0) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .then(chromeOverlayModifier)
+                                    .windowInsetsPadding(WindowInsets.navigationBars)
+                                    .padding(end = 96.dp, bottom = 24.dp),
+                        ) {
+                            AlertFloatingActionButtonMenu(
+                                expanded = alertBarsExpanded,
+                                onExpandedChange = { expanded ->
+                                    fabExpanded = false
+                                    onAlertBarsExpandedChange(expanded)
+                                },
+                                summary = alertSummary,
+                                updateState = updateBarState,
+                                blockedReminderCount = blockedReminderCount,
+                                onEnableReminderNotifications = enableReminderNotifications,
+                                onUpdateClick = onUpdateClick,
+                                onDismissUpdateAvailable = onDismissUpdateAvailable,
+                                onInstallUpdate = onInstallUpdate,
+                                horizontalAlignment = Alignment.End,
+                            )
+                        }
+                    }
                     Box(
                         modifier =
                             Modifier
                                 .align(Alignment.BottomEnd)
+                                .then(chromeOverlayModifier)
                                 .windowInsetsPadding(WindowInsets.navigationBars)
                                 .padding(end = 24.dp, bottom = 24.dp),
                     ) {
@@ -207,6 +266,7 @@ fun MainTabScaffold(
                             fabExpanded = fabExpanded,
                             onToggleNotesFab = {
                                 closeNotesRevealRequest++
+                                onAlertBarsExpandedChange(false)
                                 fabExpanded = !fabExpanded
                             },
                             historySection = historySection,
@@ -243,6 +303,7 @@ fun MainTabScaffold(
                         modifier =
                             Modifier
                                 .align(Alignment.BottomCenter)
+                                .then(chromeOverlayModifier)
                                 .fillMaxWidth()
                                 .windowInsetsPadding(WindowInsets.navigationBars)
                                 .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
@@ -258,19 +319,23 @@ fun MainTabScaffold(
                             )
                         },
                         leadingFab =
-                            if (updateFabState == UpdateChromeState.Hidden) {
+                            if (alertSummary.count == 0) {
                                 null
                             } else {
                                 {
-                                    UpdateFloatingFab(
-                                        state = updateFabState,
-                                        onClick = {
-                                            if (updateFabState == UpdateChromeState.ReadyToInstall) {
-                                                onInstallUpdate()
-                                            } else {
-                                                onUpdateClick()
-                                            }
+                                    AlertFloatingActionButtonMenu(
+                                        expanded = alertBarsExpanded,
+                                        onExpandedChange = { expanded ->
+                                            fabExpanded = false
+                                            onAlertBarsExpandedChange(expanded)
                                         },
+                                        summary = alertSummary,
+                                        updateState = updateBarState,
+                                        blockedReminderCount = blockedReminderCount,
+                                        onEnableReminderNotifications = enableReminderNotifications,
+                                        onUpdateClick = onUpdateClick,
+                                        onDismissUpdateAvailable = onDismissUpdateAvailable,
+                                        onInstallUpdate = onInstallUpdate,
                                     )
                                 }
                             },
@@ -280,6 +345,7 @@ fun MainTabScaffold(
                                 fabExpanded = fabExpanded,
                                 onToggleNotesFab = {
                                     closeNotesRevealRequest++
+                                    onAlertBarsExpandedChange(false)
                                     fabExpanded = !fabExpanded
                                 },
                                 historySection = historySection,
@@ -313,6 +379,9 @@ fun MainTabScaffold(
                         },
                         fabRightInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
                         fabBottomInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
+                        leadingFabGap = 18.dp,
+                        leadingFabLeftInset = 16.dp,
+                        leadingFabBottomInset = 16.dp,
                     )
                 }
             }
@@ -323,12 +392,12 @@ fun MainTabScaffold(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(bottom = 80.dp), // Push it above the floating nav bar
+                        .padding(bottom = 80.dp),
             )
         }
     }
 
-    if (chromeVisible && useAdaptiveNavigationRail) {
+    if (effectiveChromeVisible && useAdaptiveNavigationRail) {
         NavigationSuiteScaffold(
             layoutType = navigationSuiteType,
             containerColor = Color.Transparent,
@@ -468,6 +537,9 @@ private fun CenteredPillWithSideFab(
     fabCoreSize: androidx.compose.ui.unit.Dp = 56.dp,
     fabRightInset: androidx.compose.ui.unit.Dp = 0.dp,
     fabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
+    leadingFabGap: androidx.compose.ui.unit.Dp = fabGap,
+    leadingFabLeftInset: androidx.compose.ui.unit.Dp = 0.dp,
+    leadingFabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     androidx.compose.ui.layout.Layout(
         modifier = modifier,
@@ -492,9 +564,12 @@ private fun CenteredPillWithSideFab(
                 .getOrNull(2)
                 ?.measure(loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
         val gapPx = fabGap.roundToPx()
+        val leadingGapPx = leadingFabGap.roundToPx()
         val fabCorePx = fabCoreSize.roundToPx()
         val fabRightInsetPx = fabRightInset.roundToPx()
         val fabBottomInsetPx = fabBottomInset.roundToPx()
+        val leadingFabLeftInsetPx = leadingFabLeftInset.roundToPx()
+        val leadingFabBottomInsetPx = leadingFabBottomInset.roundToPx()
 
         val width =
             if (constraints.hasBoundedWidth) {
@@ -536,8 +611,10 @@ private fun CenteredPillWithSideFab(
             fabPlaceable.place(fabX, fabY)
 
             leadingFabPlaceable?.let { leadingPlaceable ->
-                val leadingX = (pillX - gapPx - fabCorePx).coerceAtLeast(0)
-                val leadingY = (stripHeight - leadingPlaceable.height) / 2
+                val leadingFabElementLeft = (pillX - leadingGapPx - fabCorePx).coerceAtLeast(0)
+                val leadingX = (leadingFabElementLeft - leadingFabLeftInsetPx).coerceAtLeast(0)
+                val leadingFabBottomY = (stripHeight + fabCorePx) / 2 + leadingFabBottomInsetPx
+                val leadingY = leadingFabBottomY - leadingPlaceable.height
                 leadingPlaceable.place(leadingX, leadingY)
             }
         }

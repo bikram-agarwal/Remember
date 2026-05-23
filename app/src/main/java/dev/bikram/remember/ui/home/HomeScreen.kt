@@ -70,6 +70,7 @@ import dev.bikram.remember.data.NotesFilter
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
+import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.components.toNoteCardUiModel
@@ -132,6 +133,7 @@ fun HomeRoute(
         onSwipeAction = vm::handleSwipeAction,
         onToggleSelection = vm::toggleSelection,
         onSelectAllVisible = vm::selectNotes,
+        onPruneSelection = vm::pruneSelection,
         onClearSelection = vm::clearSelection,
         onMarkSelectedDone = vm::markSelectedDone,
         onArchiveSelected = vm::archiveSelected,
@@ -155,6 +157,7 @@ fun HomeScreen(
     onSwipeAction: (NoteWithItems, NoteSwipeAction) -> Unit,
     onToggleSelection: (Long) -> Unit,
     onSelectAllVisible: (Set<Long>) -> Unit,
+    onPruneSelection: (Set<Long>) -> Unit,
     onClearSelection: () -> Unit,
     onMarkSelectedDone: () -> Unit,
     onArchiveSelected: () -> Unit,
@@ -192,6 +195,7 @@ fun HomeScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val notificationsAllowed = rememberNotificationsAllowed()
     val initialListLiftPx =
         with(LocalDensity.current) {
             16.dp.roundToPx()
@@ -245,6 +249,9 @@ fun HomeScreen(
                     }.toSet()
             }
         }
+    LaunchedEffect(selectableVisibleIds) {
+        onPruneSelection(selectableVisibleIds)
+    }
     // Note ids that appear in more than one row of [displayedItems]. Only multi-tag
     // notes under the by-tag grouping land here; everything else is mutually exclusive
     // (a note is either active or done, either overdue or upcoming). For unique ids we
@@ -565,6 +572,7 @@ fun HomeScreen(
                                 // Swipes are meaningless during bulk-select and would visually
                                 // fight the tap-to-toggle gesture.
                                 swipeEnabled = !state.inSelectionMode,
+                                reminderNotificationsAllowed = notificationsAllowed,
                             )
                         }
                     }
@@ -602,6 +610,7 @@ fun HomeScreen(
                                 onSwipeAction = onSwipeAction,
                                 badgeText = stringResource(R.string.home_search_section_badge_archive),
                                 badgeStyle = SectionBadgeStyle.ARCHIVE,
+                                reminderNotificationsAllowed = notificationsAllowed,
                                 modifier =
                                     Modifier.animateItem(
                                         fadeInSpec = itemFadeInSpec,
@@ -644,6 +653,7 @@ fun HomeScreen(
                                 onSwipeAction = onSwipeAction,
                                 badgeText = stringResource(R.string.home_search_section_badge_trash),
                                 badgeStyle = SectionBadgeStyle.TRASH,
+                                reminderNotificationsAllowed = notificationsAllowed,
                                 modifier =
                                     Modifier.animateItem(
                                         fadeInSpec = itemFadeInSpec,

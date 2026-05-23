@@ -208,6 +208,13 @@ class HomeViewModel
             selectedIds.value = noteIds.toPersistentSet()
         }
 
+        fun pruneSelection(validIds: Set<Long>) {
+            val pruned = selectedIds.value.intersect(validIds).toPersistentSet()
+            if (pruned != selectedIds.value) {
+                selectedIds.value = pruned
+            }
+        }
+
         fun clearSelection() {
             selectedIds.value = persistentSetOf()
         }

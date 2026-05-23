@@ -341,6 +341,7 @@ internal fun StateBadgedNoteCard(
     badgeText: String,
     badgeStyle: SectionBadgeStyle,
     modifier: Modifier = Modifier,
+    reminderNotificationsAllowed: Boolean = true,
 ) {
     val backgroundColor =
         when (badgeStyle) {
@@ -361,6 +362,7 @@ internal fun StateBadgedNoteCard(
                 onOpenNote = onOpen,
                 onSwipeAction = onSwipeAction,
                 swipeEnabled = false,
+                reminderNotificationsAllowed = reminderNotificationsAllowed,
             )
         }
         Box(

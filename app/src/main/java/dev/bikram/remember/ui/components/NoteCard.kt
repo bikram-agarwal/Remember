@@ -84,6 +84,7 @@ fun NoteCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
+    reminderNotificationsAllowed: Boolean = true,
 ) {
     NoteCard(
         model = remember(note) { note.toNoteCardUiModel() },
@@ -91,6 +92,7 @@ fun NoteCard(
         modifier = modifier,
         onLongClick = onLongClick,
         selected = selected,
+        reminderNotificationsAllowed = reminderNotificationsAllowed,
     )
 }
 
@@ -102,6 +104,7 @@ fun NoteCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
+    reminderNotificationsAllowed: Boolean = true,
 ) {
     val cardColors = elevatedCardColors()
     val visibleTags = model.visibleTags
@@ -480,7 +483,11 @@ fun NoteCard(
                                 hiddenCount = model.checklistHiddenItemCount,
                             )
                     }
-                    MetadataRow(model = model, visibleTags = visibleTags)
+                    MetadataRow(
+                        model = model,
+                        visibleTags = visibleTags,
+                        reminderNotificationsAllowed = reminderNotificationsAllowed,
+                    )
                 }
             }
             // Selection badge: shape morph + bloom. [selectionProgress] is hoisted to
@@ -545,6 +552,7 @@ private fun BoxScope.HeroBackground(
 private fun MetadataRow(
     model: NoteCardUiModel,
     visibleTags: List<String>,
+    reminderNotificationsAllowed: Boolean,
 ) {
     val tags = visibleTags.take(3)
     val extraTags = (visibleTags.size - tags.size).coerceAtLeast(0)
@@ -610,15 +618,21 @@ private fun MetadataRow(
             // repeat icon precedes the date as a glanceable indicator.
             if (reminderAt != null) {
                 val cdReminder = stringResource(R.string.notecard_reminder_cd)
+                val reminderPermissionMissing = !reminderNotificationsAllowed
                 RememberMaterialRoundedSymbol(
-                    name = "notifications",
+                    name = if (reminderPermissionMissing) "notifications_off" else "notifications",
                     size = 14.dp,
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    tint =
+                        if (reminderPermissionMissing) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                     weight = FontWeight.Medium,
                     modifier =
                         Modifier
                             .semantics { contentDescription = cdReminder }
-                            .alpha(0.68f),
+                            .alpha(if (reminderPermissionMissing) 1f else 0.68f),
                 )
                 if (isRecurring) {
                     val cdRecurring = stringResource(R.string.notecard_recurring_cd)
@@ -636,11 +650,16 @@ private fun MetadataRow(
                 Text(
                     text = formatShortReminderDate(reminderAt),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color =
+                        if (reminderPermissionMissing) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                     fontWeight = FontWeight.Medium,
                     modifier =
                         Modifier
-                            .alpha(0.85f),
+                            .alpha(if (reminderPermissionMissing) 1f else 0.85f),
                 )
             }
         }

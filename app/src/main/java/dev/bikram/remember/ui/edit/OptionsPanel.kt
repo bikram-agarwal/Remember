@@ -79,6 +79,7 @@ fun OptionsPanel(
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
     modifier: Modifier = Modifier,
+    reminderPermissionMissing: Boolean = false,
     // When true (archived / trashed), the Behavior row's internal bottom-sheet trigger is
     // suppressed. Every OTHER row already no-ops through its caller-provided `onOpen*` lambda
     // when read-only, but Behavior owns its own sheet so the gate has to live here.
@@ -165,12 +166,24 @@ fun OptionsPanel(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     OptionCell(
-                        symbolName = "alarm",
+                        symbolName = if (reminderPermissionMissing) "alarm_off" else "alarm",
                         title = stringResource(R.string.options_reminder),
                         summary = "",
                         onClick = onOpenReminder,
                         modifier = Modifier.fillMaxWidth(),
-                        summaryContent = { ReminderOptionSummary(reminderAt, recurrence) },
+                        iconTint =
+                            if (reminderPermissionMissing) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        summaryContent = {
+                            ReminderOptionSummary(
+                                reminderAt = reminderAt,
+                                recurrence = recurrence,
+                                permissionMissing = reminderPermissionMissing,
+                            )
+                        },
                     )
                     OptionCell(
                         symbolName = actions.firstOrNull()?.type?.materialSymbolName() ?: "bolt",
@@ -290,8 +303,8 @@ private fun OptionRow(
 private fun DotSeparatedSummary(
     parts: List<String>,
     modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
-    val summaryColor = MaterialTheme.colorScheme.onSurfaceVariant
     val bodyStyle = MaterialTheme.typography.bodySmall
     val dotFontSize = bodyStyle.fontSize * 1.45f
     Row(
@@ -308,7 +321,7 @@ private fun DotSeparatedSummary(
                             fontWeight = FontWeight.Bold,
                             lineHeight = bodyStyle.lineHeight,
                         ),
-                    color = summaryColor.copy(alpha = 0.9f),
+                    color = color.copy(alpha = 0.9f),
                     modifier = Modifier.padding(horizontal = 4.dp),
                     maxLines = 1,
                 )
@@ -316,7 +329,7 @@ private fun DotSeparatedSummary(
             Text(
                 text = part,
                 style = bodyStyle,
-                color = summaryColor,
+                color = color,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 softWrap = false,
@@ -335,12 +348,19 @@ private fun DotSeparatedSummary(
 private fun ReminderOptionSummary(
     reminderAt: Long?,
     recurrence: RecurrenceRule?,
+    permissionMissing: Boolean,
 ) {
+    val summaryColor =
+        if (permissionMissing && reminderAt != null) {
+            MaterialTheme.colorScheme.error
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
     if (reminderAt == null) {
         Text(
             text = stringResource(R.string.common_none),
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = summaryColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
@@ -353,12 +373,12 @@ private fun ReminderOptionSummary(
         Text(
             text = datePart,
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = summaryColor,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
     } else {
-        DotSeparatedSummary(listOf(datePart, recurrenceLabel))
+        DotSeparatedSummary(listOf(datePart, recurrenceLabel), color = summaryColor)
     }
 }
 
@@ -382,6 +402,7 @@ private fun OptionCell(
     summary: String,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    iconTint: Color = MaterialTheme.colorScheme.primary,
     fixedHeight: Boolean = true,
     summaryContent: (@Composable () -> Unit)? = null,
 ) {
@@ -414,7 +435,7 @@ private fun OptionCell(
             RememberMaterialRoundedSymbol(
                 name = symbolName,
                 size = 19.dp,
-                tint = MaterialTheme.colorScheme.primary,
+                tint = iconTint,
                 weight = FontWeight.Medium,
             )
             Spacer(Modifier.size(8.dp))

@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import dev.bikram.remember.data.Visibility as NoteVisibility
 
@@ -128,6 +129,14 @@ class EditListViewModel
         private var originalNote: dev.bikram.remember.data.NoteEntity? = null
         private var originalItems: List<dev.bikram.remember.data.ChecklistItemEntity> = emptyList()
 
+        /** Bumped on every user-visible mutation so a suspended save cannot clear newer edits. */
+        private val mutationEpoch = AtomicInteger(0)
+
+        private fun markDirty() {
+            mutationEpoch.incrementAndGet()
+            dirty = true
+        }
+
         private fun syncHasPersistedRow() {
             _hasPersistedRow.value = loadedId != null
         }
@@ -202,12 +211,12 @@ class EditListViewModel
 
         fun setTitle(v: String) {
             _title.value = v
-            dirty = true
+            markDirty()
         }
 
         fun toggleStar() {
             _starred.value = !_starred.value
-            dirty = true
+            markDirty()
         }
 
         fun setReminder(
@@ -216,18 +225,18 @@ class EditListViewModel
         ) {
             _reminderAt.value = at
             _recurrence.value = rule?.sanitized()
-            dirty = true
+            markDirty()
         }
 
         fun setImportance(v: Importance) {
             _importance.value = v
-            dirty = true
+            markDirty()
         }
 
         fun setVisibility(v: NoteVisibility) {
             if (_visibility.value == v) return
             _visibility.value = v
-            dirty = true
+            markDirty()
             refreshActiveNotificationVisibility(v)
         }
 
@@ -240,7 +249,7 @@ class EditListViewModel
 
         fun toggleLock() {
             _locked.value = !_locked.value
-            dirty = true
+            markDirty()
         }
 
         fun setPictureUri(v: String?) {
@@ -249,7 +258,7 @@ class EditListViewModel
                 _pictureHeroFraming.value = null
             }
             _pictureRevision.value = _pictureRevision.value + 1L
-            dirty = true
+            markDirty()
         }
 
         fun setHeroWithFraming(
@@ -259,22 +268,22 @@ class EditListViewModel
             _pictureUri.value = pictureUri
             _pictureHeroFraming.value = framing.toJsonString()
             _pictureRevision.value = _pictureRevision.value + 1L
-            dirty = true
+            markDirty()
         }
 
         fun setIconKey(v: String?) {
             _iconKey.value = v
-            dirty = true
+            markDirty()
         }
 
         fun setActions(v: List<NoteAction>) {
             _actions.value = v
-            dirty = true
+            markDirty()
         }
 
         fun setTags(v: List<String>) {
             _tags.value = v.filterNot { it == RememberReservedTags.STARRED }
-            dirty = true
+            markDirty()
         }
 
         fun saveTagsWithColors(
@@ -282,7 +291,7 @@ class EditListViewModel
             newColors: Map<String, String>,
         ) {
             _tags.value = tags.filterNot { it == RememberReservedTags.STARRED }
-            dirty = true
+            markDirty()
             if (newColors.isNotEmpty()) {
                 viewModelScope.launch {
                     newColors.forEach { (name, hex) ->
@@ -313,7 +322,7 @@ class EditListViewModel
                         }.distinctBy { tagName -> tagName.lowercase() }
                 if (_tags.value != updatedTags) {
                     _tags.value = updatedTags
-                    dirty = true
+                    markDirty()
                 }
             }
         }
@@ -334,7 +343,7 @@ class EditListViewModel
                     parentLocalId = null,
                     depth = 0,
                 )
-            dirty = true
+            markDirty()
         }
 
         fun updateItemText(
@@ -345,7 +354,7 @@ class EditListViewModel
                 _items.value.map {
                     if (it.localId == localId) it.copy(text = text) else it
                 }
-            dirty = true
+            markDirty()
         }
 
         fun toggleChecked(localId: Long) {
@@ -390,7 +399,7 @@ class EditListViewModel
                 return
             }
             _items.value = result.items
-            dirty = true
+            markDirty()
         }
 
         fun removeItem(localId: Long) {
@@ -407,7 +416,7 @@ class EditListViewModel
                             it
                         }
                     }
-            dirty = true
+            markDirty()
         }
 
         fun addAttachment(
@@ -440,7 +449,7 @@ class EditListViewModel
                         )?.uriString ?: uri.toString()
                 repository.addAttachment(id, attachmentUri, name, mime)
                 _attachments.value = repository.get(id)?.attachments ?: emptyList()
-                dirty = true
+                markDirty()
             }
         }
 
@@ -454,7 +463,7 @@ class EditListViewModel
                     } else {
                         _attachments.value.filterNot { it.id == attachmentId }
                     }
-                dirty = true
+                markDirty()
             }
         }
 
@@ -557,7 +566,7 @@ class EditListViewModel
                     // a parent and the ids disagree (or one side has a parent and the other does not).
                     val cParent = c.parentLocalId
                     val oParent = o.parentId
-                    if ((cParent == null) != (oParent == null)) return true
+                    if (cParent != oParent) return true
                 }
                 return false
             }
@@ -576,6 +585,7 @@ class EditListViewModel
                 val persistable = currentPersistable()
                 if (id == null) {
                     if (!dirty) return@withLock null
+                    val epochAtWrite = mutationEpoch.get()
                     // Creation still goes through createList which assigns sortOrder itself. If the
                     // user pre-composed hierarchy/checked state in the draft, we re-run updateList
                     // immediately afterwards with the real persistable payload.
@@ -587,7 +597,7 @@ class EditListViewModel
                         repository.updateList(newId, finalTitle, 0, persistable, currentOptions())
                     }
                     if (_starred.value) repository.setStarred(newId, true)
-                    dirty = false
+                    if (mutationEpoch.get() == epochAtWrite) dirty = false
 
                     val savedList = repository.get(newId)
                     originalNote = savedList?.note
@@ -598,13 +608,14 @@ class EditListViewModel
                     }
                 } else {
                     if (!dirty) return@withLock null
+                    val epochAtWrite = mutationEpoch.get()
                     repository.updateList(id, finalTitle, 0, persistable, currentOptions())
                     if (t.isBlank()) _title.value = finalTitle
                     val cur = repository.get(id)?.note
                     if (cur != null && cur.starred != _starred.value) {
                         repository.setStarred(id, _starred.value)
                     }
-                    dirty = false
+                    if (mutationEpoch.get() == epochAtWrite) dirty = false
 
                     val old = originalNote
                     val oldItems = originalItems

@@ -42,11 +42,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -136,8 +137,10 @@ fun SettingsRoute(
     onOpenHelp: () -> Unit = {},
     onOpenDevOptions: () -> Unit = {},
     openUpdateSheetRequest: Int = 0,
+    onOpenUpdateSheetRequestHandled: () -> Unit = {},
     startPlayInAppUpdateRequest: Int = 0,
-    updateBarVisible: Boolean = false,
+    onStartPlayInAppUpdateRequestHandled: () -> Unit = {},
+    onUpdateCheckStarted: () -> Unit = {},
     highlightSectionKey: String? = null,
     onHighlightHandled: () -> Unit = {},
 ) {
@@ -227,7 +230,11 @@ fun SettingsRoute(
     var downloadProgress by rememberSaveable { mutableStateOf<Float?>(null) }
     var updateInfo by remember { mutableStateOf<RememberUpdateInfo?>(null) }
     var updateSheetChangelog by remember { mutableStateOf<ChangelogUiState>(ChangelogUiState.Hidden) }
-    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val updateSheetState =
+        rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        )
     val playInAppUpdateLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartIntentSenderForResult(),
@@ -246,12 +253,14 @@ fun SettingsRoute(
 
     var handledStartPlayInAppUpdateRequest by rememberSaveable { mutableStateOf(0) }
     LaunchedEffect(startPlayInAppUpdateRequest) {
-        if (startPlayInAppUpdateRequest <= handledStartPlayInAppUpdateRequest ||
-            !BuildConfig.USE_PLAY_IN_APP_UPDATES
-        ) {
+        if (startPlayInAppUpdateRequest == 0) {
+            handledStartPlayInAppUpdateRequest = 0
             return@LaunchedEffect
         }
+        if (startPlayInAppUpdateRequest <= handledStartPlayInAppUpdateRequest) return@LaunchedEffect
         handledStartPlayInAppUpdateRequest = startPlayInAppUpdateRequest
+        onStartPlayInAppUpdateRequestHandled()
+        if (!BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
         val hostActivity = context as? ComponentActivity
         val started =
             hostActivity != null &&
@@ -469,7 +478,8 @@ fun SettingsRoute(
         }
         Unit
     }
-    val beginUpdateCheck = {
+    val beginUpdateCheck: (Boolean) -> Unit = { redisplayAvailableAlert ->
+        if (redisplayAvailableAlert) onUpdateCheckStarted()
         showUpdateSheet = true
         loadUpdateSheetChangelog()
         isCheckingUpdate = true
@@ -650,10 +660,16 @@ fun SettingsRoute(
         }
         Unit
     }
+    var handledOpenUpdateSheetRequest by rememberSaveable { mutableStateOf(0) }
     LaunchedEffect(openUpdateSheetRequest) {
-        if (openUpdateSheetRequest > 0) {
-            beginUpdateCheck()
+        if (openUpdateSheetRequest == 0) {
+            handledOpenUpdateSheetRequest = 0
+            return@LaunchedEffect
         }
+        if (openUpdateSheetRequest <= handledOpenUpdateSheetRequest) return@LaunchedEffect
+        handledOpenUpdateSheetRequest = openUpdateSheetRequest
+        onOpenUpdateSheetRequestHandled()
+        if (openUpdateSheetRequest > 0) beginUpdateCheck(false)
     }
     LaunchedEffect(playBannerState, showUpdateSheet) {
         if (!showUpdateSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
@@ -762,7 +778,7 @@ fun SettingsRoute(
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
-                onCheckAgain = beginUpdateCheck,
+                onCheckAgain = { beginUpdateCheck(true) },
                 onDownloadClick = downloadUpdate,
                 onSkipVersionClick = skipVersion@{
                     val availableUpdate = updateInfo ?: return@skipVersion
@@ -850,8 +866,7 @@ fun SettingsRoute(
     ) { padding ->
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
         val topInset = padding.calculateTopPadding() + 8.dp
-        val floatingUpdateBarExtraHeight = if (updateBarVisible) 72.dp else 0.dp
-        val bottomPadding = pillInset + floatingUpdateBarExtraHeight + 24.dp
+        val bottomPadding = pillInset + 24.dp
         val listContentPadding =
             remember(topInset, bottomPadding) {
                 PaddingValues(
@@ -1119,7 +1134,7 @@ fun SettingsRoute(
                                     Modifier
                                         .fillMaxWidth()
                                         .tapSoundClickable {
-                                            beginUpdateCheck()
+                                            beginUpdateCheck(true)
                                         }.padding(horizontal = 16.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {

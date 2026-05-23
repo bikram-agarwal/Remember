@@ -66,7 +66,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.app.NotificationManagerCompat
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
@@ -76,11 +75,13 @@ import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.domain.checklist.EditableItem
+import dev.bikram.remember.notifications.canPostNotifications
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.EditorShelfNotice
 import dev.bikram.remember.ui.components.EditorShelfNoticeState
 import dev.bikram.remember.ui.components.NoteActionBottomBar
@@ -154,6 +155,7 @@ fun EditListRoute(
             .pluralStringResource(dev.bikram.remember.R.plurals.bulk_action_restored, 1, 1)
     val context = androidx.compose.ui.platform.LocalContext.current
     var notificationPermissionSheetOpen by rememberSaveable { mutableStateOf(false) }
+    val notificationsAllowed = rememberNotificationsAllowed()
     // BackHandler fires synchronously on back commit, where PredictiveBackHandler
     // would suspend on its progress flow until the gesture finishes - producing a
     // visible delay before the navigation reverse animation begins.
@@ -236,6 +238,7 @@ fun EditListRoute(
             persistedForToolbar = hasPersistedRow,
             hasUnsavedChanges = hasUnsavedChanges,
             forceEdit = forceEdit,
+            notificationsAllowed = notificationsAllowed,
             onTitleChange = vm::setTitle,
             onToggleStar = vm::toggleStar,
             completed = completed,
@@ -308,12 +311,13 @@ fun EditListRoute(
                 onBack()
             },
             onNotification = {
-                if (NotificationManagerCompat.from(context).areNotificationsEnabled()) {
+                if (canPostNotifications(context)) {
                     appScope.launch { vm.fireNotification(context, untitledName) }
                 } else {
                     notificationPermissionSheetOpen = true
                 }
             },
+            onNotificationPermissionRequired = { notificationPermissionSheetOpen = true },
             onUnarchive = {
                 appScope.launch {
                     vm.unarchiveCurrent()
@@ -580,6 +584,7 @@ fun EditListScreen(
     persistedForToolbar: Boolean,
     hasUnsavedChanges: Boolean,
     forceEdit: Boolean = false,
+    notificationsAllowed: Boolean,
     completed: Boolean,
     onTitleChange: (String) -> Unit,
     onToggleStar: () -> Unit,
@@ -613,6 +618,7 @@ fun EditListScreen(
     onTrash: () -> Unit,
     onArchive: () -> Unit,
     onNotification: () -> Unit,
+    onNotificationPermissionRequired: () -> Unit,
     onUnarchive: () -> Unit,
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,
@@ -1222,7 +1228,15 @@ fun EditListScreen(
                     actions = actions,
                     tags = tags,
                     attachments = attachments,
-                    onOpenReminder = if (readOnly) ({}) else ({ reminderPickerOpen = true }),
+                    onOpenReminder =
+                        if (readOnly) {
+                            {}
+                        } else {
+                            {
+                                reminderPickerOpen = true
+                            }
+                        },
+                    reminderPermissionMissing = reminderAt != null && !notificationsAllowed,
                     onSetImportance = if (readOnly) ({ _ -> }) else onImportanceChange,
                     onSetVisibility = if (readOnly) ({ _ -> }) else onVisibilityChange,
                     onOpenPicture = if (readOnly) ({}) else launchHeroImagePick,
