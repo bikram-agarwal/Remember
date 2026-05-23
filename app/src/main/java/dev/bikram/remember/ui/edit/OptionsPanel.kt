@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -26,9 +27,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalContext
@@ -108,22 +111,17 @@ fun OptionsPanel(
         }
 
     val baseContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
-    // Same recipe as NoteCard: blend ~7% of the starred-yellow swatch into the panel's
-    // surface tint when the open note/list is starred. Non-starred is a no-op.
-    val tintedContainerColor =
-        if (starred) {
-            lerp(baseContainerColor, Color(0xFFFFD54F), 0.07f)
-        } else {
-            baseContainerColor
-        }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.largeIncreased,
-        color = tintedContainerColor,
+        color = baseContainerColor,
         tonalElevation = 1.dp,
         shadowElevation = 0.dp,
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
+            if (starred) {
+                StarredRadiantWash(Modifier.matchParentSize())
+            }
             // Watermark star for starred cards, mirrored from NoteCard. Tilted ~-15deg
             // and very low alpha so it reads as a soft starred cue without competing with
             // the option rows. Sits behind the Column so taps still land on rows.
@@ -132,14 +130,14 @@ fun OptionsPanel(
                     name = "star",
                     filled = true,
                     size = 96.dp,
-                    tint = Color(0xFFFFD54F),
+                    tint = Color(0xFFF9A825),
                     weight = FontWeight.Bold,
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
                             .graphicsLayer {
                                 rotationZ = -15f
-                                alpha = 0.13f
+                                alpha = 0.28f
                             },
                 )
             }
@@ -245,6 +243,31 @@ fun OptionsPanel(
             onDismiss = { behaviorOpen = false },
         )
     }
+}
+
+@Composable
+private fun BoxScope.StarredRadiantWash(modifier: Modifier = Modifier) {
+    Box(
+        modifier =
+            modifier.drawWithCache {
+                val starCenter = Offset(size.width - 54.dp.toPx(), 50.dp.toPx())
+                val brush =
+                    Brush.radialGradient(
+                        colorStops =
+                            arrayOf(
+                                0.00f to Color(0xFFF9A825).copy(alpha = 0.20f),
+                                0.34f to Color(0xFFF9A825).copy(alpha = 0.10f),
+                                0.72f to Color(0xFFF9A825).copy(alpha = 0.035f),
+                                1.00f to Color.Transparent,
+                            ),
+                        center = starCenter,
+                        radius = maxOf(size.width, size.height) * 0.95f,
+                    )
+                onDrawBehind {
+                    drawRect(brush)
+                }
+            },
+    )
 }
 
 @Composable

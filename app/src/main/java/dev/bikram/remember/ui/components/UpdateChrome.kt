@@ -27,7 +27,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.theme.pillShape
 
 sealed interface UpdateChromeState {
     data object Hidden : UpdateChromeState
@@ -51,6 +50,8 @@ fun UpdateFloatingBar(
     onDismissAvailable: () -> Unit,
     onInstallClick: () -> Unit,
     modifier: Modifier = Modifier,
+    contentAlpha: Float = 1f,
+    shadowAlpha: Float = 1f,
 ) {
     if (state == UpdateChromeState.Hidden) return
 
@@ -85,12 +86,10 @@ fun UpdateFloatingBar(
                 )
         }
 
-    Surface(
+    AlertBarSurface(
+        contentAlpha = contentAlpha,
+        shadowAlpha = shadowAlpha,
         modifier = modifier,
-        shape = pillShape,
-        color = scheme.surfaceContainerHigh,
-        tonalElevation = 3.dp,
-        shadowElevation = 3.dp,
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(

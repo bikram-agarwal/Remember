@@ -49,7 +49,6 @@ import androidx.graphics.shapes.Morph
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.MorphPolygonShape
-import dev.bikram.remember.ui.theme.pillShape
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @Immutable
@@ -260,13 +259,21 @@ fun AlertFloatingActionButtonMenu(
                 ) { state ->
                     if (state == EnterExitState.Visible) 1f else 0f
                 }
+            val exiting =
+                if (transition.currentState == EnterExitState.Visible &&
+                    transition.targetState == EnterExitState.PostExit
+                ) {
+                    true
+                } else {
+                    false
+                }
+            val barAlpha = if (exiting) progress else 1f
             Column(
                 modifier =
                     Modifier
                         .widthIn(min = 332.dp, max = 392.dp)
                         .padding(start = 6.dp, end = 6.dp, bottom = 12.dp)
                         .graphicsLayer {
-                            alpha = progress
                             translationY = with(density) { 18.dp.toPx() } * (1f - progress)
                         },
                 verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -274,6 +281,8 @@ fun AlertFloatingActionButtonMenu(
                 if (blockedReminderCount > 0) {
                     ReminderNotificationsBlockedBar(
                         reminderCount = blockedReminderCount,
+                        contentAlpha = barAlpha,
+                        shadowAlpha = barAlpha,
                         onEnableClick = onEnableReminderNotifications,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -284,6 +293,8 @@ fun AlertFloatingActionButtonMenu(
                         onCheckClick = onUpdateClick,
                         onDismissAvailable = onDismissUpdateAvailable,
                         onInstallClick = onInstallUpdate,
+                        contentAlpha = barAlpha,
+                        shadowAlpha = barAlpha,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -295,16 +306,16 @@ fun AlertFloatingActionButtonMenu(
 @Composable
 private fun ReminderNotificationsBlockedBar(
     reminderCount: Int,
+    contentAlpha: Float,
+    shadowAlpha: Float,
     onEnableClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
-    Surface(
+    AlertBarSurface(
+        contentAlpha = contentAlpha,
+        shadowAlpha = shadowAlpha,
         modifier = modifier,
-        shape = pillShape,
-        color = scheme.surfaceContainerHigh,
-        tonalElevation = 3.dp,
-        shadowElevation = 3.dp,
     ) {
         Row(
             modifier =

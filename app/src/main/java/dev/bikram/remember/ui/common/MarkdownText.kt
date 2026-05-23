@@ -65,10 +65,11 @@ internal fun MarkdownText(
     val styler = rememberMarkdownStyler(style)
     val includeLinkAnnotations = onLinkClick == null && onLinkLongPress == null
     if (maxLines != Int.MAX_VALUE) {
+        val previewSource = remember(markdown) { markdownPreviewSource(markdown) }
         val preview =
-            remember(markdown, styler, includeLinkAnnotations) {
-                styler.markdownPreviewAnnotatedString(
-                    markdown = markdown,
+            remember(previewSource.source, styler, includeLinkAnnotations) {
+                styler.markdownInlineAnnotatedString(
+                    source = previewSource.source,
                     includeLinkAnnotations = includeLinkAnnotations,
                 )
             }
@@ -78,8 +79,9 @@ internal fun MarkdownText(
             maxLines = maxLines,
             overflow = overflow,
             modifier = modifier,
-            source = markdown,
+            source = previewSource.source,
             sourceOffset = 0,
+            sourceOffsetByIndex = previewSource.sourceOffsetByIndex,
             onTextTap = onTextTap,
             onTextLongPress = onTextLongPress,
             onLinkClick = onLinkClick,
@@ -323,6 +325,7 @@ private fun MarkdownInlineText(
     overflow: TextOverflow = TextOverflow.Clip,
     source: String = text.text,
     sourceOffset: Int = 0,
+    sourceOffsetByIndex: IntArray? = null,
     onTextTap: ((MarkdownTextTap) -> Unit)? = null,
     onTextLongPress: ((MarkdownTextTap) -> Unit)? = null,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)? = null,
@@ -330,10 +333,11 @@ private fun MarkdownInlineText(
 ) {
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val inlineInteractionMap =
-        remember(source, sourceOffset) {
+        remember(source, sourceOffset, sourceOffsetByIndex) {
             MarkdownInlineInteractionBuilder(
                 source = source,
                 sourceOffset = sourceOffset,
+                sourceOffsetByIndex = sourceOffsetByIndex,
             ).build()
         }
     val interactionModifier =
@@ -526,13 +530,14 @@ private data class MarkdownInlineInteractionMap(
 private class MarkdownInlineInteractionBuilder(
     private val source: String,
     private val sourceOffset: Int,
+    private val sourceOffsetByIndex: IntArray? = null,
 ) {
     private val sourceOffsets = mutableListOf<Int>()
     private val links = mutableListOf<MarkdownInlineLinkRange>()
 
     fun build(): MarkdownInlineInteractionMap {
-        appendInlineMarkdown(sourceSegment = source, segmentOffset = sourceOffset)
-        sourceOffsets.add(sourceOffset + source.length)
+        appendInlineMarkdown(sourceSegment = source, segmentOffset = 0)
+        sourceOffsets.add(sourceOffsetAt(source.length))
         return MarkdownInlineInteractionMap(
             sourceOffsetByVisibleOffset = sourceOffsets.toIntArray(),
             links = links,
@@ -564,9 +569,9 @@ private class MarkdownInlineInteractionBuilder(
                                     MarkdownLinkInteraction(
                                         url = linkMatch.groupValues[2].withHttpScheme(),
                                         text = linkMatch.groupValues[1],
-                                        markdownOffset = segmentOffset + linkMatch.range.first,
-                                        textStartOffset = segmentOffset + linkTextRange.first,
-                                        textEndOffset = segmentOffset + linkTextRange.last + 1,
+                                        markdownOffset = sourceOffsetAt(segmentOffset + linkMatch.range.first),
+                                        textStartOffset = sourceOffsetAt(segmentOffset + linkTextRange.first),
+                                        textEndOffset = sourceOffsetAt(segmentOffset + linkTextRange.last + 1),
                                     ),
                             ),
                         )
@@ -637,7 +642,7 @@ private class MarkdownInlineInteractionBuilder(
                 continue
             }
 
-            sourceOffsets.add(segmentOffset + currentIndex)
+            sourceOffsets.add(sourceOffsetAt(segmentOffset + currentIndex))
             currentIndex++
         }
     }
@@ -649,10 +654,58 @@ private class MarkdownInlineInteractionBuilder(
     ) {
         var currentIndex = rangeStart
         while (currentIndex < rangeEnd) {
-            sourceOffsets.add(segmentOffset + currentIndex)
+            sourceOffsets.add(sourceOffsetAt(segmentOffset + currentIndex))
             currentIndex++
         }
     }
+
+    private fun sourceOffsetAt(index: Int): Int {
+        val offsets = sourceOffsetByIndex
+        return if (offsets != null) {
+            offsets[index.coerceIn(0, offsets.lastIndex)]
+        } else {
+            sourceOffset + index
+        }
+    }
+}
+
+private data class MarkdownPreviewSource(
+    val source: String,
+    val sourceOffsetByIndex: IntArray,
+)
+
+private fun markdownPreviewSource(markdown: String): MarkdownPreviewSource {
+    val preview = StringBuilder()
+    val offsets = mutableListOf<Int>()
+    val lineStartOffsets = markdown.lineStartOffsets()
+    val lines = markdown.lines()
+    lines.forEachIndexed { lineIndex, line ->
+        val lineStartOffset = lineStartOffsets.getOrElse(lineIndex) { markdown.length }
+        if (lineIndex > 0) {
+            preview.append('\n')
+            offsets.add((lineStartOffset - 1).coerceIn(0, markdown.length))
+        }
+
+        val visibleRange = line.visibleContentRange()
+        for (sourceIndex in visibleRange) {
+            preview.append(line[sourceIndex])
+            offsets.add(lineStartOffset + sourceIndex)
+        }
+    }
+    offsets.add(markdown.length)
+    return MarkdownPreviewSource(
+        source = preview.toString(),
+        sourceOffsetByIndex = offsets.toIntArray(),
+    )
+}
+
+private fun String.visibleContentRange(): IntRange {
+    MarkdownHeadingLineRegex.matchEntire(this)?.groups?.get(2)?.range?.let { return it }
+    MarkdownChecklistLineRegex.matchEntire(this)?.groups?.get(3)?.range?.let { return it }
+    MarkdownBulletLineRegex.matchEntire(this)?.groups?.get(2)?.range?.let { return it }
+    MarkdownNumberedLineRegex.matchEntire(this)?.groups?.get(3)?.range?.let { return it }
+    MarkdownQuoteLineRegex.matchEntire(this)?.groups?.get(1)?.range?.let { return it }
+    return indices
 }
 
 private fun String.lineStartOffsets(): List<Int> {

@@ -36,7 +36,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -313,8 +313,9 @@ fun TagEditorSheet(
     val sheetDirty = pendingTagChanges || editDirty || draftDirty
     val currentSheetDirty = rememberUpdatedState(sheetDirty)
     val sheetState =
-        rememberModalBottomSheetState(
-            skipPartiallyExpanded = true,
+        rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
             confirmValueChange =
                 remember {
                     { sheetValue ->

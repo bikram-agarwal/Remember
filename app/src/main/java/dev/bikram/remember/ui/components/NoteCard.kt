@@ -29,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -38,7 +40,6 @@ import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -251,7 +252,7 @@ fun NoteCard(
         }
     val starredBorder =
         if (model.starred && !selected) {
-            Modifier.border(BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.70f)), cardShape)
+            Modifier.border(BorderStroke(1.dp, Color(0xFFF9A825).copy(alpha = 0.70f)), cardShape)
         } else {
             Modifier
         }
@@ -265,17 +266,8 @@ fun NoteCard(
         } else {
             Modifier.tapSoundClickable(onClick = onClick)
         }
-    // Subtle yellow wash on starred cards: blend ~7% of the star-yellow swatch into
-    // the card's base container color so the card reads as starred at a glance without
-    // competing with selection highlight, picture hero, or tag accents.
-    val tintedContainerColor =
-        if (model.starred) {
-            lerp(cardColors.containerColor, Color(0xFFFFD54F), 0.07f)
-        } else {
-            cardColors.containerColor
-        }
     val completedContainerColor =
-        tintedContainerColor
+        cardColors.containerColor
             .copy(alpha = completedCardAlpha)
             .compositeOver(MaterialTheme.colorScheme.background)
     Surface(
@@ -306,6 +298,9 @@ fun NoteCard(
                         alpha = completedCardAlpha
                     },
         ) {
+            if (model.starred && !showHero) {
+                StarredRadiantWash(Modifier.matchParentSize())
+            }
             if (showHero) {
                 HeroBackground(
                     uri = heroPictureUri,
@@ -329,14 +324,14 @@ fun NoteCard(
                     name = "star",
                     filled = true,
                     size = 96.dp,
-                    tint = Color(0xFFFFD54F),
+                    tint = Color(0xFFF9A825),
                     weight = FontWeight.Bold,
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
                             .graphicsLayer {
                                 rotationZ = -15f
-                                alpha = 0.13f
+                                alpha = 0.28f
                             },
                 )
             }
@@ -523,6 +518,31 @@ fun NoteCard(
             }
         }
     }
+}
+
+@Composable
+private fun BoxScope.StarredRadiantWash(modifier: Modifier = Modifier) {
+    Box(
+        modifier =
+            modifier.drawWithCache {
+                val starCenter = Offset(size.width - 54.dp.toPx(), 50.dp.toPx())
+                val brush =
+                    Brush.radialGradient(
+                        colorStops =
+                            arrayOf(
+                                0.00f to Color(0xFFF9A825).copy(alpha = 0.20f),
+                                0.34f to Color(0xFFF9A825).copy(alpha = 0.10f),
+                                0.72f to Color(0xFFF9A825).copy(alpha = 0.035f),
+                                1.00f to Color.Transparent,
+                            ),
+                        center = starCenter,
+                        radius = maxOf(size.width, size.height) * 0.95f,
+                    )
+                onDrawBehind {
+                    drawRect(brush)
+                }
+            },
+    )
 }
 
 @Composable

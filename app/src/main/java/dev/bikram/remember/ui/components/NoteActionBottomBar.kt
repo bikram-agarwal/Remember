@@ -425,7 +425,7 @@ private fun StarActionItem(
         label = "bottomBarStarScale",
     )
     val starColor by animateColorAsState(
-        targetValue = if (starPulsing || starred) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface,
+        targetValue = if (starPulsing || starred) Color(0xFFF9A825) else MaterialTheme.colorScheme.onSurface,
         animationSpec = colorEffectsSpec,
         label = "bottomBarStarColor",
     )

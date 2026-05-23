@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
@@ -21,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
 import dev.bikram.remember.data.normalizeHex
@@ -44,9 +46,13 @@ internal fun HueColorSlider(
     }
     var currentHex by rememberSaveable(normalizedHex) { mutableStateOf(normalizedHex) }
     val currentColor = colorFromHexOrDefault(currentHex, fallbackHue)
+    val thumbColor = colorFromHue(hue, saturation = HueSliderThumbSaturation, value = HueSliderThumbValue)
+    val lightPanel = sliderPanelColor.luminance() > 0.5f
+    val handleGapWidth = if (lightPanel) HueSliderLightHandleGapWidth else HueSliderHandleGapWidth
+    val handleWidth = if (lightPanel) HueSliderLightHandleWidth else HueSliderHandleWidth
     val sliderColors =
         SliderDefaults.colors(
-            thumbColor = currentColor,
+            thumbColor = Color.Transparent,
             activeTrackColor = Color.Transparent,
             activeTickColor = Color.Transparent,
             inactiveTrackColor = Color.Transparent,
@@ -77,26 +83,42 @@ internal fun HueColorSlider(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(28.dp)
-                        .clip(MaterialTheme.shapes.extraLarge)
-                        .background(Brush.horizontalGradient(HueSliderColors)),
+                        .height(HueSliderHandleHeight),
             ) {
-                val handleGapOffset = maxWidth * (hue / 360f) - HueSliderHandleGapWidth / 2
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .fillMaxWidth()
+                            .height(HueSliderTrackHeight)
+                            .clip(HueSliderTrackShape)
+                            .background(Brush.horizontalGradient(HueSliderColors)),
+                )
+                val handleGapOffset = maxWidth * (hue / 360f) - handleGapWidth / 2
                 Box(
                     modifier =
                         Modifier
                             .align(Alignment.CenterStart)
                             .offset(x = handleGapOffset)
-                            .size(width = HueSliderHandleGapWidth, height = 28.dp)
+                            .size(width = handleGapWidth, height = HueSliderTrackHeight)
                             .background(sliderPanelColor),
+                )
+                Box(
+                    modifier =
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = maxWidth * (hue / 360f) - handleWidth / 2)
+                            .size(width = handleWidth, height = HueSliderHandleHeight)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(thumbColor),
                 )
                 SliderDefaults.Track(
                     sliderState = sliderState,
-                    trackCornerSize = 14.dp,
+                    trackCornerSize = HueSliderTrackCorner,
                     colors = trackColors,
                     drawStopIndicator = null,
                     thumbTrackGapSize = HueSliderThumbTrackGap,
-                    trackInsideCornerSize = 2.dp,
+                    trackInsideCornerSize = HueSliderInsideCorner,
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -114,9 +136,28 @@ internal fun hueFromHexColor(hex: String): Float? {
 }
 
 internal fun colorHexFromHue(hue: Float): String {
-    val colorInt = AndroidColor.HSVToColor(floatArrayOf(hue.coerceIn(0f, 360f), 0.72f, 0.96f))
+    val colorInt = androidColorFromHue(hue, HueSliderGeneratedSaturation, HueSliderGeneratedValue)
     return String.format(Locale.US, "#%06X", 0xFFFFFF and colorInt)
 }
+
+private fun colorFromHue(
+    hue: Float,
+    saturation: Float,
+    value: Float,
+): Color = Color(androidColorFromHue(hue, saturation, value))
+
+private fun androidColorFromHue(
+    hue: Float,
+    saturation: Float,
+    value: Float,
+): Int =
+    AndroidColor.HSVToColor(
+        floatArrayOf(
+            hue.coerceIn(0f, 360f),
+            saturation,
+            value,
+        ),
+    )
 
 internal fun colorFromHexOrDefault(
     hex: String,
@@ -124,20 +165,35 @@ internal fun colorFromHexOrDefault(
 ): Color {
     val colorInt =
         runCatching { AndroidColor.parseColor(hex) }
-            .getOrDefault(AndroidColor.HSVToColor(floatArrayOf(fallbackHue, 0.72f, 0.96f)))
+            .getOrDefault(
+                androidColorFromHue(fallbackHue, HueSliderGeneratedSaturation, HueSliderGeneratedValue),
+            )
     return Color(colorInt)
 }
 
 private val HueSliderColors =
     listOf(
-        Color(0xFFF54545),
-        Color(0xFFF5F545),
-        Color(0xFF45F545),
-        Color(0xFF45F5F5),
-        Color(0xFF4545F5),
-        Color(0xFFF545F5),
-        Color(0xFFF54545),
+        Color(0xFFE95A50),
+        Color(0xFFE8B84E),
+        Color(0xFFD5DB4C),
+        Color(0xFF58D95C),
+        Color(0xFF43CDD0),
+        Color(0xFF5569E8),
+        Color(0xFFD64BDD),
+        Color(0xFFE95A50),
     )
 
-private val HueSliderThumbTrackGap = 6.dp
-private val HueSliderHandleGapWidth = 16.dp
+private const val HueSliderGeneratedSaturation = 0.66f
+private const val HueSliderGeneratedValue = 0.90f
+private const val HueSliderThumbSaturation = 0.58f
+private const val HueSliderThumbValue = 0.86f
+private val HueSliderTrackHeight = 28.dp
+private val HueSliderTrackCorner = 10.dp
+private val HueSliderTrackShape = RoundedCornerShape(HueSliderTrackCorner)
+private val HueSliderInsideCorner = 3.dp
+private val HueSliderThumbTrackGap = 4.dp
+private val HueSliderHandleGapWidth = 14.dp
+private val HueSliderHandleWidth = 5.dp
+private val HueSliderLightHandleGapWidth = 13.dp
+private val HueSliderLightHandleWidth = 6.dp
+private val HueSliderHandleHeight = 42.dp

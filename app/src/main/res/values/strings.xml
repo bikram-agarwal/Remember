@@ -232,8 +232,8 @@
     <string name="edit_bottom_bar_notification">Notification</string>
     <string name="edit_bottom_bar_unarchive">Unarchive</string>
     <string name="edit_bottom_bar_trash">Trash</string>
-    <string name="edit_bottom_bar_mark_done">Mark done</string>
-    <string name="edit_bottom_bar_mark_not_done">Mark not done</string>
+    <string name="edit_bottom_bar_mark_done">Done</string>
+    <string name="edit_bottom_bar_mark_not_done">Reopen</string>
     <string name="edit_bottom_bar_delete_forever">Delete forever</string>
     <string name="edit_bottom_bar_restore">Restore</string>
     <string name="edit_archived_notice_title">Archived</string>
@@ -778,8 +778,8 @@
     <string name="swipe_action_duplicate">Duplicate</string>
     <string name="swipe_action_toggle_star">Star</string>
     <string name="swipe_action_unstar">Unstar</string>
-    <string name="swipe_action_mark_done">Mark done</string>
-    <string name="swipe_action_mark_not_done">Mark undone</string>
+    <string name="swipe_action_mark_done">Done</string>
+    <string name="swipe_action_mark_not_done">Reopen</string>
 
     <!-- Google Tasks import screen -->
     <string name="google_tasks_import_tasks_title">Import tasks</string>

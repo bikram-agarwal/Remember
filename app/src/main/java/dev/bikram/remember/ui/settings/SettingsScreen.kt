@@ -130,6 +130,12 @@ private data class PendingRestore(
 
 private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
 
+private object SettingsScreenSessionState {
+    var collapsedSectionKeys: Set<String> = emptySet()
+    var listFirstVisibleItemIndex: Int = 0
+    var listFirstVisibleItemScrollOffset: Int = 0
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SettingsRoute(
@@ -369,7 +375,9 @@ fun SettingsRoute(
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
     var pendingEnableUpdateNotificationsAfterPermission by rememberSaveable { mutableStateOf(false) }
-    var collapsedSettingsSectionKeys by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    var collapsedSettingsSectionKeys by rememberSaveable {
+        mutableStateOf(SettingsScreenSessionState.collapsedSectionKeys)
+    }
     val settingsExpandableSectionKeys =
         remember {
             setOf(
@@ -386,7 +394,11 @@ fun SettingsRoute(
         settingsExpandableSectionKeys.all { sectionKey ->
             sectionKey in collapsedSettingsSectionKeys
         }
-    val settingsListState = rememberLazyListState()
+    val settingsListState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = SettingsScreenSessionState.listFirstVisibleItemIndex,
+            initialFirstVisibleItemScrollOffset = SettingsScreenSessionState.listFirstVisibleItemScrollOffset,
+        )
     var notificationsHighlight by rememberSaveable { mutableStateOf(false) }
     var notificationsHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
     var backupHighlight by rememberSaveable { mutableStateOf(false) }
@@ -413,6 +425,14 @@ fun SettingsRoute(
     }
     var isIgnoringBatteryOptimizations by remember {
         mutableStateOf(powerManager.isIgnoringBatteryOptimizations(context.packageName))
+    }
+
+    androidx.compose.runtime.DisposableEffect(settingsListState) {
+        onDispose {
+            SettingsScreenSessionState.collapsedSectionKeys = collapsedSettingsSectionKeys
+            SettingsScreenSessionState.listFirstVisibleItemIndex = settingsListState.firstVisibleItemIndex
+            SettingsScreenSessionState.listFirstVisibleItemScrollOffset = settingsListState.firstVisibleItemScrollOffset
+        }
     }
 
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current

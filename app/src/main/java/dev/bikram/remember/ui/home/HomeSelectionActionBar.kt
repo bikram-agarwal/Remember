@@ -71,6 +71,11 @@ internal fun HomeSelectionActionBar(
             ) {
                 val exitLabel = stringResource(R.string.home_select_exit_cd)
                 val exitInteractionSource = remember { MutableInteractionSource() }
+                val exitColors =
+                    IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 val tagLabel = stringResource(R.string.home_bulk_tag)
                 val contentDescriptionTag = stringResource(R.string.home_bulk_tag_cd)
                 val tagInteractionSource = remember { MutableInteractionSource() }
@@ -101,6 +106,7 @@ internal fun HomeSelectionActionBar(
                                 modifier = Modifier.animateWidth(exitInteractionSource),
                                 interactionSource = exitInteractionSource,
                                 tooltipLabel = exitLabel,
+                                colors = exitColors,
                             ) {
                                 RememberMaterialRoundedSymbol(
                                     name = "close",

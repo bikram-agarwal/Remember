@@ -38,6 +38,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -89,14 +90,30 @@ fun HelpScreen(
         }
     val allExpanded = allSubsectionKeys.isNotEmpty() && allSubsectionKeys.all { it in expandedKeys }
 
+    val initialScrollIndex = helpVm.scrollIndex
+    val initialScrollOffset = helpVm.scrollOffset
     val topBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     val listState =
         rememberLazyListState(
-            initialFirstVisibleItemIndex = helpVm.scrollIndex,
-            initialFirstVisibleItemScrollOffset = helpVm.scrollOffset,
+            initialFirstVisibleItemIndex = initialScrollIndex,
+            initialFirstVisibleItemScrollOffset = initialScrollOffset,
         )
     val density = LocalDensity.current
+    LaunchedEffect(scrollBehavior.state.heightOffsetLimit) {
+        val heightOffsetLimit = scrollBehavior.state.heightOffsetLimit
+        val restoredAwayFromTop = initialScrollIndex > 0 || initialScrollOffset > 0
+        if (restoredAwayFromTop && heightOffsetLimit != 0f) {
+            val collapseFraction =
+                if (initialScrollIndex > 0) {
+                    1f
+                } else {
+                    val thresholdPx = with(density) { 24.dp.toPx() }
+                    (initialScrollOffset.toFloat() / thresholdPx).coerceIn(0f, 1f)
+                }
+            scrollBehavior.state.heightOffset = heightOffsetLimit * collapseFraction
+        }
+    }
     val topAlphaMultiplier by remember(listState) {
         derivedStateOf {
             val collapsedFraction = scrollBehavior.state.collapsedFraction

@@ -216,7 +216,7 @@ fun ReminderPickerSheet(
     AppBottomSheet(
         title = stringResource(R.string.reminder_set_title),
         onDismiss = onDismiss,
-        showTitleBar = true,
+        showTitleBar = notificationsGranted,
         scrollable = true,
         actions = null,
     ) {
@@ -903,7 +903,19 @@ private fun PillRow(
     onClear: (() -> Unit)? = null,
     enabled: Boolean = true,
 ) {
-    val alpha = if (enabled) 1f else 0.52f
+    val scheme = MaterialTheme.colorScheme
+    val iconColor =
+        when {
+            !enabled -> scheme.onSurfaceVariant.copy(alpha = 0.52f)
+            hasValue -> scheme.onPrimaryContainer
+            else -> scheme.onSurfaceVariant
+        }
+    val labelColor =
+        when {
+            !enabled -> scheme.onSurfaceVariant.copy(alpha = 0.52f)
+            hasValue -> scheme.onPrimaryContainer
+            else -> scheme.onSurface
+        }
     Row(
         modifier =
             Modifier
@@ -915,11 +927,11 @@ private fun PillRow(
                     // stays clearly distinct from the sheet background even in seed-based
                     // themes where the half-alpha version washes out against light surfaces.
                     if (!enabled) {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
+                        scheme.surfaceContainerHigh
                     } else if (hasValue) {
-                        MaterialTheme.colorScheme.primaryContainer
+                        scheme.primaryContainer
                     } else {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
+                        scheme.surfaceContainerHigh
                     },
                 ).let { modifier ->
                     if (enabled) {
@@ -934,24 +946,14 @@ private fun PillRow(
         RememberMaterialRoundedSymbol(
             name = materialSymbolName,
             size = 20.dp,
-            tint =
-                if (hasValue) {
-                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = alpha)
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha)
-                },
+            tint = iconColor,
             weight = FontWeight.Medium,
         )
         Spacer(Modifier.width(16.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            color =
-                if (hasValue) {
-                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = alpha)
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = alpha)
-                },
+            color = labelColor,
             modifier = Modifier.weight(1f),
         )
         // Reserve the trailing slot so rows with and without Clear match height/width.

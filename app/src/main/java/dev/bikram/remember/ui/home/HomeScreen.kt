@@ -83,6 +83,15 @@ import dev.bikram.remember.ui.theme.LocalSnackbarHostState
 import dev.bikram.remember.ui.theme.transparentTopAppBarColors
 import kotlinx.coroutines.launch
 
+private object HomeScreenSessionState {
+    var archiveSectionExpanded: Boolean = false
+    var trashSectionExpanded: Boolean = false
+    var collapsedSectionKeys: Set<String> = setOf("DONE")
+    var listFirstVisibleItemIndex: Int = 0
+    var listFirstVisibleItemScrollOffset: Int = 0
+    var initialListLiftApplied: Boolean = false
+}
+
 @Composable
 fun HomeRoute(
     interactionPrefs: InteractionPrefs,
@@ -172,17 +181,27 @@ fun HomeScreen(
     var tagSheetOpen by rememberSaveable { mutableStateOf(false) }
     // Collapsed by default so the search results feel focused on active notes. Each section
     // remembers its own expansion state when the user switches away and comes back.
-    var archiveSectionExpanded by rememberSaveable { mutableStateOf(false) }
-    var trashSectionExpanded by rememberSaveable { mutableStateOf(false) }
+    var archiveSectionExpanded by rememberSaveable { mutableStateOf(HomeScreenSessionState.archiveSectionExpanded) }
+    var trashSectionExpanded by rememberSaveable { mutableStateOf(HomeScreenSessionState.trashSectionExpanded) }
     var expandedFilterDropdown by rememberSaveable { mutableStateOf<ActiveFilterDropdown?>(null) }
-    var initialListLiftApplied by rememberSaveable { mutableStateOf(false) }
+    var initialListLiftApplied by rememberSaveable {
+        mutableStateOf(
+            HomeScreenSessionState.initialListLiftApplied ||
+                HomeScreenSessionState.listFirstVisibleItemIndex > 0 ||
+                HomeScreenSessionState.listFirstVisibleItemScrollOffset > 0,
+        )
+    }
     var revealedNoteCardId by rememberSaveable { mutableStateOf<Long?>(null) }
     var revealedNoteCardBounds by remember { mutableStateOf<Rect?>(null) }
     var homeScreenBounds by remember { mutableStateOf<Rect?>(null) }
     // Every section header is collapsible. Done starts collapsed by default because those
     // tasks are already finished; every other section starts expanded.
-    var collapsedSectionKeys by rememberSaveable { mutableStateOf(setOf("DONE")) }
-    val listState = rememberLazyListState()
+    var collapsedSectionKeys by rememberSaveable { mutableStateOf(HomeScreenSessionState.collapsedSectionKeys) }
+    val listState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = HomeScreenSessionState.listFirstVisibleItemIndex,
+            initialFirstVisibleItemScrollOffset = HomeScreenSessionState.listFirstVisibleItemScrollOffset,
+        )
     val listScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = listState,
@@ -200,6 +219,17 @@ fun HomeScreen(
         with(LocalDensity.current) {
             16.dp.roundToPx()
         }
+
+    DisposableEffect(listState) {
+        onDispose {
+            HomeScreenSessionState.archiveSectionExpanded = archiveSectionExpanded
+            HomeScreenSessionState.trashSectionExpanded = trashSectionExpanded
+            HomeScreenSessionState.collapsedSectionKeys = collapsedSectionKeys
+            HomeScreenSessionState.listFirstVisibleItemIndex = listState.firstVisibleItemIndex
+            HomeScreenSessionState.listFirstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset
+            HomeScreenSessionState.initialListLiftApplied = initialListLiftApplied
+        }
+    }
 
     DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
         val observer =
