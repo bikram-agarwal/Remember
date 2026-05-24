@@ -1,0 +1,80 @@
+# frozen_string_literal: true
+
+default_platform(:android)
+
+platform :android do
+  private_lane :upload_play_aab do |options|
+    track = options.fetch(:track).to_s
+    allowed_tracks = %w[internal beta production]
+    unless allowed_tracks.include?(track)
+      UI.user_error!("track must be one of #{allowed_tracks.join(", ")} (got #{track})")
+    end
+
+    repo_root = File.expand_path("..", __dir__)
+    aab_relative = "app/build/outputs/bundle/playstoreRelease/app-playstore-release.aab"
+    default_aab = File.join(repo_root, aab_relative)
+    play_aab_override = ENV["PLAY_AAB_PATH"]
+    aab_path = if play_aab_override && !play_aab_override.empty?
+      File.expand_path(play_aab_override)
+    else
+      default_aab
+    end
+    unless File.exist?(aab_path)
+      UI.user_error!(
+        "Missing AAB at #{aab_path}. Build with ./gradlew :app:bundlePlaystoreRelease, or set PLAY_AAB_PATH to a signed playstore .aab file."
+      )
+    end
+
+    json_key_path = ENV["PLAY_SERVICE_ACCOUNT_JSON"]
+    if json_key_path.nil? || json_key_path.empty?
+      UI.user_error!("Set PLAY_SERVICE_ACCOUNT_JSON to the absolute path of the Play service account JSON key file.")
+    end
+    unless File.exist?(json_key_path)
+      UI.user_error!("PLAY_SERVICE_ACCOUNT_JSON path does not exist: #{json_key_path}")
+    end
+
+    metadata_root = File.join(__dir__, "metadata", "android")
+    images_en_us = File.join(metadata_root, "en-US", "images")
+    phone_screenshots_dir = File.join(images_en_us, "phoneScreenshots")
+    has_phone_screenshots = Dir.exist?(phone_screenshots_dir) && Dir.children(phone_screenshots_dir).any? do |entry|
+      entry.match?(/\.(png|jpe?g)\z/i)
+    end
+    has_feature_graphic = File.exist?(File.join(images_en_us, "featureGraphic.png"))
+    has_icon = File.exist?(File.join(images_en_us, "icon.png"))
+    has_tv_banner = File.exist?(File.join(images_en_us, "tvBanner.png"))
+
+    mapping_path = File.join(repo_root, "app/build/outputs/mapping/playstoreRelease/mapping.txt")
+
+    upload_options = {
+      track: track,
+      aab: aab_path,
+      json_key: json_key_path,
+      skip_upload_apk: true,
+      skip_upload_aab: false,
+      release_status: "completed",
+      skip_upload_metadata: false,
+      skip_upload_images: !(has_feature_graphic || has_icon || has_tv_banner),
+      skip_upload_screenshots: !has_phone_screenshots
+    }
+    upload_options[:mapping] = mapping_path if File.exist?(mapping_path)
+
+    upload_to_play_store(**upload_options)
+  end
+
+  desc "Upload playstore AAB to Play internal testing. Listing from fastlane/metadata/android. " \
+       "Set PLAY_SERVICE_ACCOUNT_JSON to the decoded service account JSON path. " \
+       "Run after ./gradlew :app:bundlePlaystoreRelease or set PLAY_AAB_PATH."
+  lane :deploy_internal do
+    upload_play_aab(track: "internal")
+  end
+
+  desc "Upload playstore AAB to Play open testing (public beta). Same env vars as deploy_internal."
+  lane :deploy_beta do
+    upload_play_aab(track: "beta")
+  end
+
+  desc "Upload playstore AAB to Play production. Same env vars as deploy_internal."
+  lane :deploy_production do
+    upload_play_aab(track: "production")
+  end
+end

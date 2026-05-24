@@ -1,0 +1,1 @@
+Initial release of Remember: notes, Markdown, checklists, sticky reminders, recurring schedules, snooze, notification actions, widgets, Google Tasks import, backup and restore, tags, search, archive, trash, and theme customization.
