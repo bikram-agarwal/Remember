@@ -22,3 +22,6 @@ local.properties
 # CI-generated signing files if reproduced locally (do not commit)
 keystore.properties
 *-release.keystore
+
+# Copied from docs/HELP.md at build time
+app/src/main/assets/HELP.md

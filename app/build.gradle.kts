@@ -168,6 +168,15 @@ room {
     schemaDirectory("$projectDir/schemas")
 }
 
+val copyHelpDoc = tasks.register<Copy>("copyHelpDoc") {
+    from(rootProject.file("docs/HELP.md"))
+    into("src/main/assets")
+}
+
+tasks.named("preBuild") {
+    dependsOn(copyHelpDoc)
+}
+
 detekt {
     buildUponDefaultConfig = true
     config.setFrom(rootProject.files("config/detekt/detekt.yml"))

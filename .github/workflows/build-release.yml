@@ -1,0 +1,233 @@
+# Manual-only release build (workflow_dispatch). No push/tag triggers.
+#
+# - Git tag: creates v{versionName} from app/build.gradle.kts at the workflow commit (github.sha).
+# - Build target (workflow input build_target):
+#     - github: remember-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
+#     - playstore: remember-v{version}-playstore.aab (Play Store upload; playstore distribution flavor)
+#     - both: builds and uploads both artifacts
+# - GitHub Release: always draft; publish from the Releases UI when ready.
+# - Run from any branch (e.g. main); the tagged commit is the commit that was built.
+#
+# Optional Play Console upload (workflow input play_track):
+# - Requires repository secret PLAY_SERVICE_ACCOUNT_JSON_B64 = base64-encoded Google Play service account JSON
+#   (Google Cloud: enable Play Android Developer API, create key; Play Console: add service account and grant access to releases and store listing as needed).
+# - Runs Fastlane deploy_internal / deploy_beta / deploy_production last: uploads playstore AAB to the chosen track and
+#   syncs listing from fastlane/metadata/android (screenshots and image assets upload only if PNGs/JPEGs are present there).
+#   Order is intentional so a Play failure does not skip the draft GitHub Release or workflow artifact.
+# - Tracks: internal (internal testing), beta (open/public testing), production. Choose "none" to skip upload.
+
+name: Build and release
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_target:
+        description: "Which release artifact(s) to build."
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - github
+          - playstore
+      play_track:
+        description: "Upload AAB + Play listing (needs PLAY_SERVICE_ACCOUNT_JSON_B64). internal / beta (open testing) / production, or none to skip."
+        required: true
+        default: none
+        type: choice
+        options:
+          - none
+          - internal
+          - beta
+          - production
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Node 20 actions are deprecated; official actions below use Node 24. Third-party actions
+    # still on node20 (e.g. softprops/action-gh-release) run on Node 24 when this is set.
+    # https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+          log-accepted-android-sdk-licenses: false
+
+      - name: Cache Android SDK packages
+        uses: actions/cache@v5
+        with:
+          path: |
+            /usr/local/lib/android/sdk/platforms/android-37.0
+            /usr/local/lib/android/sdk/build-tools/37.0.0
+          key: android-sdk-${{ runner.os }}-platform-37.0-build-tools-37.0.0
+
+      - name: Install Android SDK packages
+        run: |
+          if [ ! -d "$ANDROID_HOME/platforms/android-37.0" ] || [ ! -d "$ANDROID_HOME/build-tools/37.0.0" ]; then
+            sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0" --channel=3
+          else
+            echo "Android SDK 37.0 and build-tools 37.0.0 already present."
+          fi
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate build target
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.play_track }}" != "none" ] && [ "${{ inputs.build_target }}" = "github" ]; then
+            echo "Play upload requires build_target=playstore or build_target=both."
+            exit 1
+          fi
+
+      - name: Resolve version label
+        id: version
+        run: |
+          VERSION=$(grep -oE 'versionName = "[^"]+"' app/build.gradle.kts | head -1 | sed -E 's/versionName = "([^"]+)"/\1/')
+          if [ -z "$VERSION" ]; then echo "Could not parse versionName from app/build.gradle.kts"; exit 1; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building versionName=$VERSION (tag will be v${VERSION})"
+
+      - name: Configure signing
+        run: |
+          echo "$KEYSTORE_B64" | base64 -d > remember-release.keystore
+          KEY_PASS_EFFECTIVE="${KEY_PASS:-$KS_PASS}"
+          {
+            echo "storeFile=remember-release.keystore"
+            echo "storePassword=$KS_PASS"
+            echo "keyPassword=$KEY_PASS_EFFECTIVE"
+            echo "keyAlias=$K_ALIAS"
+          } > keystore.properties
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
+          KS_PASS: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASS: ${{ secrets.KEY_PASSWORD }}
+          K_ALIAS: ${{ secrets.KEY_ALIAS }}
+
+      - name: Build selected release artifacts
+        run: |
+          set -euo pipefail
+          case "${{ inputs.build_target }}" in
+            github)
+              ./gradlew :app:assembleGithubRelease --no-configuration-cache
+              ;;
+            playstore)
+              ./gradlew :app:bundlePlaystoreRelease --no-configuration-cache
+              ;;
+            both)
+              ./gradlew :app:assembleGithubRelease :app:bundlePlaystoreRelease --no-configuration-cache
+              ;;
+            *)
+              echo "Unexpected build_target"
+              exit 1
+              ;;
+          esac
+
+      - name: Collect and rename release assets
+        run: |
+          set -euo pipefail
+          version="${{ steps.version.outputs.version }}"
+          out="release-assets"
+          mkdir -p "$out"
+
+          github_apk="app/build/outputs/apk/github/release/app-github-release.apk"
+          play_aab="app/build/outputs/bundle/playstoreRelease/app-playstore-release.aab"
+
+          case "${{ inputs.build_target }}" in
+            github|both)
+              if [ ! -f "$github_apk" ]; then
+                echo "Expected GitHub flavor APK not found: $github_apk"
+                find app/build/outputs/apk -name '*.apk' -print || true
+                exit 1
+              fi
+              cp "$github_apk" "$out/remember-v${version}-github.apk"
+              ;;
+          esac
+
+          case "${{ inputs.build_target }}" in
+            playstore|both)
+              if [ ! -f "$play_aab" ]; then
+                echo "Expected Play Store bundle not found: $play_aab"
+                find app/build/outputs/bundle -name '*.aab' -print || true
+                exit 1
+              fi
+              cp "$play_aab" "$out/remember-v${version}-playstore.aab"
+              ;;
+          esac
+
+          ls -la "$out"
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: remember-v${{ steps.version.outputs.version }}-release
+          path: release-assets/*
+
+      # Pass token via `with.token`, not env GITHUB_TOKEN — env-only breaks
+      # `on: release: types: [published]` for downstream workflows (softprops/action-gh-release #770).
+      - name: Create draft GitHub Release (tag v${{ steps.version.outputs.version }})
+        uses: softprops/action-gh-release@v2.6.1
+        with:
+          token: ${{ github.token }}
+          draft: true
+          tag_name: v${{ steps.version.outputs.version }}
+          name: v${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            **Release assets**
+          files: release-assets/*
+          generate_release_notes: true
+
+      - name: Write Play service account JSON
+        if: ${{ inputs.play_track != 'none' }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON_B64: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PLAY_SERVICE_ACCOUNT_JSON_B64}" ]; then
+            echo "Missing repository secret PLAY_SERVICE_ACCOUNT_JSON_B64 (base64-encoded service account JSON)."
+            exit 1
+          fi
+          key_path="${RUNNER_TEMP}/play-service-account.json"
+          printf '%s' "$PLAY_SERVICE_ACCOUNT_JSON_B64" | tr -d '\n\r ' | base64 -d > "$key_path"
+          python3 -c "import json,sys; json.load(open(sys.argv[1],encoding='utf-8'))" "$key_path"
+
+      - name: Set up Ruby
+        if: ${{ inputs.play_track != 'none' }}
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      - name: Install Fastlane
+        if: ${{ inputs.play_track != 'none' }}
+        run: bundle install --jobs 4 --retry 3
+
+      - name: Upload to Play (Fastlane)
+        if: ${{ inputs.play_track != 'none' }}
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ runner.temp }}/play-service-account.json
+        run: |
+          set -euo pipefail
+          case "${{ inputs.play_track }}" in
+            internal) bundle exec fastlane deploy_internal ;;
+            beta) bundle exec fastlane deploy_beta ;;
+            production) bundle exec fastlane deploy_production ;;
+            *) echo "Unexpected play_track"; exit 1 ;;
+          esac

@@ -1,0 +1,44 @@
+Remember is a notes, tasks, and reminders app built around one simple idea: important reminders should not disappear just because you accidentally swiped away a notification.
+
+If a reminder notification is dismissed without being marked done, Remember can bring it back. Mark the note done and the reminder is gone for good.
+
+<b>REMINDERS THAT STICK</b>
+Keep reminders visible until they are actually done. Use normal reminders, high-importance reminders with heads-up alerts, or a quiet reminder summary that keeps overdue and upcoming items available in your notification shade.
+
+<b>NOTIFICATION ACTIONS</b>
+Add useful actions directly to reminder notifications:
+* Call
+* Message
+* Email
+* Directions
+* Open a link
+* Open an app or shortcut
+* Copy text
+* Share content
+
+<b>HUMAN SNOOZE OPTIONS</b>
+Snooze with natural presets like soon, later today, this evening, and tomorrow morning.
+
+<b>RECURRING REMINDERS</b>
+Create daily, weekly, monthly, or yearly reminders. Remember also supports richer calendar-style patterns, such as the last Friday of every month, with optional end dates or occurrence counts.
+
+<b>NOTES AND CHECKLISTS</b>
+Write Markdown notes with headings, formatting, links, and code blocks. Build nested checklists for groceries, packing, project steps, or anything else that needs structure.
+
+<b>ORGANIZE AND FIND THINGS</b>
+Use tags, favorites, archive, trash, full-text search, filters, sorting, and bulk actions to keep your notes manageable.
+
+<b>WIDGETS AND QUICK CAPTURE</b>
+Use home-screen widgets for upcoming reminders, starred notes, and quick capture. A persistent quick-capture notification can keep note creation one swipe away.
+
+<b>IMPORT FROM GOOGLE TASKS</b>
+Move into Remember from Google Tasks with a connected account or a Google Takeout Tasks.json file. Import is read-only; Remember does not edit your Google Tasks.
+
+<b>BACKUP AND RESTORE</b>
+Export your notes and settings to a ZIP backup, optionally including media. Restore a backup when moving devices, or import one when you want to merge notes into your current collection.
+
+<b>MAKE IT YOURS</b>
+Choose Material You wallpaper colors, hand-tuned color presets, custom hex colors, palette styles, gradient backgrounds, black OLED mode, card images, and more.
+
+<b>PRIVATE BY DEFAULT</b>
+Your notes are stored on your device. There are no Remember servers and no account is required.
