@@ -21,12 +21,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -59,6 +58,8 @@ import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.compactControlShape
+import dev.bikram.remember.ui.theme.pillShape
 import dev.bikram.remember.update.RememberUpdateInfo
 import kotlinx.coroutines.launch
 
@@ -137,7 +138,7 @@ internal fun UpdateCheckBottomSheetContent(
                                 Modifier
                                     .fillMaxWidth()
                                     .height(48.dp),
-                            shape = RoundedCornerShape(24.dp),
+                            shape = pillShape,
                         ) {
                             Text(
                                 text =
@@ -171,6 +172,10 @@ internal fun UpdateCheckBottomSheetContent(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        Spacer(Modifier.height(12.dp))
+                        RememberOutlinedButton(onClick = onCheckAgain) {
+                            Text(stringResource(R.string.settings_check_for_updates))
+                        }
                     }
                 }
             }
@@ -185,7 +190,7 @@ internal fun UpdateCheckBottomSheetContent(
             ChangelogUiState.Loading -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = scheme.surfaceContainerHigh,
                     contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
@@ -197,7 +202,7 @@ internal fun UpdateCheckBottomSheetContent(
                                 .fillMaxWidth()
                                 .height(120.dp)
                                 .padding(8.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = compactControlShape,
                         color = scheme.surfaceContainerLow,
                         contentColor = scheme.onSurface,
                     ) {
@@ -216,7 +221,7 @@ internal fun UpdateCheckBottomSheetContent(
                 val changelogPagerMaxHeight = maxSheetHeight * 0.68f
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = scheme.surfaceContainerHigh,
                     contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
@@ -228,7 +233,7 @@ internal fun UpdateCheckBottomSheetContent(
                                 Modifier
                                     .fillMaxWidth()
                                     .padding(8.dp),
-                            shape = RoundedCornerShape(12.dp),
+                            shape = compactControlShape,
                             color = scheme.surfaceContainerLow,
                             contentColor = scheme.onSurface,
                         ) {
@@ -259,7 +264,7 @@ internal fun UpdateCheckBottomSheetContent(
                                     modifier =
                                         Modifier
                                             .size(32.dp)
-                                            .clip(RoundedCornerShape(50))
+                                            .clip(CircleShape)
                                             .clickable(
                                                 enabled = canGoBack,
                                                 onClick = {
@@ -304,7 +309,7 @@ internal fun UpdateCheckBottomSheetContent(
                                     modifier =
                                         Modifier
                                             .size(32.dp)
-                                            .clip(RoundedCornerShape(50))
+                                            .clip(CircleShape)
                                             .clickable(
                                                 enabled = canGoForward,
                                                 onClick = {
@@ -335,7 +340,7 @@ internal fun UpdateCheckBottomSheetContent(
                                         .fillMaxWidth()
                                         .height(changelogPagerMaxHeight)
                                         .padding(horizontal = 8.dp, vertical = 2.dp),
-                                shape = RoundedCornerShape(12.dp),
+                                shape = compactControlShape,
                                 color = scheme.surfaceContainerLow,
                                 contentColor = scheme.onSurface,
                             ) {
@@ -363,7 +368,7 @@ internal fun UpdateCheckBottomSheetContent(
             is ChangelogUiState.Failed -> {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = MaterialTheme.shapes.medium,
                     color = scheme.surfaceContainerHigh,
                     contentColor = scheme.onSurface,
                     tonalElevation = 1.dp,
@@ -374,7 +379,7 @@ internal fun UpdateCheckBottomSheetContent(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(8.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        shape = compactControlShape,
                         color = scheme.surfaceContainerLow,
                         contentColor = scheme.onSurface,
                     ) {
@@ -417,11 +422,12 @@ private fun UpToDatePhoneIcon() {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
     val scheme = MaterialTheme.colorScheme
     val buttonHeight = 48.dp
-    val shape = RoundedCornerShape(24.dp)
+    val shape = pillShape
     val label =
         when {
             downloadProgress == -1f -> stringResource(R.string.settings_installing)
@@ -463,7 +469,7 @@ private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
             }
         }
         if (downloadProgress == -1f || downloadProgress == -2f) {
-            LinearProgressIndicator(
+            LinearWavyProgressIndicator(
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -482,136 +488,6 @@ private fun UpdateSheetDownloadProgressBar(downloadProgress: Float) {
     }
 }
 
-@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
-@Composable
-internal fun UpdateCheckBottomSheetContent(
-    isCheckingUpdate: Boolean,
-    updateInfo: RememberUpdateInfo?,
-    updateCheckFinishedWithoutResult: Boolean,
-    downloadProgress: Float?,
-    changelogState: ChangelogUiState,
-    showGithubExtraUi: Boolean,
-    usePlayInAppUpdates: Boolean,
-    onCheckAgain: () -> Unit,
-    onDownloadClick: (RememberUpdateInfo) -> Unit,
-    onSkipVersionClick: () -> Unit,
-) {
-    val sheetScrollState = rememberScrollState()
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(sheetScrollState)
-                .padding(horizontal = 24.dp, vertical = 20.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Text(
-            text = stringResource(R.string.settings_updates_section),
-            style = MaterialTheme.typography.headlineSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
-        when {
-            isCheckingUpdate -> {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    LoadingIndicator(
-                        modifier = Modifier.size(32.dp),
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    Text(
-                        text = stringResource(R.string.settings_checking_for_updates),
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                }
-            }
-            updateInfo != null -> {
-                Text(
-                    text = stringResource(R.string.settings_update_available, updateInfo.versionName),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                )
-                if (usePlayInAppUpdates && updateInfo.isPlayStoreUpdateInProgress) {
-                    Text(
-                        text = stringResource(R.string.settings_update_play_in_progress_body),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-                if (updateInfo.releaseNotes.isNotBlank() && changelogState == ChangelogUiState.Hidden) {
-                    Text(
-                        text = updateInfo.releaseNotes,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 8,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                }
-                if (downloadProgress != null) {
-                    UpdateDownloadProgress(downloadProgress = downloadProgress)
-                } else {
-                    RememberOutlinedButton(
-                        onClick = { onDownloadClick(updateInfo) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(
-                            if (usePlayInAppUpdates && updateInfo.isPlayStoreUpdateInProgress) {
-                                stringResource(R.string.settings_update_resume_play)
-                            } else {
-                                stringResource(R.string.settings_download_install, updateInfo.versionName)
-                            },
-                        )
-                    }
-                }
-                if (showGithubExtraUi && updateInfo.remoteApkAssetUpdatedAt.isNotBlank()) {
-                    RememberOutlinedButton(
-                        onClick = onSkipVersionClick,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.settings_update_skip_version))
-                    }
-                }
-            }
-            updateCheckFinishedWithoutResult -> {
-                Text(
-                    text = stringResource(R.string.settings_up_to_date),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Text(
-                    text = stringResource(R.string.settings_update_current_version, BuildConfig.VERSION_NAME),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                RememberOutlinedButton(
-                    onClick = onCheckAgain,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.settings_check_for_updates))
-                }
-            }
-            else -> {
-                Text(
-                    text = stringResource(R.string.settings_update_current_version, BuildConfig.VERSION_NAME),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                RememberOutlinedButton(
-                    onClick = onCheckAgain,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.settings_check_for_updates))
-                }
-            }
-        }
-        UpdateSheetChangelog(changelogState = changelogState)
-        Spacer(Modifier.height(16.dp))
-    }
-}
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun UpdateSheetChangelog(changelogState: ChangelogUiState) {
@@ -619,7 +495,7 @@ private fun UpdateSheetChangelog(changelogState: ChangelogUiState) {
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = MaterialTheme.shapes.medium,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 1.dp,

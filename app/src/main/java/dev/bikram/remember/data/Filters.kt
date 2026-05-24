@@ -56,5 +56,10 @@ fun NotesFilter.matches(n: NoteWithItems): Boolean {
     if (note.title.lowercase().contains(needle)) return true
     if (note.body.lowercase().contains(needle)) return true
     if (visibleTags.any { it.lowercase().contains(needle) }) return true
-    return n.items.any { it.text.lowercase().contains(needle) }
+    if (n.items.any { it.text.lowercase().contains(needle) }) return true
+    if (n.attachments.any { it.displayName.lowercase().contains(needle) }) return true
+    return n.note.actions.any { action ->
+        action.title.lowercase().contains(needle) ||
+            action.details.lowercase().contains(needle)
+    }
 }

@@ -1,6 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Remember" parent="android:Theme.Material.NoActionBar" />
+
+    <style name="Theme.Remember.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#D8F3E6</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+        <item name="postSplashScreenTheme">@style/Theme.Remember</item>
+    </style>
+
     <!--
       Translucent activity theme used by SnoozeActivity. Three things matter here:
 

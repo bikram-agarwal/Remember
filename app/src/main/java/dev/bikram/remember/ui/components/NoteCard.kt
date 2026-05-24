@@ -29,6 +29,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -38,7 +40,6 @@ import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -84,6 +85,7 @@ fun NoteCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
+    reminderNotificationsAllowed: Boolean = true,
 ) {
     NoteCard(
         model = remember(note) { note.toNoteCardUiModel() },
@@ -91,6 +93,7 @@ fun NoteCard(
         modifier = modifier,
         onLongClick = onLongClick,
         selected = selected,
+        reminderNotificationsAllowed = reminderNotificationsAllowed,
     )
 }
 
@@ -102,6 +105,7 @@ fun NoteCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
+    reminderNotificationsAllowed: Boolean = true,
 ) {
     val cardColors = elevatedCardColors()
     val visibleTags = model.visibleTags
@@ -182,30 +186,6 @@ fun NoteCard(
         } else {
             Modifier
         }
-    val sharedTitleModifier =
-        if (sharedScope != null && navScope != null) {
-            with(sharedScope) {
-                Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(key = "note-title-${model.id}"),
-                    animatedVisibilityScope = navScope,
-                    boundsTransform = sharedBoundsTransform,
-                )
-            }
-        } else {
-            Modifier
-        }
-    val sharedIconModifier =
-        if (sharedScope != null && navScope != null) {
-            with(sharedScope) {
-                Modifier.sharedElement(
-                    sharedContentState = rememberSharedContentState(key = "note-icon-${model.id}"),
-                    animatedVisibilityScope = navScope,
-                    boundsTransform = sharedBoundsTransform,
-                )
-            }
-        } else {
-            Modifier
-        }
 
     // Selection and Completed progresses are both Animatables (initialized at 0 +
     // LaunchedEffect that animates to the current target) instead of
@@ -272,7 +252,7 @@ fun NoteCard(
         }
     val starredBorder =
         if (model.starred && !selected) {
-            Modifier.border(BorderStroke(1.dp, Color(0xFFFFD54F).copy(alpha = 0.70f)), cardShape)
+            Modifier.border(BorderStroke(1.dp, Color(0xFFF9A825).copy(alpha = 0.70f)), cardShape)
         } else {
             Modifier
         }
@@ -286,17 +266,8 @@ fun NoteCard(
         } else {
             Modifier.tapSoundClickable(onClick = onClick)
         }
-    // Subtle yellow wash on starred cards: blend ~7% of the star-yellow swatch into
-    // the card's base container color so the card reads as starred at a glance without
-    // competing with selection highlight, picture hero, or tag accents.
-    val tintedContainerColor =
-        if (model.starred) {
-            lerp(cardColors.containerColor, Color(0xFFFFD54F), 0.07f)
-        } else {
-            cardColors.containerColor
-        }
     val completedContainerColor =
-        tintedContainerColor
+        cardColors.containerColor
             .copy(alpha = completedCardAlpha)
             .compositeOver(MaterialTheme.colorScheme.background)
     Surface(
@@ -327,6 +298,9 @@ fun NoteCard(
                         alpha = completedCardAlpha
                     },
         ) {
+            if (model.starred && !showHero) {
+                StarredRadiantWash(Modifier.matchParentSize())
+            }
             if (showHero) {
                 HeroBackground(
                     uri = heroPictureUri,
@@ -350,14 +324,14 @@ fun NoteCard(
                     name = "star",
                     filled = true,
                     size = 96.dp,
-                    tint = Color(0xFFFFD54F),
+                    tint = Color(0xFFF9A825),
                     weight = FontWeight.Bold,
                     modifier =
                         Modifier
                             .align(Alignment.TopEnd)
                             .graphicsLayer {
                                 rotationZ = -15f
-                                alpha = 0.13f
+                                alpha = 0.28f
                             },
                 )
             }
@@ -384,7 +358,7 @@ fun NoteCard(
                                     size = 18.dp,
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.then(sharedIconModifier).alpha(0.75f),
+                                    modifier = Modifier.alpha(0.75f),
                                 )
                             is NoteIcon.Drawable ->
                                 Icon(
@@ -394,14 +368,13 @@ fun NoteCard(
                                     modifier =
                                         Modifier
                                             .size(18.dp)
-                                            .then(sharedIconModifier)
                                             .alpha(0.75f),
                                 )
                             is NoteIcon.Emoji ->
                                 Text(
                                     text = headerIcon.text,
                                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 16.sp),
-                                    modifier = Modifier.then(sharedIconModifier).alpha(0.85f),
+                                    modifier = Modifier.alpha(0.85f),
                                 )
                             NoteIcon.ListPlaceholder ->
                                 RememberMaterialRoundedSymbol(
@@ -409,7 +382,7 @@ fun NoteCard(
                                     size = 18.dp,
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
+                                    modifier = Modifier.alpha(0.65f),
                                 )
                             NoteIcon.NotePlaceholder ->
                                 RememberMaterialRoundedSymbol(
@@ -417,11 +390,11 @@ fun NoteCard(
                                     size = 18.dp,
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.then(sharedIconModifier).alpha(0.65f),
+                                    modifier = Modifier.alpha(0.65f),
                                 )
                         }
                         Spacer(Modifier.width(8.dp))
-                        Box(modifier = Modifier.weight(1f).then(sharedTitleModifier)) {
+                        Box(modifier = Modifier.weight(1f)) {
                             Text(
                                 text =
                                     model.title.ifBlank {
@@ -436,7 +409,7 @@ fun NoteCard(
                                 textDecoration =
                                     if (model.completed) TextDecoration.LineThrough else TextDecoration.None,
                                 modifier = Modifier.fillMaxWidth(),
-                                maxLines = 2,
+                                maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }
@@ -505,7 +478,11 @@ fun NoteCard(
                                 hiddenCount = model.checklistHiddenItemCount,
                             )
                     }
-                    MetadataRow(model = model, visibleTags = visibleTags)
+                    MetadataRow(
+                        model = model,
+                        visibleTags = visibleTags,
+                        reminderNotificationsAllowed = reminderNotificationsAllowed,
+                    )
                 }
             }
             // Selection badge: shape morph + bloom. [selectionProgress] is hoisted to
@@ -544,6 +521,31 @@ fun NoteCard(
 }
 
 @Composable
+private fun BoxScope.StarredRadiantWash(modifier: Modifier = Modifier) {
+    Box(
+        modifier =
+            modifier.drawWithCache {
+                val starCenter = Offset(size.width - 54.dp.toPx(), 50.dp.toPx())
+                val brush =
+                    Brush.radialGradient(
+                        colorStops =
+                            arrayOf(
+                                0.00f to Color(0xFFF9A825).copy(alpha = 0.20f),
+                                0.34f to Color(0xFFF9A825).copy(alpha = 0.10f),
+                                0.72f to Color(0xFFF9A825).copy(alpha = 0.035f),
+                                1.00f to Color.Transparent,
+                            ),
+                        center = starCenter,
+                        radius = maxOf(size.width, size.height) * 0.95f,
+                    )
+                onDrawBehind {
+                    drawRect(brush)
+                }
+            },
+    )
+}
+
+@Composable
 private fun BoxScope.HeroBackground(
     uri: String,
     framing: HeroFraming?,
@@ -570,6 +572,7 @@ private fun BoxScope.HeroBackground(
 private fun MetadataRow(
     model: NoteCardUiModel,
     visibleTags: List<String>,
+    reminderNotificationsAllowed: Boolean,
 ) {
     val tags = visibleTags.take(3)
     val extraTags = (visibleTags.size - tags.size).coerceAtLeast(0)
@@ -635,15 +638,21 @@ private fun MetadataRow(
             // repeat icon precedes the date as a glanceable indicator.
             if (reminderAt != null) {
                 val cdReminder = stringResource(R.string.notecard_reminder_cd)
+                val reminderPermissionMissing = !reminderNotificationsAllowed
                 RememberMaterialRoundedSymbol(
-                    name = "notifications",
+                    name = if (reminderPermissionMissing) "notifications_off" else "notifications",
                     size = 14.dp,
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    tint =
+                        if (reminderPermissionMissing) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                     weight = FontWeight.Medium,
                     modifier =
                         Modifier
                             .semantics { contentDescription = cdReminder }
-                            .alpha(0.68f),
+                            .alpha(if (reminderPermissionMissing) 1f else 0.68f),
                 )
                 if (isRecurring) {
                     val cdRecurring = stringResource(R.string.notecard_recurring_cd)
@@ -661,11 +670,16 @@ private fun MetadataRow(
                 Text(
                     text = formatShortReminderDate(reminderAt),
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface,
+                    color =
+                        if (reminderPermissionMissing) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                     fontWeight = FontWeight.Medium,
                     modifier =
                         Modifier
-                            .alpha(0.85f),
+                            .alpha(if (reminderPermissionMissing) 1f else 0.85f),
                 )
             }
         }

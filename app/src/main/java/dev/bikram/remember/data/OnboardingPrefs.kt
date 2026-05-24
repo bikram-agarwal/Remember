@@ -32,4 +32,10 @@ class OnboardingPrefs(
             preferences[Keys.HAS_SEEN_INTRO] = true
         }
     }
+
+    suspend fun resetIntroSeen() {
+        context.onboardingDataStore.edit { prefs ->
+            prefs.remove(Keys.HAS_SEEN_INTRO)
+        }
+    }
 }

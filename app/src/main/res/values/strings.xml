@@ -3,7 +3,7 @@
 
     <!-- App -->
     <string name="app_name">Remember</string>
-    <string name="app_tagline">Notes, lists, reminders - done right</string>
+    <string name="app_tagline">Notes, tasks, reminders - done right</string>
     <string name="app_version_format">%1$s v%2$s</string>
     <string name="about_build_variant_format">%1$s, %2$s</string>
     <string name="build_flavor_github">GitHub</string>
@@ -16,7 +16,7 @@
 
     <!-- Onboarding permissions -->
     <string name="onboarding_permissions_title">Stay on top of everything</string>
-    <string name="onboarding_permissions_subtitle">Enable notifications so reminders appear \nright when you need them</string>
+    <string name="onboarding_permissions_subtitle">Two quick permissions so reminders appear \nright when you need them</string>
     <string name="onboarding_permissions_notifications_title">Notifications</string>
     <string name="onboarding_permissions_notifications_body">Required for reminder alerts, snooze actions, and quick capture</string>
     <string name="onboarding_permissions_reliable_title">Improve reliability</string>
@@ -24,6 +24,7 @@
     <string name="onboarding_permissions_status_recommended">Recommended</string>
     <string name="onboarding_permissions_status_optional">Optional</string>
     <string name="onboarding_permissions_enabled">Enabled</string>
+    <string name="onboarding_permissions_enabled_status">✓ Enabled</string>
     <string name="onboarding_permissions_allow_notifications">Enable notifications</string>
     <string name="onboarding_permissions_improve_reliability">Improve reliability</string>
     <string name="onboarding_permissions_change_anytime_footer">You can change these anytime in Settings</string>
@@ -42,6 +43,7 @@
     <string name="notification_channel_reminder_summary">Reminder summary</string>
     <string name="notification_channel_reminder_summary_desc">Persistent silent reminder summary</string>
     <string name="common_cancel">Cancel</string>
+    <string name="common_enable">Enable</string>
     <string name="common_save">Save</string>
     <string name="common_done">Done</string>
     <string name="common_ok">OK</string>
@@ -49,6 +51,7 @@
     <string name="common_no">No</string>
     <string name="common_add">Add</string>
     <string name="common_remove">Remove</string>
+    <string name="common_download">Download</string>
     <string name="common_clear">Clear</string>
     <string name="common_back">Back</string>
     <string name="common_move_to_trash">Move to trash</string>
@@ -56,9 +59,9 @@
     <string name="app_picker_nothing_available">Nothing available</string>
     <string name="edit_note_title_existing">Untitled</string>
     <string name="edit_note_body_placeholder">Type your note…</string>
-    <string name="edit_note_empty_view_hint">Tap Edit to start writing</string>
+    <string name="edit_note_empty_view_hint">Tap here to start writing</string>
     <string name="edit_list_empty_view_title">Empty list</string>
-    <string name="edit_list_empty_view_hint">Tap Edit to start writing</string>
+    <string name="edit_list_empty_view_hint">Tap here to start writing</string>
     <string name="common_empty">Empty</string>
     <string name="common_empty_note">Empty note</string>
     <string name="common_empty_list">Empty list</string>
@@ -119,7 +122,7 @@
     <string name="main_fab_create">Create</string>
     <string name="main_menu_share_app">Share app</string>
     <string name="main_share_chooser_title">Share Remember</string>
-    <string name="main_share_text">Remember - notes, lists, reminders - done right. https://play.google.com/store/apps/details?id=dev.bikram.remember</string>
+    <string name="about_share_text">Finally found a solid app to manage my tasks and notes with a beautiful UI and fail-safe reminders. Check it out: %s</string>
     <string name="main_empty_trash_title">Empty trash?</string>
     <string name="main_empty_trash_subtitle">Permanently delete all trashed items. This cannot be undone.</string>
     <string name="main_move_archive_to_trash_title">Move all archived items to trash?</string>
@@ -215,7 +218,11 @@
     <string name="cd_switch_to_markdown_code">Switch to markdown code</string>
     <string name="cd_reorder_drag_handle">Reorder</string>
     <string name="edit_remove_picture_cd">Remove picture</string>
-
+    <string name="edit_link_actions_title">Link</string>
+    <string name="edit_link_action_open">Open</string>
+    <string name="edit_link_action_copy">Copy link</string>
+    <string name="edit_link_action_edit_text">Edit link text</string>
+    <string name="edit_link_action_share">Share</string>
     <!-- Editor bottom bar and archived state -->
     <string name="edit_bottom_bar_edit">Edit</string>
     <string name="edit_bottom_bar_done">Done</string>
@@ -224,14 +231,14 @@
     <string name="edit_bottom_bar_notification">Notification</string>
     <string name="edit_bottom_bar_unarchive">Unarchive</string>
     <string name="edit_bottom_bar_trash">Trash</string>
-    <string name="edit_bottom_bar_mark_done">Mark done</string>
-    <string name="edit_bottom_bar_mark_not_done">Mark not done</string>
+    <string name="edit_bottom_bar_mark_done">Done</string>
+    <string name="edit_bottom_bar_mark_not_done">Reopen</string>
     <string name="edit_bottom_bar_delete_forever">Delete forever</string>
     <string name="edit_bottom_bar_restore">Restore</string>
-    <string name="edit_archived_banner_title">Archived</string>
-    <string name="edit_archived_banner_body">Unarchive to make changes</string>
-    <string name="edit_trashed_banner_title">In trash</string>
-    <string name="edit_trashed_banner_body">Restore to make changes</string>
+    <string name="edit_archived_notice_title">Archived</string>
+    <string name="edit_archived_notice_body">Unarchive to make changes</string>
+    <string name="edit_trashed_notice_title">In trash</string>
+    <string name="edit_trashed_notice_body">Restore to make changes</string>
     <string name="edit_bottom_bar_archive_cd">Archive</string>
     <string name="edit_bottom_bar_unarchive_cd">Unarchive</string>
     <string name="edit_bottom_bar_delete_forever_cd">Delete forever</string>
@@ -367,19 +374,24 @@
     <string name="remove_tag_cd">Remove %1$s</string>
 
     <!-- Editor options row -->
-    <string name="options_icon">Icon</string>
-    <string name="options_icon_default_note">Note</string>
-    <string name="options_icon_default_checklist">Checklist</string>
+    <string name="options_icon_cd">Change icon</string>
     <string name="options_tags">Tags</string>
     <string name="options_reminder">Reminder</string>
     <string name="options_actions">Notification action</string>
     <string name="options_importance">Importance</string>
     <string name="options_visibility">Visibility</string>
+    <string name="options_behavior">Behavior</string>
+    <string name="options_behavior_subtitle">How this note\'s notification appears and behaves</string>
+    <string name="options_behavior_visibility_label">Visibility: %1$s</string>
+    <string name="options_behavior_importance_label">Importance: %1$s</string>
     <string name="options_picture">Picture</string>
     <string name="options_picture_none">No picture</string>
     <string name="options_picture_attached">Attached</string>
     <string name="options_attachments">Attachments</string>
-    <string name="options_tags_more_count">+%1$d more</string>
+    <plurals name="options_tags_more_count">
+        <item quantity="one">+%1$d more</item>
+        <item quantity="other">+%1$d more</item>
+    </plurals>
     <plurals name="options_actions_count">
         <item quantity="one">%1$d action</item>
         <item quantity="other">%1$d actions</item>
@@ -401,7 +413,7 @@
     <string name="visibility_default">Default</string>
     <string name="visibility_default_description">Show title and content.</string>
     <string name="visibility_private">Private</string>
-    <string name="visibility_private_description">Show title; redact content.</string>
+    <string name="visibility_private_description">Show title, redact content.</string>
     <string name="visibility_secret">Secret</string>
     <string name="visibility_secret_description">Redact all info. Don\'t show in widgets.</string>
 
@@ -489,6 +501,12 @@
     <string name="reminder_notification_hidden_title">Reminder</string>
     <string name="reminder_notification_hidden_body">Tap to view</string>
     <string name="reminder_summary_title">Reminders</string>
+    <string name="main_reminder_notifications_disabled">Notifications are disabled</string>
+    <plurals name="main_reminders_due_this_week">
+        <item quantity="one">%1$d reminder due this week</item>
+        <item quantity="other">%1$d reminders due this week</item>
+    </plurals>
+    <string name="main_alert_fab_label">Alerts</string>
     <plurals name="reminder_summary_count">
         <item quantity="one">%1$d due or upcoming</item>
         <item quantity="other">%1$d due or upcoming</item>
@@ -513,20 +531,18 @@
     </plurals>
 
     <!-- Tags editor -->
-    <string name="tags_hex_label">Hex</string>
-    <string name="tags_hex_placeholder">Enter hex</string>
     <string name="tag_editor_assigned_heading">Assigned</string>
     <string name="tag_editor_available_heading">Available</string>
     <string name="tag_editor_no_assigned_tags">No tags assigned</string>
     <string name="tag_editor_no_available_tags">No available tags</string>
     <string name="tag_editor_create_placeholder">Create new tag</string>
     <string name="tag_editor_field_placeholder">Name this tag</string>
-    <string name="tag_editor_preview_placeholder">Preview</string>
-    <string name="tag_editor_hex_label">HEX</string>
-    <string name="tag_editor_duplicate">Already added</string>
+    <string name="tag_editor_name_length_counter">%1$d/%2$d</string>
     <string name="tag_editor_duplicate_existing">A tag with this name already exists</string>
+    <string name="tag_editor_reserved_name">This tag name is reserved by the app</string>
+    <string name="tag_editor_edit_mode_label">Edit mode</string>
     <string name="tag_editor_edit_mode_cd">Edit tags</string>
-    <string name="tag_editor_edit_mode_hint">Edit mode: tap a tag to change its name and color</string>
+    <string name="tag_editor_edit_mode_hint">Create new tag or tap a tag to change its name and color</string>
     <string name="tag_editor_assign_mode_hint">Tap a tag to change its state: (+) Assign, (x) Remove</string>
     <string name="tag_editor_unsaved_title">Unsaved tag changes</string>
     <string name="tag_editor_unsaved_body">Tag changes are not saved yet. Discard them?</string>
@@ -535,15 +551,10 @@
 
     <!-- Note actions (sheet and editor) -->
     <string name="actions_sheet_subtitle">Add a quick action to the notification</string>
-    <string name="actions_add_sheet_title">Add action</string>
-    <string name="actions_pick_contacts">Pick from contacts</string>
     <string name="actions_contact_input_placeholder">Tap to pick or type</string>
     <string name="actions_pick_app">Pick app</string>
     <string name="actions_pick_app_shortcut">Pick app for shortcut</string>
-    <string name="actions_change_app">Change app</string>
     <string name="actions_pick_shortcut">Pick shortcut</string>
-    <string name="actions_change_shortcut">Change shortcut</string>
-    <string name="actions_change_type">Change type</string>
     <string name="actions_field_action_type">Action type</string>
     <string name="actions_field_button_label">Button label</string>
     <string name="actions_target_app">App</string>
@@ -599,6 +610,7 @@
     <!-- Attachments and pickers -->
     <string name="attachments_subtitle">Attach any file — PDFs, docs, audio, video</string>
     <string name="attachments_add">Add attachment</string>
+    <string name="attachments_delete_confirm_title">Permanently delete this attachment?</string>
     <string name="media_storage_stored_in_app">Stored in app</string>
     <string name="media_storage_linked_original">Linked original</string>
     <string name="media_storage_linked_original_hint">Linked media may stop working if the original file is moved, deleted, or permission is lost</string>
@@ -613,11 +625,11 @@
         <item quantity="other">%1$d linked</item>
     </plurals>
     <string name="icon_picker_title">Pick an icon</string>
-    <string name="icon_picker_starred_selection_title">Choose starred</string>
+    <string name="icon_picker_starred_selection_title">Choose favorites</string>
     <string name="icon_picker_search_hint">Search icons and emojis</string>
-    <string name="icon_picker_starred">Starred</string>
-    <string name="icon_picker_add_starred_cd">Edit starred</string>
-    <string name="icon_picker_max_starred">Max 30 in Starred</string>
+    <string name="icon_picker_starred">Favorites</string>
+    <string name="icon_picker_add_starred_cd">Edit favorites</string>
+    <string name="icon_picker_max_starred">Max 30 favorites</string>
     <string name="icon_picker_results_heading">Matches</string>
     <string name="icon_picker_no_results">No icons match that search</string>
     <string name="icon_picker_tab_icons">Icons</string>
@@ -635,6 +647,7 @@
     <string name="reminder_time_input_mode">Type time with keyboard</string>
     <string name="reminder_time_dial_mode">Pick time with clock dial</string>
     <string name="reminder_pick_time">Set time</string>
+    <string name="reminder_pick_date">Set date</string>
     <string name="share_chooser_generic">Share</string>
     <string name="action_receiver_run_error">Couldn\'t run action: %1$s</string>
 
@@ -677,13 +690,9 @@
     <string name="appearance_shading_title">Enhanced shading</string>
     <string name="appearance_shading_subtitle">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>
+    <string name="appearance_remove_custom_color_message">It will be removed from your saved custom colors</string>
     <string name="appearance_add_custom_color_cd">Add custom color</string>
-    <string name="appearance_custom_accent_title">Custom accent color</string>
-    <string name="appearance_custom_accent_body">Pick any hex color - Material You will generate a harmonized palette from it</string>
-    <string name="appearance_preview">Preview</string>
-    <string name="appearance_invalid_hex">Invalid hex</string>
-    <string name="appearance_hex_placeholder">#FF5733 or FF5733</string>
-    <string name="appearance_material_you_requires_s">Material You colors need Android 12 or newer</string>
+    <string name="appearance_select_color">Select a color</string>
 
     <!-- Palette style names (shared) -->
     <string name="palette_style_tonal_spot">Tonal spot</string>
@@ -697,14 +706,12 @@
     <string name="palette_style_content">Content</string>
 
     <!-- Settings: shell and section titles -->
-    <string name="settings_title">Settings</string>
     <string name="settings_expand_all_sections_cd">Expand all settings sections</string>
     <string name="settings_collapse_all_sections_cd">Collapse all settings sections</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_security">Security</string>
     <string name="settings_updates_section">Updates</string>
     <string name="settings_section_about">About</string>
-    <string name="settings_help_guide">Help guide</string>
     <string name="settings_open_help_cd">Open help</string>
     <string name="help_title">Help</string>
     <string name="help_expand_all_cd">Expand all</string>
@@ -712,11 +719,8 @@
     <string name="help_search_placeholder">Search</string>
     <string name="help_no_results">No results</string>
 
-    <!-- Settings: haptics, notifications, swipe -->
-    <string name="settings_haptics_section">Haptics</string>
+    <!-- Settings: notifications, swipe -->
     <string name="settings_notifications_section">Notifications</string>
-    <string name="settings_haptic_feedback">Haptic feedback</string>
-    <string name="settings_haptic_feedback_desc">Light vibration when passing a swipe threshold</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_desc">Reminders and system alerts</string>
     <string name="settings_keep_reminders_until_done">Keep reminder notifications until done</string>
@@ -729,18 +733,19 @@
     <string name="settings_run_in_background">Run in background</string>
     <string name="settings_run_in_background_desc">Prevents the system from putting the app to sleep and delaying your reminders</string>
     <string name="settings_swipe_section">Swipe gestures</string>
-    <string name="settings_swipe_gesture">Swipe actions</string>
-    <string name="settings_swipe_mode_execute_one">Swipe to execute one action</string>
-    <string name="settings_swipe_mode_reveal_actions">Swipe to reveal three actions</string>
-    <string name="settings_swipe_right_actions">Right swipe actions</string>
-    <string name="settings_swipe_left_actions">Left swipe actions</string>
-    <string name="settings_swipe_none">None</string>
+    <string name="settings_swipe_right_label">Swipe right</string>
+    <string name="settings_swipe_left_label">Swipe left</string>
+    <string name="settings_swipe_reveal_title">Reveal</string>
+    <string name="settings_swipe_execute_title">Execute</string>
+    <string name="settings_swipe_drag_hint">Each swipe reveals three actions. Drag to reorder.</string>
+    <string name="settings_swipe_tap_hint">Each swipe runs one action. Tap to change the action.</string>
+    <string name="settings_swipe_action_done_short">Done</string>
     <string name="swipe_action_open">Edit</string>
     <string name="swipe_action_duplicate">Duplicate</string>
     <string name="swipe_action_toggle_star">Star</string>
     <string name="swipe_action_unstar">Unstar</string>
-    <string name="swipe_action_mark_done">Mark done</string>
-    <string name="swipe_action_mark_not_done">Mark not done</string>
+    <string name="swipe_action_mark_done">Done</string>
+    <string name="swipe_action_mark_not_done">Reopen</string>
 
     <!-- Google Tasks import screen -->
     <string name="google_tasks_import_tasks_title">Import tasks</string>
@@ -810,7 +815,6 @@
         <item quantity="other">Discard %1$d selected?</item>
     </plurals>
     <string name="google_tasks_import_source_switch_confirm_body">None of these tasks are saved to Remember yet. Cancel and switch source?</string>
-    <string name="google_tasks_import_source_switch_confirm_continue">Switch source</string>
     <string name="google_tasks_import_cancel_takeout_confirm_title">Cancel import?</string>
     <string name="google_tasks_import_cancel_takeout_confirm_body">None of these tasks are saved to Remember yet. Cancel and start again?</string>
     <string name="google_tasks_import_leave_confirm_body">None of these tasks are saved to Remember yet. Leave this import?</string>
@@ -878,7 +882,6 @@
     <string name="settings_notify_new_updates">Get notification for new updates</string>
     <string name="settings_notify_updates_need_auto_check">Enable \"Automatically check for updates\" first</string>
     <string name="settings_notify_updates_enable_notifications">Allow notifications for Remember</string>
-    <string name="settings_checking_for_updates">Checking for updates…</string>
     <string name="settings_update_available_button">Update available - %1$s</string>
     <string name="settings_update_available">v%1$s available</string>
     <string name="settings_update_current_version">Current version: %1$s</string>
@@ -901,28 +904,187 @@
     <string name="settings_update_apk_save_to_downloads_failed">Update downloaded, but saving a copy to Download failed</string>
     <string name="notification_channel_updates_name">App updates</string>
     <string name="notification_channel_updates_description">Alerts when a new app version is available</string>
-    <string name="notification_update_available_title">Update available</string>
+    <string name="notification_update_available_title">App update available</string>
     <string name="notification_update_available_text">Version %1$s is ready to install</string>
-    <string name="update_banner_available_title">Update available</string>
-    <string name="update_banner_available_message">A newer Remember version is ready</string>
-    <string name="update_banner_available_action">Open</string>
-    <string name="play_update_banner_downloading_title">Downloading update</string>
-    <string name="play_update_banner_downloading">Downloading from Play Store…</string>
-    <string name="play_update_banner_downloading_bytes">%1$s of %2$s</string>
-    <string name="play_update_banner_install_title">Update ready</string>
-    <string name="play_update_banner_install_subtitle">Restart Remember to finish installing</string>
-    <string name="play_update_banner_install_action">Restart</string>
-    <string name="settings_dev_release_mocks_section">Dev release mocks</string>
-    <string name="settings_dev_release_mock_update_banner">Arm update promo banner</string>
-    <string name="settings_dev_release_mock_play_banner">Play update banner (download then install)</string>
+    <string name="update_bar_available_title">App update available</string>
+    <string name="update_bar_available_action">Check</string>
+    <string name="play_update_bar_downloading_title">Downloading update</string>
+    <string name="play_update_bar_downloading">from Play Store…</string>
+    <string name="play_update_bar_downloading_bytes">%1$s of %2$s</string>
+    <string name="play_update_bar_install_title">New version ready</string>
+    <string name="play_update_bar_install_subtitle">Restart to apply</string>
+    <string name="play_update_bar_install_action">Install &amp; restart</string>
     <string name="settings_share_diagnostics">Share diagnostic log</string>
-    <string name="settings_share_diagnostics_subtitle">Share app version, device info, app log, and last crash stack</string>
     <string name="settings_share_diagnostics_chooser">Share diagnostic log</string>
 
     <!-- Settings: about -->
     <string name="settings_byline">Made with ❤️ by Bikram Agarwal</string>
     <string name="settings_rate_on_play_store">Rate on Play Store</string>
     <string name="settings_star_on_github">Star on GitHub</string>
+    <string name="settings_about_other_apps">More from Bikram</string>
+    <string name="settings_about_filepipe_name">FilePipe</string>
+    <string name="settings_about_filepipe_tagline">Organize your files automatically</string>
+    <string name="settings_about_obtainx_name">ObtainX</string>
+    <string name="settings_about_obtainx_tagline">Get app updates straight from the source</string>
+    <string name="settings_about_website">Website</string>
+    <string name="settings_about_privacy_policy">Privacy policy</string>
+    <string name="settings_about_terms">Terms</string>
+    <string name="settings_about_remember_website_url" translatable="false">https://bikram-agarwal.github.io/remember/</string>
+    <string name="settings_about_remember_privacy_url" translatable="false">https://bikram-agarwal.github.io/remember/privacy/</string>
+    <string name="settings_about_remember_terms_url" translatable="false">https://bikram-agarwal.github.io/remember/terms/</string>
+    <string name="settings_about_filepipe_play_store_url" translatable="false">https://play.google.com/store/apps/details?id=dev.bikram.filepipe</string>
+    <string name="settings_about_filepipe_github_url" translatable="false">https://github.com/bikram-agarwal/filepipe/releases/latest</string>
+    <string name="settings_about_obtainx_github_url" translatable="false">https://github.com/bikram-agarwal/ObtainX/releases/latest</string>
     <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
+
+    <!-- Developer options -->
+    <string name="dev_options_title">Developer options</string>
+    <string name="dev_options_back_cd">Back</string>
+    <string name="dev_options_mode_subtitle">Disable to hide this page from Settings</string>
+    <string name="dev_options_warning">These are developer tools, not real app features. Do not use unless you know what you\'re doing. Some actions permanently change app state.</string>
+    <plurals name="dev_options_taps_remaining">
+        <item quantity="one">%1$d more tap to enable developer options</item>
+        <item quantity="other">%1$d more taps to enable developer options</item>
+    </plurals>
+
+    <!-- Developer options: sections -->
+    <string name="dev_options_section_info">Info</string>
+    <string name="dev_options_section_overview">Overview</string>
+    <string name="dev_options_section_permissions_storage">Permissions &amp; storage</string>
+    <string name="dev_options_section_database">Database</string>
+    <string name="dev_options_section_mock_operations">Mock operations</string>
+    <string name="dev_options_section_workers">Workers &amp; scheduling</string>
+    <string name="dev_options_section_settings">Settings</string>
+    <string name="dev_options_section_reset">Reset</string>
+    <string name="dev_options_section_diagnostics">Diagnostics</string>
+
+    <!-- Developer options: data population -->
+    <string name="dev_options_create_mock_notes">Create mock notes</string>
+    <string name="dev_options_mock_notes_already_exist">Already present — delete them first</string>
+    <string name="dev_options_clear_mock_data">Delete mock notes</string>
+    <plurals name="dev_options_toast_mock_created">
+        <item quantity="one">Created %1$d mock note</item>
+        <item quantity="other">Created %1$d mock notes</item>
+    </plurals>
+    <string name="dev_options_toast_mock_cleared">Mock notes deleted</string>
+
+    <!-- Developer options: notification testing -->
+    <string name="dev_options_notif_low">LOW</string>
+    <string name="dev_options_notif_default">DEFAULT</string>
+    <string name="dev_options_notif_high">HIGH</string>
+    <string name="dev_options_notif_big_picture">BigPicture</string>
+    <string name="dev_options_notif_big_text">BigText</string>
+    <string name="dev_options_notif_summary">Summary</string>
+    <string name="dev_options_notif_overdue">Overdue (keep-until-done)</string>
+    <string name="dev_options_toast_keep_until_done_enabled">Temporarily enabled \'Keep reminders until done\'</string>
+    <string name="dev_options_notif_mock_update">Mock update flow</string>
+    <string name="dev_options_notif_mock_play">Mock PlayStore update flow</string>
+
+    <!-- Developer options: settings rows -->
+    <string name="dev_options_open_app_details">App details</string>
+    <string name="dev_options_open_notif_settings">Notification settings</string>
+    <string name="dev_options_open_alarm_settings">Alarms &amp; reminders settings</string>
+    <string name="dev_options_open_battery_settings">Battery optimization settings</string>
+    <string name="dev_options_reset_skipped_update">Reset skipped update version</string>
+    <string name="dev_options_reset_first_launch">Reset first-launch flag</string>
+    <string name="dev_options_clear_update_dedupe">Clear update notification dedupe</string>
+    <string name="dev_options_delete_cached_update_apk">Delete cached update APK</string>
+    <string name="dev_options_toast_skipped_cleared">Skipped update version cleared</string>
+    <string name="dev_options_toast_first_launch_reset">First-launch flag reset</string>
+    <string name="dev_options_toast_update_dedupe_cleared">Update notification dedupe cleared</string>
+    <string name="dev_options_toast_cached_update_apk_deleted">Cached update APK deleted</string>
+    <string name="dev_options_toast_no_cached_update_apk">No cached update APK found</string>
+    <string name="dev_options_sync_backup_worker">Sync scheduled backup worker</string>
+    <string name="dev_options_sync_update_worker">Sync update check worker</string>
+    <string name="dev_options_sync_trash_worker">Sync trash cleanup worker</string>
+    <string name="dev_options_toast_workers_synced">Worker schedule synced</string>
+
+    <!-- Developer options: already unlocked -->
+    <string name="dev_options_already_unlocked">No need. Developer options are already unlocked.</string>
+
+    <!-- Developer options: database -->
+    <string name="dev_options_info_version">Version</string>
+    <string name="dev_options_info_package">Package</string>
+    <string name="dev_options_info_variant">Variant</string>
+    <string name="dev_options_info_installer">Installer</string>
+    <string name="dev_options_info_android">Android</string>
+    <string name="dev_options_info_device">Device</string>
+    <string name="dev_options_info_target_sdk">Target SDK</string>
+    <string name="dev_options_info_database">Database</string>
+    <string name="dev_options_info_first_install">First install</string>
+    <string name="dev_options_info_last_update">Last update</string>
+    <string name="dev_options_info_notifications_enabled">Notifications enabled</string>
+    <string name="dev_options_info_exact_alarms">Exact alarms access</string>
+    <string name="dev_options_info_battery_optimization">Battery optimization</string>
+    <string name="dev_options_info_persisted_uri_grants">Persisted URI grants</string>
+    <string name="dev_options_info_backup_destinations">Backup destinations</string>
+    <string name="dev_options_info_files_free_space">Files free space</string>
+    <string name="dev_options_info_cache_free_space">Cache free space</string>
+    <string name="dev_options_android_format" translatable="false">%1$s (SDK %2$d)</string>
+    <string name="dev_options_device_format" translatable="false">%1$s %2$s</string>
+    <string name="dev_options_database_format" translatable="false">%1$s / v%2$d</string>
+    <string name="dev_options_persisted_uri_grants_format" translatable="false">total: %1$d / read: %2$d / write: %3$d</string>
+    <string name="dev_options_value_unknown">unknown</string>
+    <string name="dev_options_value_ignored">ignored</string>
+    <string name="dev_options_value_active">active</string>
+    <string name="dev_options_db_stat_active_notes">Active notes</string>
+    <string name="dev_options_db_stat_archived">Archived</string>
+    <string name="dev_options_db_stat_trash">Trash</string>
+    <string name="dev_options_db_stat_file_size">DB file size</string>
+    <string name="dev_options_db_build_format" translatable="false">%1$s · %2$s</string>
+    <string name="dev_options_db_version_format" translatable="false">%1$s (%2$d)</string>
+    <string name="dev_options_db_stat_images_stored">Images stored</string>
+    <string name="dev_options_db_stat_images_linked">Images linked</string>
+    <string name="dev_options_db_stat_attachments_stored">Attachments stored</string>
+    <string name="dev_options_db_stat_attachments_linked">Attachments linked</string>
+    <string name="dev_options_db_stat_count_with_size" translatable="false">%1$d | %2$s total</string>
+
+    <!-- Developer options: diagnostic tools -->
+    <string name="dev_options_force_refresh">Force refresh widgets</string>
+    <string name="dev_options_force_crash">Force crash</string>
+    <string name="dev_options_copy_diagnostics">Copy diagnostic logs</string>
+    <string name="dev_options_export_logs">Export diagnostic logs</string>
+    <string name="dev_options_clear_logs">Clear diagnostic logs</string>
+    <string name="dev_options_toast_refresh">Refresh triggered</string>
+    <string name="dev_options_toast_diagnostics_copied">Diagnostics copied to clipboard</string>
+    <string name="dev_options_toast_logs_cleared">Diagnostic logs cleared</string>
+    <string name="dev_options_export_logs_chooser">Export diagnostic log</string>
+
+    <!-- Developer options: reset all -->
+    <string name="dev_options_reset_all">Reset all preferences</string>
+    <string name="dev_options_reset_all_title">Reset all preferences?</string>
+    <string name="dev_options_reset_all_message">This resets all preferences shown on the Settings page and hides Developer Options again.\n\nNotes, lists, and their metadata are not touched.\n\nTHIS IS NOT A MOCK. IT WILL ACTUALLY HAPPEN, WITH NO UNDO.</string>
+    <string name="dev_options_reset_all_confirm">Reset</string>
+    <string name="dev_options_toast_reset_done">All preferences reset</string>
+
+    <!-- Developer options: test notification content -->
+    <string name="dev_options_test_notif_body">Developer options test — tap Snooze or Done to test actions.</string>
+    <string name="dev_options_test_notif_low_title" translatable="false">Test: LOW channel</string>
+    <string name="dev_options_test_notif_default_title" translatable="false">Test: DEFAULT channel</string>
+    <string name="dev_options_test_notif_high_title" translatable="false">Test: HIGH channel</string>
+    <string name="dev_options_test_notif_big_picture_title" translatable="false">Test: BigPicture</string>
+    <string name="dev_options_test_notif_big_picture_body">Hero image notification test — tap Snooze or Done to test actions.</string>
+    <string name="dev_options_test_notif_big_text_title" translatable="false">Test: BigText list</string>
+    <string name="dev_options_test_notif_overdue_title" translatable="false">Test: Keep-Until-Done</string>
+    <string name="dev_options_test_notif_overdue_body">Dismiss this notification — it should reappear until you tap Done.</string>
+    <string name="dev_options_test_notif_summary_title">3 reminders due</string>
+    <string name="dev_options_test_notif_summary_text">Buy milk · Call doctor · Pack for trip</string>
+    <string name="dev_options_test_notif_summary_line1">Buy milk — overdue</string>
+    <string name="dev_options_test_notif_summary_line2">Call doctor — overdue</string>
+    <string name="dev_options_test_notif_summary_line3">Pack for trip — today</string>
+
+    <!-- Developer options: mock note content -->
+    <string name="dev_options_mock_checklist_title" translatable="false">Dev: Mock Checklist</string>
+    <string name="dev_options_mock_checklist_tag1" translatable="false">Testing</string>
+    <string name="dev_options_mock_checklist_item_groceries">Groceries</string>
+    <string name="dev_options_mock_checklist_item_milk">Milk</string>
+    <string name="dev_options_mock_checklist_item_eggs">Eggs</string>
+    <string name="dev_options_mock_checklist_item_bread">Bread</string>
+    <string name="dev_options_mock_checklist_item_work">Work tasks</string>
+    <string name="dev_options_mock_checklist_item_report">Write report</string>
+    <string name="dev_options_mock_checklist_item_pr">Review PR</string>
+    <string name="dev_options_mock_checklist_item_dentist">Book dentist</string>
+    <string name="dev_options_mock_note_title" translatable="false">Dev: Markdown Showcase</string>
+    <string name="dev_options_mock_note_body" translatable="false"># Heading 1\n## Heading 2\n\n**Bold**, *italic*, &lt;u&gt;underline&lt;/u&gt;, ~~strikethrough~~\n\n`inline code` and [a link](https://example.com)\n\n> A blockquote line\n\n- Bullet item 1\n- Bullet item 2\n\n1. Ordered item 1\n2. Ordered item 2</string>
 
 </resources>

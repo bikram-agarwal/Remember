@@ -9,3 +9,5 @@ import androidx.compose.runtime.compositionLocalOf
 val LocalSharedTransitionScope = compositionLocalOf<SharedTransitionScope?> { null }
 
 val LocalNavAnimatedVisibilityScope = compositionLocalOf<AnimatedVisibilityScope?> { null }
+
+internal const val DEV_OPTIONS_SHARED_BOUNDS_KEY = "settings-dev-options-container"

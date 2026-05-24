@@ -9,14 +9,19 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
+import androidx.compose.animation.BoundsTransform
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -27,24 +32,27 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
-import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,11 +60,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -77,7 +87,6 @@ import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.QuickCaptureState
 import dev.bikram.remember.data.ReminderPreferencesState
-import dev.bikram.remember.data.SwipeGestureMode
 import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.data.UpdatePreferencesState
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
@@ -85,7 +94,6 @@ import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.common.AppBottomSheetDragHandle
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
-import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
@@ -96,8 +104,12 @@ import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.nav.DEV_OPTIONS_SHARED_BOUNDS_KEY
+import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
+import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
 import dev.bikram.remember.ui.theme.LocalThemeState
-import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
+import dev.bikram.remember.ui.theme.transparentTopAppBarColors
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
 import dev.bikram.remember.update.RememberUpdateInfo
 import dev.bikram.remember.update.RememberUpdateState
@@ -121,17 +133,29 @@ private data class PendingRestore(
 
 private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
 
+private object SettingsScreenSessionState {
+    var collapsedSectionKeys: Set<String> = emptySet()
+    var listFirstVisibleItemIndex: Int = 0
+    var listFirstVisibleItemScrollOffset: Int = 0
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun SettingsRoute(
     onOpenIntro: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
+    onOpenDevOptions: () -> Unit = {},
     openUpdateSheetRequest: Int = 0,
+    onOpenUpdateSheetRequestHandled: () -> Unit = {},
+    startPlayInAppUpdateRequest: Int = 0,
+    onStartPlayInAppUpdateRequestHandled: () -> Unit = {},
+    onUpdateCheckStarted: () -> Unit = {},
     highlightSectionKey: String? = null,
     onHighlightHandled: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
     val resources = LocalResources.current
     val settingsDependencies =
         remember(context) {
@@ -140,6 +164,7 @@ fun SettingsRoute(
                 SettingsDependenciesEntryPoint::class.java,
             )
         }
+    val devModePrefs = settingsDependencies.devModePrefs()
     val lockPrefs = settingsDependencies.lockPrefs()
     val interactionPrefs = settingsDependencies.interactionPrefs()
     val quickCapturePrefs = settingsDependencies.quickCapturePrefs()
@@ -160,6 +185,7 @@ fun SettingsRoute(
     val appReviewLauncher = settingsDependencies.appReviewLauncher()
     val scope = rememberCoroutineScope()
 
+    val devModeEnabled by devModePrefs.isEnabled.collectAsStateWithLifecycle(initialValue = false)
     val lockState by lockPrefs.state.collectAsStateWithLifecycle(
         initialValue = LockPrefs.State(),
     )
@@ -197,7 +223,15 @@ fun SettingsRoute(
         initialValue = UpdatePreferencesState(),
     )
     val globalUpdateInfo by rememberUpdateState.updateInfo.collectAsStateWithLifecycle(initialValue = null)
-    val maxUpdateSheetHeight = (configuration.screenHeightDp * 0.85f).dp
+    val realPlayBannerState by playInAppUpdateProgressController.bannerUiState.collectAsStateWithLifecycle()
+    val devReleaseMockPlayBannerState by rememberUpdateState.devReleasePlayBannerMockUiState.collectAsStateWithLifecycle()
+    val playBannerState =
+        if (devReleaseMockPlayBannerState != PlayInAppUpdateBannerUiState.Hidden) {
+            devReleaseMockPlayBannerState
+        } else {
+            realPlayBannerState
+        }
+    val maxUpdateSheetHeight = with(density) { (windowInfo.containerSize.height * 0.85f).toDp() }
 
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
@@ -206,7 +240,11 @@ fun SettingsRoute(
     var downloadProgress by rememberSaveable { mutableStateOf<Float?>(null) }
     var updateInfo by remember { mutableStateOf<RememberUpdateInfo?>(null) }
     var updateSheetChangelog by remember { mutableStateOf<ChangelogUiState>(ChangelogUiState.Hidden) }
-    val updateSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val updateSheetState =
+        rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        )
     val playInAppUpdateLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartIntentSenderForResult(),
@@ -222,6 +260,32 @@ fun SettingsRoute(
                     ).show()
             }
         }
+
+    var handledStartPlayInAppUpdateRequest by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(startPlayInAppUpdateRequest) {
+        if (startPlayInAppUpdateRequest == 0) {
+            handledStartPlayInAppUpdateRequest = 0
+            return@LaunchedEffect
+        }
+        if (startPlayInAppUpdateRequest <= handledStartPlayInAppUpdateRequest) return@LaunchedEffect
+        handledStartPlayInAppUpdateRequest = startPlayInAppUpdateRequest
+        onStartPlayInAppUpdateRequestHandled()
+        if (!BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
+        val hostActivity = context as? ComponentActivity
+        val started =
+            hostActivity != null &&
+                playInAppUpdateStarter.startUpdateIfPending(hostActivity, playInAppUpdateLauncher)
+        if (started) {
+            playInAppUpdateProgressController.onFlexibleUpdateFlowStarted()
+        } else {
+            Toast
+                .makeText(
+                    context,
+                    resources.getString(R.string.settings_play_in_app_update_failed),
+                    Toast.LENGTH_SHORT,
+                ).show()
+        }
+    }
 
     LaunchedEffect(globalUpdateInfo) {
         if (globalUpdateInfo != null && updateInfo == null) {
@@ -315,7 +379,9 @@ fun SettingsRoute(
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
     var pendingEnableUpdateNotificationsAfterPermission by rememberSaveable { mutableStateOf(false) }
-    var collapsedSettingsSectionKeys by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    var collapsedSettingsSectionKeys by rememberSaveable {
+        mutableStateOf(SettingsScreenSessionState.collapsedSectionKeys)
+    }
     val settingsExpandableSectionKeys =
         remember {
             setOf(
@@ -332,10 +398,17 @@ fun SettingsRoute(
         settingsExpandableSectionKeys.all { sectionKey ->
             sectionKey in collapsedSettingsSectionKeys
         }
-    val settingsListState = rememberLazyListState()
-    var notificationsHighlight by remember { mutableStateOf(false) }
-    var backupHighlight by remember { mutableStateOf(false) }
-    var securityHighlight by remember { mutableStateOf(false) }
+    val settingsListState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = SettingsScreenSessionState.listFirstVisibleItemIndex,
+            initialFirstVisibleItemScrollOffset = SettingsScreenSessionState.listFirstVisibleItemScrollOffset,
+        )
+    var notificationsHighlight by rememberSaveable { mutableStateOf(false) }
+    var notificationsHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
+    var backupHighlight by rememberSaveable { mutableStateOf(false) }
+    var backupHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
+    var securityHighlight by rememberSaveable { mutableStateOf(false) }
+    var securityHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission(),
@@ -358,6 +431,14 @@ fun SettingsRoute(
         mutableStateOf(powerManager.isIgnoringBatteryOptimizations(context.packageName))
     }
 
+    androidx.compose.runtime.DisposableEffect(settingsListState) {
+        onDispose {
+            SettingsScreenSessionState.collapsedSectionKeys = collapsedSettingsSectionKeys
+            SettingsScreenSessionState.listFirstVisibleItemIndex = settingsListState.firstVisibleItemIndex
+            SettingsScreenSessionState.listFirstVisibleItemScrollOffset = settingsListState.firstVisibleItemScrollOffset
+        }
+    }
+
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     androidx.compose.runtime.DisposableEffect(lifecycleOwner, alarmManager, powerManager) {
         val observer =
@@ -372,21 +453,19 @@ fun SettingsRoute(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val topBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     val settingsScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = settingsListState,
-            additionalScrollEnabled = topBarState.collapsedFraction > 0f,
+            additionalScrollEnabled = true,
         )
-    val blurStyle = rememberProgressiveBlurStyle()
+    val blurStyle = rememberProgressiveBlurStyle(blurTop = false)
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pillInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
     val fetchRawChangelog = {
         val repo = BuildConfig.CHANGELOG_GITHUB_REPO
         val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
         val connection =
-            URL("https://raw.githubusercontent.com/$repo/$branch/CHANGELOG.md").openConnection() as HttpURLConnection
+            URL("https://raw.githubusercontent.com/$repo/$branch/docs/CHANGELOG.md").openConnection() as HttpURLConnection
         connection.instanceFollowRedirects = true
         connection.connectTimeout = 15_000
         connection.readTimeout = 20_000
@@ -423,7 +502,8 @@ fun SettingsRoute(
         }
         Unit
     }
-    val beginUpdateCheck = {
+    val beginUpdateCheck: (Boolean) -> Unit = { redisplayAvailableAlert ->
+        if (redisplayAvailableAlert) onUpdateCheckStarted()
         showUpdateSheet = true
         loadUpdateSheetChangelog()
         isCheckingUpdate = true
@@ -604,15 +684,34 @@ fun SettingsRoute(
         }
         Unit
     }
+    var handledOpenUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(openUpdateSheetRequest) {
-        if (openUpdateSheetRequest > 0) {
-            beginUpdateCheck()
+        if (openUpdateSheetRequest == 0) {
+            handledOpenUpdateSheetRequest = 0
+            return@LaunchedEffect
+        }
+        if (openUpdateSheetRequest <= handledOpenUpdateSheetRequest) return@LaunchedEffect
+        handledOpenUpdateSheetRequest = openUpdateSheetRequest
+        onOpenUpdateSheetRequestHandled()
+        if (openUpdateSheetRequest > 0) beginUpdateCheck(false)
+    }
+    LaunchedEffect(playBannerState, showUpdateSheet) {
+        if (!showUpdateSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
+        when (playBannerState) {
+            is PlayInAppUpdateBannerUiState.Downloading,
+            PlayInAppUpdateBannerUiState.ReadyToInstall,
+            -> {
+                showUpdateSheet = false
+                downloadProgress = null
+                updateSheetChangelog = ChangelogUiState.Hidden
+            }
+            PlayInAppUpdateBannerUiState.Hidden -> Unit
         }
     }
     val highlightSection = highlightSectionKey?.substringBefore(".")
     val highlightItem = highlightSectionKey?.substringAfter(".", "")?.takeIf { it.isNotEmpty() }
     var activeHighlightItem by remember { mutableStateOf<String?>(null) }
-    var activeHighlightItemRequestId by remember { mutableStateOf(0) }
+    var activeHighlightItemRequestId by remember { mutableIntStateOf(0) }
     LaunchedEffect(highlightSectionKey) {
         val key = highlightSection ?: return@LaunchedEffect
         activeHighlightItem = null
@@ -627,10 +726,20 @@ fun SettingsRoute(
             }
         settingsListState.animateScrollToItem(index)
         if (highlightItem == null) {
+            val highlightExpiresAtMillis = SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
             when (key) {
-                "notifications" -> notificationsHighlight = true
-                "backup" -> backupHighlight = true
-                "security" -> securityHighlight = true
+                "notifications" -> {
+                    notificationsHighlight = true
+                    notificationsHighlightExpiresAtMillis = highlightExpiresAtMillis
+                }
+                "backup" -> {
+                    backupHighlight = true
+                    backupHighlightExpiresAtMillis = highlightExpiresAtMillis
+                }
+                "security" -> {
+                    securityHighlight = true
+                    securityHighlightExpiresAtMillis = highlightExpiresAtMillis
+                }
             }
             onHighlightHandled()
         } else {
@@ -639,24 +748,34 @@ fun SettingsRoute(
             onHighlightHandled()
         }
     }
-    LaunchedEffect(notificationsHighlight) {
+    LaunchedEffect(notificationsHighlight, notificationsHighlightExpiresAtMillis) {
         if (!notificationsHighlight) return@LaunchedEffect
-        delay(4500)
+        val remainingHighlightMillis = notificationsHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
         notificationsHighlight = false
+        notificationsHighlightExpiresAtMillis = 0L
     }
-    LaunchedEffect(backupHighlight) {
+    LaunchedEffect(backupHighlight, backupHighlightExpiresAtMillis) {
         if (!backupHighlight) return@LaunchedEffect
-        delay(4500)
+        val remainingHighlightMillis = backupHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
         backupHighlight = false
+        backupHighlightExpiresAtMillis = 0L
     }
-    LaunchedEffect(securityHighlight) {
+    LaunchedEffect(securityHighlight, securityHighlightExpiresAtMillis) {
         if (!securityHighlight) return@LaunchedEffect
-        delay(4500)
+        val remainingHighlightMillis = securityHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
         securityHighlight = false
+        securityHighlightExpiresAtMillis = 0L
     }
-    val notificationsHighlightAlpha = rememberSectionHighlightPulseAlpha(notificationsHighlight)
-    val backupHighlightAlpha = rememberSectionHighlightPulseAlpha(backupHighlight)
-    val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlight)
+    val highlightNowMillis = SystemClock.elapsedRealtime()
+    val notificationsHighlightActive = notificationsHighlight && notificationsHighlightExpiresAtMillis > highlightNowMillis
+    val backupHighlightActive = backupHighlight && backupHighlightExpiresAtMillis > highlightNowMillis
+    val securityHighlightActive = securityHighlight && securityHighlightExpiresAtMillis > highlightNowMillis
+    val notificationsHighlightAlpha = rememberSectionHighlightPulseAlpha(notificationsHighlightActive)
+    val backupHighlightAlpha = rememberSectionHighlightPulseAlpha(backupHighlightActive)
+    val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlightActive)
 
     if (showUpdateSheet) {
         ModalBottomSheet(
@@ -664,7 +783,6 @@ fun SettingsRoute(
                 showUpdateSheet = false
                 downloadProgress = null
                 updateSheetChangelog = ChangelogUiState.Hidden
-                val playBannerState = playInAppUpdateProgressController.bannerUiState.value
                 val blocksPendingPlayClear =
                     playBannerState is PlayInAppUpdateBannerUiState.Downloading ||
                         playBannerState is PlayInAppUpdateBannerUiState.ReadyToInstall
@@ -684,7 +802,7 @@ fun SettingsRoute(
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
-                onCheckAgain = beginUpdateCheck,
+                onCheckAgain = { beginUpdateCheck(true) },
                 onDownloadClick = downloadUpdate,
                 onSkipVersionClick = skipVersion@{
                     val availableUpdate = updateInfo ?: return@skipVersion
@@ -705,7 +823,6 @@ fun SettingsRoute(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         snackbarHost = {
             SnackbarHost(
@@ -714,66 +831,61 @@ fun SettingsRoute(
             )
         },
         topBar = {
-            LargeTopAppBar(
-                colors = transparentLargeTopAppBarColors(),
-                title = {
-                    Text(
-                        stringResource(R.string.settings_title),
-                        style = MaterialTheme.typography.headlineLargeEmphasized,
-                        fontWeight = FontWeight.Bold,
-                    )
-                },
-                actions = {
-                    val openHelpLabel = stringResource(R.string.settings_open_help_cd)
-                    RememberFilledTonalIconButton(
-                        onClick = onOpenHelp,
-                        modifier =
-                            Modifier.semantics {
-                                contentDescription = openHelpLabel
-                            },
-                        tooltipLabel = openHelpLabel,
-                    ) {
-                        Text(
-                            text = "?",
-                            style =
-                                MaterialTheme.typography.headlineSmall.copy(
-                                    fontWeight = FontWeight.ExtraBold,
-                                    lineHeight = MaterialTheme.typography.headlineSmall.fontSize,
-                                ),
-                        )
-                    }
-                    val expandCollapseAllLabel =
-                        stringResource(
-                            if (allSettingsSectionsCollapsed) {
-                                R.string.settings_expand_all_sections_cd
-                            } else {
-                                R.string.settings_collapse_all_sections_cd
-                            },
-                        )
-                    RememberFilledTonalIconButton(
-                        onClick = {
-                            collapsedSettingsSectionKeys =
+            Column(Modifier.fillMaxWidth()) {
+                TopAppBar(
+                    colors = transparentTopAppBarColors(),
+                    title = {},
+                    actions = {
+                        val openHelpLabel = stringResource(R.string.settings_open_help_cd)
+                        RememberFilledTonalIconButton(
+                            onClick = onOpenHelp,
+                            modifier =
+                                Modifier.semantics {
+                                    contentDescription = openHelpLabel
+                                },
+                            tooltipLabel = openHelpLabel,
+                        ) {
+                            Text(
+                                text = "?",
+                                style =
+                                    MaterialTheme.typography.headlineSmall.copy(
+                                        fontWeight = FontWeight.Normal,
+                                        lineHeight = MaterialTheme.typography.headlineSmall.fontSize,
+                                    ),
+                            )
+                        }
+                        val expandCollapseAllLabel =
+                            stringResource(
                                 if (allSettingsSectionsCollapsed) {
-                                    collapsedSettingsSectionKeys - settingsExpandableSectionKeys
+                                    R.string.settings_expand_all_sections_cd
                                 } else {
-                                    collapsedSettingsSectionKeys + settingsExpandableSectionKeys
-                                }
-                        },
-                        modifier =
-                            Modifier.semantics {
-                                contentDescription = expandCollapseAllLabel
+                                    R.string.settings_collapse_all_sections_cd
+                                },
+                            )
+                        RememberFilledTonalIconButton(
+                            onClick = {
+                                collapsedSettingsSectionKeys =
+                                    if (allSettingsSectionsCollapsed) {
+                                        collapsedSettingsSectionKeys - settingsExpandableSectionKeys
+                                    } else {
+                                        collapsedSettingsSectionKeys + settingsExpandableSectionKeys
+                                    }
                             },
-                        tooltipLabel = expandCollapseAllLabel,
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = if (allSettingsSectionsCollapsed) "unfold_more" else "unfold_less",
-                            size = 22.dp,
-                            weight = FontWeight.Medium,
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
+                            modifier =
+                                Modifier.semantics {
+                                    contentDescription = expandCollapseAllLabel
+                                },
+                            tooltipLabel = expandCollapseAllLabel,
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = if (allSettingsSectionsCollapsed) "unfold_more" else "unfold_less",
+                                size = 22.dp,
+                                weight = FontWeight.Medium,
+                            )
+                        }
+                    },
+                )
+            }
         },
     ) { padding ->
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
@@ -820,7 +932,7 @@ fun SettingsRoute(
                         Modifier
                             .fillMaxWidth()
                             .pulsingSectionHighlightOutline(
-                                active = notificationsHighlight,
+                                active = notificationsHighlightActive,
                                 outlineColor =
                                     MaterialTheme.colorScheme.primary.copy(
                                         alpha = notificationsHighlightAlpha,
@@ -862,79 +974,26 @@ fun SettingsRoute(
                     onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
                 ) {
                     GroupedListColumn {
-                        GroupedListItem(position = GroupPosition.FIRST) {
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.settings_swipe_gesture),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                SwipeGestureModeDropdown(
-                                    current = interactionState.swipeGestureMode,
-                                    onSelect = { mode ->
-                                        scope.launch { interactionPrefs.setSwipeGestureMode(mode) }
-                                    },
-                                )
-                            }
-                        }
-                        if (interactionState.swipeGestureMode == SwipeGestureMode.EXECUTE_ONE) {
-                            GroupedListItem(position = GroupPosition.LAST) {
-                                SwipeExecuteOneActionsEditor(
-                                    startTitle = stringResource(R.string.settings_swipe_right_actions),
-                                    endTitle = stringResource(R.string.settings_swipe_left_actions),
-                                    startAction = interactionState.swipeStartToEnd,
-                                    endAction = interactionState.swipeEndToStart,
-                                    onStartActionChange = { action ->
-                                        scope.launch { interactionPrefs.setSwipeStartToEnd(action) }
-                                    },
-                                    onEndActionChange = { action ->
-                                        scope.launch { interactionPrefs.setSwipeEndToStart(action) }
-                                    },
-                                )
-                            }
-                        } else {
-                            GroupedListItem(position = GroupPosition.LAST) {
-                                SwipeRevealSlotsEditor(
-                                    startTitle = stringResource(R.string.settings_swipe_right_actions),
-                                    endTitle = stringResource(R.string.settings_swipe_left_actions),
-                                    startActions = interactionState.swipeStartToEndRevealActions,
-                                    endActions = interactionState.swipeEndToStartRevealActions,
-                                    onActionsChange = { startActions, endActions ->
-                                        scope.launch {
-                                            interactionPrefs.setSwipeRevealActions(startActions, endActions)
-                                        }
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            item(key = "haptics") {
-                SettingsExpandableSection(
-                    sectionKey = "haptics",
-                    materialSymbolName = "vibration",
-                    title = stringResource(R.string.settings_haptics_section),
-                    collapsedSectionKeys = collapsedSettingsSectionKeys,
-                    onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                ) {
-                    GroupedListColumn {
                         GroupedListItem(position = GroupPosition.ONLY) {
-                            SettingsToggleRow(
-                                materialSymbolName = "vibration",
-                                title = stringResource(R.string.settings_haptic_feedback),
-                                subtitle = stringResource(R.string.settings_haptic_feedback_desc),
-                                checked = interactionState.hapticFeedbackEnabled,
-                                onCheckedChange = { enabled ->
-                                    scope.launch { interactionPrefs.setHapticFeedbackEnabled(enabled) }
+                            SwipeGestureSettingsPanel(
+                                currentMode = interactionState.swipeGestureMode,
+                                onModeChange = { mode ->
+                                    scope.launch { interactionPrefs.setSwipeGestureMode(mode) }
+                                },
+                                startAction = interactionState.swipeStartToEnd,
+                                endAction = interactionState.swipeEndToStart,
+                                onStartActionChange = { action ->
+                                    scope.launch { interactionPrefs.setSwipeStartToEnd(action) }
+                                },
+                                onEndActionChange = { action ->
+                                    scope.launch { interactionPrefs.setSwipeEndToStart(action) }
+                                },
+                                startActions = interactionState.swipeStartToEndRevealActions,
+                                endActions = interactionState.swipeEndToStartRevealActions,
+                                onRevealActionsChange = { startActions, endActions ->
+                                    scope.launch {
+                                        interactionPrefs.setSwipeRevealActions(startActions, endActions)
+                                    }
                                 },
                             )
                         }
@@ -948,7 +1007,7 @@ fun SettingsRoute(
                         Modifier
                             .fillMaxWidth()
                             .pulsingSectionHighlightOutline(
-                                active = securityHighlight,
+                                active = securityHighlightActive,
                                 outlineColor =
                                     MaterialTheme.colorScheme.primary.copy(
                                         alpha = securityHighlightAlpha,
@@ -980,7 +1039,7 @@ fun SettingsRoute(
                         Modifier
                             .fillMaxWidth()
                             .pulsingSectionHighlightOutline(
-                                active = backupHighlight,
+                                active = backupHighlightActive,
                                 outlineColor =
                                     MaterialTheme.colorScheme.primary.copy(
                                         alpha = backupHighlightAlpha,
@@ -1099,7 +1158,7 @@ fun SettingsRoute(
                                     Modifier
                                         .fillMaxWidth()
                                         .tapSoundClickable {
-                                            beginUpdateCheck()
+                                            beginUpdateCheck(true)
                                         }.padding(horizontal = 16.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
@@ -1144,48 +1203,28 @@ fun SettingsRoute(
                 }
             }
 
-            if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease") {
-                item(key = "dev_release_mocks") {
-                    Column(modifier = Modifier.padding(top = 24.dp)) {
-                        SettingsExpandableSection(
-                            sectionKey = "dev_release_mocks",
-                            materialSymbolName = "bug_report",
-                            title = stringResource(R.string.settings_dev_release_mocks_section),
-                            collapsedSectionKeys = collapsedSettingsSectionKeys,
-                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                        ) {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                RememberOutlinedButton(
-                                    onClick = {
-                                        rememberUpdateState.devReleaseMockArmUpdatePromoBanner()
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(stringResource(R.string.settings_dev_release_mock_update_banner))
-                                }
-                                RememberOutlinedButton(
-                                    onClick = {
-                                        rememberUpdateState.devReleaseMockStartPlayUpdateBannerSequence()
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                ) {
-                                    Text(stringResource(R.string.settings_dev_release_mock_play_banner))
-                                }
-                            }
-                        }
-                    }
+            if (devModeEnabled) {
+                item(key = "dev_options_entry") {
+                    DevOptionsSettingsEntry(
+                        onClick = onOpenDevOptions,
+                    )
                 }
             }
 
             item(key = "about") {
                 AboutSection(
+                    modifier =
+                        if (devModeEnabled) {
+                            Modifier
+                        } else {
+                            Modifier.padding(top = 24.dp)
+                        },
                     onOpenIntro = onOpenIntro,
+                    devModeEnabled = devModeEnabled,
+                    onDevModeActivated = {
+                        scope.launch { devModePrefs.setEnabled(true) }
+                        onOpenDevOptions()
+                    },
                     onLaunchPlayReview = { onFlowFinished ->
                         val hostActivity = context as? ComponentActivity
                         if (hostActivity != null) {
@@ -1239,6 +1278,83 @@ fun SettingsRoute(
                 }
             },
         )
+    }
+}
+
+@OptIn(ExperimentalSharedTransitionApi::class)
+@Composable
+private fun DevOptionsSettingsEntry(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val sharedScope = LocalSharedTransitionScope.current
+    val navScope = LocalNavAnimatedVisibilityScope.current
+    val sharedBoundsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Rect>())
+    val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
+    val sharedModifier =
+        if (sharedScope != null && navScope != null) {
+            with(sharedScope) {
+                Modifier.sharedBounds(
+                    sharedContentState = rememberSharedContentState(key = DEV_OPTIONS_SHARED_BOUNDS_KEY),
+                    animatedVisibilityScope = navScope,
+                    boundsTransform = sharedBoundsTransform,
+                )
+            }
+        } else {
+            Modifier
+        }
+    Row(
+        modifier =
+            modifier
+                .then(sharedModifier)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(28.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .tapSoundClickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(36.dp)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(
+                        MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f),
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = "developer_board",
+                size = 21.dp,
+                tint = MaterialTheme.colorScheme.primary,
+                weight = FontWeight.Medium,
+            )
+        }
+        Text(
+            text = stringResource(R.string.dev_options_title),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .size(32.dp)
+                    .clip(MaterialTheme.shapes.extraExtraLarge)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center,
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = "arrow_outward",
+                size = 20.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                weight = FontWeight.Medium,
+            )
+        }
     }
 }
 

@@ -36,15 +36,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.feedback.LocalHapticEnabled
-import dev.bikram.remember.ui.feedback.performSaveHaptic
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
  * Note/list action state. Exactly one of [archived]/[trashed] is expected to be true; when both
@@ -83,11 +84,15 @@ fun NoteActionBottomBar(
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,
     modifier: Modifier = Modifier,
+    showEditAction: Boolean = true,
 ) {
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     AnimatedVisibility(
         visible = visible,
-        enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-        exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+        enter = slideInVertically(animationSpec = spatialSpec, initialOffsetY = { it }) + fadeIn(animationSpec = fadeInSpec),
+        exit = slideOutVertically(animationSpec = spatialSpec, targetOffsetY = { it }) + fadeOut(animationSpec = fadeOutSpec),
         modifier = modifier,
     ) {
         NoteActionBottomBarContent(
@@ -105,6 +110,7 @@ fun NoteActionBottomBar(
             onTrash = onTrash,
             onRestore = onRestore,
             onDeleteForever = onDeleteForever,
+            showEditAction = showEditAction,
         )
     }
 }
@@ -135,6 +141,7 @@ fun NoteActionBottomBarContent(
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,
     modifier: Modifier = Modifier,
+    showEditAction: Boolean = true,
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -153,19 +160,21 @@ fun NoteActionBottomBarContent(
         ) {
             when (shelfState) {
                 NoteShelfState.ACTIVE -> {
-                    EditActionItem(isEditMode = isEditMode, onClick = onToggleEdit)
+                    if (showEditAction) {
+                        EditActionItem(isEditMode = isEditMode, onClick = onToggleEdit)
+                    }
                     StarActionItem(starred = starred, onClick = onToggleStar)
                     if (existing) {
-                        // Mark done / not done. Filled check_circle when completed,
-                        // outlined when active, so the toggle state reads at a glance.
-                        // Label flips to match: "Mark done" vs "Mark not done".
-                        DoneActionItem(completed = completed, onClick = onToggleCompleted)
                         ActionItem(
                             icon = "notifications",
                             label = stringResource(R.string.edit_bottom_bar_notification),
                             onClick = onNotification,
                             modifier = Modifier.width(72.dp),
                         )
+                        // Mark done / not done. Filled check_circle when completed,
+                        // outlined when active, so the toggle state reads at a glance.
+                        // Label flips to match: "Mark done" vs "Mark not done".
+                        DoneActionItem(completed = completed, onClick = onToggleCompleted)
                         ActionItem(
                             icon = "archive",
                             label = stringResource(R.string.edit_bottom_bar_archive),
@@ -262,16 +271,15 @@ private fun ActionItem(
 
 /**
  * Edit/Done toggle: animates the icon + label between the two states with a shared motion spec,
- * and fires a save haptic when leaving edit mode.
+ * with save haptics only when leaving edit mode.
  */
 @Composable
 private fun EditActionItem(
     isEditMode: Boolean,
     onClick: () -> Unit,
 ) {
-    val hostView = LocalView.current
-    val hapticEnabled = LocalHapticEnabled.current
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
+    val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val haptic = LocalHapticFeedback.current
     Column(
         modifier =
             Modifier
@@ -279,7 +287,9 @@ private fun EditActionItem(
                 .clip(MaterialTheme.shapes.large)
                 .clickable(
                     onClick = {
-                        if (isEditMode && hapticEnabled) hostView.performSaveHaptic()
+                        if (isEditMode) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
                         onClick()
                     },
                 ).padding(vertical = 8.dp),
@@ -336,10 +346,9 @@ private fun DoneActionItem(
     completed: Boolean,
     onClick: () -> Unit,
 ) {
-    val hostView = LocalView.current
-    val hapticEnabled = LocalHapticEnabled.current
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val colorEffectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
+    val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
+    val haptic = LocalHapticFeedback.current
     var pulsing by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pulsing) 1.35f else 1f,
@@ -362,8 +371,8 @@ private fun DoneActionItem(
                 .clickable(
                     onClick = {
                         if (!completed) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             pulsing = true
-                            if (hapticEnabled) hostView.performSaveHaptic()
                         }
                         onClick()
                     },
@@ -405,10 +414,9 @@ private fun StarActionItem(
     starred: Boolean,
     onClick: () -> Unit,
 ) {
-    val hostView = LocalView.current
-    val hapticEnabled = LocalHapticEnabled.current
-    val effectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val colorEffectsSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
+    val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
+    val haptic = LocalHapticFeedback.current
     var starPulsing by remember { mutableStateOf(false) }
     val starScale by animateFloatAsState(
         targetValue = if (starPulsing) 1.35f else 1f,
@@ -417,7 +425,7 @@ private fun StarActionItem(
         label = "bottomBarStarScale",
     )
     val starColor by animateColorAsState(
-        targetValue = if (starPulsing || starred) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface,
+        targetValue = if (starPulsing || starred) Color(0xFFF9A825) else MaterialTheme.colorScheme.onSurface,
         animationSpec = colorEffectsSpec,
         label = "bottomBarStarColor",
     )
@@ -429,8 +437,8 @@ private fun StarActionItem(
                 .clickable(
                     onClick = {
                         if (!starred) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             starPulsing = true
-                            if (hapticEnabled) hostView.performSaveHaptic()
                         }
                         onClick()
                     },

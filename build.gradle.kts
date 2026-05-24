@@ -1,3 +1,15 @@
+buildscript {
+    configurations.classpath {
+        resolutionStrategy {
+            force(
+                "io.github.detekt.sarif4k:sarif4k:0.7.0",
+                "io.github.detekt.sarif4k:sarif4k-jvm:0.7.0",
+                "io.github.oshai:kotlin-logging:8.0.03",
+            )
+        }
+    }
+}
+
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.compose) apply false

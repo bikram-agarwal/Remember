@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.layout.Arrangement
@@ -21,8 +22,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -81,17 +84,33 @@ internal fun RemindersSection(
     highlightItemRequestId: Int = 0,
 ) {
     val context = LocalContext.current
-    var keepUntilDoneHighlight by remember { mutableStateOf(false) }
+    var keepUntilDoneHighlight by rememberSaveable { mutableStateOf(false) }
+    var keepUntilDoneHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
+    var handledKeepUntilDoneHighlightRequestId by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(highlightItemKey, highlightItemRequestId) {
-        if (highlightItemKey == "keep_until_done") {
+        if (
+            highlightItemKey == "keep_until_done" &&
+            highlightItemRequestId != handledKeepUntilDoneHighlightRequestId
+        ) {
+            handledKeepUntilDoneHighlightRequestId = highlightItemRequestId
             keepUntilDoneHighlight = true
-            delay(4500)
+            keepUntilDoneHighlightExpiresAtMillis =
+                SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
+        } else if (highlightItemKey != "keep_until_done") {
             keepUntilDoneHighlight = false
-        } else {
-            keepUntilDoneHighlight = false
+            keepUntilDoneHighlightExpiresAtMillis = 0L
         }
     }
-    val keepUntilDoneHighlightAlpha = rememberSectionHighlightPulseAlpha(keepUntilDoneHighlight)
+    LaunchedEffect(keepUntilDoneHighlight, keepUntilDoneHighlightExpiresAtMillis) {
+        if (!keepUntilDoneHighlight) return@LaunchedEffect
+        val remainingHighlightMillis = keepUntilDoneHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
+        keepUntilDoneHighlight = false
+        keepUntilDoneHighlightExpiresAtMillis = 0L
+    }
+    val keepUntilDoneHighlightActive =
+        keepUntilDoneHighlight && keepUntilDoneHighlightExpiresAtMillis > SystemClock.elapsedRealtime()
+    val keepUntilDoneHighlightAlpha = rememberSectionHighlightPulseAlpha(keepUntilDoneHighlightActive)
     GroupedListColumn {
         GroupedListItem(position = GroupPosition.FIRST) {
             Row(
@@ -227,9 +246,9 @@ internal fun RemindersSection(
             position = GroupPosition.MIDDLE,
             modifier =
                 Modifier
-                    .zIndex(if (keepUntilDoneHighlight) 1f else 0f)
+                    .zIndex(if (keepUntilDoneHighlightActive) 1f else 0f)
                     .pulsingSectionHighlightOutline(
-                        active = keepUntilDoneHighlight,
+                        active = keepUntilDoneHighlightActive,
                         outlineColor =
                             MaterialTheme.colorScheme.primary.copy(alpha = keepUntilDoneHighlightAlpha),
                         expandDp = 4.dp,

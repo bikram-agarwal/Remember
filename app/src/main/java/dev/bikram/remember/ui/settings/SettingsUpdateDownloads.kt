@@ -15,7 +15,7 @@ import java.io.FileInputStream
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val REMEMBER_UPDATE_APK_CACHE_NAME = "remember_update.apk"
+internal const val REMEMBER_UPDATE_APK_CACHE_NAME = "remember_update.apk"
 
 internal suspend fun downloadUpdateApk(
     context: Context,

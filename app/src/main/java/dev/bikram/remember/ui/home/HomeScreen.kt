@@ -2,6 +2,7 @@ package dev.bikram.remember.ui.home
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -20,15 +21,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -41,7 +41,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
@@ -49,6 +48,8 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -56,6 +57,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
@@ -66,6 +70,7 @@ import dev.bikram.remember.data.NotesFilter
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
+import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.components.toNoteCardUiModel
@@ -75,8 +80,17 @@ import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.LocalSnackbarHostState
-import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import dev.bikram.remember.ui.theme.transparentTopAppBarColors
 import kotlinx.coroutines.launch
+
+private object HomeScreenSessionState {
+    var archiveSectionExpanded: Boolean = false
+    var trashSectionExpanded: Boolean = false
+    var collapsedSectionKeys: Set<String> = setOf("DONE")
+    var listFirstVisibleItemIndex: Int = 0
+    var listFirstVisibleItemScrollOffset: Int = 0
+    var initialListLiftApplied: Boolean = false
+}
 
 @Composable
 fun HomeRoute(
@@ -128,6 +142,7 @@ fun HomeRoute(
         onSwipeAction = vm::handleSwipeAction,
         onToggleSelection = vm::toggleSelection,
         onSelectAllVisible = vm::selectNotes,
+        onPruneSelection = vm::pruneSelection,
         onClearSelection = vm::clearSelection,
         onMarkSelectedDone = vm::markSelectedDone,
         onArchiveSelected = vm::archiveSelected,
@@ -151,6 +166,7 @@ fun HomeScreen(
     onSwipeAction: (NoteWithItems, NoteSwipeAction) -> Unit,
     onToggleSelection: (Long) -> Unit,
     onSelectAllVisible: (Set<Long>) -> Unit,
+    onPruneSelection: (Set<Long>) -> Unit,
     onClearSelection: () -> Unit,
     onMarkSelectedDone: () -> Unit,
     onArchiveSelected: () -> Unit,
@@ -160,36 +176,72 @@ fun HomeScreen(
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
 ) {
-    val topBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var searchShouldRequestFocus by rememberSaveable { mutableStateOf(false) }
     var tagSheetOpen by rememberSaveable { mutableStateOf(false) }
     // Collapsed by default so the search results feel focused on active notes. Each section
     // remembers its own expansion state when the user switches away and comes back.
-    var archiveSectionExpanded by rememberSaveable { mutableStateOf(false) }
-    var trashSectionExpanded by rememberSaveable { mutableStateOf(false) }
+    var archiveSectionExpanded by rememberSaveable { mutableStateOf(HomeScreenSessionState.archiveSectionExpanded) }
+    var trashSectionExpanded by rememberSaveable { mutableStateOf(HomeScreenSessionState.trashSectionExpanded) }
     var expandedFilterDropdown by rememberSaveable { mutableStateOf<ActiveFilterDropdown?>(null) }
-    var initialListLiftApplied by rememberSaveable { mutableStateOf(false) }
+    var initialListLiftApplied by rememberSaveable {
+        mutableStateOf(
+            HomeScreenSessionState.initialListLiftApplied ||
+                HomeScreenSessionState.listFirstVisibleItemIndex > 0 ||
+                HomeScreenSessionState.listFirstVisibleItemScrollOffset > 0,
+        )
+    }
     var revealedNoteCardId by rememberSaveable { mutableStateOf<Long?>(null) }
     var revealedNoteCardBounds by remember { mutableStateOf<Rect?>(null) }
     var homeScreenBounds by remember { mutableStateOf<Rect?>(null) }
     // Every section header is collapsible. Done starts collapsed by default because those
     // tasks are already finished; every other section starts expanded.
-    var collapsedSectionKeys by rememberSaveable { mutableStateOf(setOf("DONE")) }
-    val listState = rememberLazyListState()
+    var collapsedSectionKeys by rememberSaveable { mutableStateOf(HomeScreenSessionState.collapsedSectionKeys) }
+    val listState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = HomeScreenSessionState.listFirstVisibleItemIndex,
+            initialFirstVisibleItemScrollOffset = HomeScreenSessionState.listFirstVisibleItemScrollOffset,
+        )
     val listScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = listState,
-            additionalScrollEnabled = topBarState.collapsedFraction > 0f,
+            additionalScrollEnabled = true,
         )
     val filterControlScrollState = rememberScrollState()
-    val blurStyle = rememberProgressiveBlurStyle()
+    val blurStyle = rememberProgressiveBlurStyle(blurTop = false)
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val bottomInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val notificationsAllowed = rememberNotificationsAllowed()
     val initialListLiftPx =
         with(LocalDensity.current) {
             16.dp.roundToPx()
         }
+
+    DisposableEffect(listState) {
+        onDispose {
+            HomeScreenSessionState.archiveSectionExpanded = archiveSectionExpanded
+            HomeScreenSessionState.trashSectionExpanded = trashSectionExpanded
+            HomeScreenSessionState.collapsedSectionKeys = collapsedSectionKeys
+            HomeScreenSessionState.listFirstVisibleItemIndex = listState.firstVisibleItemIndex
+            HomeScreenSessionState.listFirstVisibleItemScrollOffset = listState.firstVisibleItemScrollOffset
+            HomeScreenSessionState.initialListLiftApplied = initialListLiftApplied
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_PAUSE) {
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     // Back gesture exits selection mode before the default handler runs.
     androidx.activity.compose.BackHandler(enabled = state.inSelectionMode) {
@@ -227,6 +279,9 @@ fun HomeScreen(
                     }.toSet()
             }
         }
+    LaunchedEffect(selectableVisibleIds) {
+        onPruneSelection(selectableVisibleIds)
+    }
     // Note ids that appear in more than one row of [displayedItems]. Only multi-tag
     // notes under the by-tag grouping land here; everything else is mutually exclusive
     // (a note is either active or done, either overdue or upcoming). For unique ids we
@@ -242,7 +297,11 @@ fun HomeScreen(
                         counts[item.card.id] = (counts[item.card.id] ?: 0) + 1
                     }
                 }
-                counts.asSequence().filter { it.value > 1 }.map { it.key }.toSet()
+                counts
+                    .asSequence()
+                    .filter { it.value > 1 }
+                    .map { it.key }
+                    .toSet()
             }
         }
 
@@ -279,7 +338,7 @@ fun HomeScreen(
                             }
                         }
                     }
-                }.nestedScroll(scrollBehavior.nestedScrollConnection),
+                },
         containerColor = Color.Transparent,
         bottomBar = {
             HomeSelectionActionBar(
@@ -293,81 +352,73 @@ fun HomeScreen(
             )
         },
         topBar = {
-            LargeTopAppBar(
-                colors = transparentLargeTopAppBarColors(),
-                title = {
-                    // Selection mode swaps the title for the plain app name; the
-                    // selection action chrome lives in the `actions` slot. Otherwise
-                    // we hand the whole title row over to SearchableTopBarTitle, which
-                    // owns both the title-or-search-field swap AND the toggle button
-                    // so the search bar visually emerges from the button's left edge.
-                    if (state.inSelectionMode) {
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.headlineLargeEmphasized,
-                            fontWeight = FontWeight.Bold,
-                        )
-                    } else {
-                        SearchableTopBarTitle(
-                            searchOpen = searchOpen,
-                            query = state.filter.text,
-                            onQueryChange = onQueryChange,
-                            onToggleSearch = {
-                                if (searchOpen && state.filter.text.isNotEmpty()) {
-                                    onQueryChange("")
-                                }
-                                searchOpen = !searchOpen
-                            },
-                        )
-                    }
-                },
-                actions = {
-                    if (state.inSelectionMode) {
-                        val cdSelectAll = stringResource(R.string.home_select_all)
-                        Box(modifier = Modifier.size(48.dp)) {
-                            RememberFilledTonalIconButton(
-                                onClick = { onSelectAllVisible(selectableVisibleIds) },
-                                enabled = selectableVisibleIds.isNotEmpty(),
-                                modifier = Modifier.align(Alignment.Center),
-                            ) {
-                                RememberMaterialRoundedSymbol(
-                                    name = "select_all",
-                                    weight = FontWeight.Medium,
-                                    modifier = Modifier.semantics { contentDescription = cdSelectAll },
-                                )
-                            }
-                            Badge(
-                                modifier =
-                                    Modifier
-                                        .align(Alignment.BottomStart)
-                                        .offset(x = 2.dp, y = (-2).dp),
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                            ) {
-                                Text(
-                                    text = state.selectedIds.size.toString(),
-                                    style = MaterialTheme.typography.labelSmall,
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(6.dp))
-                        val cdUnselectAll = stringResource(R.string.home_unselect_all)
-                        RememberFilledTonalIconButton(onClick = onClearSelection) {
-                            RememberMaterialRoundedSymbol(
-                                name = "deselect",
-                                weight = FontWeight.Medium,
-                                modifier = Modifier.semantics { contentDescription = cdUnselectAll },
+            Column(Modifier.fillMaxWidth()) {
+                TopAppBar(
+                    colors = transparentTopAppBarColors(),
+                    title = {
+                        if (!state.inSelectionMode) {
+                            SearchableTopBarTitle(
+                                searchOpen = searchOpen,
+                                requestSearchFocus = searchShouldRequestFocus,
+                                query = state.filter.text,
+                                onQueryChange = onQueryChange,
+                                onSearchFocusRequested = { searchShouldRequestFocus = false },
+                                onToggleSearch = {
+                                    if (searchOpen && state.filter.text.isNotEmpty()) {
+                                        onQueryChange("")
+                                    }
+                                    val nextSearchOpen = !searchOpen
+                                    searchOpen = nextSearchOpen
+                                    if (nextSearchOpen) {
+                                        searchShouldRequestFocus = true
+                                    }
+                                },
                             )
                         }
-                        Spacer(Modifier.width(4.dp))
-                    }
-                    // Non-selection-mode actions live inside [SearchableTopBarTitle] so the
-                    // search bar can visually emerge from the toggle button on the right
-                    // edge of the title row instead of from the actions slot, which would
-                    // sit visually disconnected from where the user just tapped.
-                },
-                scrollBehavior = scrollBehavior,
-            )
+                    },
+                    actions = {
+                        if (state.inSelectionMode) {
+                            val cdSelectAll = stringResource(R.string.home_select_all)
+                            Box(modifier = Modifier.size(48.dp)) {
+                                RememberFilledTonalIconButton(
+                                    onClick = { onSelectAllVisible(selectableVisibleIds) },
+                                    enabled = selectableVisibleIds.isNotEmpty(),
+                                    modifier = Modifier.align(Alignment.Center),
+                                ) {
+                                    RememberMaterialRoundedSymbol(
+                                        name = "select_all",
+                                        weight = FontWeight.Medium,
+                                        modifier = Modifier.semantics { contentDescription = cdSelectAll },
+                                    )
+                                }
+                                Badge(
+                                    modifier =
+                                        Modifier
+                                            .align(Alignment.BottomStart)
+                                            .offset(x = 2.dp, y = (-2).dp),
+                                    containerColor = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                ) {
+                                    Text(
+                                        text = state.selectedIds.size.toString(),
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            val cdUnselectAll = stringResource(R.string.home_unselect_all)
+                            RememberFilledTonalIconButton(onClick = onClearSelection) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "deselect",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = cdUnselectAll },
+                                )
+                            }
+                            Spacer(Modifier.width(4.dp))
+                        }
+                    },
+                )
+            }
         },
     ) { padding ->
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
@@ -551,6 +602,7 @@ fun HomeScreen(
                                 // Swipes are meaningless during bulk-select and would visually
                                 // fight the tap-to-toggle gesture.
                                 swipeEnabled = !state.inSelectionMode,
+                                reminderNotificationsAllowed = notificationsAllowed,
                             )
                         }
                     }
@@ -588,6 +640,7 @@ fun HomeScreen(
                                 onSwipeAction = onSwipeAction,
                                 badgeText = stringResource(R.string.home_search_section_badge_archive),
                                 badgeStyle = SectionBadgeStyle.ARCHIVE,
+                                reminderNotificationsAllowed = notificationsAllowed,
                                 modifier =
                                     Modifier.animateItem(
                                         fadeInSpec = itemFadeInSpec,
@@ -630,6 +683,7 @@ fun HomeScreen(
                                 onSwipeAction = onSwipeAction,
                                 badgeText = stringResource(R.string.home_search_section_badge_trash),
                                 badgeStyle = SectionBadgeStyle.TRASH,
+                                reminderNotificationsAllowed = notificationsAllowed,
                                 modifier =
                                     Modifier.animateItem(
                                         fadeInSpec = itemFadeInSpec,

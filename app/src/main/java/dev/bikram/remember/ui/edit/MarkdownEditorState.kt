@@ -32,10 +32,14 @@ private val MarkdownEmptyInlineWrappers =
         "`" to "`",
         "*" to "*",
     )
+private val MarkdownEmptyFormattingWrappers = MarkdownEmptyInlineWrappers + ("```\n" to "\n```")
 private val MarkdownEmptyHeadingPrefixRegex = Regex("""^#{1,3}\s+$""")
+private val MarkdownEmptyBlockPrefixRegex = Regex("""^(#{1,3}\s+|\s*- \[[ xX]\]\s+|\s*\d+[.)]\s+|\s*[-*+]\s+|>\s*)$""")
+private val MarkdownPartialBlockPrefixRegex = Regex("""^\s*(#{1,3}|- \[[ xX]?\]?|\d+[.)]?|[-*+]|>)\s*$""")
 private const val BODY_AUTO_FOCUS_MAX_CHARS = 280
 private const val BODY_AUTO_FOCUS_MAX_PARAGRAPHS = 6
 
+@Suppress("LargeClass")
 @Stable
 internal class MarkdownEditorState(
     initialMarkdown: String = "",
@@ -136,9 +140,12 @@ internal class MarkdownEditorState(
         cleanUpEmptyMarkdownWrappers: Boolean = true,
     ) {
         val previousValue = textFieldValue
-        val updatedValue = value.withListContinuationApplied(previousValue = previousValue)
+        val newlineAdjustedValue =
+            value.withInlineWrapperEnterAdjusted(previousValue = previousValue)
+        val updatedValue =
+            newlineAdjustedValue.withListContinuationApplied(previousValue = previousValue)
         textFieldValue =
-            if (cleanUpEmptyMarkdownWrappers) {
+            if (cleanUpEmptyMarkdownWrappers && updatedValue == newlineAdjustedValue) {
                 updatedValue.withEmptyMarkdownWrapperRemoved(previousValue = previousValue)
             } else {
                 updatedValue
@@ -166,6 +173,31 @@ internal class MarkdownEditorState(
 
     fun focusAtEndAndShowKeyboard() {
         textFieldValue = textFieldValue.copy(selection = TextRange(markdown.length))
+        selectionRevision++
+        focusRequestRevision++
+    }
+
+    fun focusAtOffsetAndShowKeyboard(markdownOffset: Int) {
+        val boundedOffset = markdownOffset.coerceIn(0, markdown.length)
+        textFieldValue = textFieldValue.copy(selection = TextRange(boundedOffset))
+        selectionRevision++
+        focusRequestRevision++
+    }
+
+    fun focusRangeAndShowKeyboard(
+        startOffset: Int,
+        endOffset: Int,
+    ) {
+        val boundedStartOffset = startOffset.coerceIn(0, markdown.length)
+        val boundedEndOffset = endOffset.coerceIn(0, markdown.length)
+        textFieldValue =
+            textFieldValue.copy(
+                selection =
+                    TextRange(
+                        start = min(boundedStartOffset, boundedEndOffset),
+                        end = max(boundedStartOffset, boundedEndOffset),
+                    ),
+            )
         selectionRevision++
         focusRequestRevision++
     }
@@ -454,10 +486,7 @@ internal class MarkdownEditorState(
         val selection = textFieldValue.selection
         val start = selection.min.coerceIn(0, text.length)
         val end = selection.max.coerceIn(start, text.length)
-        val firstLineStart =
-            text.lastIndexOf('\n', (start - 1).coerceAtLeast(0)).let { newlineIndex ->
-                if (newlineIndex < 0) 0 else newlineIndex + 1
-            }
+        val firstLineStart = text.lineStartBefore(start)
         val targetEnd = if (end > start) end else start
         val lines = mutableListOf<EditorLine>()
         var currentLineStart = firstLineStart
@@ -497,11 +526,154 @@ internal class MarkdownEditorState(
         return position
     }
 
+    private fun TextFieldValue.withInlineWrapperEnterAdjusted(previousValue: TextFieldValue): TextFieldValue {
+        if (!previousValue.selection.collapsed || !selection.collapsed) {
+            return this
+        }
+        if (text.length != previousValue.text.length + 1) {
+            return this
+        }
+        val previousCursor = previousValue.selection.start.coerceIn(0, previousValue.text.length)
+        val newlineIndex = selection.start - 1
+        if (newlineIndex !in text.indices || text[newlineIndex] != '\n') {
+            return this
+        }
+        val expectedText =
+            previousValue.text.replaceRange(
+                startIndex = previousCursor,
+                endIndex = previousCursor,
+                replacement = "\n",
+            )
+        if (expectedText != text) {
+            return this
+        }
+
+        MarkdownEmptyInlineWrappers.forEach { (open, close) ->
+            if (!previousValue.text.startsWith(close, previousCursor)) {
+                return@forEach
+            }
+            val lineStart = previousValue.text.lineStartBefore(previousCursor)
+            if (previousValue.text.substring(lineStart, previousCursor).lastIndexOf(open) < 0) {
+                return@forEach
+            }
+
+            val adjustedNewlineIndex = previousCursor + close.length
+            val updatedText =
+                previousValue.text.replaceRange(
+                    startIndex = adjustedNewlineIndex,
+                    endIndex = adjustedNewlineIndex,
+                    replacement = "\n",
+                )
+            return copy(
+                text = updatedText,
+                selection = TextRange(adjustedNewlineIndex + 1),
+                composition = null,
+            )
+        }
+        return this
+    }
+
+    @Suppress("NestedBlockDepth")
     private fun TextFieldValue.withEmptyMarkdownWrapperRemoved(previousValue: TextFieldValue): TextFieldValue {
         if (text.length >= previousValue.text.length || !selection.collapsed) {
             return this
         }
         val cursor = selection.start.coerceIn(0, text.length)
+        val previousSelection = previousValue.selection
+        if (previousSelection.collapsed) {
+            val removedCharacterCount = previousValue.text.length - text.length
+            val previousCursor = previousSelection.start.coerceIn(0, previousValue.text.length)
+            MarkdownEmptyInlineWrappers.forEach { (open, close) ->
+                var closeStart = previousValue.text.indexOf(close)
+                while (closeStart >= 0) {
+                    val closeEnd = closeStart + close.length
+                    val deletedInsideCloseMarker = previousCursor in (closeStart + 1)..closeEnd
+                    val deletedSingleMarkerCharacter =
+                        removedCharacterCount == 1 &&
+                            previousCursor > 0 &&
+                            text == previousValue.text.removeRange(previousCursor - 1, previousCursor)
+                    if (deletedInsideCloseMarker && deletedSingleMarkerCharacter) {
+                        val lineStart =
+                            previousValue.text.lastIndexOf('\n', (closeStart - 1).coerceAtLeast(0)).let { newlineIndex ->
+                                if (newlineIndex < 0) 0 else newlineIndex + 1
+                            }
+                        val openStart = previousValue.text.lastIndexOf(open, closeStart - 1)
+                        val openEnd = openStart + open.length
+                        if (openStart >= lineStart && openEnd < closeStart) {
+                            val updatedText =
+                                if (openEnd == closeStart) {
+                                    previousValue.text.removeRange(openStart, closeEnd)
+                                } else {
+                                    previousValue.text.removeRange(closeStart - 1, closeStart)
+                                }
+                            val updatedSelection =
+                                if (openEnd == closeStart) {
+                                    openStart
+                                } else {
+                                    closeStart - 1
+                                }
+                            return copy(
+                                text = updatedText,
+                                selection = TextRange(updatedSelection.coerceIn(0, updatedText.length)),
+                                composition = null,
+                            )
+                        }
+                    }
+                    closeStart = previousValue.text.indexOf(close, closeStart + 1)
+                }
+            }
+            MarkdownEmptyFormattingWrappers.forEach { (open, close) ->
+                val wrapperStart = previousCursor - open.length
+                val wrapperEnd = previousCursor + close.length
+                if (
+                    wrapperStart >= 0 &&
+                    wrapperEnd <= previousValue.text.length &&
+                    previousValue.text.substring(wrapperStart, previousCursor) == open &&
+                    previousValue.text.substring(previousCursor, wrapperEnd) == close
+                ) {
+                    val updatedWrapperStart = wrapperStart.coerceIn(0, text.length)
+                    val updatedWrapperEnd = (wrapperEnd - removedCharacterCount).coerceIn(updatedWrapperStart, text.length)
+                    val updatedText = text.removeRange(updatedWrapperStart, updatedWrapperEnd)
+                    return copy(
+                        text = updatedText,
+                        selection = TextRange(updatedWrapperStart.coerceIn(0, updatedText.length)),
+                        composition = null,
+                    )
+                }
+            }
+
+            val previousLineStart = previousValue.text.lineStartBefore(previousCursor)
+            val previousLineEnd =
+                previousValue.text.indexOf('\n', previousCursor).let { newlineIndex ->
+                    if (newlineIndex < 0) previousValue.text.length else newlineIndex
+                }
+            val previousLine = previousValue.text.substring(previousLineStart, previousLineEnd)
+            val currentLineStart = text.lineStartBefore(cursor)
+            val currentLineEnd =
+                text.indexOf('\n', cursor).let { newlineIndex ->
+                    if (newlineIndex < 0) text.length else newlineIndex
+                }
+            val currentLine = text.substring(currentLineStart, currentLineEnd)
+            if (
+                MarkdownEmptyBlockPrefixRegex.matches(previousLine) &&
+                MarkdownPartialBlockPrefixRegex.matches(currentLine) &&
+                !MarkdownEmptyBlockPrefixRegex.matches(currentLine)
+            ) {
+                val removeStart = if (currentLineStart > 0) currentLineStart - 1 else currentLineStart
+                val removeEnd =
+                    if (currentLineStart == 0 && currentLineEnd < text.length) {
+                        currentLineEnd + 1
+                    } else {
+                        currentLineEnd
+                    }
+                val updatedText = text.removeRange(removeStart, removeEnd)
+                return copy(
+                    text = updatedText,
+                    selection = TextRange(removeStart.coerceIn(0, updatedText.length)),
+                    composition = null,
+                )
+            }
+        }
         MarkdownEmptyInlineWrappers.forEach { (open, close) ->
             val wrapperStart = cursor - open.length
             val wrapperEnd = cursor + close.length
@@ -519,10 +691,7 @@ internal class MarkdownEditorState(
                 )
             }
         }
-        val lineStart =
-            text.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { newlineIndex ->
-                if (newlineIndex < 0) 0 else newlineIndex + 1
-            }
+        val lineStart = text.lineStartBefore(cursor)
         val lineEnd =
             text.indexOf('\n', cursor).let { newlineIndex ->
                 if (newlineIndex < 0) text.length else newlineIndex
@@ -540,10 +709,7 @@ internal class MarkdownEditorState(
     }
 
     private fun isSentenceStartBefore(index: Int): Boolean {
-        val lineStart =
-            markdown.lastIndexOf('\n', (index - 1).coerceAtLeast(0)).let { newlineIndex ->
-                if (newlineIndex < 0) 0 else newlineIndex + 1
-            }
+        val lineStart = markdown.lineStartBefore(index)
         val currentLinePrefix = markdown.substring(lineStart, index)
         val prefixWithoutBlockMarker = currentLinePrefix.replaceFirst(MarkdownBlockPrefixRegex, "")
         if (prefixWithoutBlockMarker.isBlank()) {
@@ -554,10 +720,7 @@ internal class MarkdownEditorState(
     }
 
     private fun isCursorAfterEmptyHeadingPrefix(cursor: Int): Boolean {
-        val lineStart =
-            markdown.lastIndexOf('\n', (cursor - 1).coerceAtLeast(0)).let { newlineIndex ->
-                if (newlineIndex < 0) 0 else newlineIndex + 1
-            }
+        val lineStart = markdown.lineStartBefore(cursor)
         return MarkdownEmptyHeadingPrefixRegex.matches(markdown.substring(lineStart, cursor))
     }
 
@@ -624,6 +787,9 @@ internal class MarkdownEditorState(
                         endIndex = newlineInsertion.index + 1,
                         replacement = continuationPrefix.outdentPrefix,
                     )
+                if (!replacedText.startsWith(continuationPrefix.outdentPrefix, previousLineStart)) {
+                    return this
+                }
                 val updatedText =
                     if (continuationPrefix.outdentTopLevelNumber != null) {
                         renumberFollowingTopLevelNumberedItems(
@@ -654,6 +820,9 @@ internal class MarkdownEditorState(
                 endIndex = newlineInsertion.index + 1,
                 replacement = continuationPrefix.nextPrefix,
             )
+        if (!updatedText.startsWith(continuationPrefix.nextPrefix, newlineInsertion.index + 1)) {
+            return this
+        }
         return copy(
             text = updatedText,
             selection = TextRange(newlineInsertion.index + 1 + continuationPrefix.nextPrefix.length),
@@ -668,25 +837,68 @@ internal class MarkdownEditorState(
         if (!previousValue.selection.collapsed || !updatedValue.selection.collapsed) {
             return null
         }
-        if (updatedValue.text.length != previousValue.text.length + 1) {
-            return null
-        }
 
         val insertionIndex = updatedValue.selection.start - 1
         if (insertionIndex !in updatedValue.text.indices || updatedValue.text[insertionIndex] != '\n') {
             return null
         }
 
-        val expectedText =
-            previousValue.text.replaceRange(
-                startIndex = insertionIndex,
-                endIndex = insertionIndex,
-                replacement = "\n",
-            )
-        if (expectedText != updatedValue.text) {
+        if (updatedValue.text.length == previousValue.text.length + 1) {
+            val expectedText =
+                previousValue.text.replaceRange(
+                    startIndex = insertionIndex,
+                    endIndex = insertionIndex,
+                    replacement = "\n",
+                )
+            if (expectedText == updatedValue.text) {
+                return NewlineInsertion(index = insertionIndex)
+            }
+        }
+
+        val previousCursor = previousValue.selection.start.coerceIn(0, previousValue.text.length)
+        val previousLineStart =
+            if (previousCursor == 0) {
+                0
+            } else {
+                previousValue.text.lastIndexOf('\n', previousCursor - 1).let { newlineIndex ->
+                    if (newlineIndex < 0) 0 else newlineIndex + 1
+                }
+            }
+        val previousLineBeforeCursor = previousValue.text.substring(previousLineStart, previousCursor)
+        if (
+            continuationPrefixForLine(
+                line = previousLineBeforeCursor,
+                lineStart = previousLineStart,
+                sourceText = previousValue.text,
+            ) == null
+        ) {
+            return null
+        }
+
+        val updatedLineStart =
+            if (insertionIndex == 0) {
+                0
+            } else {
+                updatedValue.text.lastIndexOf('\n', insertionIndex - 1).let { newlineIndex ->
+                    if (newlineIndex < 0) 0 else newlineIndex + 1
+                }
+            }
+        val textBeforeLineChanged = previousValue.text.substring(0, previousLineStart) != updatedValue.text.substring(0, updatedLineStart)
+        val textAfterCursorChanged = previousValue.text.substring(previousCursor) != updatedValue.text.substring(insertionIndex + 1)
+        if (textBeforeLineChanged || textAfterCursorChanged) {
             return null
         }
         return NewlineInsertion(index = insertionIndex)
+    }
+
+    private fun String.lineStartBefore(cursor: Int): Int {
+        val boundedCursor = cursor.coerceIn(0, length)
+        if (boundedCursor == 0) {
+            return 0
+        }
+        return lastIndexOf('\n', boundedCursor - 1).let { newlineIndex ->
+            if (newlineIndex < 0) 0 else newlineIndex + 1
+        }
     }
 
     private fun continuationPrefixForLine(

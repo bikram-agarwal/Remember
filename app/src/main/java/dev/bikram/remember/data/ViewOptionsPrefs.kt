@@ -60,4 +60,8 @@ class ViewOptionsPrefs(
             stringOrNull(Keys.GROUP_BY.name)?.let { mutable[Keys.GROUP_BY] = it }
         }
     }
+
+    suspend fun reset() {
+        context.viewOptionsDataStore.edit { it.clear() }
+    }
 }

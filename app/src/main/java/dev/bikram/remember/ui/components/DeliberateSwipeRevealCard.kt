@@ -30,10 +30,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
@@ -41,9 +42,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.feedback.performSwipeThresholdHaptic
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -59,15 +60,14 @@ fun DeliberateSwipeRevealCard(
     cardShape: Shape,
     onSwipeStartToEnd: () -> Unit,
     onSwipeEndToStart: () -> Unit,
-    hapticEnabled: Boolean,
     backgroundContent: @Composable BoxScope.(draggingFromStart: Boolean, revealProgress: Float) -> Unit,
     modifier: Modifier = Modifier,
     allowSwipeStartToEnd: Boolean = true,
     allowSwipeEndToStart: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    val view = LocalView.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
     val swipeSettleSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
@@ -85,15 +85,20 @@ fun DeliberateSwipeRevealCard(
         val thresholdPx =
             if (widthPx > 0f) widthPx * commitThresholdFraction else Float.POSITIVE_INFINITY
 
-        LaunchedEffect(hapticEnabled, widthPx, commitThresholdFraction) {
-            var previousBeyond = false
+        LaunchedEffect(allowSwipeStartToEnd, allowSwipeEndToStart, haptic, thresholdPx) {
+            var wasBeyondThreshold = false
             snapshotFlow {
-                widthPx > 0f && abs(offsetX) >= thresholdPx
-            }.collect { beyond ->
-                if (beyond && !previousBeyond && hapticEnabled) {
-                    view.performSwipeThresholdHaptic()
+                thresholdPx.isFinite() &&
+                    thresholdPx > 0f &&
+                    (
+                        (allowSwipeStartToEnd && offsetX >= thresholdPx) ||
+                            (allowSwipeEndToStart && offsetX <= -thresholdPx)
+                    )
+            }.collect { isBeyondThreshold ->
+                if (isBeyondThreshold && !wasBeyondThreshold) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
-                previousBeyond = beyond
+                wasBeyondThreshold = isBeyondThreshold
             }
         }
 
@@ -199,7 +204,6 @@ fun MultiActionSwipeRevealCard(
     startActions: List<SwipeRevealTile>,
     endActions: List<SwipeRevealTile>,
     cardShape: Shape,
-    hapticEnabled: Boolean,
     modifier: Modifier = Modifier,
     maxRevealWidth: Dp = 240.dp,
     revealKey: Any? = null,
@@ -208,8 +212,8 @@ fun MultiActionSwipeRevealCard(
     onRevealClosed: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
-    val view = LocalView.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
     val swipeSettleSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
@@ -241,17 +245,16 @@ fun MultiActionSwipeRevealCard(
             }
         val openThresholdPx = (maxRevealWidthPx * 0.22f).coerceAtLeast(36f)
 
-        LaunchedEffect(hapticEnabled, startRevealPx, endRevealPx) {
-            var previousBeyond = false
+        LaunchedEffect(endRevealPx, haptic, openThresholdPx, startRevealPx) {
+            var wasBeyondOpenThreshold = false
             snapshotFlow {
-                val beyondStart = startRevealPx > 0f && offsetX >= openThresholdPx
-                val beyondEnd = endRevealPx > 0f && offsetX <= -openThresholdPx
-                beyondStart || beyondEnd
-            }.collect { beyond ->
-                if (beyond && !previousBeyond && hapticEnabled) {
-                    view.performSwipeThresholdHaptic()
+                (startRevealPx > 0f && offsetX >= openThresholdPx) ||
+                    (endRevealPx > 0f && offsetX <= -openThresholdPx)
+            }.collect { isBeyondOpenThreshold ->
+                if (isBeyondOpenThreshold && !wasBeyondOpenThreshold) {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 }
-                previousBeyond = beyond
+                wasBeyondOpenThreshold = isBeyondOpenThreshold
             }
         }
 

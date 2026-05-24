@@ -167,9 +167,29 @@ class ThemePrefs(
 
     suspend fun setActiveCustomSeed(hex: String) {
         val normalized = normalizeHex(hex) ?: return
-        context.themePrefsDataStore.edit {
-            it[Keys.ACTIVE_CUSTOM_SEED] = normalized
-            it[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
+        context.themePrefsDataStore.edit { p ->
+            val storedSeeds = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty())
+            val matchedStored =
+                storedSeeds
+                    .firstOrNull { stored ->
+                        normalizeHex(stored) == normalized
+                    }
+            if (matchedStored == null) {
+                p[Keys.CUSTOM_SEEDS] = encodeSeeds(storedSeeds + normalized)
+            }
+            p[Keys.ACTIVE_CUSTOM_SEED] =
+                matchedStored?.let { stored ->
+                    normalizeHex(stored) ?: stored
+                } ?: normalized
+            p[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
+        }
+    }
+
+    suspend fun previewCustomSeed(hex: String) {
+        val normalized = normalizeHex(hex) ?: return
+        context.themePrefsDataStore.edit { p ->
+            p[Keys.ACTIVE_CUSTOM_SEED] = normalized
+            p[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
         }
     }
 
@@ -327,6 +347,10 @@ class ThemePrefs(
                 mutable[Keys.BLUR_BARS] = value
             }
         }
+    }
+
+    suspend fun reset() {
+        context.themePrefsDataStore.edit { it.clear() }
     }
 }
 

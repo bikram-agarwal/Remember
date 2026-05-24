@@ -10,10 +10,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -26,9 +28,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
-@Suppress("DEPRECATION")
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun HomeSelectionActionBar(
@@ -40,6 +43,10 @@ internal fun HomeSelectionActionBar(
     onTrashSelected: () -> Unit,
     bottomPadding: Dp,
 ) {
+    val spatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Box(
         modifier =
             Modifier
@@ -49,8 +56,12 @@ internal fun HomeSelectionActionBar(
     ) {
         AnimatedVisibility(
             visible = visible,
-            enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
-            exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+            enter =
+                expandVertically(animationSpec = spatialSpec, expandFrom = Alignment.Bottom) +
+                    fadeIn(animationSpec = fadeInSpec),
+            exit =
+                shrinkVertically(animationSpec = spatialSpec, shrinkTowards = Alignment.Bottom) +
+                    fadeOut(animationSpec = fadeOutSpec),
         ) {
             Surface(
                 shape = MaterialTheme.shapes.extraExtraLarge,
@@ -58,88 +69,163 @@ internal fun HomeSelectionActionBar(
                 tonalElevation = 3.dp,
                 shadowElevation = 3.dp,
             ) {
+                val exitLabel = stringResource(R.string.home_select_exit_cd)
+                val exitInteractionSource = remember { MutableInteractionSource() }
+                val exitColors =
+                    IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                val tagLabel = stringResource(R.string.home_bulk_tag)
+                val contentDescriptionTag = stringResource(R.string.home_bulk_tag_cd)
+                val tagInteractionSource = remember { MutableInteractionSource() }
+                val markDoneLabel = stringResource(R.string.edit_bottom_bar_mark_done)
+                val contentDescriptionMarkDone = stringResource(R.string.home_bulk_mark_done_cd)
+                val markDoneInteractionSource = remember { MutableInteractionSource() }
+                val archiveLabel = stringResource(R.string.edit_bottom_bar_archive)
+                val contentDescriptionArchive = stringResource(R.string.home_bulk_archive_cd)
+                val archiveInteractionSource = remember { MutableInteractionSource() }
+                val trashLabel = stringResource(R.string.home_bulk_trash)
+                val contentDescriptionTrash = stringResource(R.string.home_bulk_trash_cd)
+                val trashInteractionSource = remember { MutableInteractionSource() }
+                val trashColors =
+                    IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    )
                 ButtonGroup(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    overflowIndicator = { menuState ->
+                        ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+                    },
                 ) {
-                    val exitLabel = stringResource(R.string.home_select_exit_cd)
-                    val exitInteractionSource = remember { MutableInteractionSource() }
-                    RememberFilledTonalIconButton(
-                        onClick = onClearSelection,
-                        modifier = Modifier.animateWidth(exitInteractionSource),
-                        interactionSource = exitInteractionSource,
-                        tooltipLabel = exitLabel,
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "close",
-                            weight = FontWeight.Medium,
-                            modifier = Modifier.semantics { contentDescription = exitLabel },
-                        )
-                    }
-                    val tagLabel = stringResource(R.string.home_bulk_tag)
-                    val contentDescriptionTag = stringResource(R.string.home_bulk_tag_cd)
-                    val tagInteractionSource = remember { MutableInteractionSource() }
-                    RememberFilledTonalIconButton(
-                        onClick = onTagSelected,
-                        modifier = Modifier.animateWidth(tagInteractionSource),
-                        interactionSource = tagInteractionSource,
-                        tooltipLabel = tagLabel,
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "label",
-                            weight = FontWeight.Medium,
-                            modifier = Modifier.semantics { contentDescription = contentDescriptionTag },
-                        )
-                    }
-                    val markDoneLabel = stringResource(R.string.edit_bottom_bar_mark_done)
-                    val contentDescriptionMarkDone = stringResource(R.string.home_bulk_mark_done_cd)
-                    val markDoneInteractionSource = remember { MutableInteractionSource() }
-                    RememberFilledTonalIconButton(
-                        onClick = onMarkDoneSelected,
-                        modifier = Modifier.animateWidth(markDoneInteractionSource),
-                        interactionSource = markDoneInteractionSource,
-                        tooltipLabel = markDoneLabel,
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "check_circle",
-                            weight = FontWeight.Medium,
-                            modifier = Modifier.semantics { contentDescription = contentDescriptionMarkDone },
-                        )
-                    }
-                    val archiveLabel = stringResource(R.string.edit_bottom_bar_archive)
-                    val contentDescriptionArchive = stringResource(R.string.home_bulk_archive_cd)
-                    val archiveInteractionSource = remember { MutableInteractionSource() }
-                    RememberFilledTonalIconButton(
-                        onClick = onArchiveSelected,
-                        modifier = Modifier.animateWidth(archiveInteractionSource),
-                        interactionSource = archiveInteractionSource,
-                        tooltipLabel = archiveLabel,
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "archive",
-                            weight = FontWeight.Medium,
-                            modifier = Modifier.semantics { contentDescription = contentDescriptionArchive },
-                        )
-                    }
-                    val trashLabel = stringResource(R.string.home_bulk_trash)
-                    val contentDescriptionTrash = stringResource(R.string.home_bulk_trash_cd)
-                    val trashInteractionSource = remember { MutableInteractionSource() }
-                    RememberFilledTonalIconButton(
-                        onClick = onTrashSelected,
-                        modifier = Modifier.animateWidth(trashInteractionSource),
-                        interactionSource = trashInteractionSource,
-                        tooltipLabel = trashLabel,
-                        colors =
-                            IconButtonDefaults.filledTonalIconButtonColors(
-                                containerColor = MaterialTheme.colorScheme.errorContainer,
-                                contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                            ),
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "delete",
-                            weight = FontWeight.Medium,
-                            modifier = Modifier.semantics { contentDescription = contentDescriptionTrash },
-                        )
-                    }
+                    customItem(
+                        buttonGroupContent = {
+                            RememberFilledTonalIconButton(
+                                onClick = onClearSelection,
+                                modifier = Modifier.animateWidth(exitInteractionSource),
+                                interactionSource = exitInteractionSource,
+                                tooltipLabel = exitLabel,
+                                colors = exitColors,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "close",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = exitLabel },
+                                )
+                            }
+                        },
+                        menuContent = { menuState ->
+                            RememberDropdownMenuItem(
+                                text = { Text(exitLabel) },
+                                onClick = {
+                                    onClearSelection()
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
+                    customItem(
+                        buttonGroupContent = {
+                            RememberFilledTonalIconButton(
+                                onClick = onTagSelected,
+                                modifier = Modifier.animateWidth(tagInteractionSource),
+                                interactionSource = tagInteractionSource,
+                                tooltipLabel = tagLabel,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "label",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = contentDescriptionTag },
+                                )
+                            }
+                        },
+                        menuContent = { menuState ->
+                            RememberDropdownMenuItem(
+                                text = { Text(tagLabel) },
+                                onClick = {
+                                    onTagSelected()
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
+                    customItem(
+                        buttonGroupContent = {
+                            RememberFilledTonalIconButton(
+                                onClick = onMarkDoneSelected,
+                                modifier = Modifier.animateWidth(markDoneInteractionSource),
+                                interactionSource = markDoneInteractionSource,
+                                tooltipLabel = markDoneLabel,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "check_circle",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = contentDescriptionMarkDone },
+                                )
+                            }
+                        },
+                        menuContent = { menuState ->
+                            RememberDropdownMenuItem(
+                                text = { Text(markDoneLabel) },
+                                onClick = {
+                                    onMarkDoneSelected()
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
+                    customItem(
+                        buttonGroupContent = {
+                            RememberFilledTonalIconButton(
+                                onClick = onArchiveSelected,
+                                modifier = Modifier.animateWidth(archiveInteractionSource),
+                                interactionSource = archiveInteractionSource,
+                                tooltipLabel = archiveLabel,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "archive",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = contentDescriptionArchive },
+                                )
+                            }
+                        },
+                        menuContent = { menuState ->
+                            RememberDropdownMenuItem(
+                                text = { Text(archiveLabel) },
+                                onClick = {
+                                    onArchiveSelected()
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
+                    customItem(
+                        buttonGroupContent = {
+                            RememberFilledTonalIconButton(
+                                onClick = onTrashSelected,
+                                modifier = Modifier.animateWidth(trashInteractionSource),
+                                interactionSource = trashInteractionSource,
+                                tooltipLabel = trashLabel,
+                                colors = trashColors,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "delete",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = contentDescriptionTrash },
+                                )
+                            }
+                        },
+                        menuContent = { menuState ->
+                            RememberDropdownMenuItem(
+                                text = { Text(trashLabel) },
+                                onClick = {
+                                    onTrashSelected()
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
                 }
             }
         }

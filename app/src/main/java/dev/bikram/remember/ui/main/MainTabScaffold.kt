@@ -1,19 +1,21 @@
 package dev.bikram.remember.ui.main
 
+import android.Manifest
 import android.content.Intent
-import androidx.compose.animation.AnimatedContent
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -41,7 +43,7 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfo
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
@@ -54,7 +56,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -68,26 +69,27 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.graphics.shapes.Morph
+import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
-import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.NoteRepository
-import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.notifications.appNotificationSettingsIntent
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
+import dev.bikram.remember.ui.components.AlertChromeSummary
+import dev.bikram.remember.ui.components.AlertFloatingActionButtonMenu
 import dev.bikram.remember.ui.components.RememberFloatingActionButton
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.history.HistoryRoute
 import dev.bikram.remember.ui.history.HistorySection
-import dev.bikram.remember.ui.home.HomeRoute
-import dev.bikram.remember.ui.settings.SettingsRoute
-import dev.bikram.remember.ui.theme.LocalReducedMotion
+import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
+import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.RoundedPolygonShape
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -110,122 +112,96 @@ enum class MainTab(
     ExperimentalMaterial3Api::class,
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalMaterial3AdaptiveNavigationSuiteApi::class,
+    ExperimentalSharedTransitionApi::class,
 )
 @Composable
 fun MainTabScaffold(
     repository: NoteRepository,
-    interactionPrefs: InteractionPrefs,
+    currentTab: MainTab,
+    chromeVisible: Boolean = true,
+    onTabSelected: (MainTab) -> Unit,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
-    onOpenNote: (NoteWithItems, Boolean) -> Unit,
     onImportGoogleTasks: () -> Unit,
-    onOpenIntro: () -> Unit,
-    onOpenHelp: () -> Unit = {},
-    settingsHighlightSection: String? = null,
-    onSettingsHighlightHandled: () -> Unit = {},
-    openSettingsRequest: Int = 0,
-    openUpdateSheetRequest: Int = 0,
+    historySection: HistorySection,
+    historyVisibleItemCount: Int,
+    updateBarState: UpdateChromeState,
+    onUpdateClick: () -> Unit,
+    onDismissUpdateAvailable: () -> Unit,
+    onInstallUpdate: () -> Unit,
+    alertSummary: AlertChromeSummary,
+    blockedReminderCount: Int,
+    alertBarsExpanded: Boolean,
+    onAlertBarsExpandedChange: (Boolean) -> Unit,
+    content: @Composable (closeRevealRequest: Int) -> Unit,
 ) {
-    var tab by rememberSaveable { mutableStateOf(MainTab.Notes) }
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
     var clearTrashOpen by rememberSaveable { mutableStateOf(false) }
     var moveArchiveToTrashOpen by rememberSaveable { mutableStateOf(false) }
     var closeNotesRevealRequest by rememberSaveable { mutableIntStateOf(0) }
-    var historySection by rememberSaveable { mutableStateOf(HistorySection.ARCHIVE) }
-    var historyVisibleItemCount by rememberSaveable { mutableIntStateOf(0) }
-    val tabStateHolder = rememberSaveableStateHolder()
     val context = LocalContext.current
-    val shareText = stringResource(R.string.main_share_text)
+    val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
+    val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
+    val shareUrl =
+        when {
+            BuildConfig.FLAVOR == "playstore" -> playStoreListingUrl
+            githubRepoForSourceLink.isNotEmpty() -> "https://github.com/$githubRepoForSourceLink/releases/latest"
+            else -> playStoreListingUrl
+        }
+    val shareText = stringResource(R.string.about_share_text, shareUrl)
     val shareChooserTitle = stringResource(R.string.main_share_chooser_title)
-    val reducedMotion = LocalReducedMotion.current
+    val navAnimatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+    val chromeTargetVisible =
+        navAnimatedVisibilityScope?.transition?.targetState == EnterExitState.Visible
+    val effectiveChromeVisible = chromeVisible && (navAnimatedVisibilityScope == null || chromeTargetVisible)
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val chromeOverlayModifier =
+        if (sharedTransitionScope != null) {
+            with(sharedTransitionScope) {
+                Modifier.renderInSharedTransitionScopeOverlay(zIndexInOverlay = 10f)
+            }
+        } else {
+            Modifier
+        }
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            // The global permission state is refreshed by rememberNotificationsAllowed.
+        }
+    val enableReminderNotifications = {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            context.startActivity(appNotificationSettingsIntent(context))
+        }
+    }
 
-    // Back handling: when the FAB speed dial is open, back closes it first.
-    // On History/Settings tab, back returns to the Notes tab instead of exiting.
-    // On Notes tab with nothing open, the default handler runs (exits the app).
-    RememberPredictiveBackHandler(enabled = fabExpanded) { fabExpanded = false }
-    RememberPredictiveBackHandler(enabled = !fabExpanded && tab != MainTab.Notes) {
-        tab = MainTab.Notes
+    // Back handling: when the FAB speed dial is open, back closes it first. Tab route
+    // back behavior is owned by Navigation Compose so predictive back can preview it.
+    RememberPredictiveBackHandler(enabled = effectiveChromeVisible && fabExpanded) { fabExpanded = false }
+    RememberPredictiveBackHandler(enabled = effectiveChromeVisible && alertBarsExpanded && !fabExpanded) {
+        onAlertBarsExpandedChange(false)
     }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(openSettingsRequest) {
-        if (openSettingsRequest > 0) {
-            tab = MainTab.Settings
-        }
-    }
-    LaunchedEffect(settingsHighlightSection) {
-        if (settingsHighlightSection != null) {
-            tab = MainTab.Settings
-        }
-    }
-    LaunchedEffect(tab) {
+    LaunchedEffect(effectiveChromeVisible, currentTab) {
         // Switching tabs collapses the speed dial so the captured FAB bounds do not
         // briefly point at a stale location while the new tab's FAB rebinds.
-        if (tab != MainTab.Notes) fabExpanded = false
+        if (!effectiveChromeVisible || currentTab != MainTab.Notes) fabExpanded = false
     }
-
     val navigationSuiteType =
-        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfo())
+        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfoV2())
     val useAdaptiveNavigationRail = navigationSuiteType != NavigationSuiteType.NavigationBar
     val mainContent: @Composable () -> Unit = {
         Box(modifier = Modifier.fillMaxSize()) {
-            AnimatedContent(
-                targetState = tab,
-                transitionSpec = {
-                    if (reducedMotion) {
-                        fadeIn(animationSpec = tween(durationMillis = 0)) togetherWith
-                            fadeOut(animationSpec = tween(durationMillis = 0))
-                    } else if (targetState.ordinal > initialState.ordinal) {
-                        (slideInHorizontally { it } + fadeIn()) togetherWith
-                            (slideOutHorizontally { -it / 3 } + fadeOut())
-                    } else {
-                        (slideInHorizontally { -it } + fadeIn()) togetherWith
-                            (slideOutHorizontally { it } + fadeOut())
-                    }
-                },
-                label = "tab",
-                modifier = Modifier.fillMaxSize(),
-            ) { current ->
-                tabStateHolder.SaveableStateProvider(current.name) {
-                    when (current) {
-                        MainTab.Notes ->
-                            HomeRoute(
-                                interactionPrefs = interactionPrefs,
-                                closeRevealRequest = closeNotesRevealRequest,
-                                onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
-                                onCreateNote = {
-                                    fabExpanded = false
-                                    onCreateNote()
-                                },
-                                onCreateList = {
-                                    fabExpanded = false
-                                    onCreateList()
-                                },
-                            )
-                        MainTab.History ->
-                            HistoryRoute(
-                                interactionPrefs = interactionPrefs,
-                                section = historySection,
-                                onSectionChange = { historySection = it },
-                                onVisibleItemCountChange = { historyVisibleItemCount = it },
-                                onOpenNote = { note, forceEdit -> onOpenNote(note, forceEdit) },
-                            )
-                        MainTab.Settings ->
-                            SettingsRoute(
-                                onOpenIntro = onOpenIntro,
-                                onOpenHelp = onOpenHelp,
-                                openUpdateSheetRequest = openUpdateSheetRequest,
-                                highlightSectionKey = settingsHighlightSection,
-                                onHighlightHandled = onSettingsHighlightHandled,
-                            )
-                    }
-                }
-            }
+            content(closeNotesRevealRequest)
 
             // Scrim covers the page (not the toolbar / FAB) when the speed dial is open.
             // Tapping the scrim collapses the menu, matching standard speed-dial dismiss.
             AnimatedVisibility(
-                visible = fabExpanded && tab == MainTab.Notes,
+                visible = effectiveChromeVisible && ((fabExpanded && currentTab == MainTab.Notes) || alertBarsExpanded),
                 enter = fadeIn(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
                 exit = fadeOut(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
                 modifier = Modifier.fillMaxSize(),
@@ -234,85 +210,63 @@ fun MainTabScaffold(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .tapSoundClickable(onClick = { fabExpanded = false }),
+                            .tapSoundClickable(
+                                onClick = {
+                                    fabExpanded = false
+                                    onAlertBarsExpandedChange(false)
+                                },
+                            ),
                 )
             }
 
-            // Bottom strip. Pill mode (phones) re-uses the original CenteredPillWithSideFab
-            // layout so the FAB visually attaches to the pill at the same position as
-            // before; the layout's measure logic clamps its reported height to the FAB's
-            // *core* size, so when the FloatingActionButtonMenu's content expands the
-            // wrapper grows upward beyond the strip's reported bounds without pushing the
-            // pill. Rail mode is unaffected - the FAB sits in its own BottomEnd box.
-            if (useAdaptiveNavigationRail) {
-                Box(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomEnd)
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(end = 24.dp, bottom = 24.dp),
-                ) {
-                    MainFabSlot(
-                        tab = tab,
-                        fabExpanded = fabExpanded,
-                        onToggleNotesFab = {
-                            closeNotesRevealRequest++
-                            fabExpanded = !fabExpanded
-                        },
-                        historySection = historySection,
-                        historyVisibleItemCount = historyVisibleItemCount,
-                        onClearTrashRequest = { clearTrashOpen = true },
-                        onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
-                        onShareApp = {
-                            val send =
-                                Intent(Intent.ACTION_SEND).apply {
-                                    type = "text/plain"
-                                    putExtra(Intent.EXTRA_TEXT, shareText)
-                                }
-                            context.startActivity(Intent.createChooser(send, shareChooserTitle))
-                        },
-                        onPickImport = {
-                            closeNotesRevealRequest++
-                            fabExpanded = false
-                            onImportGoogleTasks()
-                        },
-                        onPickList = {
-                            closeNotesRevealRequest++
-                            fabExpanded = false
-                            onCreateList()
-                        },
-                        onPickNote = {
-                            closeNotesRevealRequest++
-                            fabExpanded = false
-                            onCreateNote()
-                        },
-                    )
-                }
-            } else {
-                CenteredPillWithSideFab(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .windowInsetsPadding(WindowInsets.navigationBars)
-                            .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
-                    fabGap = 12.dp,
-                    pill = {
-                        RememberFloatingNavPill(
-                            currentTab = tab,
-                            onTabClick = { selected ->
-                                closeNotesRevealRequest++
-                                tab = selected
-                                fabExpanded = false
-                            },
-                        )
-                    },
-                    fab = {
+            if (effectiveChromeVisible) {
+                // Bottom strip. Pill mode (phones) re-uses the original CenteredPillWithSideFab
+                // layout so the FAB visually attaches to the pill at the same position as
+                // before; the layout's measure logic clamps its reported height to the FAB's
+                // *core* size, so when the FloatingActionButtonMenu's content expands the
+                // wrapper grows upward beyond the strip's reported bounds without pushing the
+                // pill. Rail mode is unaffected - the FAB sits in its own BottomEnd box.
+                if (useAdaptiveNavigationRail) {
+                    if (alertSummary.count > 0) {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .then(chromeOverlayModifier)
+                                    .windowInsetsPadding(WindowInsets.navigationBars)
+                                    .padding(end = 96.dp, bottom = 24.dp),
+                        ) {
+                            AlertFloatingActionButtonMenu(
+                                expanded = alertBarsExpanded,
+                                onExpandedChange = { expanded ->
+                                    fabExpanded = false
+                                    onAlertBarsExpandedChange(expanded)
+                                },
+                                summary = alertSummary,
+                                updateState = updateBarState,
+                                blockedReminderCount = blockedReminderCount,
+                                onEnableReminderNotifications = enableReminderNotifications,
+                                onUpdateClick = onUpdateClick,
+                                onDismissUpdateAvailable = onDismissUpdateAvailable,
+                                onInstallUpdate = onInstallUpdate,
+                                horizontalAlignment = Alignment.End,
+                            )
+                        }
+                    }
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomEnd)
+                                .then(chromeOverlayModifier)
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(end = 24.dp, bottom = 24.dp),
+                    ) {
                         MainFabSlot(
-                            tab = tab,
+                            tab = currentTab,
                             fabExpanded = fabExpanded,
                             onToggleNotesFab = {
                                 closeNotesRevealRequest++
+                                onAlertBarsExpandedChange(false)
                                 fabExpanded = !fabExpanded
                             },
                             historySection = historySection,
@@ -343,10 +297,93 @@ fun MainTabScaffold(
                                 onCreateNote()
                             },
                         )
-                    },
-                    fabRightInset = if (tab == MainTab.Notes) 16.dp else 0.dp,
-                    fabBottomInset = if (tab == MainTab.Notes) 16.dp else 0.dp,
-                )
+                    }
+                } else {
+                    CenteredPillWithSideFab(
+                        modifier =
+                            Modifier
+                                .align(Alignment.BottomCenter)
+                                .then(chromeOverlayModifier)
+                                .fillMaxWidth()
+                                .windowInsetsPadding(WindowInsets.navigationBars)
+                                .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
+                        fabGap = 12.dp,
+                        pill = {
+                            RememberFloatingNavPill(
+                                currentTab = currentTab,
+                                onTabClick = { selected ->
+                                    closeNotesRevealRequest++
+                                    onTabSelected(selected)
+                                    fabExpanded = false
+                                },
+                            )
+                        },
+                        leadingFab =
+                            if (alertSummary.count == 0) {
+                                null
+                            } else {
+                                {
+                                    AlertFloatingActionButtonMenu(
+                                        expanded = alertBarsExpanded,
+                                        onExpandedChange = { expanded ->
+                                            fabExpanded = false
+                                            onAlertBarsExpandedChange(expanded)
+                                        },
+                                        summary = alertSummary,
+                                        updateState = updateBarState,
+                                        blockedReminderCount = blockedReminderCount,
+                                        onEnableReminderNotifications = enableReminderNotifications,
+                                        onUpdateClick = onUpdateClick,
+                                        onDismissUpdateAvailable = onDismissUpdateAvailable,
+                                        onInstallUpdate = onInstallUpdate,
+                                    )
+                                }
+                            },
+                        fab = {
+                            MainFabSlot(
+                                tab = currentTab,
+                                fabExpanded = fabExpanded,
+                                onToggleNotesFab = {
+                                    closeNotesRevealRequest++
+                                    onAlertBarsExpandedChange(false)
+                                    fabExpanded = !fabExpanded
+                                },
+                                historySection = historySection,
+                                historyVisibleItemCount = historyVisibleItemCount,
+                                onClearTrashRequest = { clearTrashOpen = true },
+                                onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
+                                onShareApp = {
+                                    val send =
+                                        Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, shareText)
+                                        }
+                                    context.startActivity(Intent.createChooser(send, shareChooserTitle))
+                                },
+                                onPickImport = {
+                                    closeNotesRevealRequest++
+                                    fabExpanded = false
+                                    onImportGoogleTasks()
+                                },
+                                onPickList = {
+                                    closeNotesRevealRequest++
+                                    fabExpanded = false
+                                    onCreateList()
+                                },
+                                onPickNote = {
+                                    closeNotesRevealRequest++
+                                    fabExpanded = false
+                                    onCreateNote()
+                                },
+                            )
+                        },
+                        fabRightInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
+                        fabBottomInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
+                        leadingFabGap = 18.dp,
+                        leadingFabLeftInset = 16.dp,
+                        leadingFabBottomInset = 16.dp,
+                    )
+                }
             }
 
             androidx.compose.material3.SnackbarHost(
@@ -355,29 +392,29 @@ fun MainTabScaffold(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(bottom = 80.dp), // Push it above the floating nav bar
+                        .padding(bottom = 80.dp),
             )
         }
     }
 
-    if (useAdaptiveNavigationRail) {
+    if (effectiveChromeVisible && useAdaptiveNavigationRail) {
         NavigationSuiteScaffold(
             layoutType = navigationSuiteType,
             containerColor = Color.Transparent,
             navigationSuiteItems = {
                 MainTab.entries.forEach { tabItem ->
                     item(
-                        selected = tab == tabItem,
+                        selected = currentTab == tabItem,
                         onClick = {
                             closeNotesRevealRequest++
-                            tab = tabItem
+                            onTabSelected(tabItem)
                             fabExpanded = false
                         },
                         icon = {
                             RememberMaterialRoundedSymbol(
                                 name = tabItem.symbolName,
                                 weight = FontWeight.Medium,
-                                filled = tab == tabItem,
+                                filled = currentTab == tabItem,
                             )
                         },
                         label = {
@@ -496,15 +533,22 @@ private fun CenteredPillWithSideFab(
     fab: @Composable () -> Unit,
     fabGap: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
+    leadingFab: (@Composable () -> Unit)? = null,
     fabCoreSize: androidx.compose.ui.unit.Dp = 56.dp,
     fabRightInset: androidx.compose.ui.unit.Dp = 0.dp,
     fabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
+    leadingFabGap: androidx.compose.ui.unit.Dp = fabGap,
+    leadingFabLeftInset: androidx.compose.ui.unit.Dp = 0.dp,
+    leadingFabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     androidx.compose.ui.layout.Layout(
         modifier = modifier,
         content = {
             Box { pill() }
             Box { fab() }
+            if (leadingFab != null) {
+                Box { leadingFab() }
+            }
         },
     ) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
@@ -515,10 +559,17 @@ private fun CenteredPillWithSideFab(
             measurables[1].measure(
                 loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity),
             )
+        val leadingFabPlaceable =
+            measurables
+                .getOrNull(2)
+                ?.measure(loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
         val gapPx = fabGap.roundToPx()
+        val leadingGapPx = leadingFabGap.roundToPx()
         val fabCorePx = fabCoreSize.roundToPx()
         val fabRightInsetPx = fabRightInset.roundToPx()
         val fabBottomInsetPx = fabBottomInset.roundToPx()
+        val leadingFabLeftInsetPx = leadingFabLeftInset.roundToPx()
+        val leadingFabBottomInsetPx = leadingFabBottomInset.roundToPx()
 
         val width =
             if (constraints.hasBoundedWidth) {
@@ -558,6 +609,14 @@ private fun CenteredPillWithSideFab(
             val fabBottomY = (stripHeight + fabCorePx) / 2 + fabBottomInsetPx
             val fabY = fabBottomY - fabPlaceable.height
             fabPlaceable.place(fabX, fabY)
+
+            leadingFabPlaceable?.let { leadingPlaceable ->
+                val leadingFabElementLeft = (pillX - leadingGapPx - fabCorePx).coerceAtLeast(0)
+                val leadingX = (leadingFabElementLeft - leadingFabLeftInsetPx).coerceAtLeast(0)
+                val leadingFabBottomY = (stripHeight + fabCorePx) / 2 + leadingFabBottomInsetPx
+                val leadingY = leadingFabBottomY - leadingPlaceable.height
+                leadingPlaceable.place(leadingX, leadingY)
+            }
         }
     }
 }
@@ -605,17 +664,15 @@ private fun FloatingNavTabItem(
             horizontalArrangement = Arrangement.Center,
             modifier = Modifier.padding(horizontal = if (selected) 6.dp else 0.dp),
         ) {
-            Box(modifier = Modifier.size(24.dp)) {
-                RememberMaterialRoundedSymbol(
-                    name = item.symbolName,
-                    size = 24.dp,
-                    tint = LocalContentColor.current,
-                    weight = FontWeight.Medium,
-                    // Selected tab renders from the FILL=1 subset; inactive tabs render from
-                    // the FILL=0 subset so the pill reads with standard tab semantics.
-                    filled = selected,
-                )
-            }
+            RememberMaterialRoundedSymbol(
+                name = item.symbolName,
+                size = 24.dp,
+                tint = LocalContentColor.current,
+                weight = FontWeight.Medium,
+                // Selected tab renders from the FILL=1 subset; inactive tabs render from
+                // the FILL=0 subset so the pill reads with standard tab semantics.
+                filled = selected,
+            )
             if (labelWidth > 4.dp) {
                 Spacer(Modifier.width(6.dp))
                 Text(
@@ -652,7 +709,6 @@ private fun MainFabSlot(
 ) {
     when (tab) {
         MainTab.Notes -> {
-            val playTap = rememberPlayTapSound()
             val createDescription = stringResource(R.string.main_fab_create)
             val closeDescription = stringResource(R.string.main_fab_close)
             val description = if (fabExpanded) closeDescription else createDescription
@@ -693,7 +749,6 @@ private fun MainFabSlot(
                     ToggleFloatingActionButton(
                         checked = fabExpanded,
                         onCheckedChange = {
-                            playTap()
                             onToggleNotesFab()
                         },
                         modifier =

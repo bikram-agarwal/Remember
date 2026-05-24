@@ -2,10 +2,13 @@
 Walk app/src/main/java and extract every Material Symbols ligature name we use.
 
 Sources of truth (any one match is enough to keep the glyph):
-- `RememberMaterialRoundedSymbol(name = "xxx", ...)` literal calls.
-- `materialSymbolName = "xxx"` (data class / enum property assignments).
-- `symbolName = "xxx"` (IconChoice entries in BundledMaterialSymbolIcons.kt).
-- String literals returned from `ActionType.materialSymbolName()`-style helper functions.
+- `*MaterialRoundedSymbol(name = "xxx", ...)` literal calls.
+- `iconName = "xxx"` / `leadingIconName = "xxx"` wrapper parameters.
+- `materialSymbolName = "xxx"` / `leadingMaterialSymbolName = "xxx"` wrapper parameters.
+- `symbolName = "xxx"` field assignments.
+- String literals returned from `*.materialSymbolName()`-style helper functions.
+- String literals returned from file-extension `when` branches such as
+  `"mp3", "wav" -> "audio_file"` and `else -> "draft"`.
 
 We err on the side of including extras: ligatures are cheap (~50-200 bytes
 each), but a missing one ships as an invisible icon in production.
@@ -26,43 +29,62 @@ OUTPUT_REPORT = Path(__file__).with_name("ligatures_report.json")
 LIGATURE = r'"([a-z][a-z0-9_]+)"'
 
 PATTERNS: list[tuple[str, re.Pattern[str]]] = [
-    ("RememberMaterialRoundedSymbol", re.compile(rf'RememberMaterialRoundedSymbol\s*\(\s*(?:name\s*=\s*)?{LIGATURE}', re.MULTILINE)),
+    ("MaterialRoundedSymbol", re.compile(rf'\b[A-Za-z0-9_]*MaterialRoundedSymbol\s*\(\s*(?:name\s*=\s*)?{LIGATURE}', re.MULTILINE)),
     # Do not use [^)]* here: modifier args often contain `)` (e.g. Modifier.size(24.dp)).
-    ("RememberMaterialRoundedSymbol_multiline", re.compile(
-        rf'RememberMaterialRoundedSymbol\s*\(\s*.*?\bname\s*=\s*{LIGATURE}',
+    ("MaterialRoundedSymbol_multiline", re.compile(
+        rf'\b[A-Za-z0-9_]*MaterialRoundedSymbol\s*\(\s*.*?\bname\s*=\s*{LIGATURE}',
         re.DOTALL,
     )),
     ("materialSymbolName_assign", re.compile(rf'materialSymbolName\s*=\s*{LIGATURE}')),
     ("materialSymbolName_param", re.compile(rf'materialSymbolName\s*:\s*String\??\s*=\s*{LIGATURE}')),
+    ("iconName_assign", re.compile(rf'\biconName\s*=\s*{LIGATURE}')),
+    ("iconName_param", re.compile(rf'\biconName\s*:\s*String\??\s*=\s*{LIGATURE}')),
+    ("leadingIconName_assign", re.compile(rf'\bleadingIconName\s*=\s*{LIGATURE}')),
+    ("leadingIconName_param", re.compile(rf'\bleadingIconName\s*:\s*String\??\s*=\s*{LIGATURE}')),
     ("leadingMaterialSymbolName", re.compile(rf'leadingMaterialSymbolName\s*=\s*{LIGATURE}')),
     ("symbolName_field", re.compile(rf'symbolName\s*=\s*{LIGATURE}')),
-    # MainTab entries use (labelRes, symbolName) pairs, not `symbolName =`. The
-    # first arg used to be a string literal ("Notes") but was migrated to a
-    # @StringRes int (R.string.main_tab_notes) when labels moved to strings.xml.
-    # Accept either form so the regex does not silently drop notes/history/
-    # settings and ship a missing icon.
-    ("MainTab_enum_symbol", re.compile(
-        rf'\b(?:Notes|History|Settings)\(\s*(?:R\.string\.\w+|"[^"]*")\s*,\s*{LIGATURE}\s*\)',
+    # `name = if (cond) "icon_a" else "icon_b"` or wrapper variants like
+    # `iconName = if (...) "restore_from_trash" else "delete_forever"`.
+    # The simpler `name = "x"` patterns stop at the first `)` inside the condition.
+    ("symbol_name_if_else", re.compile(
+        r'\b(?:name|iconName|leadingIconName|materialSymbolName|leadingMaterialSymbolName|symbolName)\s*=\s*if\s*\([^)]*\)\s*(?:\{\s*)?"([a-z][a-z0-9_]+)"\s*(?:\}\s*)?else\s*(?:\{\s*)?"([a-z][a-z0-9_]+)"',
+        re.DOTALL,
     )),
-    # `name = if (cond) "icon_a" else "icon_b"` on RememberMaterialRoundedSymbol rows
-    # (the simpler `name = "x"` patterns stop at the first `)` inside the condition).
-    ("material_symbol_name_if_else", re.compile(
-        r'\bname\s*=\s*if\s*\([^)]*\)\s*"([a-z][a-z0-9_]+)"\s*else\s*"([a-z][a-z0-9_]+)"',
+    # `EnumType.FOO -> "icon"` in `fun EnumType.materialSymbolName()`-style maps.
+    ("enum_icon_arrow", re.compile(
+        r'\b[A-Z][A-Za-z0-9_]*\.\w+\s*->\s*"([a-z][a-z0-9_]+)"',
         re.MULTILINE,
     )),
-    # `ActionType.FOO -> "icon"` in `fun ActionType.materialSymbolName()`-style maps.
-    ("action_type_icon_arrow", re.compile(
-        r'\bActionType\.\w+\s*->\s*"([a-z][a-z0-9_]+)"',
+    # Kotlin when branches that map string literals to icon ligatures, e.g.
+    # `"mp3", "wav" -> "audio_file"` in file type helpers.
+    ("string_when_icon_arrow", re.compile(
+        r'(?:"[^"]+"\s*,\s*)*"[^"]+"\s*->\s*"([a-z][a-z0-9_]+)"',
+        re.MULTILINE,
+    )),
+    # Fallback branches in icon-name helper functions, e.g. `else -> "draft"`.
+    ("else_icon_arrow", re.compile(
+        r'\belse\s*->\s*"([a-z][a-z0-9_]+)"',
+        re.MULTILINE,
+    )),
+    # Enum constructor entries like `ARCHIVE("archive")`.
+    ("enum_entry_first_string_arg", re.compile(
+        r'^\s*[A-Z][A-Z0-9_]*\(\s*"([a-z][a-z0-9_]+)"\s*\)\s*,?',
+        re.MULTILINE,
+    )),
+    # Enum constructor entries like `Notes(R.string.main_tab_notes, "notes")`.
+    ("enum_entry_second_string_arg", re.compile(
+        r'^\s*[A-Z][A-Za-z0-9_]*\(\s*R\.string\.\w+\s*,\s*"([a-z][a-z0-9_]+)"',
         re.MULTILINE,
     )),
 ]
 
 ENABLED_FILES_HINT = {
-    "RememberMaterialRoundedSymbol",
+    "MaterialRoundedSymbol",
+    "iconName",
+    "leadingIconName",
     "materialSymbolName",
     "leadingMaterialSymbolName",
     "symbolName",
-    "FilledRoundedSymbol",
 }
 
 EXCLUDE_DIRS = {"build", "generated", ".gradle"}
@@ -74,8 +96,6 @@ def file_is_relevant(text: str) -> bool:
 
 def harvest() -> dict[str, set[str]]:
     by_pattern: dict[str, set[str]] = {name: set() for name, _ in PATTERNS}
-    by_pattern["NoteSwipeAction_enum"] = set()
-    swipe_icon = re.compile(r'^[A-Z_]+\("([a-z][a-z0-9_]+)"\)\s*,', re.MULTILINE)
     for path in JAVA_ROOT.rglob("*.kt"):
         if any(part in EXCLUDE_DIRS for part in path.parts):
             continue
@@ -94,9 +114,6 @@ def harvest() -> dict[str, set[str]]:
                     if ligature.startswith("ic_") or ligature.startswith("symbol:"):
                         continue
                     by_pattern[name].add(ligature)
-        if path.name == "NoteSwipeAction.kt":
-            for match in swipe_icon.finditer(text):
-                by_pattern["NoteSwipeAction_enum"].add(match.group(1))
     return by_pattern
 
 

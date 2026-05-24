@@ -11,6 +11,7 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -58,6 +59,7 @@ import dev.bikram.remember.ui.components.NoteCardUiModel
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
  * Top-bar title that doubles as the search entry point. Renders a single Row of:
@@ -79,14 +81,16 @@ import dev.bikram.remember.ui.feedback.tapSoundClickable
 @Composable
 internal fun SearchableTopBarTitle(
     searchOpen: Boolean,
+    requestSearchFocus: Boolean,
     query: String,
     onQueryChange: (String) -> Unit,
+    onSearchFocusRequested: () -> Unit,
     onToggleSearch: () -> Unit,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
-    val scaleIconSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+    val scaleIconSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -107,13 +111,14 @@ internal fun SearchableTopBarTitle(
             label = "topBarTitleSearchExpand",
         ) { open ->
             if (open) {
-                InlineSearchField(query = query, onQueryChange = onQueryChange)
-            } else {
-                Text(
-                    text = stringResource(R.string.app_name),
-                    style = MaterialTheme.typography.headlineLargeEmphasized,
-                    fontWeight = FontWeight.Bold,
+                InlineSearchField(
+                    query = query,
+                    requestFocus = requestSearchFocus,
+                    onQueryChange = onQueryChange,
+                    onFocusRequested = onSearchFocusRequested,
                 )
+            } else {
+                // Empty title placeholder to remove the big title
             }
         }
         // Toggle button stays in place at the End. The icon morphs between search and
@@ -147,7 +152,9 @@ internal fun SearchableTopBarTitle(
 @Composable
 internal fun InlineSearchField(
     query: String,
+    requestFocus: Boolean,
     onQueryChange: (String) -> Unit,
+    onFocusRequested: () -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -159,16 +166,23 @@ internal fun InlineSearchField(
             searchFieldValue = TextFieldValue(query, selection = TextRange(query.length))
         }
     }
-    LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-        keyboardController?.show()
+    LaunchedEffect(requestFocus) {
+        if (requestFocus) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+            onFocusRequested()
+        }
     }
     val searchContentDescription = stringResource(R.string.cd_search)
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .background(
+                .border(
+                    width = 1.dp,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer,
+                    shape = MaterialTheme.shapes.extraLargeIncreased,
+                ).background(
                     MaterialTheme.colorScheme.surfaceContainerHigh,
                     MaterialTheme.shapes.extraLargeIncreased,
                 ).padding(horizontal = 16.dp, vertical = 8.dp),
@@ -227,7 +241,7 @@ internal fun SearchSectionPillDivider(
     muted: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Float>()
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
     val chevronRotation by animateFloatAsState(
         targetValue = if (expanded) 180f else 0f,
         animationSpec = spatialSpec,
@@ -327,6 +341,7 @@ internal fun StateBadgedNoteCard(
     badgeText: String,
     badgeStyle: SectionBadgeStyle,
     modifier: Modifier = Modifier,
+    reminderNotificationsAllowed: Boolean = true,
 ) {
     val backgroundColor =
         when (badgeStyle) {
@@ -347,6 +362,7 @@ internal fun StateBadgedNoteCard(
                 onOpenNote = onOpen,
                 onSwipeAction = onSwipeAction,
                 swipeEnabled = false,
+                reminderNotificationsAllowed = reminderNotificationsAllowed,
             )
         }
         Box(

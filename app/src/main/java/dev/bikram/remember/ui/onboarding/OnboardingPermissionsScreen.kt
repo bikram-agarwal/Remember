@@ -59,12 +59,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -75,7 +76,8 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
-import dev.bikram.remember.ui.components.RememberOutlinedButton
+import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -239,47 +241,50 @@ fun OnboardingPermissionsScreen(
             }
         }
 
-        RememberButton(
-            onClick = onContinue,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
-            shape = MaterialTheme.shapes.extraExtraLarge,
-            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
-        ) {
-            val motionScheme = MaterialTheme.motionScheme
-            AnimatedContent(
-                targetState = notificationsGranted,
-                modifier = Modifier.weight(1f),
-                transitionSpec = {
-                    (
-                        slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { it / 2 } +
-                            fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
-                    ) togetherWith
-                        (
-                            slideOutVertically(animationSpec = motionScheme.defaultSpatialSpec()) { -it / 2 } +
-                                fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
-                        )
-                },
-                label = "permissionBottomCtaText",
-            ) { granted ->
+        val bottomCtaModifier =
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(start = 32.dp, end = 32.dp, bottom = 40.dp)
+        val bottomCtaShape = MaterialTheme.shapes.extraExtraLarge
+        val bottomCtaPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
+        if (notificationsGranted) {
+            RememberButton(
+                onClick = onContinue,
+                modifier = bottomCtaModifier,
+                shape = bottomCtaShape,
+                contentPadding = bottomCtaPadding,
+            ) {
                 Text(
-                    text =
-                        if (granted) {
-                            stringResource(R.string.onboarding_permissions_continue)
-                        } else {
-                            stringResource(R.string.onboarding_permissions_skip_for_now)
-                        },
+                    text = stringResource(R.string.onboarding_permissions_continue),
+                    modifier = Modifier.weight(1f),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
+                RememberMaterialRoundedSymbol(
+                    name = "arrow_forward",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                )
             }
-            RememberMaterialRoundedSymbol(
-                name = "chevron_right",
-                tint = MaterialTheme.colorScheme.onPrimary,
-            )
+        } else {
+            RememberTextButton(
+                onClick = onContinue,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 40.dp),
+                colors =
+                    ButtonDefaults.textButtonColors(
+                        contentColor = scheme.onSurfaceVariant,
+                    ),
+                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.onboarding_permissions_skip_for_now),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
         }
     }
 }
@@ -347,7 +352,7 @@ private fun PermissionsHeroIllustration(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 RememberMaterialRoundedSymbol(
-                    name = "notifications",
+                    name = "calendar_month",
                     size = 46.dp,
                     tint = scheme.onPrimaryContainer,
                 )
@@ -549,6 +554,11 @@ private fun PermissionStatusCard(
 ) {
     val scheme = MaterialTheme.colorScheme
     val motionScheme = MaterialTheme.motionScheme
+    val spatialSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec<Float>())
+    val colorSpec = reducedMotionAwareSpec(motionScheme.defaultEffectsSpec<Color>())
+    val actionSpatialSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec<IntOffset>())
+    val actionFadeInSpec = reducedMotionAwareSpec(motionScheme.defaultEffectsSpec<Float>())
+    val actionFadeOutSpec = reducedMotionAwareSpec(motionScheme.fastEffectsSpec<Float>())
     val cardPadding = if (primaryAction) 16.dp else 10.dp
     val cardShape = if (primaryAction) MaterialTheme.shapes.largeIncreased else MaterialTheme.shapes.large
     val iconSize = if (primaryAction) 54.dp else 44.dp
@@ -557,42 +567,42 @@ private fun PermissionStatusCard(
     val bottomActionSpacing = if (primaryAction) 14.dp else 9.dp
     val actionVerticalPadding = if (primaryAction) 13.dp else 10.dp
     val scale by animateFloatAsState(
-        targetValue = if (granted) 1.02f else 1f,
-        animationSpec = motionScheme.defaultSpatialSpec(),
+        targetValue = 1f,
+        animationSpec = spatialSpec,
         label = "permissionCardScale",
     )
     val iconPulseScale by animateFloatAsState(
-        targetValue = if (granted) 1.08f else 1f,
-        animationSpec = motionScheme.defaultSpatialSpec(),
+        targetValue = 1f,
+        animationSpec = spatialSpec,
         label = "permissionIconPulse",
     )
     val borderColor by animateColorAsState(
         targetValue =
             if (granted) {
-                scheme.primary.copy(alpha = 0.72f)
+                scheme.outlineVariant.copy(alpha = 0.18f)
             } else {
                 scheme.surfaceTint.copy(alpha = 0.24f)
             },
-        animationSpec = motionScheme.defaultEffectsSpec(),
+        animationSpec = colorSpec,
         label = "permissionCardBorder",
     )
     val containerColor =
         if (granted) {
-            lerp(scheme.primaryContainer, scheme.surface, 0.38f)
+            scheme.surfaceContainer.copy(alpha = 0.72f)
         } else {
             scheme.surfaceContainerHigh.copy(alpha = 0.92f)
         }
-    val titleColor = if (granted) scheme.onPrimaryContainer else scheme.onSurface
-    val bodyColor = if (granted) scheme.onPrimaryContainer.copy(alpha = 0.86f) else scheme.onSurfaceVariant
+    val titleColor = if (granted) scheme.onSurface.copy(alpha = 0.70f) else scheme.onSurface
+    val bodyColor = if (granted) scheme.onSurfaceVariant.copy(alpha = 0.70f) else scheme.onSurfaceVariant
     Card(
         modifier =
             modifier
                 .fillMaxWidth()
                 .scale(scale),
         shape = cardShape,
-        border = BorderStroke(if (granted) 1.4.dp else 1.dp, borderColor),
+        border = BorderStroke(1.dp, borderColor),
         colors = CardDefaults.cardColors(containerColor = containerColor),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (granted) 3.dp else 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (granted) 0.dp else 1.dp),
     ) {
         Column(
             modifier =
@@ -618,8 +628,14 @@ private fun PermissionStatusCard(
                     color = titleColor,
                 )
                 StatusPill(
-                    text = statusText,
-                    emphasized = primaryAction,
+                    text =
+                        if (granted) {
+                            stringResource(R.string.onboarding_permissions_enabled_status)
+                        } else {
+                            statusText
+                        },
+                    emphasized = primaryAction && !granted,
+                    enabled = granted,
                 )
             }
             Spacer(Modifier.height(topBodySpacing))
@@ -629,87 +645,62 @@ private fun PermissionStatusCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = bodyColor,
             )
-            Spacer(Modifier.height(bottomActionSpacing))
-            AnimatedContent(
-                targetState = granted,
-                transitionSpec = {
-                    (
-                        slideInVertically(animationSpec = motionScheme.defaultSpatialSpec()) { it / 2 } +
-                            fadeIn(animationSpec = motionScheme.defaultEffectsSpec())
-                    ) togetherWith
+            if (!granted) {
+                Spacer(Modifier.height(bottomActionSpacing))
+                AnimatedContent(
+                    targetState = actionEnabled,
+                    transitionSpec = {
                         (
-                            slideOutVertically(animationSpec = motionScheme.defaultSpatialSpec()) { -it / 2 } +
-                                fadeOut(animationSpec = motionScheme.defaultEffectsSpec())
-                        )
-                },
-                label = "permissionCardAction",
-            ) { targetGranted ->
-                if (targetGranted) {
-                    RememberOutlinedButton(
-                        onClick = {},
-                        enabled = false,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.extraExtraLarge,
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
-                        colors =
-                            ButtonDefaults.outlinedButtonColors(
-                                disabledContainerColor = scheme.surfaceContainerHighest,
-                                disabledContentColor = scheme.primary,
-                            ),
-                        border = BorderStroke(1.25.dp, scheme.primary.copy(alpha = 0.75f)),
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                        ) {
-                            RememberMaterialRoundedSymbol(
-                                name = "check_circle",
-                                size = 20.dp,
-                                tint = scheme.primary,
+                            slideInVertically(animationSpec = actionSpatialSpec) { it / 2 } +
+                                fadeIn(animationSpec = actionFadeInSpec)
+                        ) togetherWith
+                            (
+                                slideOutVertically(animationSpec = actionSpatialSpec) { -it / 2 } +
+                                    fadeOut(animationSpec = actionFadeOutSpec)
                             )
-                            Spacer(Modifier.width(8.dp))
+                    },
+                    label = "permissionCardAction",
+                ) { currentActionEnabled ->
+                    if (primaryAction) {
+                        RememberButton(
+                            onClick = onAction,
+                            enabled = currentActionEnabled,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.extraExtraLarge,
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = scheme.primaryContainer,
+                                    contentColor = scheme.onPrimaryContainer,
+                                ),
+                        ) {
                             Text(
                                 text = actionText,
+                                modifier = Modifier.fillMaxWidth(),
                                 style = MaterialTheme.typography.labelLarge,
                                 textAlign = TextAlign.Center,
                             )
                         }
-                    }
-                } else if (primaryAction) {
-                    RememberButton(
-                        onClick = onAction,
-                        enabled = actionEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.extraExtraLarge,
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
-                        colors =
-                            ButtonDefaults.buttonColors(
-                                containerColor = scheme.primaryContainer,
-                                contentColor = scheme.onPrimaryContainer,
-                            ),
-                    ) {
-                        Text(
-                            text = actionText,
+                    } else {
+                        RememberButton(
+                            onClick = onAction,
+                            enabled = currentActionEnabled,
                             modifier = Modifier.fillMaxWidth(),
-                            style = MaterialTheme.typography.labelLarge,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
-                } else {
-                    RememberOutlinedButton(
-                        onClick = onAction,
-                        enabled = actionEnabled,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.extraExtraLarge,
-                        contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
-                    ) {
-                        Text(
-                            text = actionText,
-                            modifier = Modifier.fillMaxWidth(),
-                            style = MaterialTheme.typography.labelLarge,
-                            textAlign = TextAlign.Center,
-                        )
+                            shape = MaterialTheme.shapes.extraExtraLarge,
+                            contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = scheme.surfaceContainerHighest,
+                                    contentColor = scheme.onSurfaceVariant,
+                                ),
+                        ) {
+                            Text(
+                                text = actionText,
+                                modifier = Modifier.fillMaxWidth(),
+                                style = MaterialTheme.typography.labelLarge,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
                     }
                 }
             }
@@ -725,19 +716,21 @@ private fun PermissionIconBadge(
     pulseScale: Float,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val containerColor = if (granted) scheme.primary else scheme.primaryContainer
+    val iconColor = if (granted) scheme.onPrimary else scheme.onPrimaryContainer
     Surface(
         modifier =
             Modifier
                 .size(iconSize)
                 .scale(pulseScale),
         shape = CircleShape,
-        color = if (granted) scheme.primary else scheme.surfaceContainerHighest,
+        color = containerColor,
     ) {
         Box(contentAlignment = Alignment.Center) {
             RememberMaterialRoundedSymbol(
                 name = iconName,
                 size = 25.dp,
-                tint = if (granted) scheme.onPrimary else scheme.onSurfaceVariant,
+                tint = iconColor,
             )
         }
     }
@@ -747,12 +740,21 @@ private fun PermissionIconBadge(
 private fun StatusPill(
     text: String,
     emphasized: Boolean,
+    enabled: Boolean,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val enabledStatusGreen =
+        if (scheme.surface.luminance() < 0.5f) {
+            Color(0xFF7FBC8A)
+        } else {
+            Color(0xFF1B5E20)
+        }
     Surface(
         shape = MaterialTheme.shapes.extraExtraLarge,
         color =
-            if (emphasized) {
+            if (enabled) {
+                scheme.surfaceContainerHighest.copy(alpha = 0.78f)
+            } else if (emphasized) {
                 scheme.primaryContainer
             } else {
                 scheme.surfaceContainerHighest
@@ -762,9 +764,11 @@ private fun StatusPill(
             text = text,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             style = MaterialTheme.typography.labelSmall,
-            fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
+            fontWeight = if (emphasized || enabled) FontWeight.Bold else FontWeight.Medium,
             color =
-                if (emphasized) {
+                if (enabled) {
+                    enabledStatusGreen
+                } else if (emphasized) {
                     scheme.onPrimaryContainer
                 } else {
                     scheme.onSurfaceVariant

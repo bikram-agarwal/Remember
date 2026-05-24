@@ -24,7 +24,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -39,25 +38,25 @@ internal fun GroupHeader(
     pinned: Boolean = false,
 ) {
     val headerInteractionSource = remember { MutableInteractionSource() }
-    val playTap = rememberPlayTapSound()
     val outerSpacing =
         modifier
             .fillMaxWidth()
             .padding(top = 12.dp, bottom = 2.dp)
     val rowModifier =
-        (if (collapsible && onToggle != null) {
-            outerSpacing
-                .clip(MaterialTheme.shapes.small)
-                .clickable(
-                    interactionSource = headerInteractionSource,
-                    indication = LocalIndication.current,
-                ) {
-                    playTap()
-                    onToggle()
-                }.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
-        } else {
-            outerSpacing.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
-        }).semantics {
+        (
+            if (collapsible && onToggle != null) {
+                outerSpacing
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable(
+                        interactionSource = headerInteractionSource,
+                        indication = LocalIndication.current,
+                    ) {
+                        onToggle()
+                    }.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
+            } else {
+                outerSpacing.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
+            }
+        ).semantics {
             heading()
             if (collapsible) stateDescription = if (collapsed) "Collapsed" else "Expanded"
         }

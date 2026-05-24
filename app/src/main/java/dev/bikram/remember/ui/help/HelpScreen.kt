@@ -38,6 +38,8 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -46,12 +48,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.MarkdownText
@@ -59,10 +67,10 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.rememberPlayTapSound
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -76,22 +84,74 @@ fun HelpScreen(
     val searchQuery by helpVm.searchQuery.collectAsStateWithLifecycle()
     val filteredSections by helpVm.filteredSections.collectAsStateWithLifecycle()
 
-    val allSubsectionKeys = remember(filteredSections) {
-        filteredSections.flatMap { s -> s.subsections.map { "${s.title}/${it.title}" } }
-    }
+    val allSubsectionKeys =
+        remember(filteredSections) {
+            filteredSections.flatMap { s -> s.subsections.map { "${s.title}/${it.title}" } }
+        }
     val allExpanded = allSubsectionKeys.isNotEmpty() && allSubsectionKeys.all { it in expandedKeys }
 
+    val initialScrollIndex = helpVm.scrollIndex
+    val initialScrollOffset = helpVm.scrollOffset
     val topBarState = rememberTopAppBarState()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
-    val blurStyle = rememberProgressiveBlurStyle(bottomExtra = 0.dp)
-    val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
-
-    val listState = rememberLazyListState(
-        initialFirstVisibleItemIndex = helpVm.scrollIndex,
-        initialFirstVisibleItemScrollOffset = helpVm.scrollOffset,
-    )
+    val listState =
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = initialScrollIndex,
+            initialFirstVisibleItemScrollOffset = initialScrollOffset,
+        )
+    val density = LocalDensity.current
+    LaunchedEffect(scrollBehavior.state.heightOffsetLimit) {
+        val heightOffsetLimit = scrollBehavior.state.heightOffsetLimit
+        val restoredAwayFromTop = initialScrollIndex > 0 || initialScrollOffset > 0
+        if (restoredAwayFromTop && heightOffsetLimit != 0f) {
+            val collapseFraction =
+                if (initialScrollIndex > 0) {
+                    1f
+                } else {
+                    val thresholdPx = with(density) { 24.dp.toPx() }
+                    (initialScrollOffset.toFloat() / thresholdPx).coerceIn(0f, 1f)
+                }
+            scrollBehavior.state.heightOffset = heightOffsetLimit * collapseFraction
+        }
+    }
+    val topAlphaMultiplier by remember(listState) {
+        derivedStateOf {
+            val collapsedFraction = scrollBehavior.state.collapsedFraction
+            if (listState.firstVisibleItemIndex > 0) {
+                collapsedFraction
+            } else {
+                val offsetPx = listState.firstVisibleItemScrollOffset.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                val scrollFraction = (offsetPx / thresholdPx).coerceIn(0f, 1f)
+                collapsedFraction * scrollFraction
+            }
+        }
+    }
+    val blurStyle =
+        rememberProgressiveBlurStyle(
+            bottomExtra = 0.dp,
+            topExtra = 76.dp,
+            topBlurProgressPower = 1.1f,
+        )
+    val blurMod =
+        blurStyle?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier)
+            ?: Modifier
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(Unit) {
         onDispose { helpVm.saveScrollState(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+    }
+    DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_PAUSE) {
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     Scaffold(
@@ -127,8 +187,11 @@ fun HelpScreen(
                         )
                     RememberFilledTonalIconButton(
                         onClick = {
-                            if (allExpanded) helpVm.collapseAll(allSubsectionKeys)
-                            else helpVm.expandAll(allSubsectionKeys)
+                            if (allExpanded) {
+                                helpVm.collapseAll(allSubsectionKeys)
+                            } else {
+                                helpVm.expandAll(allSubsectionKeys)
+                            }
                         },
                         modifier = Modifier.semantics { contentDescription = expandCollapseLabel },
                         tooltipLabel = expandCollapseLabel,
@@ -253,15 +316,17 @@ private fun HelpSubsectionCard(
     actions: List<HelpAction>,
     onOpenAppSection: (sectionKey: String) -> Unit,
 ) {
-    val spatialSpec = MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>()
-    val dpSpatialSpec = MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>()
-    val colorSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Color>()
-    val fadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
-    val fadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
+    val spatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>())
+    val dpSpatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>())
+    val colorSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
+    val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
     val chevronRotation by animateFloatAsState(
         targetValue = if (isExpanded) 90f else 0f,
-        animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec()),
         label = "help_chevron_rotation",
     )
     val chevronContainerSize by animateDpAsState(
@@ -278,7 +343,6 @@ private fun HelpSubsectionCard(
     val contentDescriptionExpand = stringResource(R.string.section_expand_cd, subsection.title)
     val contentDescriptionCollapse = stringResource(R.string.section_collapse_cd, subsection.title)
     val interactionSource = remember { MutableInteractionSource() }
-    val playTap = rememberPlayTapSound()
 
     GroupedListItem(position = groupPosition) {
         Column {
@@ -293,7 +357,6 @@ private fun HelpSubsectionCard(
                             interactionSource = interactionSource,
                             indication = LocalIndication.current,
                         ) {
-                            playTap()
                             onToggle()
                         }.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,

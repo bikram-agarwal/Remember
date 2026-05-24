@@ -24,8 +24,8 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
  * disabled, and which bottom-bar action restores editability.
  */
 @Composable
-fun ArchivedBanner(
-    state: ArchivedBannerState,
+fun EditorShelfNotice(
+    state: EditorShelfNoticeState,
     modifier: Modifier = Modifier,
 ) {
     // ARCHIVED uses secondaryContainer: a neutral muted tint that reads "this item is in a
@@ -33,34 +33,34 @@ fun ArchivedBanner(
     // resolves to green in Material You, which signals success - wrong affordance for archive).
     val containerColor =
         when (state) {
-            ArchivedBannerState.ARCHIVED -> MaterialTheme.colorScheme.secondaryContainer
-            ArchivedBannerState.TRASHED -> MaterialTheme.colorScheme.errorContainer
+            EditorShelfNoticeState.ARCHIVED -> MaterialTheme.colorScheme.secondaryContainer
+            EditorShelfNoticeState.TRASHED -> MaterialTheme.colorScheme.errorContainer
         }
     val contentColor =
         when (state) {
-            ArchivedBannerState.ARCHIVED -> MaterialTheme.colorScheme.onSecondaryContainer
-            ArchivedBannerState.TRASHED -> MaterialTheme.colorScheme.onErrorContainer
+            EditorShelfNoticeState.ARCHIVED -> MaterialTheme.colorScheme.onSecondaryContainer
+            EditorShelfNoticeState.TRASHED -> MaterialTheme.colorScheme.onErrorContainer
         }
     val iconName =
         when (state) {
-            ArchivedBannerState.ARCHIVED -> "archive"
-            ArchivedBannerState.TRASHED -> "delete_outline"
+            EditorShelfNoticeState.ARCHIVED -> "archive"
+            EditorShelfNoticeState.TRASHED -> "delete_outline"
         }
     val titleRes =
         when (state) {
-            ArchivedBannerState.ARCHIVED -> R.string.edit_archived_banner_title
-            ArchivedBannerState.TRASHED -> R.string.edit_trashed_banner_title
+            EditorShelfNoticeState.ARCHIVED -> R.string.edit_archived_notice_title
+            EditorShelfNoticeState.TRASHED -> R.string.edit_trashed_notice_title
         }
     val bodyRes =
         when (state) {
-            ArchivedBannerState.ARCHIVED -> R.string.edit_archived_banner_body
-            ArchivedBannerState.TRASHED -> R.string.edit_trashed_banner_body
+            EditorShelfNoticeState.ARCHIVED -> R.string.edit_archived_notice_body
+            EditorShelfNoticeState.TRASHED -> R.string.edit_trashed_notice_body
         }
 
     Surface(
         color = containerColor,
         contentColor = contentColor,
-        shape = MaterialTheme.shapes.largeIncreased,
+        shape = MaterialTheme.shapes.large,
         modifier = modifier,
     ) {
         Row(
@@ -91,4 +91,4 @@ fun ArchivedBanner(
     }
 }
 
-enum class ArchivedBannerState { ARCHIVED, TRASHED }
+enum class EditorShelfNoticeState { ARCHIVED, TRASHED }

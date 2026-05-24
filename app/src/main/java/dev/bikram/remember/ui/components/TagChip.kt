@@ -138,7 +138,8 @@ fun TagChipFilled(
     compact: Boolean = false,
 ) {
     val cdRemoveTag = stringResource(R.string.remove_tag_cd, tag)
-    val contentColor = TagPalette.textOn(color)
+    val contentColor = MaterialTheme.colorScheme.onSurface
+    val containerColor = MaterialTheme.colorScheme.surfaceVariant
     val horizontal = if (compact) 8.dp else 12.dp
     val vertical = if (compact) 3.dp else 6.dp
     val shape = if (compact) MaterialTheme.shapes.small else MaterialTheme.shapes.medium
@@ -148,7 +149,7 @@ fun TagChipFilled(
         modifier =
             modifier
                 .alpha(if (faded) 0.4f else 1f)
-                .background(color, shape)
+                .background(containerColor, shape)
                 .border(
                     width = if (highlighted) 2.dp else 0.dp,
                     color = if (highlighted) MaterialTheme.colorScheme.primary else Color.Transparent,
@@ -171,6 +172,13 @@ fun TagChipFilled(
                 size = 14.dp,
                 tint = contentColor,
                 weight = FontWeight.Medium,
+            )
+        } else {
+            Box(
+                modifier =
+                    Modifier
+                        .size(if (compact) 7.dp else 9.dp)
+                        .background(color, CircleShape),
             )
         }
         Text(

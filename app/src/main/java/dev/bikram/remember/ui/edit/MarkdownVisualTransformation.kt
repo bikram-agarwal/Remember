@@ -14,6 +14,9 @@ import dev.bikram.remember.ui.common.MarkdownQuoteLineRegex
 import dev.bikram.remember.ui.common.MarkdownStyler
 
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
+private const val LIVE_PREVIEW_UNCHECKED_CHECKLIST_MARKER = "\u2610 "
+private const val LIVE_PREVIEW_CHECKED_CHECKLIST_MARKER = "\u2611 "
+private const val LIVE_PREVIEW_QUOTE_MARKER = "| "
 
 internal class MarkdownVisualTransformation(
     private val styler: MarkdownStyler,
@@ -45,6 +48,7 @@ private class MarkdownPreviewTransformationBuilder(
 ) {
     private val hiddenRanges = mutableListOf<HiddenRange>()
     private val styleRanges = mutableListOf<MarkdownStyleRange>()
+    private val insertedTextBeforeSourceIndex = mutableMapOf<Int, String>()
 
     fun build(): TransformedMarkdown {
         collectMarkdownRanges()
@@ -56,6 +60,13 @@ private class MarkdownPreviewTransformationBuilder(
         var transformedOffset = 0
 
         for (sourceIndex in source.indices) {
+            insertedTextBeforeSourceIndex[sourceIndex]?.let { insertedText ->
+                insertedText.forEach { character ->
+                    transformedToOriginal.add(sourceIndex)
+                    transformedText.append(character)
+                    transformedOffset++
+                }
+            }
             while (
                 hiddenRangeIndex < normalizedHiddenRanges.size &&
                 sourceIndex >= normalizedHiddenRanges[hiddenRangeIndex].end
@@ -140,7 +151,15 @@ private class MarkdownPreviewTransformationBuilder(
         }
 
         MarkdownChecklistLineRegex.matchEntire(line)?.let { match ->
+            val checked = match.groupValues[2].equals("x", ignoreCase = true)
             val contentStartIndex = lineStartIndex + match.groups[3]!!.range.first
+            insertedTextBeforeSourceIndex[lineStartIndex] =
+                match.groupValues[1] +
+                if (checked) {
+                    LIVE_PREVIEW_CHECKED_CHECKLIST_MARKER
+                } else {
+                    LIVE_PREVIEW_UNCHECKED_CHECKLIST_MARKER
+                }
             hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)
             return
@@ -148,6 +167,7 @@ private class MarkdownPreviewTransformationBuilder(
 
         MarkdownBulletLineRegex.matchEntire(line)?.let { match ->
             val contentStartIndex = lineStartIndex + match.groups[2]!!.range.first
+            insertedTextBeforeSourceIndex[lineStartIndex] = "  " + match.groupValues[1] + "\u2022 "
             hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)
             return
@@ -155,6 +175,7 @@ private class MarkdownPreviewTransformationBuilder(
 
         MarkdownNumberedLineRegex.matchEntire(line)?.let { match ->
             val contentStartIndex = lineStartIndex + match.groups[3]!!.range.first
+            insertedTextBeforeSourceIndex[lineStartIndex] = " " + match.groupValues[1] + match.groupValues[2] + ". "
             hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)
             return
@@ -162,6 +183,7 @@ private class MarkdownPreviewTransformationBuilder(
 
         MarkdownQuoteLineRegex.matchEntire(line)?.let { match ->
             val contentStartIndex = lineStartIndex + match.groups[1]!!.range.first
+            insertedTextBeforeSourceIndex[lineStartIndex] = LIVE_PREVIEW_QUOTE_MARKER
             hiddenRanges.add(HiddenRange(lineStartIndex, contentStartIndex))
             styleRanges.add(MarkdownStyleRange(contentStartIndex, lineEndIndex, styler.quoteSpanStyle))
             collectInlineRanges(startIndex = contentStartIndex, endIndex = lineEndIndex)

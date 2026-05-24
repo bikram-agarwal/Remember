@@ -1,10 +1,15 @@
 package dev.bikram.remember.ui.edit
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ScrollState
-import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,13 +29,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -42,47 +44,50 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.lerp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.HERO_MASK_ASPECT_RATIO
-import dev.bikram.remember.ui.common.HeroFramedImage
-import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.common.MarkdownLinkInteraction
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.components.ArchivedBanner
-import dev.bikram.remember.ui.components.ArchivedBannerState
 import dev.bikram.remember.ui.components.NoteShelfState
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.components.TagAccentEditorStrip
 import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.modifiers.rememberExpressiveOverscrollEffect
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
@@ -276,206 +281,6 @@ internal fun rememberEditorBodyBridge(
 }
 
 /**
- * Top app bar that reads its mutable state slices ([title], [iconKey]) directly from
- * the VM. The rest of the screen does not collect these flows so title typing only
- * recomposes the title field area.
- */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-internal fun EditNoteTopBarSection(
-    vm: EditNoteViewModel,
-    scrollBehavior: TopAppBarScrollBehavior,
-    titlePlaceholder: String,
-    existing: Boolean,
-    sharedNoteId: Long?,
-    isEditMode: Boolean,
-    readOnly: Boolean,
-    hasUnsavedChanges: Boolean,
-    markdownDisplayMode: MarkdownEditorDisplayMode,
-    onBack: () -> Unit,
-    onToggleMarkdownDisplayMode: () -> Unit,
-    onSave: (() -> Unit)? = null,
-) {
-    val title by vm.title.collectAsStateWithLifecycle()
-    val iconKey by vm.iconKey.collectAsStateWithLifecycle()
-    val sharedTransitionActive =
-        dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
-            ?.isTransitionActive == true &&
-            sharedNoteId != null
-
-    val newNoteTitleFocus = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    LaunchedEffect(existing, isEditMode, readOnly) {
-        if (!existing && isEditMode && !readOnly) {
-            delay(80)
-            newNoteTitleFocus.requestFocus()
-            keyboardController?.show()
-        }
-    }
-
-    Box {
-        LargeTopAppBar(
-            colors = transparentLargeTopAppBarColors(),
-            title = {
-                val collapseFraction = scrollBehavior.state.collapsedFraction
-                val expandedStyle = MaterialTheme.typography.headlineMedium
-                val collapsedStyle = MaterialTheme.typography.titleLarge
-                val titleStyle =
-                    expandedStyle.copy(
-                        fontSize = lerp(expandedStyle.fontSize, collapsedStyle.fontSize, collapseFraction),
-                        lineHeight = lerp(expandedStyle.lineHeight, collapsedStyle.lineHeight, collapseFraction),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                val iconSize = lerp(28.dp, 22.dp, collapseFraction)
-                val iconGap = lerp(12.dp, 8.dp, collapseFraction)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .alpha(if (sharedTransitionActive) 0f else 1f),
-                ) {
-                    when (val headerIcon = resolveNoteIcon(iconKey, NoteKind.NOTE)) {
-                        is NoteIcon.Symbol ->
-                            RememberMaterialRoundedSymbol(
-                                name = headerIcon.name,
-                                size = iconSize,
-                                tint = MaterialTheme.colorScheme.primary,
-                                weight = FontWeight.Medium,
-                            )
-                        is NoteIcon.Drawable ->
-                            Icon(
-                                painterResource(headerIcon.resId),
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(iconSize),
-                            )
-                        is NoteIcon.Emoji ->
-                            Text(
-                                text = headerIcon.text,
-                                style = titleStyle.copy(fontSize = iconSize.value.sp),
-                            )
-                        NoteIcon.ListPlaceholder, NoteIcon.NotePlaceholder ->
-                            RememberMaterialRoundedSymbol(
-                                name = DEFAULT_NOTE_HEADER_SYMBOL,
-                                size = iconSize,
-                                tint = MaterialTheme.colorScheme.primary,
-                                weight = FontWeight.Medium,
-                            )
-                    }
-                    Spacer(Modifier.width(iconGap))
-                    if ((isEditMode && !readOnly) || title.isEmpty()) {
-                        BasicTextField(
-                            value = title,
-                            onValueChange = { if (it.length <= 80) vm.setTitle(it) },
-                            textStyle = titleStyle,
-                            enabled = !readOnly,
-                            keyboardOptions =
-                                androidx.compose.foundation.text.KeyboardOptions(
-                                    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
-                                    imeAction = androidx.compose.ui.text.input.ImeAction.Next,
-                                ),
-                            singleLine = true,
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(newNoteTitleFocus),
-                            decorationBox = { inner ->
-                                if (title.isEmpty()) {
-                                    Text(
-                                        text = titlePlaceholder,
-                                        style =
-                                            titleStyle.copy(
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                            ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                inner()
-                            },
-                        )
-                    } else {
-                        SelectionContainer {
-                            Text(
-                                text = title,
-                                style = titleStyle,
-                                modifier = Modifier.fillMaxWidth(),
-                            )
-                        }
-                    }
-                }
-            },
-            navigationIcon = {
-                RememberIconButton(onClick = onBack) {
-                    RememberMaterialRoundedSymbol(
-                        name = "arrow_back",
-                        size = 24.dp,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        weight = FontWeight.Medium,
-                    )
-                }
-            },
-            actions = {
-                if (isEditMode && !readOnly && onSave != null) {
-                    val toggleCd =
-                        stringResource(
-                            if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
-                                R.string.cd_switch_to_live_preview
-                            } else {
-                                R.string.cd_switch_to_markdown_code
-                            },
-                        )
-                    RememberIconButton(
-                        onClick = onToggleMarkdownDisplayMode,
-                        modifier = Modifier.semantics { contentDescription = toggleCd },
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name =
-                                if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
-                                    "visibility"
-                                } else {
-                                    "code"
-                                },
-                            size = 24.dp,
-                            tint = MaterialTheme.colorScheme.primary,
-                            weight = FontWeight.Medium,
-                        )
-                    }
-                }
-                if ((isEditMode || hasUnsavedChanges) && !readOnly && onSave != null) {
-                    val saveCd = stringResource(R.string.edit_save_cd)
-                    RememberIconButton(
-                        onClick = onSave,
-                        modifier = Modifier.semantics { contentDescription = saveCd },
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "check",
-                            size = 24.dp,
-                            tint = MaterialTheme.colorScheme.primary,
-                            weight = FontWeight.Medium,
-                        )
-                    }
-                }
-            },
-            scrollBehavior = scrollBehavior,
-        )
-        ExpandedEditorSharedTopBarAnchor(
-            sharedNoteId = sharedNoteId,
-            title = title,
-            fallbackTitle = titlePlaceholder,
-            iconKey = iconKey,
-            isChecklist = false,
-            modifier =
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp),
-        )
-    }
-}
-
-/**
  * Bottom toolbar wrapping [MarkdownToolbar]. Stable lambdas (built once via [remember]) keep
  * the toolbar from rebuilding undo/redo callbacks on every parent recomposition.
  */
@@ -507,7 +312,13 @@ internal fun EditNoteBottomBarSection(
                 Unit
             }
         }
-    AnimatedVisibility(visible = isEditMode) {
+    val formatFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val formatFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+    AnimatedVisibility(
+        visible = isEditMode,
+        enter = fadeIn(animationSpec = formatFadeInSpec),
+        exit = fadeOut(animationSpec = formatFadeOutSpec),
+    ) {
         EditNoteFormatBarContent(
             markdownEditorState = markdownEditorState,
             undoController = undoController,
@@ -628,8 +439,15 @@ internal fun EditNoteMarkdownEditorSection(
     assignedTags: List<String>,
     onMarkdownChanged: (String) -> Unit,
     onAddTag: (String, String) -> Unit,
+    onBodyFocusChanged: (Boolean) -> Unit,
+    onEnterEditModeAtOffset: (Int) -> Unit,
+    onEnterEditModeSelectingRange: (Int, Int) -> Unit,
 ) {
     val bodyEmpty = markdownEditorState.markdown.isEmpty()
+    var linkActions by remember { mutableStateOf<MarkdownLinkInteraction?>(null) }
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    val uriHandler = LocalUriHandler.current
 
     LaunchedEffect(isEditMode, autoFocusBodyOnEdit, markdownEditorState) {
         if (!isEditMode || !autoFocusBodyOnEdit) return@LaunchedEffect
@@ -657,13 +475,17 @@ internal fun EditNoteMarkdownEditorSection(
             displayMode = displayMode,
             assignedTags = assignedTags,
             onAddTag = onAddTag,
+            onFocusChanged = onBodyFocusChanged,
         )
     } else if (existing && bodyEmpty) {
         Column(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 140.dp),
+                    .heightIn(min = 140.dp)
+                    .tapSoundClickable {
+                        onEnterEditModeAtOffset(markdownEditorState.markdown.length)
+                    },
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(
@@ -681,24 +503,116 @@ internal fun EditNoteMarkdownEditorSection(
             )
         }
     } else {
-        SelectionContainer {
-            MarkdownText(
-                markdown = markdownEditorState.markdown,
-                style =
-                    MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurface,
+        MarkdownText(
+            markdown = markdownEditorState.markdown,
+            style =
+                MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 140.dp),
+            onChecklistToggle = { lineIndex, checked ->
+                val updatedMarkdown = markdownEditorState.markdown.withChecklistLineToggled(lineIndex, checked)
+                markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
+                onMarkdownChanged(updatedMarkdown)
+            },
+            onTextTap = { tap ->
+                onEnterEditModeAtOffset(tap.markdownOffset)
+            },
+            onLinkClick = { link ->
+                runCatching { uriHandler.openUri(link.url) }
+            },
+            onLinkLongPress = { link ->
+                linkActions = link
+            },
+        )
+    }
+
+    linkActions?.let { link ->
+        LinkActionsSheet(
+            link = link,
+            onDismiss = { linkActions = null },
+            onOpen = {
+                runCatching { uriHandler.openUri(link.url) }
+                linkActions = null
+            },
+            onCopy = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(
+                    ClipData.newPlainText(resources.getString(R.string.clipboard_link_label), link.url),
+                )
+                Toast
+                    .makeText(context, resources.getString(R.string.toast_about_link_copied), Toast.LENGTH_SHORT)
+                    .show()
+                linkActions = null
+            },
+            onEditText = {
+                onEnterEditModeSelectingRange(link.textStartOffset, link.textEndOffset)
+                linkActions = null
+            },
+            onShare = {
+                val shareIntent =
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, link.url)
+                    }
+                context.startActivity(
+                    Intent.createChooser(
+                        shareIntent,
+                        resources.getString(R.string.share_chooser_generic),
                     ),
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 140.dp),
-                onChecklistToggle = { lineIndex, checked ->
-                    val updatedMarkdown = markdownEditorState.markdown.withChecklistLineToggled(lineIndex, checked)
-                    markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
-                    onMarkdownChanged(updatedMarkdown)
-                },
-            )
-        }
+                )
+                linkActions = null
+            },
+        )
+    }
+}
+
+@Composable
+private fun LinkActionsSheet(
+    link: MarkdownLinkInteraction,
+    onDismiss: () -> Unit,
+    onOpen: () -> Unit,
+    onCopy: () -> Unit,
+    onEditText: () -> Unit,
+    onShare: () -> Unit,
+) {
+    AppBottomSheet(
+        title = stringResource(R.string.edit_link_actions_title),
+        subtitle = link.url,
+        onDismiss = onDismiss,
+        scrollable = false,
+    ) {
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_link_action_open)) },
+            onClick = onOpen,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "open_in_new", weight = FontWeight.Medium)
+            },
+        )
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_link_action_copy)) },
+            onClick = onCopy,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "content_copy", weight = FontWeight.Medium)
+            },
+        )
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_link_action_edit_text)) },
+            onClick = onEditText,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "edit", weight = FontWeight.Medium)
+            },
+        )
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_link_action_share)) },
+            onClick = onShare,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "share", weight = FontWeight.Medium)
+            },
+        )
     }
 }
 
@@ -741,112 +655,71 @@ internal fun EditNoteScrollableContent(
     isEditMode: Boolean,
     markdownDisplayMode: MarkdownEditorDisplayMode,
     existing: Boolean,
+    autoFocusBodyOnEdit: Boolean,
     shelfState: NoteShelfState,
     pictureViewerOpen: Boolean,
     onOpenReminder: () -> Unit,
+    notificationsAllowed: Boolean,
     onOpenPicture: () -> Unit,
     onViewPictureFull: (String, Long) -> Unit,
-    onOpenIcon: () -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
+    onEnterEditModeAtOffset: (Int) -> Unit,
+    onEnterEditModeSelectingRange: (Int, Int) -> Unit,
+    onBodyFocusChanged: (Boolean) -> Unit,
     scrollState: ScrollState = rememberScrollState(),
     scrollEnabled: Boolean = true,
 ) {
     val readOnly = shelfState != NoteShelfState.ACTIVE
     val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
     val assignedTags by vm.tags.collectAsStateWithLifecycle()
-    // NOTE: do NOT attach scrollBehavior.nestedScrollConnection here. It is already attached on
-    // the Scaffold in EditNoteScreen. Double-attachment causes the top bar to consume each
-    // scroll delta twice and produces a glitchy overscroll bounce.
-    //
-    // We replace the platform stretch-overscroll with [rememberExpressiveOverscrollEffect] -
-    // a translation-based overscroll that releases on the Material 3 Expressive slow spatial
-    // spring. The OEM stretch snaps back with a stiff hard-coded spring that reads as a sudden
-    // "crack" on the editor; the Expressive spring gives a soft, rounded settle that matches
-    // the rest of the motion language in the app.
-    val overscrollEffect = rememberExpressiveOverscrollEffect()
-    val scrollModifier =
-        Modifier.verticalScroll(
-            state = scrollState,
-            enabled = scrollEnabled,
-            overscrollEffect = overscrollEffect,
-        )
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .then(modifier)
-                // Clip BEFORE the overscroll translation so the translated content doesn't bleed
-                // into the top-app-bar / bottom-bar zones during the bounce. Foundation 1.8+
-                // deprecated `OverscrollEffect.effectModifier`; the replacement is the
-                // `Modifier.overscroll(effect)` extension, which attaches the effect's
-                // DelegatableNode to the chain.
-                .clipToBounds()
-                .overscroll(overscrollEffect)
-                .then(scrollModifier)
-                .padding(horizontal = horizontalPadding),
-    ) {
-        Spacer(Modifier.height(padding.calculateTopPadding()))
-        // Order: tag color strip -> hero image -> shelf banner -> body. The banner sits right
-        // above the note body so the "why is this disabled" hint is adjacent to the content it
-        // gates, not buried at the top of the scroll above decorative chrome.
-        TagAccentEditorStrip(tags = assignedTags)
-        PictureHeroSection(
-            vm = vm,
-            viewerOpen = pictureViewerOpen,
-            onViewPictureFull = onViewPictureFull,
-        )
-        when (shelfState) {
-            NoteShelfState.ARCHIVED -> {
-                Spacer(Modifier.height(16.dp))
-                ArchivedBanner(
-                    state = ArchivedBannerState.ARCHIVED,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            NoteShelfState.TRASHED -> {
-                Spacer(Modifier.height(16.dp))
-                ArchivedBanner(
-                    state = ArchivedBannerState.TRASHED,
-                    modifier = Modifier.fillMaxWidth(),
-                )
-            }
-            NoteShelfState.ACTIVE -> {}
-        }
-        Spacer(Modifier.height(16.dp))
-
-        EditNoteMarkdownEditorSection(
-            markdownEditorState = markdownEditorState,
-            bodyPlaceholder = bodyPlaceholder,
-            isEditMode = isEditMode && !readOnly,
-            existing = existing,
-            autoFocusBodyOnEdit = existing,
-            scrollState = scrollState,
-            displayMode = markdownDisplayMode,
-            assignedTags = assignedTags,
-            onMarkdownChanged = vm::setBody,
-            onAddTag = vm::addTag,
-        )
-        Spacer(Modifier.height(24.dp))
-        OptionsPanelSection(
-            vm = vm,
-            readOnly = readOnly,
-            onOpenReminder = if (readOnly) ({}) else onOpenReminder,
-            onOpenPicture = if (readOnly) ({}) else onOpenPicture,
-            onOpenIcon = if (readOnly) ({}) else onOpenIcon,
-            onOpenActions = if (readOnly) ({}) else onOpenActions,
-            onOpenTags = if (readOnly) ({}) else onOpenTags,
-            onOpenAttachments = if (readOnly) ({}) else onOpenAttachments,
-        )
-        Spacer(
-            Modifier.height(
-                40.dp +
-                    padding.calculateBottomPadding() +
-                    if (isEditMode && !readOnly) imeBottomPadding else 0.dp,
-            ),
-        )
-    }
+    EditorContentBodyColumn(
+        modifier = modifier,
+        horizontalPadding = horizontalPadding,
+        padding = padding,
+        scrollState = scrollState,
+        scrollEnabled = scrollEnabled,
+        shelfState = shelfState,
+        bottomPadding = padding.calculateBottomPadding() + if (isEditMode && !readOnly) imeBottomPadding else 0.dp,
+        heroContent = {
+            PictureHeroSection(
+                vm = vm,
+                viewerOpen = pictureViewerOpen,
+                onViewPictureFull = onViewPictureFull,
+            )
+        },
+        bodyContent = {
+            EditNoteMarkdownEditorSection(
+                markdownEditorState = markdownEditorState,
+                bodyPlaceholder = bodyPlaceholder,
+                isEditMode = isEditMode && !readOnly,
+                existing = existing,
+                autoFocusBodyOnEdit = autoFocusBodyOnEdit,
+                scrollState = scrollState,
+                displayMode = markdownDisplayMode,
+                assignedTags = assignedTags,
+                onMarkdownChanged = vm::setBody,
+                onAddTag = vm::addTag,
+                onBodyFocusChanged = onBodyFocusChanged,
+                onEnterEditModeAtOffset = onEnterEditModeAtOffset,
+                onEnterEditModeSelectingRange = onEnterEditModeSelectingRange,
+            )
+        },
+        optionsContent = {
+            Spacer(Modifier.height(24.dp))
+            OptionsPanelSection(
+                vm = vm,
+                readOnly = readOnly,
+                onOpenReminder = if (readOnly) ({}) else onOpenReminder,
+                notificationsAllowed = notificationsAllowed,
+                onOpenPicture = if (readOnly) ({}) else onOpenPicture,
+                onOpenActions = if (readOnly) ({}) else onOpenActions,
+                onOpenTags = if (readOnly) ({}) else onOpenTags,
+                onOpenAttachments = if (readOnly) ({}) else onOpenAttachments,
+            )
+        },
+    )
 }
 
 @Composable
@@ -859,13 +732,17 @@ private fun PictureHeroSection(
     val pictureRevision by vm.pictureRevision.collectAsStateWithLifecycle()
     val pictureHeroFraming by vm.pictureHeroFraming.collectAsStateWithLifecycle()
     val uri = pictureUri ?: return
-    Spacer(Modifier.height(16.dp))
-    EditNotePictureHero(
+    Spacer(Modifier.height(EditorContentBodyDefaults.HeroTopSpacing))
+    EditorContentPictureHero(
         uri = uri,
         pictureRevision = pictureRevision,
         pictureHeroFraming = pictureHeroFraming,
         viewerOpen = viewerOpen,
         onOpenFull = { onViewPictureFull(uri, pictureRevision) },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(HERO_MASK_ASPECT_RATIO),
     )
 }
 
@@ -874,8 +751,8 @@ private fun OptionsPanelSection(
     vm: EditNoteViewModel,
     readOnly: Boolean,
     onOpenReminder: () -> Unit,
+    notificationsAllowed: Boolean,
     onOpenPicture: () -> Unit,
-    onOpenIcon: () -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
@@ -885,99 +762,30 @@ private fun OptionsPanelSection(
     val importance by vm.importance.collectAsStateWithLifecycle()
     val visibility by vm.visibility.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
-    val iconKey by vm.iconKey.collectAsStateWithLifecycle()
     val actions by vm.actions.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
     val attachments by vm.attachments.collectAsStateWithLifecycle()
     val starred by vm.starred.collectAsStateWithLifecycle()
 
-    OptionsPanel(
+    EditorOptionsPanel(
         reminderAt = reminderAt,
         recurrence = recurrence,
         importance = importance,
         visibility = visibility,
         pictureUri = pictureUri,
-        iconKey = iconKey,
-        isChecklist = false,
         actions = actions,
         tags = tags,
         attachments = attachments,
-        onOpenReminder = onOpenReminder,
-        onSetImportance = if (readOnly) ({ _ -> }) else vm::setImportance,
-        onSetVisibility = if (readOnly) ({ _ -> }) else vm::setVisibility,
-        onOpenPicture = onOpenPicture,
-        onOpenIcon = onOpenIcon,
-        onOpenActions = onOpenActions,
-        onOpenTags = onOpenTags,
-        onOpenAttachments = onOpenAttachments,
+        notificationsAllowed = notificationsAllowed,
         readOnly = readOnly,
         starred = starred,
+        onOpenReminder = onOpenReminder,
+        onImportanceChange = vm::setImportance,
+        onVisibilityChange = vm::setVisibility,
+        onOpenPicture = onOpenPicture,
+        onOpenActions = onOpenActions,
+        onOpenTags = onOpenTags,
+        onOpenAttachmentsSheet = onOpenAttachments,
+        onPickAttachment = onOpenAttachments,
     )
-}
-
-@Composable
-private fun EditNotePictureHero(
-    uri: String,
-    pictureRevision: Long,
-    pictureHeroFraming: String?,
-    viewerOpen: Boolean,
-    onOpenFull: () -> Unit,
-) {
-    val framing = remember(pictureHeroFraming) { HeroFraming.fromJsonString(pictureHeroFraming) }
-    val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
-
-    // Same-screen container transform requires both ends of sharedBounds to live in
-    // coordinated AnimatedVisibility / AnimatedContent scopes. The destination's nav
-    // scope is "always visible" while we're on this screen, so keying the inline hero
-    // to it leaves both copies (inline + overlay) reporting visibility at the same
-    // time and the bounds animation has no clean source-to-target driver. We wrap the
-    // inline hero in its own AnimatedVisibility(visible = !viewerOpen) and use that
-    // scope so opening the viewer cleanly hands the shared element off to the overlay.
-    //
-    // Outer Box keeps the layout slot at a constant size; only the inline content
-    // toggles, so the surrounding scrollable column never reflows mid-transition.
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(HERO_MASK_ASPECT_RATIO),
-    ) {
-        AnimatedVisibility(
-            visible = !viewerOpen,
-            enter = fadeIn(),
-            exit = fadeOut(),
-        ) {
-            val sharedModifier =
-                if (sharedScope != null) {
-                    with(sharedScope) {
-                        Modifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState(key = "hero-image-$uri"),
-                            animatedVisibilityScope = this@AnimatedVisibility,
-                        )
-                    }
-                } else {
-                    Modifier
-                }
-
-            // No delete overlay on the inline hero: it competes visually with the
-            // hero image and invites accidental taps. Delete lives in the full-screen
-            // viewer (see EditNoteScreen).
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .then(sharedModifier)
-                        .clip(MaterialTheme.shapes.large)
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .tapSoundClickable(onClick = onOpenFull),
-            ) {
-                HeroFramedImage(
-                    imageUri = uri,
-                    framing = framing,
-                    cacheRevision = pictureRevision,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
-    }
 }

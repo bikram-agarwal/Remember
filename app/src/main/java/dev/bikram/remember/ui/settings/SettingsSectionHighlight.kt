@@ -19,6 +19,8 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+internal const val SETTINGS_SECTION_HIGHLIGHT_DURATION_MS = 4_500L
+
 @Composable
 internal fun rememberSectionHighlightPulseAlpha(active: Boolean): Float {
     val infiniteTransition = rememberInfiniteTransition(label = "settingsSectionHighlight")

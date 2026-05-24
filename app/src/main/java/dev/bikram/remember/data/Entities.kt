@@ -96,6 +96,11 @@ data class NoteEntity(
     val kind: NoteKind,
     val title: String,
     val body: String,
+    val checklistText: String = "",
+    /** Denormalized attachment display names for FTS search. */
+    val attachmentText: String = "",
+    /** Denormalized action titles and details for FTS search. */
+    val actionsText: String = "",
     val colorIndex: Int,
     val starred: Boolean,
     val trashed: Boolean,
@@ -137,8 +142,9 @@ data class NoteEntity(
 
 /**
  * Content-less FTS4 shadow table over [NoteEntity]. Only the text-bearing columns are
- * indexed; everything else stays in `notes`. Triggers in the migration keep it in sync
- * so application code doesn't have to maintain it manually.
+ * indexed; everything else stays in `notes`. Checklist item text is mirrored into
+ * [NoteEntity.checklistText], [NoteEntity.attachmentText], and [NoteEntity.actionsText]
+ * so related rows participate in the same indexed search path as title, body, and tags.
  *
  * `tokenize = "unicode61 remove_diacritics 2"` gives diacritic-insensitive matching and
  * sensible word breaking across the user's mixed-language content.
@@ -153,6 +159,9 @@ data class NoteFtsEntity(
     val title: String,
     val body: String,
     val tags: String,
+    val checklistText: String,
+    val attachmentText: String,
+    val actionsText: String,
 )
 
 @Entity(

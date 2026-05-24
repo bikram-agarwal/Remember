@@ -37,6 +37,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 /**
  * A synthetic, non-persisted header that stands in for the real parent row when a child has been
@@ -106,6 +107,7 @@ internal fun ChecklistRow(
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onNext: () -> Unit = {},
+    onTextTap: (() -> Unit)? = null,
     /**
      * Horizontal drag callback. `+1` means the user dragged right past the indent threshold
      * (request to nest under the previous top-level sibling). `-1` means the user dragged left
@@ -126,18 +128,16 @@ internal fun ChecklistRow(
     val animatedIndent by androidx.compose.animation.core
         .animateDpAsState(depthIndent, label = "checklistDepthIndent")
 
-    // Haptics + RTL awareness for the gesture surfaces below.
     val haptic = LocalHapticFeedback.current
-    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
-    // Fire a haptic tick when the user starts a vertical reorder drag (the library transitions
-    // `isDragging` from false to true at drag-start). Matches the feel of the indent gesture
-    // below so both reorder directions are physically acknowledged.
     LaunchedEffect(isDragging) {
         if (isDragging) {
             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
         }
     }
+
+    // RTL awareness for the gesture surfaces below.
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
     // Drag-to-indent gesture: accumulates horizontal movement during a single drag and fires the
     // callback once when a threshold (48.dp ~= fingertip width) is crossed. We only fire once per
@@ -302,7 +302,14 @@ internal fun ChecklistRow(
                             },
                         textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
                     ),
-                modifier = Modifier.weight(1f),
+                modifier =
+                    if (onTextTap != null) {
+                        Modifier
+                            .weight(1f)
+                            .tapSoundClickable(onClick = onTextTap)
+                    } else {
+                        Modifier.weight(1f)
+                    },
             )
         }
     }

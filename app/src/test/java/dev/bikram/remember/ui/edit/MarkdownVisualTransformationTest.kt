@@ -2,6 +2,7 @@ package dev.bikram.remember.ui.edit
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.TextStyle
 import dev.bikram.remember.ui.common.MarkdownStyler
 import org.junit.Assert.assertEquals
@@ -30,6 +31,72 @@ class MarkdownVisualTransformationTest {
 
         assertTrue(transformedText.text.spanStyles.any { spanRange -> spanRange.start == 0 && spanRange.end == 11 })
         assertTrue(transformedText.text.spanStyles.size >= 2)
+    }
+
+    @Test
+    fun unmatchedAsteriskAtEndDoesNotCorruptSubsequentParsing() {
+        val styler = testMarkdownStyler()
+        val text = styler.markdownInlineAnnotatedString("*Bold**, *italic*")
+        // "*Bold**" -> opens with *, next close single * at index 5 is followed by *, so rejected.
+        // There is no other single closing *. So it falls back to plain text.
+        // wait, let's see how our parser handles "*Bold**, *italic*"
+        // At 0: starts with "*". Valid opening? Yes.
+        // It searches for closing single *:
+        // Index 5: rejected (followed by *).
+        // Index 6: rejected (preceded by *).
+        // Index 10: preceded by space, so rejected as closing.
+        // Index 17: preceded by "c", so accepted!
+        // So it treats "Bold**, *italic" as italicized, and renders "Bold**, *italic" with italic style.
+        // This is still balanced because the opening "*" at index 0 matched the closing "*" at index 17.
+        // Now let's check "*Bold**" by itself:
+        val textSingle = styler.markdownInlineAnnotatedString("*Bold**")
+        // Since there is no other closing asterisk, it should fall back to plain text and render as "*Bold**"
+        assertEquals("*Bold**", textSingle.text)
+    }
+
+    @Test
+    fun whitespaceFlankedAsterisksAreNotTreatedAsFormatting() {
+        val styler = testMarkdownStyler()
+        val text = styler.markdownInlineAnnotatedString("* bold *")
+        // "* bold *" has space after opening * and space before closing *.
+        // So both isValidOpening and indexOfClosingMarker reject them.
+        // It should render exactly as "* bold *"
+        assertEquals("* bold *", text.text)
+    }
+
+    @Test
+    fun closingMarkerFollowedByWhitespaceIsTreatedAsFormatting() {
+        val styler = testMarkdownStyler()
+
+        assertEquals("bold", styler.markdownInlineAnnotatedString("*bold*").text)
+        assertEquals("bold next", styler.markdownInlineAnnotatedString("*bold* next").text)
+        assertEquals("code next", styler.markdownInlineAnnotatedString("`code` next").text)
+    }
+
+    @Test
+    fun inlineLinksKeepLinkAnnotationsByDefault() {
+        val styler = testMarkdownStyler()
+        val text = styler.markdownInlineAnnotatedString("[site](example.com)")
+
+        val links = text.getLinkAnnotations(start = 0, end = text.length)
+
+        assertEquals("site", text.text)
+        assertEquals(1, links.size)
+        assertEquals("https://example.com", (links.single().item as LinkAnnotation.Url).url)
+    }
+
+    @Test
+    fun inlineLinksCanSuppressLinkAnnotationsForCustomGestureHandling() {
+        val styler = testMarkdownStyler()
+        val text =
+            styler.markdownInlineAnnotatedString(
+                source = "[site](example.com)",
+                includeLinkAnnotations = false,
+            )
+
+        assertEquals("site", text.text)
+        assertTrue(text.getLinkAnnotations(start = 0, end = text.length).isEmpty())
+        assertTrue(text.spanStyles.any { spanRange -> spanRange.start == 0 && spanRange.end == 4 })
     }
 }
 

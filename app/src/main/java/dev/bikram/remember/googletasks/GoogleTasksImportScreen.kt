@@ -3,12 +3,19 @@ package dev.bikram.remember.googletasks
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -32,28 +39,31 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LargeTopAppBar
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.WavyProgressIndicatorDefaults
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -66,17 +76,25 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -86,9 +104,11 @@ import dev.bikram.remember.ui.components.RememberCheckbox
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
-import dev.bikram.remember.ui.components.RememberSegmentedButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.LocalReducedMotion
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
@@ -121,6 +141,12 @@ fun GoogleTasksImportRoute(
     val effect by vm.effects.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val uriHandler = LocalUriHandler.current
+    val reducedMotion = LocalReducedMotion.current
+    val methodPanelSpatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     var pendingExitConfirmation by rememberSaveable { mutableStateOf<ImportExitConfirmation?>(null) }
 
     val requestBack = {
@@ -139,6 +165,18 @@ fun GoogleTasksImportRoute(
         enabled = state.isImporting || state.isLoaded,
         onBack = requestBack,
     )
+
+    DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_PAUSE) {
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     val consentLauncher =
         rememberLauncherForActivityResult(
@@ -244,7 +282,6 @@ fun GoogleTasksImportRoute(
                 title = {
                     Text(
                         stringResource(R.string.google_tasks_import_tasks_title),
-                        style = MaterialTheme.typography.headlineMedium,
                     )
                 },
                 scrollBehavior = scrollBehavior,
@@ -312,24 +349,46 @@ fun GoogleTasksImportRoute(
                                 onBack()
                             },
                         )
-                    state.selectedMethod == ImportMethod.ManualImport && state.isFetching -> LoadingPanel()
-                    state.selectedMethod == ImportMethod.ManualImport ->
-                        TakeoutImportPanel(
-                            onOpenTakeout = { uriHandler.openUri(GOOGLE_TAKEOUT_URL) },
-                            onPickJson = pickJsonLauncher,
-                        )
-                    !state.connected && !state.isFetching ->
-                        SignedOutPanel(
-                            rememberedEmail = state.rememberedEmail,
-                            onConnect = vm::connect,
-                            onSwitchAccount = vm::switchAccount,
-                        )
-                    state.isFetching -> LoadingPanel()
-                    state.isEmpty ->
-                        EmptyPanel(
-                            accountEmail = state.accountEmail.orEmpty(),
-                            onSwitchAccount = vm::switchAccount,
-                        )
+                    else ->
+                        AnimatedContent(
+                            targetState = state.selectedMethod,
+                            modifier = Modifier.fillMaxSize(),
+                            transitionSpec = {
+                                if (reducedMotion) {
+                                    EnterTransition.None togetherWith ExitTransition.None
+                                } else {
+                                    val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                                    slideInHorizontally(animationSpec = methodPanelSpatialSpec) { width ->
+                                        direction * width
+                                    } togetherWith
+                                        slideOutHorizontally(animationSpec = methodPanelSpatialSpec) { width ->
+                                            -direction * width
+                                        }
+                                }.using(SizeTransform(clip = true))
+                            },
+                            label = "googleTasksImportMethodPanel",
+                        ) { selectedMethod ->
+                            when {
+                                selectedMethod == ImportMethod.ManualImport && state.isFetching -> LoadingPanel()
+                                selectedMethod == ImportMethod.ManualImport ->
+                                    TakeoutImportPanel(
+                                        onOpenTakeout = { uriHandler.openUri(GOOGLE_TAKEOUT_URL) },
+                                        onPickJson = pickJsonLauncher,
+                                    )
+                                !state.connected && !state.isFetching ->
+                                    SignedOutPanel(
+                                        rememberedEmail = state.rememberedEmail,
+                                        onConnect = vm::connect,
+                                        onSwitchAccount = vm::switchAccount,
+                                    )
+                                state.isFetching -> LoadingPanel()
+                                state.isEmpty ->
+                                    EmptyPanel(
+                                        accountEmail = state.accountEmail.orEmpty(),
+                                        onSwitchAccount = vm::switchAccount,
+                                    )
+                            }
+                        }
                 }
             }
         }
@@ -402,7 +461,7 @@ private fun ImportExitConfirmationDialog(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ImportMethodSelector(
     selectedMethod: ImportMethod,
@@ -410,18 +469,55 @@ private fun ImportMethodSelector(
     modifier: Modifier = Modifier,
 ) {
     val entries = ImportMethod.entries
-    SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
+    val labels = entries.map { method -> stringResource(importMethodLabelRes(method)) }
+    val shapes =
+        entries.mapIndexed { index, _ ->
+            when (index) {
+                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                entries.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+            }
+        }
+    val colors =
+        ToggleButtonDefaults.toggleButtonColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    ButtonGroup(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
+    ) {
         entries.forEachIndexed { index, method ->
-            RememberSegmentedButton(
-                selected = selectedMethod == method,
-                onClick = { onChange(method) },
-                shape = SegmentedButtonDefaults.itemShape(index, entries.size),
-                label = {
-                    Text(
-                        text = stringResource(importMethodLabelRes(method)),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+            val label = labels[index]
+            customItem(
+                buttonGroupContent = {
+                    RememberToggleButton(
+                        checked = selectedMethod == method,
+                        onCheckedChange = { checked -> if (checked) onChange(method) },
+                        modifier = Modifier.weight(1f).semantics { role = Role.RadioButton },
+                        shapes = shapes[index],
+                        colors = colors,
+                    ) {
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                menuContent = { menuState ->
+                    RememberDropdownMenuItem(
+                        text = { Text(label) },
+                        onClick = {
+                            onChange(method)
+                            menuState.dismiss()
+                        },
                     )
                 },
             )
@@ -748,10 +844,26 @@ private fun LoadedPanel(
             modifier = Modifier.align(Alignment.BottomCenter),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            val sourceSheetSpatialSpec =
+                reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>())
+            val sourceSheetFadeInSpec =
+                reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+            val sourceSheetFadeOutSpec =
+                reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
             AnimatedVisibility(
                 visible = sourceSheetExpanded,
-                enter = fadeIn() + expandVertically(expandFrom = Alignment.Bottom),
-                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Bottom),
+                enter =
+                    fadeIn(animationSpec = sourceSheetFadeInSpec) +
+                        expandVertically(
+                            animationSpec = sourceSheetSpatialSpec,
+                            expandFrom = Alignment.Bottom,
+                        ),
+                exit =
+                    fadeOut(animationSpec = sourceSheetFadeOutSpec) +
+                        shrinkVertically(
+                            animationSpec = sourceSheetSpatialSpec,
+                            shrinkTowards = Alignment.Bottom,
+                        ),
             ) {
                 SourcePopup(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 0.dp),
@@ -1134,8 +1246,14 @@ private fun GroupCard(
         }
     val allSelected = selectedInGroup == group.tasks.size && group.tasks.isNotEmpty()
     val anySelected = selectedInGroup > 0
+    val groupSpatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.IntSize>())
+    val groupFloatSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
+    val groupFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val groupFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     val rotation by animateFloatAsState(
         targetValue = if (collapsed) 0f else 90f,
+        animationSpec = groupFloatSpec,
         label = "groupCardChevron",
     )
     val expandLabel = stringResource(R.string.google_tasks_import_group_expand_cd, group.list.title)
@@ -1143,7 +1261,6 @@ private fun GroupCard(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         GroupHeaderCard(
             title = group.list.title,
@@ -1160,13 +1277,17 @@ private fun GroupCard(
         )
         AnimatedVisibility(
             visible = !collapsed,
-            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
-            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+            enter =
+                fadeIn(animationSpec = groupFadeInSpec) +
+                    expandVertically(animationSpec = groupSpatialSpec, expandFrom = Alignment.Top),
+            exit =
+                fadeOut(animationSpec = groupFadeOutSpec) +
+                    shrinkVertically(animationSpec = groupSpatialSpec, shrinkTowards = Alignment.Top),
         ) {
             // Indent task cards 16dp from the left edge of the group header so they
             // visually nest under the group rather than sitting at the same level.
             Column(
-                modifier = Modifier.padding(start = 16.dp, top = 2.dp),
+                modifier = Modifier.padding(start = 16.dp, top = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 group.tasks.forEach { wrapper ->
@@ -1348,6 +1469,7 @@ private fun ImportButtonGroup(
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val chevronRotation by animateFloatAsState(
         targetValue = if (sourceExpanded) 180f else 0f,
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
         label = "sourceChevron",
     )
     Column(
@@ -1661,8 +1783,10 @@ private fun ImportProgressInline(
         }
     val animatedProgress by animateFloatAsState(
         targetValue = progress,
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
         label = "tasksImportProgress",
     )
+    val useFlatCompletedWave = completed && animatedProgress >= 0.95f
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLarge,
@@ -1703,19 +1827,19 @@ private fun ImportProgressInline(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
-            if (completed) {
-                LinearProgressIndicator(
-                    progress = { 1f },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.primary,
-                    trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f),
-                )
-            } else {
+            key(useFlatCompletedWave) {
                 LinearWavyProgressIndicator(
                     progress = { animatedProgress },
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.primary,
                     trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.18f),
+                    amplitude = { indicatorProgress ->
+                        if (useFlatCompletedWave) {
+                            0f
+                        } else {
+                            WavyProgressIndicatorDefaults.indicatorAmplitude(indicatorProgress)
+                        }
+                    },
                 )
             }
             if (completed) {

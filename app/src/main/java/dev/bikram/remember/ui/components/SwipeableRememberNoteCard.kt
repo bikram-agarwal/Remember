@@ -44,6 +44,7 @@ fun SwipeableRememberNoteCard(
     activeRevealKey: Any? = null,
     onRevealStarted: ((Long) -> Unit)? = null,
     onRevealClosed: ((Long) -> Unit)? = null,
+    reminderNotificationsAllowed: Boolean = true,
 ) {
     SwipeableRememberNoteCard(
         note = note,
@@ -58,6 +59,7 @@ fun SwipeableRememberNoteCard(
         activeRevealKey = activeRevealKey,
         onRevealStarted = onRevealStarted,
         onRevealClosed = onRevealClosed,
+        reminderNotificationsAllowed = reminderNotificationsAllowed,
     )
 }
 
@@ -75,6 +77,7 @@ fun SwipeableRememberNoteCard(
     activeRevealKey: Any? = null,
     onRevealStarted: ((Long) -> Unit)? = null,
     onRevealClosed: ((Long) -> Unit)? = null,
+    reminderNotificationsAllowed: Boolean = true,
 ) {
     val swipeStart = interaction.swipeStartToEnd
     val swipeEnd = interaction.swipeEndToStart
@@ -122,7 +125,6 @@ fun SwipeableRememberNoteCard(
             startActions = startTiles,
             endActions = endTiles,
             cardShape = noteCardShape,
-            hapticEnabled = interaction.hapticFeedbackEnabled,
             revealKey = revealKey,
             activeRevealKey = activeRevealKey,
             onRevealStarted = { onRevealStarted?.invoke(revealKey) },
@@ -133,6 +135,7 @@ fun SwipeableRememberNoteCard(
                 onClick = { onOpenNote(note) },
                 selected = selected,
                 onLongClick = onLongClick,
+                reminderNotificationsAllowed = reminderNotificationsAllowed,
             )
         }
         return
@@ -141,13 +144,18 @@ fun SwipeableRememberNoteCard(
         modifier = modifier.fillMaxWidth(),
         commitThresholdFraction = 0.35f,
         cardShape = noteCardShape,
-        hapticEnabled = interaction.hapticFeedbackEnabled,
         allowSwipeStartToEnd = swipeEnabled,
         allowSwipeEndToStart = swipeEnabled,
         onSwipeStartToEnd = { onSwipeAction(note, swipeStart) },
         onSwipeEndToStart = { onSwipeAction(note, swipeEnd) },
         backgroundContent = { fromStart, revealProgress ->
             val action = if (fromStart) swipeStart else swipeEnd
+            val actionIconFilled =
+                when (action) {
+                    NoteSwipeAction.TOGGLE_STAR -> noteStarred
+                    NoteSwipeAction.MARK_DONE -> noteCompleted
+                    else -> false
+                }
             val backgroundColor by animateColorAsState(
                 targetValue = action.semanticSwipeBackground(),
                 animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec()),
@@ -163,16 +171,6 @@ fun SwipeableRememberNoteCard(
                         .padding(horizontal = 16.dp),
                 contentAlignment = if (fromStart) Alignment.CenterStart else Alignment.CenterEnd,
             ) {
-                // For MARK_DONE the FILL axis flips with completion state so the
-                // glyph itself reads done vs not-done at a glance:
-                //   active note  -> outlined check_circle (FILL=0) "Mark done"
-                //   completed    -> filled check_circle (FILL=1)   "Mark not done"
-                // All other actions ignore the flag.
-                val iconFilled =
-                    action == NoteSwipeAction.MARK_DONE &&
-                        noteCompleted ||
-                        action == NoteSwipeAction.TOGGLE_STAR &&
-                        noteStarred
                 val contentScale = 0.88f + 0.12f * revealProgress
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -186,7 +184,7 @@ fun SwipeableRememberNoteCard(
                     if (fromStart) {
                         RememberMaterialRoundedSymbol(
                             name = action.materialSymbolName,
-                            filled = iconFilled,
+                            filled = actionIconFilled,
                             size = 20.dp,
                             tint = tint,
                             weight = FontWeight.Medium,
@@ -206,7 +204,7 @@ fun SwipeableRememberNoteCard(
                         Spacer(Modifier.width(6.dp))
                         RememberMaterialRoundedSymbol(
                             name = action.materialSymbolName,
-                            filled = iconFilled,
+                            filled = actionIconFilled,
                             size = 20.dp,
                             tint = tint,
                             weight = FontWeight.Medium,
@@ -221,6 +219,7 @@ fun SwipeableRememberNoteCard(
             onClick = { onOpenNote(note) },
             selected = selected,
             onLongClick = onLongClick,
+            reminderNotificationsAllowed = reminderNotificationsAllowed,
         )
     }
 }
@@ -259,11 +258,6 @@ private fun NoteSwipeAction.revealTile(
     noteStarred: Boolean,
     onClick: () -> Unit,
 ): SwipeRevealTile {
-    val iconFilled =
-        this == NoteSwipeAction.MARK_DONE &&
-            noteCompleted ||
-            this == NoteSwipeAction.TOGGLE_STAR &&
-            noteStarred
     val labelRes =
         when (this) {
             NoteSwipeAction.EDIT -> R.string.swipe_action_open
@@ -287,7 +281,12 @@ private fun NoteSwipeAction.revealTile(
         symbolName = materialSymbolName,
         backgroundColor = semanticSwipeBackground(),
         contentColor = semanticSwipeIconTint(),
-        filled = iconFilled,
+        filled =
+            when (this) {
+                NoteSwipeAction.TOGGLE_STAR -> noteStarred
+                NoteSwipeAction.MARK_DONE -> noteCompleted
+                else -> false
+            },
         onClick = onClick,
     )
 }

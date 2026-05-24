@@ -83,7 +83,7 @@ internal class MarkdownStyler(
     val linkSpanStyle: SpanStyle = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
     val inlineCodeSpanStyle: SpanStyle = SpanStyle(background = codeBackground, fontFamily = FontFamily.Monospace)
     val quoteSpanStyle: SpanStyle = SpanStyle(color = quoteColor, fontStyle = FontStyle.Italic)
-    val codeBlockSpanStyle: SpanStyle = SpanStyle(color = quoteColor, fontFamily = FontFamily.Monospace)
+    val codeBlockSpanStyle: SpanStyle = SpanStyle(color = quoteColor, background = codeBackground, fontFamily = FontFamily.Monospace)
     val boldSpanStyle: SpanStyle = SpanStyle(fontWeight = FontWeight.Bold)
     val italicSpanStyle: SpanStyle = SpanStyle(fontStyle = FontStyle.Italic)
     val underlineSpanStyle: SpanStyle = SpanStyle(textDecoration = TextDecoration.Underline)
@@ -133,17 +133,29 @@ internal class MarkdownStyler(
         return baseIndent + nestedIndent
     }
 
-    fun markdownInlineAnnotatedString(source: String): AnnotatedString =
+    fun markdownInlineAnnotatedString(
+        source: String,
+        includeLinkAnnotations: Boolean = true,
+    ): AnnotatedString =
         buildAnnotatedString {
-            appendInlineMarkdown(source = source)
+            appendInlineMarkdown(
+                source = source,
+                includeLinkAnnotations = includeLinkAnnotations,
+            )
         }
 
-    fun markdownPreviewAnnotatedString(markdown: String): AnnotatedString {
+    fun markdownPreviewAnnotatedString(
+        markdown: String,
+        includeLinkAnnotations: Boolean = true,
+    ): AnnotatedString {
         val previewSource =
             markdown.lines().joinToString("\n") { line ->
                 visibleLineContent(line)
             }
-        return markdownInlineAnnotatedString(previewSource)
+        return markdownInlineAnnotatedString(
+            source = previewSource,
+            includeLinkAnnotations = includeLinkAnnotations,
+        )
     }
 
     fun markdownEditingAnnotatedString(markdown: String): AnnotatedString =
@@ -182,23 +194,36 @@ internal class MarkdownStyler(
         return line
     }
 
-    private fun AnnotatedString.Builder.appendInlineMarkdown(source: String) {
+    private fun AnnotatedString.Builder.appendInlineMarkdown(
+        source: String,
+        includeLinkAnnotations: Boolean,
+    ) {
         var currentIndex = 0
         while (currentIndex < source.length) {
             val linkMatch = MarkdownLinkRegex.find(source, currentIndex)
             if (linkMatch != null && linkMatch.range.first == currentIndex) {
                 val url = linkMatch.groupValues[2]
-                withLink(LinkAnnotation.Url(url.withHttpScheme())) {
+                val appendLinkText = {
                     withStyle(linkSpanStyle) {
-                        appendInlineMarkdown(source = linkMatch.groupValues[1])
+                        appendInlineMarkdown(
+                            source = linkMatch.groupValues[1],
+                            includeLinkAnnotations = includeLinkAnnotations,
+                        )
                     }
+                }
+                if (includeLinkAnnotations) {
+                    withLink(LinkAnnotation.Url(url.withHttpScheme())) {
+                        appendLinkText()
+                    }
+                } else {
+                    appendLinkText()
                 }
                 currentIndex = linkMatch.range.last + 1
                 continue
             }
 
-            val inlineCodeClose = source.indexOf('`', currentIndex + 1)
-            if (source.startsWith("`", currentIndex) && inlineCodeClose > currentIndex) {
+            val inlineCodeClose = source.indexOfMarkdownClosingMarker("`", currentIndex + 1)
+            if (source.startsWith("`", currentIndex) && source.isValidOpening(currentIndex, 1) && inlineCodeClose > currentIndex) {
                 withStyle(inlineCodeSpanStyle) {
                     append(source.substring(currentIndex + 1, inlineCodeClose))
                 }
@@ -209,45 +234,60 @@ internal class MarkdownStyler(
             val underlineClose = source.indexOf("</u>", currentIndex + 3, ignoreCase = true)
             if (source.startsWith("<u>", currentIndex, ignoreCase = true) && underlineClose > currentIndex) {
                 withStyle(underlineSpanStyle) {
-                    appendInlineMarkdown(source = source.substring(currentIndex + 3, underlineClose))
+                    appendInlineMarkdown(
+                        source = source.substring(currentIndex + 3, underlineClose),
+                        includeLinkAnnotations = includeLinkAnnotations,
+                    )
                 }
                 currentIndex = underlineClose + 4
                 continue
             }
 
-            val strikeClose = source.indexOf("~~", currentIndex + 2)
-            if (source.startsWith("~~", currentIndex) && strikeClose > currentIndex) {
+            val strikeClose = source.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
+            if (source.startsWith("~~", currentIndex) && source.isValidOpening(currentIndex, 2) && strikeClose > currentIndex) {
                 withStyle(strikethroughSpanStyle) {
-                    appendInlineMarkdown(source = source.substring(currentIndex + 2, strikeClose))
+                    appendInlineMarkdown(
+                        source = source.substring(currentIndex + 2, strikeClose),
+                        includeLinkAnnotations = includeLinkAnnotations,
+                    )
                 }
                 currentIndex = strikeClose + 2
                 continue
             }
 
-            val boldItalicClose = source.indexOf("***", currentIndex + 3)
-            if (source.startsWith("***", currentIndex) && boldItalicClose > currentIndex) {
+            val boldItalicClose = source.indexOfMarkdownClosingMarker("***", currentIndex + 3)
+            if (source.startsWith("***", currentIndex) && source.isValidOpening(currentIndex, 3) && boldItalicClose > currentIndex) {
                 withStyle(boldSpanStyle) {
                     withStyle(italicSpanStyle) {
-                        appendInlineMarkdown(source = source.substring(currentIndex + 3, boldItalicClose))
+                        appendInlineMarkdown(
+                            source = source.substring(currentIndex + 3, boldItalicClose),
+                            includeLinkAnnotations = includeLinkAnnotations,
+                        )
                     }
                 }
                 currentIndex = boldItalicClose + 3
                 continue
             }
 
-            val boldClose = source.indexOf("**", currentIndex + 2)
-            if (source.startsWith("**", currentIndex) && boldClose > currentIndex) {
+            val boldClose = source.indexOfMarkdownClosingMarker("**", currentIndex + 2)
+            if (source.startsWith("**", currentIndex) && source.isValidOpening(currentIndex, 2) && boldClose > currentIndex) {
                 withStyle(boldSpanStyle) {
-                    appendInlineMarkdown(source = source.substring(currentIndex + 2, boldClose))
+                    appendInlineMarkdown(
+                        source = source.substring(currentIndex + 2, boldClose),
+                        includeLinkAnnotations = includeLinkAnnotations,
+                    )
                 }
                 currentIndex = boldClose + 2
                 continue
             }
 
-            val italicClose = source.indexOf('*', currentIndex + 1)
-            if (source.startsWith("*", currentIndex) && italicClose > currentIndex) {
+            val italicClose = source.indexOfMarkdownClosingMarker("*", currentIndex + 1)
+            if (source.startsWith("*", currentIndex) && source.isValidOpening(currentIndex, 1) && italicClose > currentIndex) {
                 withStyle(italicSpanStyle) {
-                    appendInlineMarkdown(source = source.substring(currentIndex + 1, italicClose))
+                    appendInlineMarkdown(
+                        source = source.substring(currentIndex + 1, italicClose),
+                        includeLinkAnnotations = includeLinkAnnotations,
+                    )
                 }
                 currentIndex = italicClose + 1
                 continue
@@ -461,4 +501,12 @@ private fun String.withHttpScheme(): String {
         return this
     }
     return "https://$this"
+}
+
+private fun String.isValidOpening(
+    index: Int,
+    markerLength: Int,
+): Boolean {
+    val nextChar = getOrNull(index + markerLength)
+    return nextChar != null && !nextChar.isWhitespace()
 }

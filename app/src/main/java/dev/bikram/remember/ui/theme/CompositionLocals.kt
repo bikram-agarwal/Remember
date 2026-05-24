@@ -13,6 +13,8 @@ data class ProgressiveBlurStyle(
     val blurRadius: Float,
     val overlayAlpha: Float,
     val overlayAlphaBottom: Float,
+    /** Top-edge blur curve exponent; lower values keep blur stronger over overlaid chrome. */
+    val topBlurProgressPower: Float = 2.5f,
 )
 
 val LocalProgressiveBlurStyle = staticCompositionLocalOf<ProgressiveBlurStyle?> { null }

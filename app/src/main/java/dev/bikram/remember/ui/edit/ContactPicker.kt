@@ -9,6 +9,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 
 data class ContactPick(
     val displayName: String,
@@ -86,7 +87,7 @@ fun rememberEmailPickLauncher(onPicked: (ContactPick) -> Unit): ActivityResultLa
 
 private fun android.content.ContentResolver.drawableFromUri(uri: String): Drawable? =
     runCatching {
-        openInputStream(Uri.parse(uri))?.use { input ->
+        openInputStream(uri.toUri())?.use { input ->
             Drawable.createFromStream(input, null)
         }
     }.getOrNull()

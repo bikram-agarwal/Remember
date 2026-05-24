@@ -5,17 +5,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
 
-/** Flatten surfaces to pure black for BLACK (OLED) mode. */
+/** Keep BLACK mode OLED-dark while preserving enough surface separation for cards and sheets. */
 internal fun ColorScheme.toOled(): ColorScheme =
     copy(
         background = Color.Black,
-        surface = Color.Black,
+        surface = Color(0xFF050505),
         surfaceDim = Color.Black,
         surfaceContainerLowest = Color.Black,
-        surfaceContainerLow = Color(0xFF080808),
-        surfaceContainer = Color(0xFF0F0F0F),
-        surfaceContainerHigh = Color(0xFF181818),
-        surfaceContainerHighest = Color(0xFF222222),
+        surfaceContainerLow = Color(0xFF111111),
+        surfaceContainer = Color(0xFF1A1A1A),
+        surfaceContainerHigh = Color(0xFF242424),
+        surfaceContainerHighest = Color(0xFF303030),
     )
 
 /**

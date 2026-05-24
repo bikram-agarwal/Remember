@@ -90,6 +90,12 @@ class UpdatePrefs(
         }
     }
 
+    suspend fun clearUpdateLastNotifiedDedupeKey() {
+        context.updateDataStore.edit { prefs ->
+            prefs.remove(Keys.UPDATE_LAST_NOTIFIED_DEDUPE_KEY)
+        }
+    }
+
     suspend fun setSaveUpdateApkToDownloads(enabled: Boolean) {
         context.updateDataStore.edit { prefs ->
             prefs[Keys.SAVE_UPDATE_APK_TO_DOWNLOADS] = enabled
@@ -137,5 +143,16 @@ class UpdatePrefs(
         context.updateDataStore.edit { prefs ->
             prefs[Keys.PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME] = lastUpdateTimeMillis
         }
+    }
+
+    suspend fun clearGithubReleaseAck() {
+        context.updateDataStore.edit { prefs ->
+            prefs.remove(Keys.GITHUB_ACK_FINGERPRINT)
+            prefs.remove(Keys.GITHUB_ACK_INSTALLED_VERSION)
+        }
+    }
+
+    suspend fun reset() {
+        context.updateDataStore.edit { it.clear() }
     }
 }

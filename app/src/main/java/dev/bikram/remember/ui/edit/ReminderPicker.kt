@@ -100,6 +100,7 @@ import dev.bikram.remember.ui.components.RememberFilledTonalButton
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -126,6 +127,8 @@ fun ReminderPickerSheet(
     var selectedDate by rememberSaveable {
         mutableLongStateOf(pickerDayMillisForLocalWallClock(initial))
     }
+    var reminderDateExplicit by rememberSaveable { mutableStateOf(initialMillis != null) }
+    var reminderCleared by rememberSaveable { mutableStateOf(false) }
     var dateDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -208,8 +211,10 @@ fun ReminderPickerSheet(
         mutableStateOf((initialRule?.endCount ?: DEFAULT_END_COUNT).toString())
     }
 
+    val controlsEnabled = notificationsGranted
+
     AppBottomSheet(
-        title = if (notificationsGranted) stringResource(R.string.reminder_set_title) else "",
+        title = stringResource(R.string.reminder_set_title),
         onDismiss = onDismiss,
         showTitleBar = notificationsGranted,
         scrollable = true,
@@ -232,15 +237,23 @@ fun ReminderPickerSheet(
                 },
             )
             Spacer(Modifier.height(8.dp))
-            return@AppBottomSheet
         }
 
         // Date pill
         PillRow(
             materialSymbolName = "calendar_month",
-            label = formatDate(selectedDate),
-            hasValue = true,
-            onClick = { dateDialogOpen = true },
+            label =
+                if (reminderDateExplicit) {
+                    formatDate(selectedDate)
+                } else {
+                    stringResource(R.string.reminder_pick_date)
+                },
+            hasValue = reminderDateExplicit && !reminderCleared,
+            enabled = controlsEnabled,
+            onClick = {
+                reminderCleared = false
+                dateDialogOpen = true
+            },
         )
 
         Spacer(Modifier.height(8.dp))
@@ -248,15 +261,19 @@ fun ReminderPickerSheet(
         PillRow(
             materialSymbolName = "schedule",
             label =
-                if (reminderTimeExplicit) {
+                if (reminderTimeExplicit && !reminderCleared) {
                     formatReminderTimePill(reminderHour, reminderMinute)
                 } else {
                     stringResource(R.string.reminder_pick_time)
                 },
-            hasValue = reminderTimeExplicit,
-            onClick = { timePickerOpen = true },
+            hasValue = reminderTimeExplicit && !reminderCleared,
+            enabled = controlsEnabled,
+            onClick = {
+                reminderCleared = false
+                timePickerOpen = true
+            },
             onClear =
-                if (reminderTimeExplicit) {
+                if (reminderTimeExplicit && controlsEnabled) {
                     { reminderTimeExplicit = false }
                 } else {
                     null
@@ -269,7 +286,7 @@ fun ReminderPickerSheet(
         PillRow(
             materialSymbolName = "repeat",
             label =
-                if (repeatOn) {
+                if (repeatOn && !reminderCleared) {
                     repeatSummary(
                         unit = unit,
                         interval = intervalText.toIntOrNull() ?: 1,
@@ -285,8 +302,10 @@ fun ReminderPickerSheet(
                 } else {
                     stringResource(R.string.reminder_repeat)
                 },
-            hasValue = repeatOn,
+            hasValue = repeatOn && !reminderCleared,
+            enabled = controlsEnabled,
             onClick = {
+                reminderCleared = false
                 if (!repeatOn) {
                     repeatOn = true
                     repeatExpanded = true
@@ -295,7 +314,7 @@ fun ReminderPickerSheet(
                 }
             },
             onClear =
-                if (repeatOn) {
+                if (repeatOn && controlsEnabled) {
                     {
                         repeatOn = false
                         repeatExpanded = false
@@ -305,7 +324,7 @@ fun ReminderPickerSheet(
                 },
         )
 
-        if (repeatOn && repeatExpanded) {
+        if (repeatOn && repeatExpanded && controlsEnabled && !reminderCleared) {
             Spacer(Modifier.height(10.dp))
             RepeatConfig(
                 unit = unit,
@@ -341,7 +360,7 @@ fun ReminderPickerSheet(
 
         Spacer(Modifier.height(12.dp))
 
-        if (!canScheduleExact) {
+        if (controlsEnabled && !canScheduleExact) {
             Row(
                 modifier =
                     Modifier
@@ -374,13 +393,30 @@ fun ReminderPickerSheet(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
-            if (initialMillis != null) {
-                RememberFilledTonalButton(onClick = { onConfirm(null, null) }) { Text(stringResource(R.string.common_clear)) }
+            val hasReminderDraft =
+                initialMillis != null ||
+                    reminderDateExplicit ||
+                    reminderTimeExplicit ||
+                    repeatOn ||
+                    reminderCleared
+            if (hasReminderDraft) {
+                RememberFilledTonalButton(
+                    onClick = {
+                        reminderCleared = true
+                        reminderDateExplicit = false
+                        reminderTimeExplicit = false
+                        repeatOn = false
+                        repeatExpanded = false
+                    },
+                ) { Text(stringResource(R.string.common_clear)) }
             }
             RememberFilledTonalButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
 
             val isDoneEnabled =
                 run {
+                    if (reminderCleared) return@run true
+                    if (!controlsEnabled) return@run initialMillis != null
+                    if (!reminderDateExplicit) return@run false
                     if (repeatOn) {
                         if (unit == RecurrenceUnit.WEEK && daysOfWeek.isEmpty()) return@run false
                         if (endKind == RecurrenceEndKind.ON_DATE && endDate == null) return@run false
@@ -393,49 +429,53 @@ fun ReminderPickerSheet(
             RememberButton(
                 enabled = isDoneEnabled,
                 onClick = {
-                    val hour24 = if (reminderTimeExplicit) reminderHour else 18
-                    val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
-                    val selectedDay =
-                        Instant.ofEpochMilli(selectedDate).atZone(ZoneOffset.UTC).toLocalDate()
-                    val fireAt =
-                        selectedDay
-                            .atTime(LocalTime.of(hour24, minuteVal))
-                            .atZone(ZoneId.systemDefault())
-                            .toInstant()
-                            .toEpochMilli()
-                    val rule =
-                        if (!repeatOn) {
-                            null
-                        } else {
-                            val interval = intervalText.toIntOrNull()?.coerceIn(1, 999) ?: 1
-                            val mode: MonthlyMode? =
-                                if (unit == RecurrenceUnit.MONTH) {
-                                    if (monthlyKind == MonthlyKind.BY_DAY) {
-                                        MonthlyMode.ByDayOfMonth(dayOfMonth)
+                    if (reminderCleared) {
+                        onConfirm(null, null)
+                    } else {
+                        val hour24 = if (reminderTimeExplicit) reminderHour else 18
+                        val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
+                        val selectedDay =
+                            Instant.ofEpochMilli(selectedDate).atZone(ZoneOffset.UTC).toLocalDate()
+                        val fireAt =
+                            selectedDay
+                                .atTime(LocalTime.of(hour24, minuteVal))
+                                .atZone(ZoneId.systemDefault())
+                                .toInstant()
+                                .toEpochMilli()
+                        val rule =
+                            if (!repeatOn) {
+                                null
+                            } else {
+                                val interval = intervalText.toIntOrNull()?.coerceIn(1, 999) ?: 1
+                                val mode: MonthlyMode? =
+                                    if (unit == RecurrenceUnit.MONTH) {
+                                        if (monthlyKind == MonthlyKind.BY_DAY) {
+                                            MonthlyMode.ByDayOfMonth(dayOfMonth)
+                                        } else {
+                                            MonthlyMode.ByNthWeekday(nthOrdinal, nthWeekday)
+                                        }
                                     } else {
-                                        MonthlyMode.ByNthWeekday(nthOrdinal, nthWeekday)
+                                        null
                                     }
-                                } else {
-                                    null
-                                }
-                            val daysSet = if (unit == RecurrenceUnit.WEEK) daysOfWeek else emptySet()
-                            // Fall back to the same default the picker pre-populates (10) when the field is
-                            // empty or otherwise unparseable. [RecurrenceRule.sanitized] also maps invalid
-                            // AFTER_COUNT + null endCount to NEVER so reminders never stop after one fire.
-                            val count = endCountText.toIntOrNull()?.coerceIn(1, 9999) ?: DEFAULT_END_COUNT
-                            RecurrenceRule(
-                                unit = unit,
-                                interval = interval,
-                                daysOfWeek = daysSet,
-                                monthlyMode = mode,
-                                endKind = endKind,
-                                endDate = if (endKind == RecurrenceEndKind.ON_DATE) endDate else null,
-                                endCount = if (endKind == RecurrenceEndKind.AFTER_COUNT) count else null,
-                            )
-                        }
-                    onConfirm(fireAt, rule)
+                                val daysSet = if (unit == RecurrenceUnit.WEEK) daysOfWeek else emptySet()
+                                // Fall back to the same default the picker pre-populates (10) when the field is
+                                // empty or otherwise unparseable. [RecurrenceRule.sanitized] also maps invalid
+                                // AFTER_COUNT + null endCount to NEVER so reminders never stop after one fire.
+                                val count = endCountText.toIntOrNull()?.coerceIn(1, 9999) ?: DEFAULT_END_COUNT
+                                RecurrenceRule(
+                                    unit = unit,
+                                    interval = interval,
+                                    daysOfWeek = daysSet,
+                                    monthlyMode = mode,
+                                    endKind = endKind,
+                                    endDate = if (endKind == RecurrenceEndKind.ON_DATE) endDate else null,
+                                    endCount = if (endKind == RecurrenceEndKind.AFTER_COUNT) count else null,
+                                )
+                            }
+                        onConfirm(fireAt, rule)
+                    }
                 },
-            ) { Text(stringResource(R.string.common_done)) }
+            ) { Text(stringResource(R.string.common_save)) }
         }
         Spacer(Modifier.height(8.dp))
     }
@@ -445,6 +485,8 @@ fun ReminderPickerSheet(
             initial = selectedDate,
             onConfirm = {
                 selectedDate = it
+                reminderDateExplicit = true
+                reminderCleared = false
                 dateDialogOpen = false
             },
             onDismiss = { dateDialogOpen = false },
@@ -477,6 +519,7 @@ fun ReminderPickerSheet(
                 reminderHour = pickedHour
                 reminderMinute = pickedMinute
                 reminderTimeExplicit = true
+                reminderCleared = false
                 timePickerOpen = false
             },
         )
@@ -674,7 +717,7 @@ internal fun CalendarPickerDialog(
                         .widthIn(min = 328.dp, max = 400.dp)
                         .wrapContentHeight()
                         .animateContentSize(
-                            animationSpec = MaterialTheme.motionScheme.defaultSpatialSpec(),
+                            animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec()),
                         ).padding(horizontal = 16.dp)
                         .clickable(
                             // Catch clicks on the surface so they don't leak to the dismiss background
@@ -858,7 +901,21 @@ private fun PillRow(
     hasValue: Boolean,
     onClick: () -> Unit,
     onClear: (() -> Unit)? = null,
+    enabled: Boolean = true,
 ) {
+    val scheme = MaterialTheme.colorScheme
+    val iconColor =
+        when {
+            !enabled -> scheme.onSurfaceVariant.copy(alpha = 0.52f)
+            hasValue -> scheme.onPrimaryContainer
+            else -> scheme.onSurfaceVariant
+        }
+    val labelColor =
+        when {
+            !enabled -> scheme.onSurfaceVariant.copy(alpha = 0.52f)
+            hasValue -> scheme.onPrimaryContainer
+            else -> scheme.onSurface
+        }
     Row(
         modifier =
             Modifier
@@ -869,36 +926,33 @@ private fun PillRow(
                     // Use full-opacity primaryContainer for the activated state so the pill
                     // stays clearly distinct from the sheet background even in seed-based
                     // themes where the half-alpha version washes out against light surfaces.
-                    if (hasValue) {
-                        MaterialTheme.colorScheme.primaryContainer
+                    if (!enabled) {
+                        scheme.surfaceContainerHigh
+                    } else if (hasValue) {
+                        scheme.primaryContainer
                     } else {
-                        MaterialTheme.colorScheme.surfaceContainerHigh
+                        scheme.surfaceContainerHigh
                     },
-                ).tapSoundClickable(onClick = onClick)
-                .padding(start = 20.dp, end = 8.dp),
+                ).let { modifier ->
+                    if (enabled) {
+                        modifier.tapSoundClickable(onClick = onClick)
+                    } else {
+                        modifier
+                    }
+                }.padding(start = 20.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RememberMaterialRoundedSymbol(
             name = materialSymbolName,
             size = 20.dp,
-            tint =
-                if (hasValue) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
+            tint = iconColor,
             weight = FontWeight.Medium,
         )
         Spacer(Modifier.width(16.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
-            color =
-                if (hasValue) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
+            color = labelColor,
             modifier = Modifier.weight(1f),
         )
         // Reserve the trailing slot so rows with and without Clear match height/width.

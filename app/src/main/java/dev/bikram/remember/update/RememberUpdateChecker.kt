@@ -3,6 +3,7 @@ package dev.bikram.remember.update
 import dev.bikram.remember.data.UpdatePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.net.HttpURLConnection
@@ -20,12 +21,12 @@ data class RememberUpdateInfo(
     val isDevReleaseMock: Boolean = false,
 )
 
-fun RememberUpdateInfo.notificationDedupeKey(): String =
-    if (remoteApkAssetUpdatedAt.isNotBlank()) "$versionName|$remoteApkAssetUpdatedAt" else versionName
+fun RememberUpdateInfo.notificationDedupeKey(): String = if (remoteApkAssetUpdatedAt.isNotBlank()) "$versionName|$remoteApkAssetUpdatedAt" else versionName
 
 @Serializable
 private data class GithubRelease(
-    val tag_name: String,
+    @SerialName("tag_name")
+    val tagName: String,
     val body: String = "",
     val assets: List<GithubAsset> = emptyList(),
 )
@@ -33,8 +34,10 @@ private data class GithubRelease(
 @Serializable
 private data class GithubAsset(
     val name: String,
-    val browser_download_url: String,
-    val updated_at: String = "",
+    @SerialName("browser_download_url")
+    val browserDownloadUrl: String,
+    @SerialName("updated_at")
+    val updatedAt: String = "",
 )
 
 @Singleton
@@ -70,10 +73,10 @@ class RememberUpdateChecker
                     error("GitHub returned HTTP ${connection.responseCode}")
                 }
                 val release = json.decodeFromString<GithubRelease>(connection.inputStream.bufferedReader().use { it.readText() })
-                val remoteVersionName = release.tag_name.trim().removePrefix("v")
+                val remoteVersionName = release.tagName.trim().removePrefix("v")
                 if (remoteVersionName.isBlank()) return null
                 val apkAsset = release.assets.firstOrNull { asset -> asset.name.endsWith(".apk", ignoreCase = true) } ?: return null
-                val currentFingerprint = "$remoteVersionName|${apkAsset.updated_at}"
+                val currentFingerprint = "$remoteVersionName|${apkAsset.updatedAt}"
                 val ack = updatePrefs.readGithubReleaseAck()
                 val effectiveFingerprint =
                     if (ack.forInstalledVersion == currentVersionName) {
@@ -112,10 +115,10 @@ class RememberUpdateChecker
         ): RememberUpdateInfo =
             RememberUpdateInfo(
                 versionName = remoteVersionName,
-                downloadUrl = apkAsset.browser_download_url,
+                downloadUrl = apkAsset.browserDownloadUrl,
                 releaseNotes = body,
                 remoteApkFileName = apkAsset.name,
-                remoteApkAssetUpdatedAt = apkAsset.updated_at,
+                remoteApkAssetUpdatedAt = apkAsset.updatedAt,
             )
 
         private fun compareVersionNames(
