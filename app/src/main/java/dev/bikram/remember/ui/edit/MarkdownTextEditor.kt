@@ -69,6 +69,7 @@ internal fun MarkdownTextEditor(
     assignedTags: List<String> = emptyList(),
     onStylusInput: () -> Unit = {},
     onAddTag: (String, String) -> Unit = { _, _ -> },
+    onFocusChanged: (Boolean) -> Unit = {},
 ) {
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -199,7 +200,6 @@ internal fun MarkdownTextEditor(
                     .semantics { contentDescription = bodyPlaceholder }
                     .onGloballyPositioned { editorCoordinates = it }
                     .focusRequester(focusRequester)
-                    .onFocusChanged { focused = it.isFocused }
                     .pointerInput(onStylusInput) {
                         awaitPointerEventScope {
                             while (true) {
@@ -209,6 +209,9 @@ internal fun MarkdownTextEditor(
                                 }
                             }
                         }
+                    }.onFocusChanged {
+                        focused = it.isFocused
+                        onFocusChanged(it.isFocused)
                     },
             decorationBox = { innerTextField ->
                 Box(modifier = Modifier.fillMaxWidth()) {

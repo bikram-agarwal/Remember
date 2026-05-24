@@ -42,9 +42,9 @@ import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.googletasks.GoogleTasksImportRoute
+import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.components.alertChromeSummary
-import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.edit.EditListRoute
 import dev.bikram.remember.ui.edit.EditNoteRoute
 import dev.bikram.remember.ui.help.HelpScreen
@@ -76,37 +76,73 @@ object Routes {
     const val NOTES = "notes"
     const val HISTORY = "history"
     const val SETTINGS = "settings"
+    const val EDIT_CONTENT = "editContent"
     const val EDIT_NOTE = "editNote"
     const val EDIT_LIST = "editList"
     const val GOOGLE_TASKS_IMPORT = "googleTasksImport"
     const val HELP = "help"
     const val DEV_OPTIONS = "devOptions"
     const val ARG_ID = "id"
+    const val ARG_TYPE = "type"
     const val ARG_PREFILL = "prefill"
     const val ARG_FORCE_EDIT = "forceEdit"
     const val ARG_EXIT_ON_BACK = "exitOnBack"
+    const val TYPE_NOTE = "note"
+    const val TYPE_LIST = "checklist"
+
+    fun editContent(
+        id: Long?,
+        type: NoteKind? = null,
+        prefill: String = "",
+        forceEdit: Boolean = false,
+        exitOnBack: Boolean = false,
+    ): String {
+        val t =
+            type?.let { kind ->
+                "&$ARG_TYPE=" +
+                    when (kind) {
+                        NoteKind.NOTE -> TYPE_NOTE
+                        NoteKind.LIST -> TYPE_LIST
+                    }
+            } ?: ""
+        val p = if (prefill.isNotEmpty()) "&$ARG_PREFILL=${Uri.encode(prefill)}" else ""
+        val f = if (forceEdit) "&$ARG_FORCE_EDIT=true" else ""
+        val e = if (exitOnBack) "&$ARG_EXIT_ON_BACK=true" else ""
+        return "$EDIT_CONTENT?${ARG_ID}=${id ?: -1L}$t$p$f$e"
+    }
 
     fun editNote(
         id: Long?,
         prefill: String = "",
         forceEdit: Boolean = false,
         exitOnBack: Boolean = false,
-    ): String {
-        val p = if (prefill.isNotEmpty()) "&$ARG_PREFILL=${Uri.encode(prefill)}" else ""
-        val f = if (forceEdit) "&$ARG_FORCE_EDIT=true" else ""
-        val e = if (exitOnBack) "&$ARG_EXIT_ON_BACK=true" else ""
-        return "$EDIT_NOTE?${ARG_ID}=${id ?: -1L}$p$f$e"
-    }
+    ): String =
+        editContent(
+            id = id,
+            type = NoteKind.NOTE,
+            prefill = prefill,
+            forceEdit = forceEdit,
+            exitOnBack = exitOnBack,
+        )
 
     fun editList(
         id: Long?,
         forceEdit: Boolean = false,
         exitOnBack: Boolean = false,
-    ): String {
-        val f = if (forceEdit) "&${ARG_FORCE_EDIT}=true" else ""
-        val e = if (exitOnBack) "&$ARG_EXIT_ON_BACK=true" else ""
-        return "$EDIT_LIST?${ARG_ID}=${id ?: -1L}$f$e"
-    }
+    ): String =
+        editContent(
+            id = id,
+            type = NoteKind.LIST,
+            forceEdit = forceEdit,
+            exitOnBack = exitOnBack,
+        )
+
+    fun noteKindFor(type: String?): NoteKind? =
+        when (type) {
+            TYPE_NOTE -> NoteKind.NOTE
+            TYPE_LIST -> NoteKind.LIST
+            else -> null
+        }
 }
 
 @Composable
@@ -466,6 +502,102 @@ fun RememberNavGraph(
                                         )
                                 }
                             }
+                        }
+                    }
+                }
+
+                composable(
+                    route = "${Routes.EDIT_CONTENT}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_TYPE}={${Routes.ARG_TYPE}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
+                    arguments =
+                        listOf(
+                            navArgument(Routes.ARG_ID) {
+                                type = NavType.LongType
+                                defaultValue = -1L
+                            },
+                            navArgument(Routes.ARG_TYPE) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(Routes.ARG_PREFILL) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                            navArgument(Routes.ARG_FORCE_EDIT) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                            navArgument(Routes.ARG_EXIT_ON_BACK) {
+                                type = NavType.BoolType
+                                defaultValue = false
+                            },
+                        ),
+                ) { entry ->
+                    val context = LocalContext.current
+                    val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
+                    val requestedType = entry.arguments?.getString(Routes.ARG_TYPE).orEmpty()
+                    val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
+                    val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
+                    var resolvedKind by remember(id, requestedType) {
+                        mutableStateOf(
+                            Routes.noteKindFor(requestedType)
+                                ?: if (id <= 0) NoteKind.NOTE else null,
+                        )
+                    }
+                    LaunchedEffect(id, requestedType) {
+                        if (resolvedKind == null && id > 0) {
+                            resolvedKind = repository.get(id)?.note?.kind ?: NoteKind.NOTE
+                        }
+                    }
+                    val onBack = {
+                        if (exitOnBack) {
+                            val activity = context as? Activity
+                            if (activity != null) {
+                                activity.finish()
+                            } else {
+                                navController.popBackStack()
+                                Unit
+                            }
+                        } else {
+                            navController.popBackStack()
+                            Unit
+                        }
+                    }
+                    val onNavigateUp = {
+                        if (exitOnBack) {
+                            currentMainTab = MainTab.Notes
+                            navController.navigate(Routes.MAIN) {
+                                popUpTo(navController.graph.id) {
+                                    inclusive = true
+                                }
+                                launchSingleTop = true
+                            }
+                        } else {
+                            navController.popBackStack()
+                            Unit
+                        }
+                    }
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
+                        LocalNavAnimatedVisibilityScope provides this@composable,
+                    ) {
+                        when (resolvedKind) {
+                            NoteKind.LIST ->
+                                EditListRoute(
+                                    appScope = appScope,
+                                    noteId = id.takeIf { it > 0 },
+                                    forceEdit = forceEdit,
+                                    onBack = onBack,
+                                    onNavigateUp = onNavigateUp,
+                                )
+                            NoteKind.NOTE ->
+                                EditNoteRoute(
+                                    appScope = appScope,
+                                    noteId = id.takeIf { it > 0 },
+                                    forceEdit = forceEdit,
+                                    onBack = onBack,
+                                    onNavigateUp = onNavigateUp,
+                                )
+                            null -> Box(modifier = Modifier.fillMaxSize())
                         }
                     }
                 }

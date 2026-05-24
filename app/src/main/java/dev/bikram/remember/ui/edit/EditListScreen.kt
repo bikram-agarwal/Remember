@@ -1,14 +1,9 @@
 package dev.bikram.remember.ui.edit
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.BoundsTransform
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,16 +18,10 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.TopAppBarScrollBehavior
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -45,7 +34,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
@@ -76,22 +64,16 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.notifications.canPostNotifications
-import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
-import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
-import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
-import dev.bikram.remember.ui.components.EditorShelfNotice
-import dev.bikram.remember.ui.components.EditorShelfNoticeState
-import dev.bikram.remember.ui.components.NoteActionBottomBar
+import dev.bikram.remember.ui.components.NoteActionBottomBarContent
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
-import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -368,196 +350,6 @@ fun EditListRoute(
     }
 }
 
-@Composable
-@OptIn(ExperimentalMaterial3Api::class)
-private fun EditListTopBarSection(
-    scrollBehavior: TopAppBarScrollBehavior,
-    title: String,
-    titlePlaceholder: String,
-    iconKey: String?,
-    isEditMode: Boolean,
-    readOnly: Boolean,
-    hasUnsavedChanges: Boolean,
-    sharedNoteId: Long?,
-    titleFocusRequester: FocusRequester,
-    titleFocusOffset: Int?,
-    onTitleChange: (String) -> Unit,
-    onBack: () -> Unit,
-    onTitleTappedInViewMode: (Int) -> Unit,
-    onTitleFocusOffsetConsumed: () -> Unit,
-    onOpenIcon: () -> Unit,
-    onSave: () -> Unit,
-) {
-    val keyboardController = LocalSoftwareKeyboardController.current
-    var titleFieldValue by remember {
-        mutableStateOf(TextFieldValue(text = title, selection = TextRange(title.length)))
-    }
-    LaunchedEffect(title) {
-        if (title != titleFieldValue.text) {
-            val selection = titleFieldValue.selection
-            titleFieldValue =
-                TextFieldValue(
-                    text = title,
-                    selection =
-                        TextRange(
-                            start = selection.start.coerceIn(0, title.length),
-                            end = selection.end.coerceIn(0, title.length),
-                        ),
-                )
-        }
-    }
-    LaunchedEffect(isEditMode, readOnly, titleFocusOffset) {
-        val offset = titleFocusOffset
-        if (isEditMode && !readOnly && offset != null) {
-            val boundedOffset = offset.coerceIn(0, title.length)
-            titleFieldValue = TextFieldValue(text = title, selection = TextRange(boundedOffset))
-            delay(80)
-            titleFocusRequester.requestFocus()
-            keyboardController?.show()
-            onTitleFocusOffsetConsumed()
-        }
-    }
-
-    Box {
-        LargeTopAppBar(
-            colors = transparentLargeTopAppBarColors(),
-            title = {
-                val collapseFraction = scrollBehavior.state.collapsedFraction
-                val expandedStyle = MaterialTheme.typography.headlineMedium
-                val collapsedStyle = MaterialTheme.typography.titleLarge
-                val titleStyle =
-                    expandedStyle.copy(
-                        fontSize =
-                            androidx.compose.ui.unit.lerp(
-                                expandedStyle.fontSize,
-                                collapsedStyle.fontSize,
-                                collapseFraction,
-                            ),
-                        lineHeight =
-                            androidx.compose.ui.unit.lerp(
-                                expandedStyle.lineHeight,
-                                collapsedStyle.lineHeight,
-                                collapseFraction,
-                            ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                val iconSize =
-                    androidx.compose.ui.unit
-                        .lerp(28.dp, 22.dp, collapseFraction)
-                val iconGap =
-                    androidx.compose.ui.unit
-                        .lerp(12.dp, 8.dp, collapseFraction)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth(),
-                ) {
-                    EditorHeaderIcon(
-                        iconKey = iconKey,
-                        kind = NoteKind.LIST,
-                        iconSize = iconSize,
-                        onClick = if (readOnly) null else onOpenIcon,
-                    )
-                    Spacer(Modifier.width(iconGap))
-                    if ((isEditMode && !readOnly) || title.isEmpty()) {
-                        BasicTextField(
-                            value = titleFieldValue,
-                            onValueChange = {
-                                if (it.text.length <= 80) {
-                                    titleFieldValue = it
-                                    if (it.text != title) {
-                                        onTitleChange(it.text)
-                                    }
-                                }
-                            },
-                            textStyle = titleStyle,
-                            enabled = !readOnly,
-                            keyboardOptions =
-                                androidx.compose.foundation.text.KeyboardOptions(
-                                    capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
-                                    imeAction = androidx.compose.ui.text.input.ImeAction.Next,
-                                ),
-                            singleLine = true,
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .focusRequester(titleFocusRequester),
-                            decorationBox = { inner ->
-                                if (title.isEmpty()) {
-                                    Text(
-                                        text = titlePlaceholder,
-                                        style =
-                                            titleStyle.copy(
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                                            ),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                }
-                                inner()
-                            },
-                        )
-                    } else {
-                        var titleLayout by remember(title) { mutableStateOf<TextLayoutResult?>(null) }
-                        androidx.compose.foundation.text.selection.SelectionContainer {
-                            Text(
-                                text = title,
-                                style = titleStyle,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                onTextLayout = { titleLayout = it },
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .pointerInput(readOnly, titleLayout) {
-                                            if (!readOnly) {
-                                                detectTapGestures { tapOffset ->
-                                                    val offset =
-                                                        titleLayout
-                                                            ?.getOffsetForPosition(tapOffset)
-                                                            ?: title.length
-                                                    onTitleTappedInViewMode(offset)
-                                                }
-                                            }
-                                        },
-                            )
-                        }
-                    }
-                }
-            },
-            navigationIcon = {
-                RememberIconButton(onClick = onBack) {
-                    RememberMaterialRoundedSymbol(
-                        name = "arrow_back",
-                        size = 24.dp,
-                        tint = MaterialTheme.colorScheme.onSurface,
-                        weight = FontWeight.Medium,
-                    )
-                }
-            },
-            actions = {
-                if ((isEditMode || hasUnsavedChanges) && !readOnly) {
-                    val saveCd = stringResource(R.string.edit_save_cd)
-                    RememberIconButton(
-                        onClick = onSave,
-                        modifier = Modifier.semantics { contentDescription = saveCd },
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "check",
-                            size = 24.dp,
-                            tint = MaterialTheme.colorScheme.primary,
-                            weight = FontWeight.Medium,
-                        )
-                    }
-                }
-            },
-            scrollBehavior = scrollBehavior,
-        )
-    }
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Suppress("CyclomaticComplexMethod")
 @Composable
@@ -626,8 +418,6 @@ fun EditListScreen(
     onNavigateUp: () -> Unit = onBack,
     onSave: () -> Unit = {},
 ) {
-    val topBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
     var reminderPickerOpen by rememberSaveable { mutableStateOf(false) }
     var iconPickerOpen by rememberSaveable { mutableStateOf(false) }
     var actionsPickerOpen by rememberSaveable { mutableStateOf(false) }
@@ -676,15 +466,7 @@ fun EditListScreen(
         }
     }
 
-    val newListTitleFocus = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
-    LaunchedEffect(existing, isEditMode, readOnly) {
-        if (!existing && isEditMode && !readOnly) {
-            delay(80)
-            newListTitleFocus.requestFocus()
-            keyboardController?.show()
-        }
-    }
 
     val lazyListStateForVisibility =
         androidx.compose.foundation.lazy
@@ -746,20 +528,18 @@ fun EditListScreen(
     Scaffold(
         modifier =
             Modifier
-                .nestedScroll(barVisibilityNestedScroll)
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .nestedScroll(barVisibilityNestedScroll),
         containerColor = Color.Transparent,
         topBar = {
-            EditListTopBarSection(
-                scrollBehavior = scrollBehavior,
+            EditorTitleTopBar(
+                contentKind = NoteKind.LIST,
                 title = title,
                 titlePlaceholder = titlePlaceholder,
                 iconKey = iconKey,
+                existing = existing,
                 isEditMode = isEditMode,
                 readOnly = readOnly,
                 hasUnsavedChanges = hasUnsavedChanges,
-                sharedNoteId = sharedNoteId,
-                titleFocusRequester = newListTitleFocus,
                 titleFocusOffset = pendingTitleFocusOffset,
                 onTitleChange = onTitleChange,
                 onBack = onNavigateUp,
@@ -772,41 +552,45 @@ fun EditListScreen(
                 },
                 onOpenIcon = { iconPickerOpen = true },
                 onSave = saveAndExitEditMode,
+                showEditableWhenTitleEmpty = true,
             )
         },
         bottomBar = {
-            NoteActionBottomBar(
-                shelfState = shelfState,
-                existing = persistedForToolbar,
+            EditorBottomBarSlot(
                 isEditMode = isEditMode,
-                starred = starred,
-                completed = completed,
-                visible = actionBarVisible,
-                // Action bar is hidden while isEditMode, so this callback only fires from
-                // view mode - always turning edit mode ON. Save is owned by the top bar.
-                onToggleEdit = { if (!isEditMode) isEditMode = true else saveAndExitEditMode() },
-                onToggleStar = onToggleStar,
-                onToggleCompleted = onToggleCompleted,
-                onArchive = onArchive,
-                onNotification = onNotification,
-                onUnarchive = onUnarchive,
-                onTrash = onTrash,
-                onRestore = onRestore,
-                onDeleteForever = { deleteForeverConfirmOpen = true },
-                showEditAction = false,
+                actionBarVisible = actionBarVisible,
+                actionContent = {
+                    NoteActionBottomBarContent(
+                        shelfState = shelfState,
+                        existing = persistedForToolbar,
+                        isEditMode = isEditMode,
+                        starred = starred,
+                        completed = completed,
+                        // Action bar is hidden while isEditMode, so this callback only fires from
+                        // view mode - always turning edit mode ON. Save is owned by the top bar.
+                        onToggleEdit = { if (!isEditMode) isEditMode = true else saveAndExitEditMode() },
+                        onToggleStar = onToggleStar,
+                        onToggleCompleted = onToggleCompleted,
+                        onArchive = onArchive,
+                        onNotification = onNotification,
+                        onUnarchive = onUnarchive,
+                        onTrash = onTrash,
+                        onRestore = onRestore,
+                        onDeleteForever = { deleteForeverConfirmOpen = true },
+                        showEditAction = false,
+                    )
+                },
             )
         },
     ) { padding ->
         val topAlphaMultiplier by remember(lazyListStateForVisibility) {
             derivedStateOf {
-                val collapsedFraction = scrollBehavior.state.collapsedFraction
                 if (lazyListStateForVisibility.firstVisibleItemIndex > 0) {
-                    collapsedFraction
+                    1f
                 } else {
                     val offsetPx = lazyListStateForVisibility.firstVisibleItemScrollOffset.toFloat()
                     val thresholdPx = with(density) { 24.dp.toPx() }
-                    val scrollFraction = (offsetPx / thresholdPx).coerceIn(0f, 1f)
-                    collapsedFraction * scrollFraction
+                    (offsetPx / thresholdPx).coerceIn(0f, 1f)
                 }
             }
         }
@@ -914,40 +698,29 @@ fun EditListScreen(
                     .then(blurMod)
                     .padding(horizontal = 20.dp),
         ) {
-            item(key = "top_padding") {
-                Spacer(Modifier.height(padding.calculateTopPadding()))
-            }
             // Order: hero image -> shelf banner -> list items. The banner sits right above the
             // list body so the "why is this read-only" hint is adjacent to the items it gates.
-            if (pictureUri != null) {
-                item(key = "picture_hero") {
-                    Spacer(Modifier.height(16.dp))
-                    PictureHero(
-                        uri = pictureUri,
-                        pictureRevision = pictureRevision,
-                        pictureHeroFraming = pictureHeroFraming,
-                        viewerOpen = pictureViewer != null,
-                        onOpenFull = { pictureViewer = pictureUri to pictureRevision },
-                    )
-                }
-            }
-            if (shelfState != NoteShelfState.ACTIVE) {
-                item(key = "editor_shelf_notice") {
-                    Spacer(Modifier.height(16.dp))
-                    EditorShelfNotice(
-                        state =
-                            if (shelfState == NoteShelfState.TRASHED) {
-                                EditorShelfNoticeState.TRASHED
-                            } else {
-                                EditorShelfNoticeState.ARCHIVED
-                            },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-            item(key = "items_spacing") {
-                Spacer(Modifier.height(12.dp))
-            }
+            editorContentHeaderItems(
+                padding = padding,
+                shelfState = shelfState,
+                heroContent =
+                    pictureUri?.let { uri ->
+                        {
+                            EditorContentPictureHero(
+                                uri = uri,
+                                pictureRevision = pictureRevision,
+                                pictureHeroFraming = pictureHeroFraming,
+                                viewerOpen = pictureViewer != null,
+                                onOpenFull = { pictureViewer = uri to pictureRevision },
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .height(220.dp),
+                            )
+                        }
+                    },
+                bodyTopSpacing = 12.dp,
+            )
 
             if (existing && !isEditMode && activeEntries.isEmpty() && completedEntries.isEmpty()) {
                 item(key = "empty_list_view_placeholder") {
@@ -1217,9 +990,9 @@ fun EditListScreen(
                 }
             }
 
-            item(key = "options_panel") {
+            editorContentOptionsItem(padding = padding) {
                 Spacer(Modifier.height(20.dp))
-                OptionsPanel(
+                EditorOptionsPanel(
                     reminderAt = reminderAt,
                     recurrence = recurrence,
                     importance = importance,
@@ -1228,204 +1001,60 @@ fun EditListScreen(
                     actions = actions,
                     tags = tags,
                     attachments = attachments,
-                    onOpenReminder =
-                        if (readOnly) {
-                            {}
-                        } else {
-                            {
-                                reminderPickerOpen = true
-                            }
-                        },
-                    reminderPermissionMissing = reminderAt != null && !notificationsAllowed,
-                    onSetImportance = if (readOnly) ({ _ -> }) else onImportanceChange,
-                    onSetVisibility = if (readOnly) ({ _ -> }) else onVisibilityChange,
-                    onOpenPicture = if (readOnly) ({}) else launchHeroImagePick,
-                    onOpenActions = if (readOnly) ({}) else ({ actionsPickerOpen = true }),
-                    onOpenTags = if (readOnly) ({}) else ({ tagsPickerOpen = true }),
-                    onOpenAttachments =
-                        if (readOnly) {
-                            {}
-                        } else {
-                            {
-                                if (attachments.isEmpty()) {
-                                    launchAttachmentPicker()
-                                } else {
-                                    attachmentsPickerOpen = true
-                                }
-                            }
-                        },
+                    notificationsAllowed = notificationsAllowed,
                     readOnly = readOnly,
                     starred = starred,
+                    onOpenReminder = { reminderPickerOpen = true },
+                    onImportanceChange = onImportanceChange,
+                    onVisibilityChange = onVisibilityChange,
+                    onOpenPicture = launchHeroImagePick,
+                    onOpenActions = { actionsPickerOpen = true },
+                    onOpenTags = { tagsPickerOpen = true },
+                    onOpenAttachmentsSheet = { attachmentsPickerOpen = true },
+                    onPickAttachment = launchAttachmentPicker,
                 )
-                Spacer(Modifier.height(40.dp + padding.calculateBottomPadding()))
             }
         }
 
-        if (reminderPickerOpen) {
-            ReminderPickerSheet(
-                initialMillis = reminderAt,
-                initialRule = recurrence,
-                onConfirm = { at, rule ->
-                    onReminderChange(at, rule)
-                    reminderPickerOpen = false
-                },
-                onDismiss = { reminderPickerOpen = false },
-            )
-        }
-        if (iconPickerOpen) {
-            IconPicker(
-                current = iconKey,
-                onPick = {
-                    onIconKeyChange(it)
-                    iconPickerOpen = false
-                },
-                onDismiss = { iconPickerOpen = false },
-                isChecklist = true,
-            )
-        }
-        if (actionsPickerOpen) {
-            ActionPicker(
-                current = actions,
-                onConfirm = {
-                    onActionsChange(it)
-                    actionsPickerOpen = false
-                },
-                onDismiss = { actionsPickerOpen = false },
-            )
-        }
-        if (tagsPickerOpen) {
-            TagEditorSheet(
-                initial = tags,
-                availableTags = activeTagSuggestions,
-                onConfirm = { newTags, newColors ->
-                    onTagsWithColorsChange(newTags, newColors)
-                },
-                onEditExistingTag = onEditExistingTag,
-                onDismiss = { tagsPickerOpen = false },
-            )
-        }
-        if (attachmentsPickerOpen) {
-            AttachmentsSheet(
-                attachments = attachments,
-                onDismiss = { attachmentsPickerOpen = false },
-                onAdd = { uri, name, mime -> onAddAttachment(uri, name, mime) },
-                onRemove = onRemoveAttachment,
-            )
-        }
-        val viewerForOverlay = pictureViewer
-        FullScreenHeroImageOverlay(
-            visible = viewerForOverlay != null,
-            imageUri = viewerForOverlay?.first,
-            imageCacheRevision = viewerForOverlay?.second ?: 0L,
-            imageContentDescription = stringResource(R.string.viewer_cover_image_cd),
-            sharedElementKey = viewerForOverlay?.first?.let { uri -> "hero-image-$uri" },
-            onDismiss = { pictureViewer = null },
-            // Delete is only reachable on the active shelf - archived/trashed lists are
-            // read-only, so there's no delete affordance there.
-            onDelete = if (readOnly) null else ({ onPictureChange(null) }),
+        EditorOptionSheets(
+            contentKind = NoteKind.LIST,
+            reminderPickerOpen = reminderPickerOpen,
+            iconPickerOpen = iconPickerOpen,
+            actionsPickerOpen = actionsPickerOpen,
+            tagsPickerOpen = tagsPickerOpen,
+            attachmentsPickerOpen = attachmentsPickerOpen,
+            notificationPermissionSheetOpen = false,
+            deleteForeverConfirmOpen = deleteForeverConfirmOpen,
+            pendingHeroSession = pendingHeroSession,
+            pictureViewer = pictureViewer,
+            readOnly = readOnly,
+            activeTagSuggestions = activeTagSuggestions,
+            attachments = attachments,
+            currentReminderAt = reminderAt,
+            currentRecurrence = recurrence,
+            currentIconKey = iconKey,
+            currentActions = actions,
+            currentTags = tags,
+            heroImageContentDescription = stringResource(R.string.viewer_cover_image_cd),
+            onReminderChange = onReminderChange,
+            onIconKeyChange = onIconKeyChange,
+            onActionsChange = onActionsChange,
+            onTagsWithColorsChange = onTagsWithColorsChange,
+            onEditExistingTag = onEditExistingTag,
+            onAddAttachment = onAddAttachment,
+            onRemoveAttachment = onRemoveAttachment,
+            onHeroCommitted = onHeroCommitted,
+            onPictureChange = onPictureChange,
+            onDeleteForever = onDeleteForever,
+            onDismissReminder = { reminderPickerOpen = false },
+            onDismissIcon = { iconPickerOpen = false },
+            onDismissActions = { actionsPickerOpen = false },
+            onDismissTags = { tagsPickerOpen = false },
+            onDismissAttachments = { attachmentsPickerOpen = false },
+            onDismissNotificationPermission = {},
+            onDismissPendingHero = { pendingHeroSession = null },
+            onDismissDeleteForever = { deleteForeverConfirmOpen = false },
+            onDismissPictureViewer = { pictureViewer = null },
         )
-        pendingHeroSession?.let { (pickedUri, copiedFile) ->
-            HeroFramingEditorDialog(
-                imageUri = pickedUri,
-                pendingCopiedFile = copiedFile,
-                initialFraming = null,
-                onDismiss = {
-                    copiedFile?.delete()
-                    pendingHeroSession = null
-                },
-                onConfirm = { framing ->
-                    onHeroCommitted(pickedUri, framing)
-                    pendingHeroSession = null
-                },
-            )
-        }
-        if (deleteForeverConfirmOpen) {
-            AlertDialog(
-                onDismissRequest = { deleteForeverConfirmOpen = false },
-                title = { Text(stringResource(R.string.edit_delete_forever_dialog_title)) },
-                text = { Text(stringResource(R.string.edit_delete_forever_dialog_body)) },
-                confirmButton = {
-                    TextButton(onClick = {
-                        deleteForeverConfirmOpen = false
-                        onDeleteForever()
-                    }) {
-                        Text(stringResource(R.string.edit_delete_forever_dialog_confirm))
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { deleteForeverConfirmOpen = false }) {
-                        Text(stringResource(R.string.common_cancel))
-                    }
-                },
-            )
-        }
-    }
-}
-
-@Composable
-private fun PictureHero(
-    uri: String,
-    pictureRevision: Long,
-    pictureHeroFraming: String?,
-    viewerOpen: Boolean,
-    onOpenFull: () -> Unit,
-) {
-    val framing = remember(pictureHeroFraming) { HeroFraming.fromJsonString(pictureHeroFraming) }
-    val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
-
-    // Same-screen container transform requires both ends of sharedBounds to live in
-    // coordinated AnimatedVisibility / AnimatedContent scopes. The destination's nav
-    // scope is "always visible" while we're on this screen, so keying the inline hero
-    // to it leaves both copies (inline + overlay) reporting visibility at the same
-    // time and the bounds animation has no clean source-to-target driver. We wrap the
-    // inline hero in its own AnimatedVisibility(visible = !viewerOpen) and use that
-    // scope so opening the viewer cleanly hands the shared element off to the overlay.
-    //
-    // Outer Box keeps the layout slot at a constant height; only the inline content
-    // toggles, so the surrounding lazy column never reflows mid-transition.
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(220.dp),
-    ) {
-        val heroFadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
-        val heroFadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
-        AnimatedVisibility(
-            visible = !viewerOpen,
-            enter = fadeIn(animationSpec = heroFadeInSpec),
-            exit = fadeOut(animationSpec = heroFadeOutSpec),
-        ) {
-            val sharedModifier =
-                if (sharedScope != null) {
-                    with(sharedScope) {
-                        Modifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState(key = "hero-image-$uri"),
-                            animatedVisibilityScope = this@AnimatedVisibility,
-                        )
-                    }
-                } else {
-                    Modifier
-                }
-            // No delete overlay on the inline hero: it competes visually with the
-            // hero image and invites accidental taps. Delete lives in the full-screen
-            // viewer.
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .then(sharedModifier)
-                        .clip(MaterialTheme.shapes.large)
-                        .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .tapSoundClickable(onClick = onOpenFull),
-            ) {
-                HeroFramedImage(
-                    imageUri = uri,
-                    framing = framing,
-                    cacheRevision = pictureRevision,
-                    modifier = Modifier.fillMaxSize(),
-                )
-            }
-        }
     }
 }

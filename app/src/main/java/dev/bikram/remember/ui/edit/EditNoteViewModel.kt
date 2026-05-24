@@ -21,15 +21,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import dev.bikram.remember.data.Visibility as NoteVisibility
 
 /**
  * Owns every persisted field for the Edit Note screen and serializes save/load through
- * a single [persistMutex] so that ON_STOP, dispose, and explicit calls cannot race against
+ * a single [EditorPersistenceSession] so that ON_STOP, dispose, and explicit calls cannot race against
  * each other (or against the async note load in [init]).
  *
  * Each field is exposed as its own [StateFlow] so leaf composables can collect just the
@@ -131,26 +128,16 @@ class EditNoteViewModel
         private val _loaded = MutableStateFlow(noteId == null)
         val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 
-        private val _hasUnsavedChanges = MutableStateFlow(noteId == null && prefillBody.isNotBlank())
-        val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
+        private val persistence = EditorPersistenceSession(initialDirty = noteId == null && prefillBody.isNotBlank())
+        val hasUnsavedChanges: StateFlow<Boolean> = persistence.hasUnsavedChanges
 
         private var loadedId: Long? = noteId
-        private var dirty: Boolean = noteId == null && prefillBody.isNotBlank()
-            set(value) {
-                field = value
-                _hasUnsavedChanges.value = value
-            }
-        private val persistMutex = Mutex()
-
-        /** Bumped on every user-visible mutation so a save that suspends in the repository cannot clear [dirty] if edits landed mid-flight. */
-        private val mutationEpoch = AtomicInteger(0)
-
-        private fun markDirty() {
-            mutationEpoch.incrementAndGet()
-            dirty = true
-        }
 
         private var originalNote: dev.bikram.remember.data.NoteEntity? = null
+
+        private fun markDirty() {
+            persistence.markDirty()
+        }
 
         private fun syncHasPersistedRow() {
             _hasPersistedRow.value = loadedId != null
@@ -158,7 +145,7 @@ class EditNoteViewModel
 
         init {
             if (noteId != null) {
-                check(persistMutex.tryLock()) { "persistMutex must be unlocked at construction" }
+                check(persistence.tryLock()) { "persistence lock must be unlocked at construction" }
                 viewModelScope.launch {
                     try {
                         val existing = repository.get(noteId)
@@ -186,7 +173,7 @@ class EditNoteViewModel
                     } finally {
                         // Leave loading when the load finishes: missing row, success, or thrown from get().
                         _loaded.value = true
-                        persistMutex.unlock()
+                        persistence.unlock()
                     }
                 }
                 // Live-mirror only the fields that can be written from OUTSIDE this VM
@@ -363,7 +350,7 @@ class EditNoteViewModel
             mime: String?,
         ) {
             viewModelScope.launch {
-                persistMutex.withLock {
+                persistence.withLock {
                     val id =
                         loadedId ?: run {
                             val newId =
@@ -395,7 +382,7 @@ class EditNoteViewModel
 
         fun removeAttachment(attachmentId: Long) {
             viewModelScope.launch {
-                persistMutex.withLock {
+                persistence.withLock {
                     repository.removeAttachment(attachmentId)
                     val id = loadedId
                     _attachments.value =
@@ -461,13 +448,13 @@ class EditNoteViewModel
 
         /**
          * Persist the in-memory state. Safe to call from ON_STOP, onDispose, or any other
-         * lifecycle hook; concurrent calls serialize through [persistMutex] so we never
+         * lifecycle hook; concurrent calls serialize through [persistence] so we never
          * insert the same draft note twice.
          */
         suspend fun saveIfNeeded(untitledName: String): (suspend () -> Unit)? {
-            return persistMutex.withLock {
+            return persistence.withLock {
                 if (!hasNetChanges()) {
-                    dirty = false
+                    persistence.clearDirty()
                     return@withLock null
                 }
                 val titleValue = _title.value
@@ -475,14 +462,14 @@ class EditNoteViewModel
                 val id = loadedId
                 val finalTitle = titleValue.ifBlank { untitledName }
                 if (id == null) {
-                    if (!dirty) return@withLock null
-                    val epochAtWrite = mutationEpoch.get()
+                    if (!persistence.isDirty) return@withLock null
+                    val epochAtWrite = persistence.currentEpoch()
                     val newId = repository.createNote(finalTitle, bodyValue, 0, currentOptions())
                     loadedId = newId
                     syncHasPersistedRow()
                     if (titleValue.isBlank()) _title.value = finalTitle
                     if (_starred.value) repository.setStarred(newId, true)
-                    if (mutationEpoch.get() == epochAtWrite) dirty = false
+                    persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     originalNote = repository.get(newId)?.note
 
@@ -490,15 +477,15 @@ class EditNoteViewModel
                         repository.moveToTrash(newId)
                     }
                 } else {
-                    if (!dirty) return@withLock null
-                    val epochAtWrite = mutationEpoch.get()
+                    if (!persistence.isDirty) return@withLock null
+                    val epochAtWrite = persistence.currentEpoch()
                     repository.updateNote(id, finalTitle, bodyValue, 0, currentOptions())
                     if (titleValue.isBlank()) _title.value = finalTitle
                     val cur = repository.get(id)?.note
                     if (cur != null && cur.starred != _starred.value) {
                         repository.setStarred(id, _starred.value)
                     }
-                    if (mutationEpoch.get() == epochAtWrite) dirty = false
+                    persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val old = originalNote
                     originalNote = repository.get(id)?.note
@@ -534,10 +521,10 @@ class EditNoteViewModel
         }
 
         suspend fun trashCurrent() {
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.moveToTrash(id)
-                dirty = false
+                persistence.clearDirty()
                 _trashed.value = true
                 _archived.value = false
             }
@@ -563,32 +550,32 @@ class EditNoteViewModel
         suspend fun archiveCurrent(untitledName: String) {
             // Persist any in-flight edits first so the archive snapshot matches what the user sees.
             saveIfNeeded(untitledName)
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.archiveNote(id)
                 _archived.value = true
                 _trashed.value = false
-                dirty = false
+                persistence.clearDirty()
             }
         }
 
         suspend fun unarchiveCurrent() {
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.unarchiveNote(id)
                 _archived.value = false
                 _trashed.value = false
-                dirty = false
+                persistence.clearDirty()
             }
         }
 
         suspend fun restoreFromTrashCurrent() {
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.restoreFromTrash(id)
                 _trashed.value = false
                 _archived.value = false
-                dirty = false
+                persistence.clearDirty()
             }
         }
 
@@ -599,10 +586,10 @@ class EditNoteViewModel
          * was unresolved.
          */
         suspend fun deleteForeverCurrent() {
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.deleteForever(id)
-                dirty = false
+                persistence.clearDirty()
             }
         }
 

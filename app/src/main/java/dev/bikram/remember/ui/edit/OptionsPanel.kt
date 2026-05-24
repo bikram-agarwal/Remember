@@ -1,5 +1,8 @@
 package dev.bikram.remember.ui.edit
 
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -57,12 +60,14 @@ import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import java.text.DateFormat
 import java.util.Date
 import dev.bikram.remember.data.Visibility as NoteVisibility
 
 private val OPTION_CELL_HEIGHT = 56.dp
 private const val TAG_PILLS_MAX_LINES = 2
+private const val STARRED_WATERMARK_ALPHA = 0.28f
 
 @Composable
 fun OptionsPanel(
@@ -111,6 +116,18 @@ fun OptionsPanel(
         }
 
     val baseContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
+    val starredCueSpec =
+        reducedMotionAwareSpec(
+            tween<Float>(
+                durationMillis = 280,
+                easing = FastOutSlowInEasing,
+            ),
+        )
+    val starredCueProgress by animateFloatAsState(
+        targetValue = if (starred) 1f else 0f,
+        animationSpec = starredCueSpec,
+        label = "optionsPanelStarredCue",
+    )
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.largeIncreased,
@@ -119,13 +136,15 @@ fun OptionsPanel(
         shadowElevation = 0.dp,
     ) {
         Box(modifier = Modifier.fillMaxWidth()) {
-            if (starred) {
-                StarredRadiantWash(Modifier.matchParentSize())
+            if (starredCueProgress > 0.001f) {
+                StarredRadiantWash(
+                    modifier = Modifier.matchParentSize(),
+                    progress = starredCueProgress,
+                )
             }
-            // Watermark star for starred cards, mirrored from NoteCard. Tilted ~-15deg
-            // and very low alpha so it reads as a soft starred cue without competing with
-            // the option rows. Sits behind the Column so taps still land on rows.
-            if (starred) {
+            // Watermark star for starred cards, mirrored from NoteCard. It softly fades
+            // and settles into the same tilted pose when the editor star state changes.
+            if (starredCueProgress > 0.001f) {
                 RememberMaterialRoundedSymbol(
                     name = "star",
                     filled = true,
@@ -136,8 +155,11 @@ fun OptionsPanel(
                         Modifier
                             .align(Alignment.TopEnd)
                             .graphicsLayer {
-                                rotationZ = -15f
-                                alpha = 0.28f
+                                val inverseProgress = 1f - starredCueProgress
+                                rotationZ = -15f - (12f * inverseProgress)
+                                scaleX = 0.82f + (0.18f * starredCueProgress)
+                                scaleY = scaleX
+                                alpha = STARRED_WATERMARK_ALPHA * starredCueProgress
                             },
                 )
             }
@@ -246,7 +268,11 @@ fun OptionsPanel(
 }
 
 @Composable
-private fun BoxScope.StarredRadiantWash(modifier: Modifier = Modifier) {
+private fun BoxScope.StarredRadiantWash(
+    modifier: Modifier = Modifier,
+    progress: Float,
+) {
+    val washAlpha = progress.coerceIn(0f, 1f)
     Box(
         modifier =
             modifier.drawWithCache {
@@ -255,13 +281,15 @@ private fun BoxScope.StarredRadiantWash(modifier: Modifier = Modifier) {
                     Brush.radialGradient(
                         colorStops =
                             arrayOf(
-                                0.00f to Color(0xFFF9A825).copy(alpha = 0.20f),
-                                0.34f to Color(0xFFF9A825).copy(alpha = 0.10f),
-                                0.72f to Color(0xFFF9A825).copy(alpha = 0.035f),
+                                0.00f to Color(0xFFF9A825).copy(alpha = 0.22f * washAlpha),
+                                0.20f to Color(0xFFF9A825).copy(alpha = 0.15f * washAlpha),
+                                0.44f to Color(0xFFF9A825).copy(alpha = 0.08f * washAlpha),
+                                0.72f to Color(0xFFF9A825).copy(alpha = 0.035f * washAlpha),
+                                0.92f to Color(0xFFF9A825).copy(alpha = 0.010f * washAlpha),
                                 1.00f to Color.Transparent,
                             ),
                         center = starCenter,
-                        radius = maxOf(size.width, size.height) * 0.95f,
+                        radius = maxOf(size.width, size.height) * 1.35f,
                     )
                 onDrawBehind {
                     drawRect(brush)
@@ -695,22 +723,16 @@ private fun BehaviorSheet(
         subtitle = stringResource(R.string.options_behavior_subtitle),
         onDismiss = onDismiss,
         actions = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            RememberTextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel))
+            }
+            RememberButton(
+                onClick = {
+                    onConfirm(draftVisibility, draftImportance)
+                    onDismiss()
+                },
             ) {
-                RememberTextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-                RememberButton(
-                    onClick = {
-                        onConfirm(draftVisibility, draftImportance)
-                        onDismiss()
-                    },
-                ) {
-                    Text(stringResource(R.string.common_done))
-                }
+                Text(stringResource(R.string.common_done))
             }
         },
     ) {

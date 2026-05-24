@@ -409,7 +409,7 @@ fun NoteCard(
                                 textDecoration =
                                     if (model.completed) TextDecoration.LineThrough else TextDecoration.None,
                                 modifier = Modifier.fillMaxWidth(),
-                                maxLines = 2,
+                                maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
                         }

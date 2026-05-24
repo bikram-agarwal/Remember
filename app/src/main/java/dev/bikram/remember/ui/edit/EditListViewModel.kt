@@ -25,9 +25,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import dev.bikram.remember.data.Visibility as NoteVisibility
 
@@ -115,26 +112,16 @@ class EditListViewModel
         private val _hasPersistedRow = MutableStateFlow(noteId != null)
         val hasPersistedRow: StateFlow<Boolean> = _hasPersistedRow.asStateFlow()
 
-        private val _hasUnsavedChanges = MutableStateFlow(false)
-        val hasUnsavedChanges: StateFlow<Boolean> = _hasUnsavedChanges.asStateFlow()
+        private val persistence = EditorPersistenceSession()
+        val hasUnsavedChanges: StateFlow<Boolean> = persistence.hasUnsavedChanges
 
         private var loadedId: Long? = noteId
-        private var dirty: Boolean = false
-            set(value) {
-                field = value
-                _hasUnsavedChanges.value = value
-            }
         private var nextLocalId: Long = -1L
-        private val persistMutex = Mutex()
         private var originalNote: dev.bikram.remember.data.NoteEntity? = null
         private var originalItems: List<dev.bikram.remember.data.ChecklistItemEntity> = emptyList()
 
-        /** Bumped on every user-visible mutation so a suspended save cannot clear newer edits. */
-        private val mutationEpoch = AtomicInteger(0)
-
         private fun markDirty() {
-            mutationEpoch.incrementAndGet()
-            dirty = true
+            persistence.markDirty()
         }
 
         private fun syncHasPersistedRow() {
@@ -425,45 +412,49 @@ class EditListViewModel
             mime: String?,
         ) {
             viewModelScope.launch {
-                val id =
-                    loadedId ?: run {
-                        val entities = currentItems()
-                        val newId =
-                            repository.createList(
-                                title = _title.value,
-                                colorIndex = 0,
-                                items = entities.map { it.text },
-                                options = currentOptions(),
-                            )
-                        loadedId = newId
-                        syncHasPersistedRow()
-                        newId
-                    }
-                val attachmentUri =
-                    appMediaStorage
-                        ?.copyAttachmentToPrivateStorage(
-                            noteId = id,
-                            sourceUri = uri,
-                            displayName = name,
-                            mimeType = mime,
-                        )?.uriString ?: uri.toString()
-                repository.addAttachment(id, attachmentUri, name, mime)
-                _attachments.value = repository.get(id)?.attachments ?: emptyList()
-                markDirty()
+                persistence.withLock {
+                    val id =
+                        loadedId ?: run {
+                            val entities = currentItems()
+                            val newId =
+                                repository.createList(
+                                    title = _title.value,
+                                    colorIndex = 0,
+                                    items = entities.map { it.text },
+                                    options = currentOptions(),
+                                )
+                            loadedId = newId
+                            syncHasPersistedRow()
+                            newId
+                        }
+                    val attachmentUri =
+                        appMediaStorage
+                            ?.copyAttachmentToPrivateStorage(
+                                noteId = id,
+                                sourceUri = uri,
+                                displayName = name,
+                                mimeType = mime,
+                            )?.uriString ?: uri.toString()
+                    repository.addAttachment(id, attachmentUri, name, mime)
+                    _attachments.value = repository.get(id)?.attachments ?: emptyList()
+                    markDirty()
+                }
             }
         }
 
         fun removeAttachment(attachmentId: Long) {
             viewModelScope.launch {
-                repository.removeAttachment(attachmentId)
-                val id = loadedId
-                _attachments.value =
-                    if (id != null) {
-                        repository.get(id)?.attachments ?: emptyList()
-                    } else {
-                        _attachments.value.filterNot { it.id == attachmentId }
-                    }
-                markDirty()
+                persistence.withLock {
+                    repository.removeAttachment(attachmentId)
+                    val id = loadedId
+                    _attachments.value =
+                        if (id != null) {
+                            repository.get(id)?.attachments ?: emptyList()
+                        } else {
+                            _attachments.value.filterNot { it.id == attachmentId }
+                        }
+                    markDirty()
+                }
             }
         }
 
@@ -573,9 +564,9 @@ class EditListViewModel
         }
 
         suspend fun saveIfNeeded(untitledName: String): (suspend () -> Unit)? {
-            return persistMutex.withLock {
+            return persistence.withLock {
                 if (!hasNetChanges()) {
-                    dirty = false
+                    persistence.clearDirty()
                     return@withLock null
                 }
                 val t = _title.value
@@ -584,8 +575,8 @@ class EditListViewModel
                 val nonEmpty = _items.value.filter { it.text.isNotBlank() }
                 val persistable = currentPersistable()
                 if (id == null) {
-                    if (!dirty) return@withLock null
-                    val epochAtWrite = mutationEpoch.get()
+                    if (!persistence.isDirty) return@withLock null
+                    val epochAtWrite = persistence.currentEpoch()
                     // Creation still goes through createList which assigns sortOrder itself. If the
                     // user pre-composed hierarchy/checked state in the draft, we re-run updateList
                     // immediately afterwards with the real persistable payload.
@@ -597,7 +588,7 @@ class EditListViewModel
                         repository.updateList(newId, finalTitle, 0, persistable, currentOptions())
                     }
                     if (_starred.value) repository.setStarred(newId, true)
-                    if (mutationEpoch.get() == epochAtWrite) dirty = false
+                    persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val savedList = repository.get(newId)
                     originalNote = savedList?.note
@@ -607,15 +598,15 @@ class EditListViewModel
                         repository.moveToTrash(newId)
                     }
                 } else {
-                    if (!dirty) return@withLock null
-                    val epochAtWrite = mutationEpoch.get()
+                    if (!persistence.isDirty) return@withLock null
+                    val epochAtWrite = persistence.currentEpoch()
                     repository.updateList(id, finalTitle, 0, persistable, currentOptions())
                     if (t.isBlank()) _title.value = finalTitle
                     val cur = repository.get(id)?.note
                     if (cur != null && cur.starred != _starred.value) {
                         repository.setStarred(id, _starred.value)
                     }
-                    if (mutationEpoch.get() == epochAtWrite) dirty = false
+                    persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val old = originalNote
                     val oldItems = originalItems
@@ -665,10 +656,10 @@ class EditListViewModel
         }
 
         suspend fun trashCurrent() {
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.moveToTrash(id)
-                dirty = false
+                persistence.clearDirty()
                 _trashed.value = true
                 _archived.value = false
             }
@@ -677,32 +668,32 @@ class EditListViewModel
         /** Flip the list onto the archive shelf. Saves any in-flight edits first. */
         suspend fun archiveCurrent(untitledName: String) {
             saveIfNeeded(untitledName)
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.archiveNote(id)
                 _archived.value = true
                 _trashed.value = false
-                dirty = false
+                persistence.clearDirty()
             }
         }
 
         suspend fun unarchiveCurrent() {
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.unarchiveNote(id)
                 _archived.value = false
                 _trashed.value = false
-                dirty = false
+                persistence.clearDirty()
             }
         }
 
         suspend fun restoreFromTrashCurrent() {
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.restoreFromTrash(id)
                 _trashed.value = false
                 _archived.value = false
-                dirty = false
+                persistence.clearDirty()
             }
         }
 
@@ -727,10 +718,10 @@ class EditListViewModel
         }
 
         suspend fun deleteForeverCurrent() {
-            persistMutex.withLock {
+            persistence.withLock {
                 val id = loadedId ?: return@withLock
                 repository.deleteForever(id)
-                dirty = false
+                persistence.clearDirty()
             }
         }
     }
