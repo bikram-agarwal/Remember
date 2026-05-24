@@ -693,7 +693,7 @@ private fun MoreTagsChip(count: Int) {
             ),
     ) {
         Text(
-            text = stringResource(R.string.options_tags_more_count, count),
+            text = pluralStringResource(R.plurals.options_tags_more_count, count, count),
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,
             maxLines = 1,

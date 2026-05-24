@@ -72,8 +72,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 80
-        versionName = "0.8.0"
+        versionCode = 100
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }

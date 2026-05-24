@@ -127,7 +127,6 @@ object DiagnosticLog {
     }
 
     private fun StringBuilder.appendNotificationChannels(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channels =
             runCatching {
@@ -170,14 +169,13 @@ object DiagnosticLog {
             "not required"
         }
 
-    @Suppress("DEPRECATION")
     private fun installerPackageName(context: Context): String =
         runCatching {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
-            } else {
-                context.packageManager.getInstallerPackageName(context.packageName)
-            }.orEmpty().ifBlank { "unknown" }
+            val installingPackageName =
+                context.packageManager
+                    .getInstallSourceInfo(context.packageName)
+                    .installingPackageName
+            installingPackageName.orEmpty().ifBlank { "unknown" }
         }.getOrDefault("unknown")
 
     private fun trimIfNeeded(logFile: File) {

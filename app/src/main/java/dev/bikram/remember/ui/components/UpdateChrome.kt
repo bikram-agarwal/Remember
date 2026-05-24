@@ -47,7 +47,7 @@ sealed interface UpdateChromeState {
 fun UpdateFloatingBar(
     state: UpdateChromeState,
     onCheckClick: () -> Unit,
-    onDismissAvailable: () -> Unit,
+    @Suppress("UnusedParameter") onDismissAvailable: () -> Unit,
     onInstallClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentAlpha: Float = 1f,

@@ -7,7 +7,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -50,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -72,6 +72,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
+import androidx.core.graphics.createBitmap
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.EntryPointAccessors
@@ -189,7 +190,7 @@ fun DevOptionsRoute(onBack: () -> Unit) {
     var workersCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.workersCollapsed) }
     var diagnosticsCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.diagnosticsCollapsed) }
     var resetCollapsed by remember { mutableStateOf(DevOptionsScreenSessionState.resetCollapsed) }
-    var developerModeHeaderHeightPx by remember { mutableStateOf(0) }
+    var developerModeHeaderHeightPx by remember { mutableIntStateOf(0) }
     val developerModeHeaderHeight = with(density) { developerModeHeaderHeightPx.toDp() }
     val allDevOptionsSectionsCollapsed =
         infoCollapsed &&
@@ -225,13 +226,13 @@ fun DevOptionsRoute(onBack: () -> Unit) {
 
             fun isInternal(uri: String): Boolean =
                 runCatching {
-                    val parsedUri = Uri.parse(uri)
+                    val parsedUri = uri.toUri()
                     parsedUri.authority == fpAuthority
                 }.getOrDefault(false)
 
             fun uriBytes(uri: String): Long =
                 runCatching {
-                    context.contentResolver.openFileDescriptor(Uri.parse(uri), "r")?.use { it.statSize } ?: 0L
+                    context.contentResolver.openFileDescriptor(uri.toUri(), "r")?.use { it.statSize } ?: 0L
                 }.getOrDefault(0L)
 
             val heroUris = allNotes.mapNotNull { it.note.pictureUri?.takeIf { u -> u.isNotBlank() } }
@@ -504,7 +505,16 @@ fun DevOptionsRoute(onBack: () -> Unit) {
                                         scope.launch(Dispatchers.IO) {
                                             val count = createMockNotes(context, noteRepository)
                                             withContext(Dispatchers.Main) {
-                                                Toast.makeText(context, resources.getString(R.string.dev_options_toast_mock_created, count), Toast.LENGTH_SHORT).show()
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        resources.getQuantityString(
+                                                            R.plurals.dev_options_toast_mock_created,
+                                                            count,
+                                                            count,
+                                                        ),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
                                             }
                                         }
                                     },
@@ -1246,7 +1256,7 @@ private fun createMockHeroImageUri(context: Context): String? =
     runCatching {
         val w = 800
         val h = 450
-        val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(w, h)
         val canvas = android.graphics.Canvas(bitmap)
         val gradient =
             android.graphics.LinearGradient(
@@ -1311,12 +1321,10 @@ private fun permissionsAndStorageRows(
         context.getString(R.string.dev_options_info_notifications_enabled) to
             NotificationManagerCompat.from(context).areNotificationsEnabled().toString(),
         context.getString(R.string.dev_options_info_exact_alarms) to
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (
                 runCatching { alarmManager.canScheduleExactAlarms() }.getOrNull()?.toString()
                     ?: context.getString(R.string.dev_options_value_unknown)
-            } else {
-                true.toString()
-            },
+            ),
         context.getString(R.string.dev_options_info_battery_optimization) to
             if (powerManager.isIgnoringBatteryOptimizations(context.packageName)) {
                 context.getString(R.string.dev_options_value_ignored)
@@ -1351,12 +1359,7 @@ private fun packageInfo(context: Context): android.content.pm.PackageInfo? =
 
 private fun installerPackageName(context: Context): String? =
     runCatching {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
-        } else {
-            @Suppress("DEPRECATION")
-            context.packageManager.getInstallerPackageName(context.packageName)
-        }
+        context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
     }.getOrNull()
 
 private fun appDetailsIntent(context: Context): Intent =
@@ -1372,16 +1375,8 @@ private fun notifSettingsIntent(context: Context): Intent =
     }
 
 private fun alarmsAndRemindersIntent(context: Context): Intent =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, "package:${context.packageName}".toUri())
-            .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-    } else {
-        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-            .apply {
-                data = "package:${context.packageName}".toUri()
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-    }
+    Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, "package:${context.packageName}".toUri())
+        .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
 
 private fun batteryIntent(): Intent =
     Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)

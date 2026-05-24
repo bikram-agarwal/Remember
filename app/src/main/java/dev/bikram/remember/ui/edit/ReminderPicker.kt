@@ -939,8 +939,7 @@ private fun PillRow(
                     } else {
                         modifier
                     }
-                }
-                .padding(start = 20.dp, end = 8.dp),
+                }.padding(start = 20.dp, end = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RememberMaterialRoundedSymbol(

@@ -118,25 +118,26 @@ abstract class RememberDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    db.query(
-                        """
-                        SELECT rowid, actions
-                        FROM notes
-                        WHERE actions IS NOT NULL AND actions != '' AND actions != '[]'
-                        """.trimIndent(),
-                    ).use { cursor ->
-                        val rowIdColumn = cursor.getColumnIndex("rowid")
-                        val actionsColumn = cursor.getColumnIndex("actions")
-                        while (cursor.moveToNext()) {
-                            val rowId = cursor.getLong(rowIdColumn)
-                            val actionsJson = cursor.getString(actionsColumn) ?: continue
-                            val actionsText = actionsSearchTextFromJson(actionsJson)
-                            db.execSQL(
-                                "UPDATE notes SET actionsText = ? WHERE rowid = ?",
-                                arrayOf<Any?>(actionsText, rowId),
-                            )
+                    db
+                        .query(
+                            """
+                            SELECT rowid, actions
+                            FROM notes
+                            WHERE actions IS NOT NULL AND actions != '' AND actions != '[]'
+                            """.trimIndent(),
+                        ).use { cursor ->
+                            val rowIdColumn = cursor.getColumnIndex("rowid")
+                            val actionsColumn = cursor.getColumnIndex("actions")
+                            while (cursor.moveToNext()) {
+                                val rowId = cursor.getLong(rowIdColumn)
+                                val actionsJson = cursor.getString(actionsColumn) ?: continue
+                                val actionsText = actionsSearchTextFromJson(actionsJson)
+                                db.execSQL(
+                                    "UPDATE notes SET actionsText = ? WHERE rowid = ?",
+                                    arrayOf<Any?>(actionsText, rowId),
+                                )
+                            }
                         }
-                    }
                     dropNotesFtsSyncTriggers(db)
                     db.execSQL("DROP TABLE IF EXISTS notes_fts")
                     createNotesFtsTable(db)

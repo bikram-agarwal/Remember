@@ -14,6 +14,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -23,8 +24,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
+import androidx.core.graphics.toColorInt
 import dev.bikram.remember.data.normalizeHex
 import java.util.Locale
 import android.graphics.Color as AndroidColor
@@ -42,11 +45,11 @@ internal fun HueColorSlider(
     val fallbackHex = colorHexFromHue(fallbackHue)
     val normalizedHex = normalizeHex(selectedHex.orEmpty()) ?: fallbackHex
     var hue by rememberSaveable(normalizedHex) {
-        mutableStateOf(hueFromHexColor(normalizedHex) ?: fallbackHue)
+        mutableFloatStateOf(hueFromHexColor(normalizedHex) ?: fallbackHue)
     }
     var currentHex by rememberSaveable(normalizedHex) { mutableStateOf(normalizedHex) }
     val currentColor = colorFromHexOrDefault(currentHex, fallbackHue)
-    val thumbColor = colorFromHue(hue, saturation = HueSliderThumbSaturation, value = HueSliderThumbValue)
+    val thumbColor = colorFromHue(hue, saturation = HUE_SLIDER_THUMB_SATURATION, value = HUE_SLIDER_THUMB_VALUE)
     val lightPanel = sliderPanelColor.luminance() > 0.5f
     val handleGapWidth = if (lightPanel) HueSliderLightHandleGapWidth else HueSliderHandleGapWidth
     val handleWidth = if (lightPanel) HueSliderLightHandleWidth else HueSliderHandleWidth
@@ -99,7 +102,7 @@ internal fun HueColorSlider(
                     modifier =
                         Modifier
                             .align(Alignment.CenterStart)
-                            .offset(x = handleGapOffset)
+                            .offset { IntOffset(handleGapOffset.roundToPx(), 0) }
                             .size(width = handleGapWidth, height = HueSliderTrackHeight)
                             .background(sliderPanelColor),
                 )
@@ -107,7 +110,7 @@ internal fun HueColorSlider(
                     modifier =
                         Modifier
                             .align(Alignment.CenterStart)
-                            .offset(x = maxWidth * (hue / 360f) - handleWidth / 2)
+                            .offset { IntOffset((maxWidth * (hue / 360f) - handleWidth / 2).roundToPx(), 0) }
                             .size(width = handleWidth, height = HueSliderHandleHeight)
                             .clip(RoundedCornerShape(2.dp))
                             .background(thumbColor),
@@ -130,13 +133,13 @@ internal fun hueFromHexColor(hex: String): Float? {
     val normalized = normalizeHex(hex) ?: return null
     val hsv = FloatArray(3)
     return runCatching {
-        AndroidColor.colorToHSV(AndroidColor.parseColor(normalized), hsv)
+        AndroidColor.colorToHSV(normalized.toColorInt(), hsv)
         hsv[0]
     }.getOrNull()
 }
 
 internal fun colorHexFromHue(hue: Float): String {
-    val colorInt = androidColorFromHue(hue, HueSliderGeneratedSaturation, HueSliderGeneratedValue)
+    val colorInt = androidColorFromHue(hue, HUE_SLIDER_GENERATED_SATURATION, HUE_SLIDER_GENERATED_VALUE)
     return String.format(Locale.US, "#%06X", 0xFFFFFF and colorInt)
 }
 
@@ -164,9 +167,9 @@ internal fun colorFromHexOrDefault(
     fallbackHue: Float = 270f,
 ): Color {
     val colorInt =
-        runCatching { AndroidColor.parseColor(hex) }
+        runCatching { hex.toColorInt() }
             .getOrDefault(
-                androidColorFromHue(fallbackHue, HueSliderGeneratedSaturation, HueSliderGeneratedValue),
+                androidColorFromHue(fallbackHue, HUE_SLIDER_GENERATED_SATURATION, HUE_SLIDER_GENERATED_VALUE),
             )
     return Color(colorInt)
 }
@@ -183,10 +186,10 @@ private val HueSliderColors =
         Color(0xFFE95A50),
     )
 
-private const val HueSliderGeneratedSaturation = 0.66f
-private const val HueSliderGeneratedValue = 0.90f
-private const val HueSliderThumbSaturation = 0.58f
-private const val HueSliderThumbValue = 0.86f
+private const val HUE_SLIDER_GENERATED_SATURATION = 0.66f
+private const val HUE_SLIDER_GENERATED_VALUE = 0.90f
+private const val HUE_SLIDER_THUMB_SATURATION = 0.58f
+private const val HUE_SLIDER_THUMB_VALUE = 0.86f
 private val HueSliderTrackHeight = 28.dp
 private val HueSliderTrackCorner = 10.dp
 private val HueSliderTrackShape = RoundedCornerShape(HueSliderTrackCorner)

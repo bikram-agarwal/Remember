@@ -28,6 +28,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -70,9 +72,9 @@ import dev.bikram.remember.ui.theme.pillShape
 internal fun AboutSection(
     onOpenIntro: () -> Unit,
     onLaunchPlayReview: (onFlowFinished: () -> Unit) -> Unit,
+    modifier: Modifier = Modifier,
     onDevModeActivated: () -> Unit = {},
     devModeEnabled: Boolean = false,
-    modifier: Modifier = Modifier.padding(top = 24.dp),
 ) {
     val context = LocalContext.current
     val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
@@ -165,8 +167,8 @@ private fun AboutSettingsBlock(
             else -> BuildConfig.BUILD_TYPE
         }
     val buildVariantToastText = stringResource(R.string.about_build_variant_format, buildFlavorLabel, buildTypeLabel)
-    var devModeTapCount by remember { mutableStateOf(0) }
-    var lastAlreadyUnlockedToastMs by remember { mutableStateOf(0L) }
+    var devModeTapCount by remember { mutableIntStateOf(0) }
+    var lastAlreadyUnlockedToastMs by remember { mutableLongStateOf(0L) }
     val copyAboutLink =
         remember(context) {
             { url: String ->
@@ -217,7 +219,16 @@ private fun AboutSettingsBlock(
                                         onDevModeActivated()
                                     } else if (devModeTapCount >= 3) {
                                         val tapsLeft = 7 - devModeTapCount
-                                        Toast.makeText(context, resources.getString(R.string.dev_options_taps_remaining, tapsLeft), Toast.LENGTH_SHORT).show()
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                resources.getQuantityString(
+                                                    R.plurals.dev_options_taps_remaining,
+                                                    tapsLeft,
+                                                    tapsLeft,
+                                                ),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
                                     }
                                 }
                             },

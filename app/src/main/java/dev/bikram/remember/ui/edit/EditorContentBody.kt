@@ -160,10 +160,7 @@ internal fun EditorContentPictureHero(
     pictureHeroFraming: String?,
     viewerOpen: Boolean,
     onOpenFull: () -> Unit,
-    modifier: Modifier =
-        Modifier
-            .fillMaxWidth()
-            .aspectRatio(HERO_MASK_ASPECT_RATIO),
+    modifier: Modifier = Modifier,
 ) {
     val framing = remember(pictureHeroFraming) { HeroFraming.fromJsonString(pictureHeroFraming) }
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current

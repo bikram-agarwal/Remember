@@ -1,11 +1,11 @@
 package dev.bikram.remember.ui.edit
 
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.ResolveInfo
 import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -35,11 +35,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.IntentCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.drawable.toDrawable
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.components.RememberTextButton
@@ -195,6 +197,7 @@ fun rememberShortcutPickLauncher(
     onPicked: (ShortcutPick) -> Unit,
 ): (ComponentName) -> Unit {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val launcher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartActivityForResult(),
@@ -204,7 +207,7 @@ fun rememberShortcutPickLauncher(
             val intent = IntentCompat.getParcelableExtra(data, EXTRA_LEGACY_SHORTCUT_INTENT, Intent::class.java)
             intent ?: return@rememberLauncherForActivityResult
             val label = data.getStringExtra(EXTRA_LEGACY_SHORTCUT_NAME).orEmpty()
-            val icon = shortcutIcon(data, context.resources, context.packageManager)
+            val icon = shortcutIcon(data, resources, context.packageManager)
             val uri =
                 try {
                     intent.toUri(Intent.URI_INTENT_SCHEME)
@@ -230,13 +233,14 @@ fun rememberShortcutPickLauncher(
     }
 }
 
+@SuppressLint("DiscouragedApi")
 private fun shortcutIcon(
     data: Intent,
     resources: android.content.res.Resources,
     packageManager: android.content.pm.PackageManager,
 ): Drawable? {
     val bitmapIcon = IntentCompat.getParcelableExtra(data, EXTRA_LEGACY_SHORTCUT_ICON, Bitmap::class.java)
-    if (bitmapIcon != null) return BitmapDrawable(resources, bitmapIcon)
+    if (bitmapIcon != null) return bitmapIcon.toDrawable(resources)
 
     val iconResource =
         IntentCompat.getParcelableExtra(

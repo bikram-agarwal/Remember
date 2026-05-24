@@ -216,7 +216,6 @@ fun EditListRoute(
             archived = archived,
             trashed = trashed,
             existing = noteId != null,
-            sharedNoteId = noteId,
             persistedForToolbar = hasPersistedRow,
             hasUnsavedChanges = hasUnsavedChanges,
             forceEdit = forceEdit,
@@ -299,7 +298,6 @@ fun EditListRoute(
                     notificationPermissionSheetOpen = true
                 }
             },
-            onNotificationPermissionRequired = { notificationPermissionSheetOpen = true },
             onUnarchive = {
                 appScope.launch {
                     vm.unarchiveCurrent()
@@ -372,7 +370,6 @@ fun EditListScreen(
     archived: Boolean,
     trashed: Boolean,
     existing: Boolean,
-    sharedNoteId: Long?,
     persistedForToolbar: Boolean,
     hasUnsavedChanges: Boolean,
     forceEdit: Boolean = false,
@@ -410,7 +407,6 @@ fun EditListScreen(
     onTrash: () -> Unit,
     onArchive: () -> Unit,
     onNotification: () -> Unit,
-    onNotificationPermissionRequired: () -> Unit,
     onUnarchive: () -> Unit,
     onRestore: () -> Unit,
     onDeleteForever: () -> Unit,

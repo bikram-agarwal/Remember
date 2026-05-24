@@ -700,11 +700,36 @@ private fun markdownPreviewSource(markdown: String): MarkdownPreviewSource {
 }
 
 private fun String.visibleContentRange(): IntRange {
-    MarkdownHeadingLineRegex.matchEntire(this)?.groups?.get(2)?.range?.let { return it }
-    MarkdownChecklistLineRegex.matchEntire(this)?.groups?.get(3)?.range?.let { return it }
-    MarkdownBulletLineRegex.matchEntire(this)?.groups?.get(2)?.range?.let { return it }
-    MarkdownNumberedLineRegex.matchEntire(this)?.groups?.get(3)?.range?.let { return it }
-    MarkdownQuoteLineRegex.matchEntire(this)?.groups?.get(1)?.range?.let { return it }
+    MarkdownHeadingLineRegex
+        .matchEntire(this)
+        ?.groups
+        ?.get(2)
+        ?.range
+        ?.let { return it }
+    MarkdownChecklistLineRegex
+        .matchEntire(this)
+        ?.groups
+        ?.get(3)
+        ?.range
+        ?.let { return it }
+    MarkdownBulletLineRegex
+        .matchEntire(this)
+        ?.groups
+        ?.get(2)
+        ?.range
+        ?.let { return it }
+    MarkdownNumberedLineRegex
+        .matchEntire(this)
+        ?.groups
+        ?.get(3)
+        ?.range
+        ?.let { return it }
+    MarkdownQuoteLineRegex
+        .matchEntire(this)
+        ?.groups
+        ?.get(1)
+        ?.range
+        ?.let { return it }
     return indices
 }
 

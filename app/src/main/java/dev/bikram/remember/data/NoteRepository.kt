@@ -301,11 +301,12 @@ class NoteRepository(
                     existing.copy(
                         title = title,
                         colorIndex = colorIndex,
-                        checklistText = checklistSearchText(
-                            items
-                                .sortedBy { item -> item.sortOrder }
-                                .map { item -> item.text },
-                        ),
+                        checklistText =
+                            checklistSearchText(
+                                items
+                                    .sortedBy { item -> item.sortOrder }
+                                    .map { item -> item.text },
+                            ),
                         updatedAt = clock(),
                         reminderAt = options.reminderAt,
                         importance = options.importance,

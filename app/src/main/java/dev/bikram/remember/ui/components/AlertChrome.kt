@@ -227,8 +227,8 @@ fun AlertFloatingActionButtonMenu(
     onUpdateClick: () -> Unit,
     onDismissUpdateAvailable: () -> Unit,
     onInstallUpdate: () -> Unit,
-    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
     modifier: Modifier = Modifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
 ) {
     if (summary.count <= 0) return
 

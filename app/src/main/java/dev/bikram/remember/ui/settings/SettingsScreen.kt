@@ -51,6 +51,8 @@ import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,9 +63,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -151,7 +154,8 @@ fun SettingsRoute(
     onHighlightHandled: () -> Unit = {},
 ) {
     val context = LocalContext.current
-    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
     val resources = LocalResources.current
     val settingsDependencies =
         remember(context) {
@@ -227,7 +231,7 @@ fun SettingsRoute(
         } else {
             realPlayBannerState
         }
-    val maxUpdateSheetHeight = (configuration.screenHeightDp * 0.85f).dp
+    val maxUpdateSheetHeight = with(density) { (windowInfo.containerSize.height * 0.85f).toDp() }
 
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
@@ -257,7 +261,7 @@ fun SettingsRoute(
             }
         }
 
-    var handledStartPlayInAppUpdateRequest by rememberSaveable { mutableStateOf(0) }
+    var handledStartPlayInAppUpdateRequest by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(startPlayInAppUpdateRequest) {
         if (startPlayInAppUpdateRequest == 0) {
             handledStartPlayInAppUpdateRequest = 0
@@ -400,11 +404,11 @@ fun SettingsRoute(
             initialFirstVisibleItemScrollOffset = SettingsScreenSessionState.listFirstVisibleItemScrollOffset,
         )
     var notificationsHighlight by rememberSaveable { mutableStateOf(false) }
-    var notificationsHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
+    var notificationsHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
     var backupHighlight by rememberSaveable { mutableStateOf(false) }
-    var backupHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
+    var backupHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
     var securityHighlight by rememberSaveable { mutableStateOf(false) }
-    var securityHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
+    var securityHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission(),
@@ -680,7 +684,7 @@ fun SettingsRoute(
         }
         Unit
     }
-    var handledOpenUpdateSheetRequest by rememberSaveable { mutableStateOf(0) }
+    var handledOpenUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(openUpdateSheetRequest) {
         if (openUpdateSheetRequest == 0) {
             handledOpenUpdateSheetRequest = 0
@@ -707,7 +711,7 @@ fun SettingsRoute(
     val highlightSection = highlightSectionKey?.substringBefore(".")
     val highlightItem = highlightSectionKey?.substringAfter(".", "")?.takeIf { it.isNotEmpty() }
     var activeHighlightItem by remember { mutableStateOf<String?>(null) }
-    var activeHighlightItemRequestId by remember { mutableStateOf(0) }
+    var activeHighlightItemRequestId by remember { mutableIntStateOf(0) }
     LaunchedEffect(highlightSectionKey) {
         val key = highlightSection ?: return@LaunchedEffect
         activeHighlightItem = null
@@ -845,7 +849,7 @@ fun SettingsRoute(
                                 text = "?",
                                 style =
                                     MaterialTheme.typography.headlineSmall.copy(
-                                        fontWeight = FontWeight.Medium,
+                                        fontWeight = FontWeight.Normal,
                                         lineHeight = MaterialTheme.typography.headlineSmall.fontSize,
                                     ),
                             )

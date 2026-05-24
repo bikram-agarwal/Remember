@@ -22,6 +22,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -83,8 +85,8 @@ internal fun RemindersSection(
 ) {
     val context = LocalContext.current
     var keepUntilDoneHighlight by rememberSaveable { mutableStateOf(false) }
-    var keepUntilDoneHighlightExpiresAtMillis by rememberSaveable { mutableStateOf(0L) }
-    var handledKeepUntilDoneHighlightRequestId by rememberSaveable { mutableStateOf(0) }
+    var keepUntilDoneHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
+    var handledKeepUntilDoneHighlightRequestId by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(highlightItemKey, highlightItemRequestId) {
         if (
             highlightItemKey == "keep_until_done" &&

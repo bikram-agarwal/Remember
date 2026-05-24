@@ -374,10 +374,7 @@
     <string name="remove_tag_cd">Remove %1$s</string>
 
     <!-- Editor options row -->
-    <string name="options_icon">Icon</string>
     <string name="options_icon_cd">Change icon</string>
-    <string name="options_icon_default_note">Note</string>
-    <string name="options_icon_default_checklist">Checklist</string>
     <string name="options_tags">Tags</string>
     <string name="options_reminder">Reminder</string>
     <string name="options_actions">Notification action</string>
@@ -391,7 +388,10 @@
     <string name="options_picture_none">No picture</string>
     <string name="options_picture_attached">Attached</string>
     <string name="options_attachments">Attachments</string>
-    <string name="options_tags_more_count">+%1$d more</string>
+    <plurals name="options_tags_more_count">
+        <item quantity="one">+%1$d more</item>
+        <item quantity="other">+%1$d more</item>
+    </plurals>
     <plurals name="options_actions_count">
         <item quantity="one">%1$d action</item>
         <item quantity="other">%1$d actions</item>
@@ -531,8 +531,6 @@
     </plurals>
 
     <!-- Tags editor -->
-    <string name="tags_hex_label">Hex</string>
-    <string name="tags_hex_placeholder">Enter hex</string>
     <string name="tag_editor_assigned_heading">Assigned</string>
     <string name="tag_editor_available_heading">Available</string>
     <string name="tag_editor_no_assigned_tags">No tags assigned</string>
@@ -540,9 +538,6 @@
     <string name="tag_editor_create_placeholder">Create new tag</string>
     <string name="tag_editor_field_placeholder">Name this tag</string>
     <string name="tag_editor_name_length_counter">%1$d/%2$d</string>
-    <string name="tag_editor_preview_placeholder">Preview</string>
-    <string name="tag_editor_hex_label">HEX</string>
-    <string name="tag_editor_duplicate">Already added</string>
     <string name="tag_editor_duplicate_existing">A tag with this name already exists</string>
     <string name="tag_editor_reserved_name">This tag name is reserved by the app</string>
     <string name="tag_editor_edit_mode_label">Edit mode</string>
@@ -556,15 +551,10 @@
 
     <!-- Note actions (sheet and editor) -->
     <string name="actions_sheet_subtitle">Add a quick action to the notification</string>
-    <string name="actions_add_sheet_title">Add action</string>
-    <string name="actions_pick_contacts">Pick from contacts</string>
     <string name="actions_contact_input_placeholder">Tap to pick or type</string>
     <string name="actions_pick_app">Pick app</string>
     <string name="actions_pick_app_shortcut">Pick app for shortcut</string>
-    <string name="actions_change_app">Change app</string>
     <string name="actions_pick_shortcut">Pick shortcut</string>
-    <string name="actions_change_shortcut">Change shortcut</string>
-    <string name="actions_change_type">Change type</string>
     <string name="actions_field_action_type">Action type</string>
     <string name="actions_field_button_label">Button label</string>
     <string name="actions_target_app">App</string>
@@ -702,12 +692,7 @@
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>
     <string name="appearance_remove_custom_color_message">It will be removed from your saved custom colors</string>
     <string name="appearance_add_custom_color_cd">Add custom color</string>
-    <string name="appearance_custom_accent_title">Custom accent color</string>
     <string name="appearance_select_color">Select a color</string>
-    <string name="appearance_preview">Preview</string>
-    <string name="appearance_invalid_hex">Invalid hex</string>
-    <string name="appearance_hex_placeholder">#FF5733 or FF5733</string>
-    <string name="appearance_material_you_requires_s">Material You colors need Android 12 or newer</string>
 
     <!-- Palette style names (shared) -->
     <string name="palette_style_tonal_spot">Tonal spot</string>
@@ -721,14 +706,12 @@
     <string name="palette_style_content">Content</string>
 
     <!-- Settings: shell and section titles -->
-    <string name="settings_title">Settings</string>
     <string name="settings_expand_all_sections_cd">Expand all settings sections</string>
     <string name="settings_collapse_all_sections_cd">Collapse all settings sections</string>
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_security">Security</string>
     <string name="settings_updates_section">Updates</string>
     <string name="settings_section_about">About</string>
-    <string name="settings_help_guide">Help guide</string>
     <string name="settings_open_help_cd">Open help</string>
     <string name="help_title">Help</string>
     <string name="help_expand_all_cd">Expand all</string>
@@ -750,29 +733,13 @@
     <string name="settings_run_in_background">Run in background</string>
     <string name="settings_run_in_background_desc">Prevents the system from putting the app to sleep and delaying your reminders</string>
     <string name="settings_swipe_section">Swipe gestures</string>
-    <string name="settings_swipe_gesture">Swipe actions</string>
-    <string name="settings_swipe_mode_execute_one">Swipe to execute one action</string>
-    <string name="settings_swipe_mode_reveal_actions">Swipe to reveal three actions</string>
     <string name="settings_swipe_right_label">Swipe right</string>
     <string name="settings_swipe_left_label">Swipe left</string>
     <string name="settings_swipe_reveal_title">Reveal</string>
-    <string name="settings_swipe_reveal_subtitle">3 per side</string>
     <string name="settings_swipe_execute_title">Execute</string>
-    <string name="settings_swipe_execute_subtitle">1 per side</string>
-    <string name="settings_swipe_actions_configured">%1$d of %2$d actions configured</string>
-    <string name="settings_swipe_single_action_desc">Single action - fires on full swipe</string>
     <string name="settings_swipe_drag_hint">Each swipe reveals three actions. Drag to reorder.</string>
     <string name="settings_swipe_tap_hint">Each swipe runs one action. Tap to change the action.</string>
     <string name="settings_swipe_action_done_short">Done</string>
-    <plurals name="settings_swipe_right_actions">
-        <item quantity="one">Right swipe action</item>
-        <item quantity="other">Right swipe actions</item>
-    </plurals>
-    <plurals name="settings_swipe_left_actions">
-        <item quantity="one">Left swipe action</item>
-        <item quantity="other">Left swipe actions</item>
-    </plurals>
-    <string name="settings_swipe_none">None</string>
     <string name="swipe_action_open">Edit</string>
     <string name="swipe_action_duplicate">Duplicate</string>
     <string name="swipe_action_toggle_star">Star</string>
@@ -848,7 +815,6 @@
         <item quantity="other">Discard %1$d selected?</item>
     </plurals>
     <string name="google_tasks_import_source_switch_confirm_body">None of these tasks are saved to Remember yet. Cancel and switch source?</string>
-    <string name="google_tasks_import_source_switch_confirm_continue">Switch source</string>
     <string name="google_tasks_import_cancel_takeout_confirm_title">Cancel import?</string>
     <string name="google_tasks_import_cancel_takeout_confirm_body">None of these tasks are saved to Remember yet. Cancel and start again?</string>
     <string name="google_tasks_import_leave_confirm_body">None of these tasks are saved to Remember yet. Leave this import?</string>
@@ -916,7 +882,6 @@
     <string name="settings_notify_new_updates">Get notification for new updates</string>
     <string name="settings_notify_updates_need_auto_check">Enable \"Automatically check for updates\" first</string>
     <string name="settings_notify_updates_enable_notifications">Allow notifications for Remember</string>
-    <string name="settings_checking_for_updates">Checking for updates…</string>
     <string name="settings_update_available_button">Update available - %1$s</string>
     <string name="settings_update_available">v%1$s available</string>
     <string name="settings_update_current_version">Current version: %1$s</string>
@@ -950,7 +915,6 @@
     <string name="play_update_bar_install_subtitle">Restart to apply</string>
     <string name="play_update_bar_install_action">Install &amp; restart</string>
     <string name="settings_share_diagnostics">Share diagnostic log</string>
-    <string name="settings_share_diagnostics_subtitle">Share app version, device info, app log, and last crash stack</string>
     <string name="settings_share_diagnostics_chooser">Share diagnostic log</string>
 
     <!-- Settings: about -->
@@ -978,7 +942,10 @@
     <string name="dev_options_back_cd">Back</string>
     <string name="dev_options_mode_subtitle">Disable to hide this page from Settings</string>
     <string name="dev_options_warning">These are developer tools, not real app features. Do not use unless you know what you\'re doing. Some actions permanently change app state.</string>
-    <string name="dev_options_taps_remaining">%1$d more taps to enable developer options</string>
+    <plurals name="dev_options_taps_remaining">
+        <item quantity="one">%1$d more tap to enable developer options</item>
+        <item quantity="other">%1$d more taps to enable developer options</item>
+    </plurals>
 
     <!-- Developer options: sections -->
     <string name="dev_options_section_info">Info</string>
@@ -987,18 +954,18 @@
     <string name="dev_options_section_database">Database</string>
     <string name="dev_options_section_mock_operations">Mock operations</string>
     <string name="dev_options_section_workers">Workers &amp; scheduling</string>
-    <string name="dev_options_section_data">Mock data</string>
-    <string name="dev_options_section_notifications">Notification testing</string>
     <string name="dev_options_section_settings">Settings</string>
     <string name="dev_options_section_reset">Reset</string>
-    <string name="dev_options_section_db">Database</string>
     <string name="dev_options_section_diagnostics">Diagnostics</string>
 
     <!-- Developer options: data population -->
     <string name="dev_options_create_mock_notes">Create mock notes</string>
     <string name="dev_options_mock_notes_already_exist">Already present — delete them first</string>
     <string name="dev_options_clear_mock_data">Delete mock notes</string>
-    <string name="dev_options_toast_mock_created">Created %1$d mock notes</string>
+    <plurals name="dev_options_toast_mock_created">
+        <item quantity="one">Created %1$d mock note</item>
+        <item quantity="other">Created %1$d mock notes</item>
+    </plurals>
     <string name="dev_options_toast_mock_cleared">Mock notes deleted</string>
 
     <!-- Developer options: notification testing -->
@@ -1056,19 +1023,14 @@
     <string name="dev_options_android_format" translatable="false">%1$s (SDK %2$d)</string>
     <string name="dev_options_device_format" translatable="false">%1$s %2$s</string>
     <string name="dev_options_database_format" translatable="false">%1$s / v%2$d</string>
-    <string name="dev_options_persisted_uri_grants_format" translatable="false">%1$d total / %2$d read / %3$d write</string>
+    <string name="dev_options_persisted_uri_grants_format" translatable="false">total: %1$d / read: %2$d / write: %3$d</string>
     <string name="dev_options_value_unknown">unknown</string>
     <string name="dev_options_value_ignored">ignored</string>
     <string name="dev_options_value_active">active</string>
-    <string name="dev_options_db_stat_version">Version</string>
-    <string name="dev_options_db_stat_build">Build</string>
-    <string name="dev_options_db_stat_room_schema">Room schema</string>
     <string name="dev_options_db_stat_active_notes">Active notes</string>
     <string name="dev_options_db_stat_archived">Archived</string>
     <string name="dev_options_db_stat_trash">Trash</string>
     <string name="dev_options_db_stat_file_size">DB file size</string>
-    <string name="dev_options_db_stat_loading">loading…</string>
-    <string name="dev_options_db_stat_room_version" translatable="false">v1</string>
     <string name="dev_options_db_build_format" translatable="false">%1$s · %2$s</string>
     <string name="dev_options_db_version_format" translatable="false">%1$s (%2$d)</string>
     <string name="dev_options_db_stat_images_stored">Images stored</string>

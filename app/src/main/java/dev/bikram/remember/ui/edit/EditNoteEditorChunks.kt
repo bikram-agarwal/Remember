@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -78,6 +79,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.HERO_MASK_ASPECT_RATIO
 import dev.bikram.remember.ui.common.MarkdownLinkInteraction
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -737,6 +739,10 @@ private fun PictureHeroSection(
         pictureHeroFraming = pictureHeroFraming,
         viewerOpen = viewerOpen,
         onOpenFull = { onViewPictureFull(uri, pictureRevision) },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .aspectRatio(HERO_MASK_ASPECT_RATIO),
     )
 }
 
