@@ -1,9 +1,10 @@
 # Manual-only release build (workflow_dispatch). No push/tag triggers.
 #
 # - Git tag: creates v{versionName} from app/build.gradle.kts at the workflow commit (github.sha).
-# - Artifacts (signed release, same versionCode):
-#     - remember-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
-#     - remember-v{version}-playstore.aab (Play Store upload; playstore distribution flavor)
+# - Build target (workflow input build_target):
+#     - github: remember-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
+#     - playstore: remember-v{version}-playstore.aab (Play Store upload; playstore distribution flavor)
+#     - both: builds and uploads both artifacts
 # - GitHub Release: always draft; publish from the Releases UI when ready.
 # - Run from any branch (e.g. main); the tagged commit is the commit that was built.
 #
@@ -20,6 +21,15 @@ name: Build and release
 on:
   workflow_dispatch:
     inputs:
+      build_target:
+        description: "Which release artifact(s) to build."
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - github
+          - playstore
       play_track:
         description: "Upload AAB + Play listing (needs PLAY_SERVICE_ACCOUNT_JSON_B64). internal / beta (open testing) / production, or none to skip."
         required: true
@@ -57,20 +67,33 @@ jobs:
       - uses: android-actions/setup-android@v4
         with:
           packages: ''
-          log-accepted-android-sdk-licenses: false
 
-      - name: Install Android SDK packages
-        run: |
-          sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0" --channel=3
-
-      - name: Cache Gradle
+      - name: Cache Android SDK packages
         uses: actions/cache@v5
         with:
           path: |
-            ~/.gradle/caches
-            ~/.gradle/wrapper
-          key: gradle-${{ runner.os }}-${{ hashFiles('**/*.gradle*', '**/libs.versions.toml', '**/gradle-wrapper.properties') }}
-          restore-keys: gradle-${{ runner.os }}-
+            /usr/local/lib/android/sdk/platforms/android-37.0
+            /usr/local/lib/android/sdk/build-tools/37.0.0
+          key: android-sdk-${{ runner.os }}-platform-37.0-build-tools-37.0.0
+
+      - name: Install Android SDK packages
+        run: |
+          if [ ! -d "$ANDROID_HOME/platforms/android-37.0" ] || [ ! -d "$ANDROID_HOME/build-tools/37.0.0" ]; then
+            sdkmanager --install "platforms;android-37.0" "build-tools;37.0.0" --channel=3
+          else
+            echo "Android SDK 37.0 and build-tools 37.0.0 already present."
+          fi
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Validate build target
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.play_track }}" != "none" ] && [ "${{ inputs.build_target }}" = "github" ]; then
+            echo "Play upload requires build_target=playstore or build_target=both."
+            exit 1
+          fi
 
       - name: Resolve version label
         id: version
@@ -96,8 +119,24 @@ jobs:
           KEY_PASS: ${{ secrets.KEY_PASSWORD }}
           K_ALIAS: ${{ secrets.KEY_ALIAS }}
 
-      - name: Build GitHub APK and Play bundle
-        run: ./gradlew :app:assembleGithubRelease :app:bundlePlaystoreRelease --no-configuration-cache
+      - name: Build selected release artifacts
+        run: |
+          set -euo pipefail
+          case "${{ inputs.build_target }}" in
+            github)
+              ./gradlew :app:assembleGithubRelease --no-configuration-cache
+              ;;
+            playstore)
+              ./gradlew :app:bundlePlaystoreRelease --no-configuration-cache
+              ;;
+            both)
+              ./gradlew :app:assembleGithubRelease :app:bundlePlaystoreRelease --no-configuration-cache
+              ;;
+            *)
+              echo "Unexpected build_target"
+              exit 1
+              ;;
+          esac
 
       - name: Collect and rename release assets
         run: |
@@ -109,19 +148,28 @@ jobs:
           github_apk="app/build/outputs/apk/github/release/app-github-release.apk"
           play_aab="app/build/outputs/bundle/playstoreRelease/app-playstore-release.aab"
 
-          if [ ! -f "$github_apk" ]; then
-            echo "Expected GitHub flavor APK not found: $github_apk"
-            find app/build/outputs/apk -name '*.apk' -print || true
-            exit 1
-          fi
-          if [ ! -f "$play_aab" ]; then
-            echo "Expected Play Store bundle not found: $play_aab"
-            find app/build/outputs/bundle -name '*.aab' -print || true
-            exit 1
-          fi
+          case "${{ inputs.build_target }}" in
+            github|both)
+              if [ ! -f "$github_apk" ]; then
+                echo "Expected GitHub flavor APK not found: $github_apk"
+                find app/build/outputs/apk -name '*.apk' -print || true
+                exit 1
+              fi
+              cp "$github_apk" "$out/remember-v${version}-github.apk"
+              ;;
+          esac
 
-          cp "$github_apk" "$out/remember-v${version}-github.apk"
-          cp "$play_aab" "$out/remember-v${version}-playstore.aab"
+          case "${{ inputs.build_target }}" in
+            playstore|both)
+              if [ ! -f "$play_aab" ]; then
+                echo "Expected Play Store bundle not found: $play_aab"
+                find app/build/outputs/bundle -name '*.aab' -print || true
+                exit 1
+              fi
+              cp "$play_aab" "$out/remember-v${version}-playstore.aab"
+              ;;
+          esac
+
           ls -la "$out"
 
       - name: Upload release artifacts
@@ -141,10 +189,8 @@ jobs:
           name: v${{ steps.version.outputs.version }}
           target_commitish: ${{ github.sha }}
           body: |
-            **Release assets (same versionCode; distribution flavors)**
-          files: |
-            release-assets/remember-v${{ steps.version.outputs.version }}-github.apk
-            release-assets/remember-v${{ steps.version.outputs.version }}-playstore.aab
+            **Release assets**
+          files: release-assets/*
           generate_release_notes: true
 
       - name: Write Play service account JSON
