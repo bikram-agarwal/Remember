@@ -1,5 +1,7 @@
 package dev.bikram.remember.ui.home
 
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -79,6 +81,8 @@ import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberContentOverflowScrollEnabled
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
+import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
 import dev.bikram.remember.ui.theme.LocalSnackbarHostState
 import dev.bikram.remember.ui.theme.transparentTopAppBarColors
 import kotlinx.coroutines.launch
@@ -154,7 +158,11 @@ fun HomeRoute(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(
+    ExperimentalMaterial3Api::class,
+    ExperimentalMaterial3ExpressiveApi::class,
+    ExperimentalSharedTransitionApi::class,
+)
 @Composable
 fun HomeScreen(
     state: HomeState,
@@ -304,6 +312,19 @@ fun HomeScreen(
                     .toSet()
             }
         }
+    val navAnimatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
+    val homeRouteVisible =
+        navAnimatedVisibilityScope == null ||
+            navAnimatedVisibilityScope.transition.targetState == EnterExitState.Visible
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val topBarOverlayModifier =
+        if (homeRouteVisible && sharedTransitionScope != null) {
+            with(sharedTransitionScope) {
+                Modifier.renderInSharedTransitionScopeOverlay(zIndexInOverlay = 20f)
+            }
+        } else {
+            Modifier
+        }
 
     Scaffold(
         modifier =
@@ -352,7 +373,11 @@ fun HomeScreen(
             )
         },
         topBar = {
-            Column(Modifier.fillMaxWidth()) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .then(topBarOverlayModifier),
+            ) {
                 TopAppBar(
                     colors = transparentTopAppBarColors(),
                     title = {

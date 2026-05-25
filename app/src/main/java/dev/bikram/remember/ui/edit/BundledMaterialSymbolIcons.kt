@@ -2589,6 +2589,12 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         label = "Ea",
                     ),
                     IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_epicgames",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_epicgames,
+                        label = "Epic Games",
+                    ),
+                    IconChoice(
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_humblebundle",
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_humblebundle,
@@ -2623,6 +2629,12 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_twitch,
                         label = "Twitch",
+                    ),
+                    IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_ubisoft",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_ubisoft,
+                        label = "Ubisoft",
                     ),
                 ),
         ),

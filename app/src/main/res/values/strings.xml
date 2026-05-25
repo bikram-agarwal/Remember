@@ -284,6 +284,7 @@
     <string name="home_section_done">Done</string>
     <string name="home_section_today">Today</string>
     <string name="home_section_upcoming">Upcoming</string>
+    <string name="home_section_later">Later</string>
     <string name="home_section_no_date">No date</string>
     <string name="home_section_notes">Notes</string>
     <string name="home_section_lists">Lists</string>

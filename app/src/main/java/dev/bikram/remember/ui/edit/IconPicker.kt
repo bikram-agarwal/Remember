@@ -30,6 +30,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -490,7 +491,10 @@ fun IconPicker(
                 onSaveStarredSelection = ::saveStarredSelection,
                 onRemove = { onPick(null) },
                 onDismiss = onDismiss,
-                modifier = Modifier.align(Alignment.BottomEnd),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .imePadding(),
             )
         }
     }
@@ -1764,7 +1768,7 @@ private fun EditStarredTile(
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier =
                 Modifier
-                    .size(44.dp)
+                    .size(cellSize)
                     .clip(CircleShape)
                     .tapSoundClickable(onClick = onClick)
                     .semantics { this.contentDescription = contentDescription },

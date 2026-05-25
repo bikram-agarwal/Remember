@@ -180,6 +180,7 @@ fun BulkTagSheet(
         title = stringResource(R.string.home_bulk_tag_sheet_title),
         subtitle = stringResource(R.string.home_bulk_tag_sheet_subtitle),
         onDismiss = onDismiss,
+        actionsImePadding = true,
         actions = {
             RememberTextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.common_cancel))

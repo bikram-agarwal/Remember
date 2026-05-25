@@ -62,7 +62,7 @@ fun AppBottomSheet(
         dragHandle = { AppBottomSheetDragHandle() },
     ) {
         RememberPredictiveBackHandler(onBack = onDismiss)
-        Column(modifier = Modifier.navigationBarsPadding().imePadding()) {
+        Column(modifier = Modifier.navigationBarsPadding()) {
             if (showTitleBar) {
                 Column(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),

@@ -246,6 +246,7 @@ fun ActionPicker(
         subtitle = if (screen == ActionPickerScreen.ChooseType) stringResource(R.string.actions_sheet_subtitle) else null,
         onDismiss = onDismiss,
         scrollable = !pickingInSheet,
+        actionsImePadding = screen == ActionPickerScreen.EditAction,
         actions = {
             RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
             if (screen == ActionPickerScreen.EditAction && selectedType != null) {
