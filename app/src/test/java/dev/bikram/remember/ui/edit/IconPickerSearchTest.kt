@@ -128,4 +128,37 @@ class IconPickerSearchTest {
         val fields = listOf(SearchableField("self_improvement", weight = 2.0f))
         assertTrue(scoreSearchable(tokenizeQuery("improvement"), fields) > 0f)
     }
+
+    @Test
+    fun keywordFieldDoesNotPrefixMatchPartialQuery() {
+        // "control" is a keyword on 30+ icons (alarm, AC, brightness, …). Without this guard
+        // they all flood results for any query starting with "contr", burying controller icons.
+        val controlledThing =
+            listOf(
+                SearchableField("alarm", weight = 3.0f),
+                SearchableField("alarm", weight = 2.0f),
+                SearchableField("control", weight = 1.5f, prefixMatchEnabled = false),
+                SearchableField("device controls", weight = 0.8f, prefixMatchEnabled = false),
+            )
+        assertEquals(
+            "partial 'contr' must not match keyword 'control'",
+            0f,
+            scoreSearchable(tokenizeQuery("contr"), controlledThing),
+        )
+        // Full word "control" still works.
+        assertTrue(scoreSearchable(tokenizeQuery("control"), controlledThing) > 0f)
+    }
+
+    @Test
+    fun keywordFieldAllowsExactAndStemmedMatchWithPrefixDisabled() {
+        val controllerIcon =
+            listOf(
+                SearchableField("sports esports", weight = 3.0f),
+                SearchableField("sports_esports", weight = 2.0f),
+                SearchableField("controller gaming gamepad", weight = 1.5f, prefixMatchEnabled = false),
+                SearchableField("social", weight = 0.8f, prefixMatchEnabled = false),
+            )
+        assertTrue(scoreSearchable(tokenizeQuery("controller"), controllerIcon) > 0f)
+        assertTrue(scoreSearchable(tokenizeQuery("gaming"), controllerIcon) > 0f)
+    }
 }

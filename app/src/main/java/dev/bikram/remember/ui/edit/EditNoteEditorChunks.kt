@@ -616,25 +616,6 @@ private fun LinkActionsSheet(
     }
 }
 
-private fun String.withChecklistLineToggled(
-    lineIndex: Int,
-    checked: Boolean,
-): String {
-    val lines = lines().toMutableList()
-    val line = lines.getOrNull(lineIndex) ?: return this
-    val match = Regex("""^(\s*- \[)[ xX](]\s+)""").find(line) ?: return this
-    val updatedLine =
-        match.groupValues[1] +
-            (if (checked) "x" else " ") +
-            match.groupValues[2] +
-            line.substring(match.range.last + 1)
-    if (updatedLine == line) {
-        return this
-    }
-    lines[lineIndex] = updatedLine
-    return lines.joinToString("\n")
-}
-
 /**
  * Scrollable column for the body of the edit screen. Only reads [padding] / [blurModifier]
  * directly; mutable note state is collected by leaf sections so that, e.g., title typing

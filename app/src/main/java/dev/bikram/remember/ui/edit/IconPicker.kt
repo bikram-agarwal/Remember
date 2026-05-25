@@ -187,6 +187,10 @@ fun IconPicker(
         remember(configuration) {
             loadIconKeywords(resources)
         }
+    val iconAliases =
+        remember(configuration) {
+            loadIconAliases(resources)
+        }
     // Build the skin-tone group index once; rebuilding it on every sub-tab
     // switch was the main culprit behind the laggy category change.
     val emojiSkinToneIndex =
@@ -335,11 +339,11 @@ fun IconPicker(
         }
     }
     val filteredOrdered =
-        remember(trimmedQuery, configuration, iconKeywords) {
+        remember(trimmedQuery, configuration, iconKeywords, iconAliases) {
             if (trimmedQuery.isEmpty()) {
                 emptyList()
             } else {
-                iconChoicesRankedForSearch(resources, iconKeywords, trimmedQuery)
+                iconChoicesRankedForSearch(resources, iconKeywords, iconAliases, trimmedQuery)
             }
         }
     val activeStarredEmojis =
@@ -1529,6 +1533,20 @@ private fun loadIconKeywords(resources: Resources): Map<String, List<String>> =
         }
 
 /**
+ * Loads hand-curated search aliases keyed by icon ligature (e.g.
+ * `sports_esports` -> [controller, gamepad, gaming]). Edited in
+ * `app/src/main/res/raw/icon_aliases.json`; aliases carry the highest field
+ * weight so they surface the icon even on partial queries.
+ */
+private fun loadIconAliases(resources: Resources): Map<String, List<String>> =
+    resources
+        .openRawResource(R.raw.icon_aliases)
+        .bufferedReader()
+        .use { reader ->
+            emojiJson.decodeFromString<Map<String, List<String>>>(reader.readText())
+        }
+
+/**
  * Wait this long after the last keystroke before re-running the in-memory icon /
  * emoji filter. Matches the home search debounce so typing feel is consistent.
  */
@@ -1544,14 +1562,10 @@ private const val FIELD_WEIGHT_ALIAS: Float = 4.0f
 private const val FIELD_WEIGHT_KEYWORDS: Float = 1.5f
 private const val FIELD_WEIGHT_CATEGORY: Float = 0.8f
 
-private val iconSearchAliases: Map<String, List<String>> =
-    mapOf(
-        "business_center" to listOf("work", "office", "job", "briefcase", "business"),
-    )
-
 private fun iconChoicesRankedForSearch(
     resources: Resources,
     iconKeywords: Map<String, List<String>>,
+    iconAliases: Map<String, List<String>>,
     rawQuery: String,
 ): List<IconChoice> {
     val tokens = tokenizeQuery(rawQuery)
@@ -1560,7 +1574,7 @@ private fun iconChoicesRankedForSearch(
     iconCatalog.forEach { category ->
         val categoryLabel = resources.getString(category.nameRes)
         category.icons.forEach { choice ->
-            val score = scoreSearchable(tokens, buildIconSearchFields(choice, categoryLabel, iconKeywords))
+            val score = scoreSearchable(tokens, buildIconSearchFields(choice, categoryLabel, iconKeywords, iconAliases))
             if (score > 0f) scored += choice to score
         }
     }
@@ -1579,15 +1593,16 @@ private fun buildIconSearchFields(
     choice: IconChoice,
     categoryLabel: String,
     iconKeywords: Map<String, List<String>>,
+    iconAliases: Map<String, List<String>>,
 ): List<SearchableField> {
     val tags = choice.symbolName?.let { iconKeywords[it] }.orEmpty()
-    val aliases = choice.symbolName?.let { iconSearchAliases[it] }.orEmpty()
+    val aliases = choice.symbolName?.let { iconAliases[it] }.orEmpty()
     return listOf(
         SearchableField(text = humanizeIconKey(choice.key), weight = FIELD_WEIGHT_NAME),
         SearchableField(text = iconKeyToSearchWords(choice.key), weight = FIELD_WEIGHT_SLUG),
         SearchableField(text = aliases.joinToString(" "), weight = FIELD_WEIGHT_ALIAS),
-        SearchableField(text = tags.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS),
-        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY),
+        SearchableField(text = tags.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS, prefixMatchEnabled = false),
+        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY, prefixMatchEnabled = false),
     )
 }
 
@@ -1620,8 +1635,8 @@ private fun buildEmojiSearchFields(emoji: BundledEmoji): List<SearchableField> {
     return listOf(
         SearchableField(text = emoji.name, weight = FIELD_WEIGHT_NAME),
         SearchableField(text = emoji.slug.replace('_', ' '), weight = FIELD_WEIGHT_SLUG),
-        SearchableField(text = emoji.keywords.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS),
-        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY),
+        SearchableField(text = emoji.keywords.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS, prefixMatchEnabled = false),
+        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY, prefixMatchEnabled = false),
     )
 }
 

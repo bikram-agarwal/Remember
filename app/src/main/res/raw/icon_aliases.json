@@ -1,0 +1,12 @@
+{
+  "business_center": ["work", "office", "job", "briefcase", "business"],
+  "do_not_disturb_on": ["mute", "dnd", "silent", "quiet"],
+  "ecg_heart": ["EKG"],
+  "fastfood": ["burger", "food", "fries"],
+  "featured_seasonal_and_gifts": ["present", "christmas", "holiday", "birthday"],
+  "local_cafe": ["espresso", "latte", "cappuccino"],
+  "local_florist": ["roses", "bouquet"],
+  "local_taxi": ["cab", "uber", "rideshare"],
+  "sports_esports": ["controller", "gamepad", "gaming"],
+  "terminal": ["bash", "shell", "cmd"]
+}

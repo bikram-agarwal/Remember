@@ -31,6 +31,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.feedback.tapSoundClickable
@@ -224,7 +225,7 @@ private fun MarkdownLine(
                         source = checklistMatch.groupValues[3],
                         includeLinkAnnotations = includeLinkAnnotations,
                     ),
-                style = style,
+                style = if (checked) style.copy(textDecoration = TextDecoration.LineThrough) else style,
                 modifier = Modifier.weight(1f),
                 source = checklistMatch.groupValues[3],
                 sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
@@ -679,18 +680,40 @@ private fun markdownPreviewSource(markdown: String): MarkdownPreviewSource {
     val offsets = mutableListOf<Int>()
     val lineStartOffsets = markdown.lineStartOffsets()
     val lines = markdown.lines()
+
+    fun appendText(
+        text: String,
+        offset: Int,
+    ) {
+        text.forEach { character ->
+            preview.append(character)
+            offsets.add(offset.coerceIn(0, markdown.length))
+        }
+    }
+
+    fun appendSourceRange(
+        line: String,
+        lineStartOffset: Int,
+        range: IntRange,
+    ) {
+        for (sourceIndex in range) {
+            preview.append(line[sourceIndex])
+            offsets.add(lineStartOffset + sourceIndex)
+        }
+    }
+
     lines.forEachIndexed { lineIndex, line ->
         val lineStartOffset = lineStartOffsets.getOrElse(lineIndex) { markdown.length }
         if (lineIndex > 0) {
             preview.append('\n')
             offsets.add((lineStartOffset - 1).coerceIn(0, markdown.length))
         }
-
-        val visibleRange = line.visibleContentRange()
-        for (sourceIndex in visibleRange) {
-            preview.append(line[sourceIndex])
-            offsets.add(lineStartOffset + sourceIndex)
-        }
+        appendPreviewLine(
+            line = line,
+            lineStartOffset = lineStartOffset,
+            appendText = ::appendText,
+            appendSourceRange = ::appendSourceRange,
+        )
     }
     offsets.add(markdown.length)
     return MarkdownPreviewSource(
@@ -699,38 +722,64 @@ private fun markdownPreviewSource(markdown: String): MarkdownPreviewSource {
     )
 }
 
-private fun String.visibleContentRange(): IntRange {
+private fun appendPreviewLine(
+    line: String,
+    lineStartOffset: Int,
+    appendText: (String, Int) -> Unit,
+    appendSourceRange: (String, Int, IntRange) -> Unit,
+) {
     MarkdownHeadingLineRegex
-        .matchEntire(this)
+        .matchEntire(line)
         ?.groups
         ?.get(2)
         ?.range
-        ?.let { return it }
-    MarkdownChecklistLineRegex
-        .matchEntire(this)
-        ?.groups
-        ?.get(3)
-        ?.range
-        ?.let { return it }
-    MarkdownBulletLineRegex
-        .matchEntire(this)
-        ?.groups
-        ?.get(2)
-        ?.range
-        ?.let { return it }
-    MarkdownNumberedLineRegex
-        .matchEntire(this)
-        ?.groups
-        ?.get(3)
-        ?.range
-        ?.let { return it }
+        ?.let { range ->
+            appendSourceRange(line, lineStartOffset, range)
+            return
+        }
+    MarkdownChecklistLineRegex.matchEntire(line)?.let { match ->
+        val contentRange = match.groups[3]?.range ?: return@let
+        val checked = match.groupValues[2].equals("x", ignoreCase = true)
+        appendText(match.groupValues[1] + if (checked) "\u2611 " else "\u2610 ", lineStartOffset)
+        if (checked && !match.groupValues[3].hasStrikethroughWrapper()) {
+            appendText("~~", lineStartOffset + contentRange.first)
+            appendSourceRange(line, lineStartOffset, contentRange)
+            appendText("~~", lineStartOffset + contentRange.last + 1)
+        } else {
+            appendSourceRange(line, lineStartOffset, contentRange)
+        }
+        return
+    }
+    MarkdownBulletLineRegex.matchEntire(line)?.let { match ->
+        val contentRange = match.groups[2]?.range ?: return@let
+        appendText("  " + match.groupValues[1] + "\u2022 ", lineStartOffset)
+        appendSourceRange(line, lineStartOffset, contentRange)
+        return
+    }
+    MarkdownNumberedLineRegex.matchEntire(line)?.let { match ->
+        val contentRange = match.groups[3]?.range ?: return@let
+        appendText(" " + match.groupValues[1] + match.groupValues[2] + ". ", lineStartOffset)
+        appendSourceRange(line, lineStartOffset, contentRange)
+        return
+    }
     MarkdownQuoteLineRegex
-        .matchEntire(this)
+        .matchEntire(line)
         ?.groups
         ?.get(1)
         ?.range
-        ?.let { return it }
-    return indices
+        ?.let { range ->
+            appendSourceRange(line, lineStartOffset, range)
+            return
+        }
+    appendSourceRange(line, lineStartOffset, line.indices)
+}
+
+private fun String.hasStrikethroughWrapper(): Boolean {
+    val contentStart = indexOfFirst { !it.isWhitespace() }.let { if (it < 0) return false else it }
+    val contentEndExclusive = indexOfLast { !it.isWhitespace() } + 1
+    return contentEndExclusive - contentStart >= 4 &&
+        startsWith("~~", contentStart) &&
+        substring(contentStart, contentEndExclusive).endsWith("~~")
 }
 
 private fun String.lineStartOffsets(): List<Int> {
