@@ -685,6 +685,16 @@ private fun markdownPreviewSource(markdown: String): MarkdownPreviewSource {
         text: String,
         offset: Int,
     ) {
+        text.forEachIndexed { index, character ->
+            preview.append(character)
+            offsets.add((offset + index).coerceIn(0, markdown.length))
+        }
+    }
+
+    fun appendSyntheticText(
+        text: String,
+        offset: Int,
+    ) {
         text.forEach { character ->
             preview.append(character)
             offsets.add(offset.coerceIn(0, markdown.length))
@@ -712,6 +722,7 @@ private fun markdownPreviewSource(markdown: String): MarkdownPreviewSource {
             line = line,
             lineStartOffset = lineStartOffset,
             appendText = ::appendText,
+            appendSyntheticText = ::appendSyntheticText,
             appendSourceRange = ::appendSourceRange,
         )
     }
@@ -726,6 +737,7 @@ private fun appendPreviewLine(
     line: String,
     lineStartOffset: Int,
     appendText: (String, Int) -> Unit,
+    appendSyntheticText: (String, Int) -> Unit,
     appendSourceRange: (String, Int, IntRange) -> Unit,
 ) {
     MarkdownHeadingLineRegex
@@ -740,11 +752,15 @@ private fun appendPreviewLine(
     MarkdownChecklistLineRegex.matchEntire(line)?.let { match ->
         val contentRange = match.groups[3]?.range ?: return@let
         val checked = match.groupValues[2].equals("x", ignoreCase = true)
-        appendText(match.groupValues[1] + if (checked) "\u2611 " else "\u2610 ", lineStartOffset)
+        appendSourceRange(line, lineStartOffset, match.groups[1]?.range ?: IntRange.EMPTY)
+        appendSyntheticText(
+            if (checked) "\u2611 " else "\u2610 ",
+            lineStartOffset + (match.groups[2]?.range?.first ?: contentRange.first),
+        )
         if (checked && !match.groupValues[3].hasStrikethroughWrapper()) {
-            appendText("~~", lineStartOffset + contentRange.first)
+            appendSyntheticText("~~", lineStartOffset + contentRange.first)
             appendSourceRange(line, lineStartOffset, contentRange)
-            appendText("~~", lineStartOffset + contentRange.last + 1)
+            appendSyntheticText("~~", lineStartOffset + contentRange.last + 1)
         } else {
             appendSourceRange(line, lineStartOffset, contentRange)
         }
@@ -752,13 +768,19 @@ private fun appendPreviewLine(
     }
     MarkdownBulletLineRegex.matchEntire(line)?.let { match ->
         val contentRange = match.groups[2]?.range ?: return@let
-        appendText("  " + match.groupValues[1] + "\u2022 ", lineStartOffset)
+        appendSyntheticText("  ", lineStartOffset)
+        appendSourceRange(line, lineStartOffset, match.groups[1]?.range ?: IntRange.EMPTY)
+        appendSyntheticText("\u2022 ", lineStartOffset + match.groupValues[1].length)
         appendSourceRange(line, lineStartOffset, contentRange)
         return
     }
     MarkdownNumberedLineRegex.matchEntire(line)?.let { match ->
         val contentRange = match.groups[3]?.range ?: return@let
-        appendText(" " + match.groupValues[1] + match.groupValues[2] + ". ", lineStartOffset)
+        appendSyntheticText(" ", lineStartOffset)
+        appendSourceRange(line, lineStartOffset, match.groups[1]?.range ?: IntRange.EMPTY)
+        val numberRange = match.groups[2]?.range ?: return@let
+        appendText(match.groupValues[2], lineStartOffset + numberRange.first)
+        appendSyntheticText(". ", lineStartOffset + numberRange.last + 1)
         appendSourceRange(line, lineStartOffset, contentRange)
         return
     }

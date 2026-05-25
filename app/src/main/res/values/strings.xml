@@ -245,6 +245,9 @@
     <string name="edit_bottom_bar_restore_cd">Restore from trash</string>
     <string name="edit_save_cd">Save changes</string>
     <string name="edit_picture_framing_cd">Edit picture framing</string>
+    <string name="edit_picture_reframe">Reframe</string>
+    <string name="edit_picture_replace">Replace</string>
+    <string name="edit_replace_picture_cd">Replace picture</string>
     <string name="edit_delete_forever_dialog_title">Delete forever?</string>
     <string name="edit_delete_forever_dialog_body">This note will be permanently deleted and cannot be recovered</string>
     <string name="edit_delete_forever_dialog_confirm">Delete</string>
@@ -690,9 +693,11 @@
     <string name="appearance_gradient_subtitle">Show a subtle accent gradient behind the app</string>
     <string name="appearance_black_theme_effect_disabled">Can\'t change this in Black theme</string>
     <string name="appearance_blur_title">Progressive blur</string>
-    <string name="appearance_blur_subtitle">Blur content behind the top and bottom bars</string>
-    <string name="appearance_hero_title">Hero image on cards</string>
-    <string name="appearance_hero_subtitle">Use the note picture as a faded background of the card</string>
+    <string name="appearance_blur_subtitle">Blur content at bottom of screen &amp; other places</string>
+    <string name="appearance_cover_title">Cover image on cards</string>
+    <string name="appearance_cover_subtitle">Use the note picture as a faded background of the card</string>
+    <string name="appearance_adaptive_note_themes_title">Adaptive note themes</string>
+    <string name="appearance_adaptive_note_themes_subtitle">Use color from cover image to tint the note page</string>
     <string name="appearance_shading_title">Enhanced shading</string>
     <string name="appearance_shading_subtitle">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>

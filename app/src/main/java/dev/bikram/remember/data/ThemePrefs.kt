@@ -103,6 +103,7 @@ data class ThemeState(
     val useGradient: Boolean = true,
     val useEnhancedShading: Boolean = false,
     val heroOnCards: Boolean = true,
+    val adaptiveNoteThemes: Boolean = true,
     val blurBars: Boolean = true,
 )
 
@@ -118,6 +119,7 @@ class ThemePrefs(
         val USE_GRADIENT = booleanPreferencesKey("use_gradient")
         val USE_ENHANCED_SHADING = booleanPreferencesKey("use_enhanced_shading")
         val HERO_ON_CARDS = booleanPreferencesKey("hero_on_cards")
+        val ADAPTIVE_NOTE_THEMES = booleanPreferencesKey("adaptive_note_themes")
         val BLUR_BARS = booleanPreferencesKey("blur_bars")
     }
 
@@ -139,6 +141,7 @@ class ThemePrefs(
                 useGradient = p[Keys.USE_GRADIENT] ?: true,
                 useEnhancedShading = p[Keys.USE_ENHANCED_SHADING] ?: false,
                 heroOnCards = p[Keys.HERO_ON_CARDS] ?: true,
+                adaptiveNoteThemes = p[Keys.ADAPTIVE_NOTE_THEMES] ?: true,
                 blurBars = p[Keys.BLUR_BARS] ?: true,
             )
         }
@@ -234,6 +237,10 @@ class ThemePrefs(
 
     suspend fun setHeroOnCards(value: Boolean) {
         context.themePrefsDataStore.edit { it[Keys.HERO_ON_CARDS] = value }
+    }
+
+    suspend fun setAdaptiveNoteThemes(value: Boolean) {
+        context.themePrefsDataStore.edit { it[Keys.ADAPTIVE_NOTE_THEMES] = value }
     }
 
     suspend fun setBlurBars(value: Boolean) {

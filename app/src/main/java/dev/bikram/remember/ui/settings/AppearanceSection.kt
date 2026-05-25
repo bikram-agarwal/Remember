@@ -163,19 +163,34 @@ fun AppearanceSection(
             }
             GroupedListItem(position = GroupPosition.MIDDLE) {
                 AppearanceSettingsToggleItem(
+                    title = stringResource(R.string.appearance_adaptive_note_themes_title),
+                    subtitle = stringResource(R.string.appearance_adaptive_note_themes_subtitle),
+                    checked = state.adaptiveNoteThemes && !blackThemeEffectsDisabled,
+                    enabled = !blackThemeEffectsDisabled,
+                    onDisabledClick = {
+                        scope.launch {
+                            snackbarHostState.currentSnackbarData?.dismiss()
+                            snackbarHostState.showSnackbar(blackThemeEffectsDisabledMessage)
+                        }
+                    },
+                    onCheckedChange = { scope.launch { prefs.setAdaptiveNoteThemes(it) } },
+                )
+            }
+            GroupedListItem(position = GroupPosition.MIDDLE) {
+                AppearanceSettingsToggleItem(
+                    title = stringResource(R.string.appearance_cover_title),
+                    subtitle = stringResource(R.string.appearance_cover_subtitle),
+                    checked = state.heroOnCards,
+                    onCheckedChange = { scope.launch { prefs.setHeroOnCards(it) } },
+                )
+            }
+            GroupedListItem(position = GroupPosition.LAST) {
+                AppearanceSettingsToggleItem(
                     title = stringResource(R.string.appearance_blur_title),
                     subtitle = stringResource(R.string.appearance_blur_subtitle),
                     checked = state.blurBars,
                     leadingMaterialSymbolName = "blur_on",
                     onCheckedChange = { scope.launch { prefs.setBlurBars(it) } },
-                )
-            }
-            GroupedListItem(position = GroupPosition.LAST) {
-                AppearanceSettingsToggleItem(
-                    title = stringResource(R.string.appearance_hero_title),
-                    subtitle = stringResource(R.string.appearance_hero_subtitle),
-                    checked = state.heroOnCards,
-                    onCheckedChange = { scope.launch { prefs.setHeroOnCards(it) } },
                 )
             }
         }

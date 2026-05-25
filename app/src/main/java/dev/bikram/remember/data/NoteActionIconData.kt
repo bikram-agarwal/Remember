@@ -14,14 +14,21 @@ private const val NOTE_ACTION_ICON_SIZE_PX = 96
 fun Drawable.toNoteActionIconData(): String? =
     runCatching {
         val bitmap = Bitmap.createBitmap(NOTE_ACTION_ICON_SIZE_PX, NOTE_ACTION_ICON_SIZE_PX, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        val oldBounds = Rect(bounds)
-        setBounds(0, 0, canvas.width, canvas.height)
-        draw(canvas)
-        setBounds(oldBounds)
-        ByteArrayOutputStream().use { output ->
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
-            Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+        try {
+            val canvas = Canvas(bitmap)
+            val oldBounds = Rect(bounds)
+            try {
+                setBounds(0, 0, canvas.width, canvas.height)
+                draw(canvas)
+            } finally {
+                setBounds(oldBounds)
+            }
+            ByteArrayOutputStream().use { output ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)
+                Base64.encodeToString(output.toByteArray(), Base64.NO_WRAP)
+            }
+        } finally {
+            bitmap.recycle()
         }
     }.getOrNull()
 
@@ -33,5 +40,4 @@ fun String?.toNoteActionIconBitmap(): Bitmap? {
     }.getOrNull()
 }
 
-fun String?.toNoteActionIconDrawable(resources: Resources): Drawable? =
-    toNoteActionIconBitmap()?.let { BitmapDrawable(resources, it) }
+fun String?.toNoteActionIconDrawable(resources: Resources): Drawable? = toNoteActionIconBitmap()?.let { BitmapDrawable(resources, it) }

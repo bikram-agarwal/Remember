@@ -637,12 +637,23 @@ class ReminderReceiver : BroadcastReceiver() {
 
         private fun Drawable.toNotificationActionBitmap(): Bitmap {
             val bitmap = createBitmap(NOTIFICATION_ACTION_ICON_SIZE_PX, NOTIFICATION_ACTION_ICON_SIZE_PX)
-            val canvas = Canvas(bitmap)
-            val oldBounds = Rect(bounds)
-            setBounds(0, 0, canvas.width, canvas.height)
-            draw(canvas)
-            setBounds(oldBounds)
-            return bitmap
+            var success = false
+            try {
+                val canvas = Canvas(bitmap)
+                val oldBounds = Rect(bounds)
+                try {
+                    setBounds(0, 0, canvas.width, canvas.height)
+                    draw(canvas)
+                } finally {
+                    setBounds(oldBounds)
+                }
+                success = true
+                return bitmap
+            } finally {
+                if (!success) {
+                    bitmap.recycle()
+                }
+            }
         }
 
         private const val NOTIFICATION_ACTION_ICON_SIZE_PX = 96
