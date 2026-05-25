@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,7 @@ import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.dataLabelRes
 import dev.bikram.remember.data.labelRes
+import dev.bikram.remember.data.recycleNoteActionIconBitmap
 import dev.bikram.remember.data.toNoteActionIconData
 import dev.bikram.remember.data.toNoteActionIconDrawable
 import dev.bikram.remember.ui.common.AppBottomSheet
@@ -106,6 +108,11 @@ fun ActionPicker(
         remember(initialAction?.iconData, resources) {
             initialAction?.iconData.toNoteActionIconDrawable(resources)
         }
+    DisposableEffect(savedShortcutIcon) {
+        onDispose {
+            savedShortcutIcon?.recycleNoteActionIconBitmap()
+        }
+    }
 
     val targetDisplayName =
         when (selectedType) {

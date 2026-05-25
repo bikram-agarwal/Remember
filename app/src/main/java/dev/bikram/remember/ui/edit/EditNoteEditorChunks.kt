@@ -699,6 +699,7 @@ internal fun EditNoteScrollableContent(
                 onOpenTags = if (readOnly) ({}) else onOpenTags,
                 onOpenAttachments = if (readOnly) ({}) else onOpenAttachments,
             )
+            Spacer(Modifier.height(36.dp))
         },
     )
 }

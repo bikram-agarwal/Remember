@@ -89,9 +89,10 @@ fun rememberImageDerivedColorScheme(imageColors: ImageDerivedColors?): ImageDeri
             } else {
                 base
             }
-        val themed = shaded
-            .boostOutlineForVisibility(darkTheme)
-            .boostContainersForSeedThemes(darkTheme)
+        val themed =
+            shaded
+                .boostOutlineForVisibility(darkTheme)
+                .boostContainersForSeedThemes(darkTheme)
         ImageDerivedColorResolution(
             colorScheme = themed,
             backgroundScheme = base,
@@ -248,4 +249,3 @@ private fun readableContentFor(background: Color): Color =
     } else {
         Color(0xFFF3EFF7)
     }
-

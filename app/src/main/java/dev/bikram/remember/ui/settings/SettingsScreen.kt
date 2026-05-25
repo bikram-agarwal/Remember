@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.settings
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlarmManager
 import android.content.Context
@@ -74,6 +75,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -96,6 +98,8 @@ import dev.bikram.remember.ui.common.AppBottomSheetDragHandle
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
+import dev.bikram.remember.ui.components.rememberResponsiveActionIconSize
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
@@ -140,6 +144,7 @@ private object SettingsScreenSessionState {
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun SettingsRoute(
     onOpenIntro: () -> Unit = {},
@@ -831,7 +836,7 @@ fun SettingsRoute(
                 modifier = Modifier.padding(bottom = 80.dp),
             )
         },
-    ) {
+    ) { _ ->
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
         val topInset = statusBarInset + 68.dp
         val bottomPadding = pillInset + 24.dp
@@ -1190,21 +1195,26 @@ fun SettingsRoute(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                val actionButtonSize = rememberResponsiveActionButtonSize()
+                val actionIconSize = rememberResponsiveActionIconSize()
                 val openHelpLabel = stringResource(R.string.settings_open_help_cd)
                 RememberFilledTonalIconButton(
                     onClick = onOpenHelp,
                     modifier =
-                        Modifier.semantics {
-                            contentDescription = openHelpLabel
-                        },
+                        Modifier
+                            .size(actionButtonSize)
+                            .semantics {
+                                contentDescription = openHelpLabel
+                            },
                     tooltipLabel = openHelpLabel,
                 ) {
                     Text(
                         text = "?",
                         style =
-                            MaterialTheme.typography.headlineSmall.copy(
+                            MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Normal,
-                                lineHeight = MaterialTheme.typography.headlineSmall.fontSize,
+                                fontSize = actionIconSize.value.sp,
+                                lineHeight = actionIconSize.value.sp,
                             ),
                     )
                 }
@@ -1226,14 +1236,16 @@ fun SettingsRoute(
                             }
                     },
                     modifier =
-                        Modifier.semantics {
-                            contentDescription = expandCollapseAllLabel
-                        },
+                        Modifier
+                            .size(actionButtonSize)
+                            .semantics {
+                                contentDescription = expandCollapseAllLabel
+                            },
                     tooltipLabel = expandCollapseAllLabel,
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = if (allSettingsSectionsCollapsed) "unfold_more" else "unfold_less",
-                        size = 22.dp,
+                        size = actionIconSize,
                         weight = FontWeight.Medium,
                     )
                 }

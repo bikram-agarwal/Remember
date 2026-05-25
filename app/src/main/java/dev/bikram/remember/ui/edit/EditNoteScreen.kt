@@ -567,7 +567,7 @@ fun EditNoteScreen(
                 EditNoteScrollableContent(
                     vm = vm,
                     modifier = blurMod,
-                    horizontalPadding = 20.dp,
+                    horizontalPadding = EditorContentBodyDefaults.HorizontalPadding,
                     padding = padding,
                     markdownEditorState = markdownEditorState,
                     bodyPlaceholder = bodyPlaceholder,
@@ -626,7 +626,6 @@ fun EditNoteScreen(
                 deleteForeverConfirmOpen = deleteForeverConfirmOpen,
                 pendingHeroSession = pendingHeroSession,
                 pictureViewer = pictureViewer,
-                currentPictureUri = pictureUri,
                 currentPictureHeroFraming = pictureHeroFraming,
                 readOnly = readOnly,
                 activeTagSuggestions = activeTagSuggestions,

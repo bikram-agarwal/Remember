@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.home
 
+import android.annotation.SuppressLint
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
@@ -76,6 +77,7 @@ import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.toNoteCardUiModel
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
@@ -163,6 +165,7 @@ fun HomeRoute(
     ExperimentalMaterial3ExpressiveApi::class,
     ExperimentalSharedTransitionApi::class,
 )
+@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
 fun HomeScreen(
     state: HomeState,
@@ -373,7 +376,7 @@ fun HomeScreen(
                 bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
             )
         },
-    ) {
+    ) { _ ->
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
         val topInset = statusBarInset + 68.dp
         val bottomPadding = bottomInset + 24.dp
@@ -680,12 +683,13 @@ fun HomeScreen(
                     )
                 } else {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        val actionButtonSize = rememberResponsiveActionButtonSize()
                         val cdSelectAll = stringResource(R.string.home_select_all)
-                        Box(modifier = Modifier.size(48.dp)) {
+                        Box(modifier = Modifier.size(actionButtonSize)) {
                             RememberFilledTonalIconButton(
                                 onClick = { onSelectAllVisible(selectableVisibleIds) },
                                 enabled = selectableVisibleIds.isNotEmpty(),
-                                modifier = Modifier.align(Alignment.Center),
+                                modifier = Modifier.align(Alignment.Center).size(actionButtonSize),
                             ) {
                                 RememberMaterialRoundedSymbol(
                                     name = "select_all",
@@ -709,7 +713,10 @@ fun HomeScreen(
                         }
                         Spacer(Modifier.width(6.dp))
                         val cdUnselectAll = stringResource(R.string.home_unselect_all)
-                        RememberFilledTonalIconButton(onClick = onClearSelection) {
+                        RememberFilledTonalIconButton(
+                            onClick = onClearSelection,
+                            modifier = Modifier.size(actionButtonSize),
+                        ) {
                             RememberMaterialRoundedSymbol(
                                 name = "deselect",
                                 weight = FontWeight.Medium,

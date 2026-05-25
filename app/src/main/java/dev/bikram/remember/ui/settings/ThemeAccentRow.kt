@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -34,6 +35,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ColorSource
@@ -89,116 +91,129 @@ fun ThemeAccentRow(
     onAddCustomHexClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyRow(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        items(accentPresetSpecs, key = { "preset_${it.source.name}" }) { spec ->
-            val isSelected = colorSource == spec.source
-            val borderColor =
-                if (isSelected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
-                }
-            Box(
-                modifier =
-                    Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .border(
-                            width = if (isSelected) 3.dp else 1.dp,
-                            color = borderColor,
-                            shape = CircleShape,
-                        ).tapSoundClickable(
-                            onClick = { onSelectPreset(spec.source) },
-                            indication = ripple(bounded = true),
-                            interactionSource = remember { MutableInteractionSource() },
-                        ).semantics { role = Role.RadioButton },
-                contentAlignment = Alignment.Center,
-            ) {
-                ThemeAccentCircleContent(spec = spec)
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val swatchSize =
+            when {
+                maxWidth < 300.dp -> 42.dp
+                maxWidth < 360.dp -> 46.dp
+                else -> 52.dp
             }
-        }
-        items(savedCustomSeedHexes, key = { "hex_$it" }) { storedHex ->
-            val isSelected = customHexSwatchSelected(colorSource, activeCustomSeedHex, storedHex)
-            val borderColor =
-                if (isSelected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
-                }
-            val fillColor =
-                runCatching {
-                    Color((normalizeHex(storedHex) ?: storedHex).toColorInt())
-                }.getOrDefault(MaterialTheme.colorScheme.surfaceVariant)
-            Box(
-                modifier =
-                    Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .border(
-                            width = if (isSelected) 3.dp else 1.dp,
-                            color = borderColor,
-                            shape = CircleShape,
-                        ).tapSoundCombinedClickable(
-                            onClick = { onSelectCustomHex(storedHex) },
-                            onLongClick = { onCustomHexLongPress(storedHex) },
-                            indication = ripple(bounded = true),
-                            interactionSource = remember { MutableInteractionSource() },
-                        ).semantics { role = Role.RadioButton },
-                contentAlignment = Alignment.Center,
-            ) {
+        val innerSwatchSize = swatchSize - 8.dp
+        val swatchGap = if (maxWidth < 340.dp) 8.dp else 12.dp
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(swatchGap),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items(accentPresetSpecs, key = { "preset_${it.source.name}" }) { spec ->
+                val isSelected = colorSource == spec.source
+                val borderColor =
+                    if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                    }
                 Box(
                     modifier =
                         Modifier
-                            .size(44.dp)
+                            .size(swatchSize)
                             .clip(CircleShape)
-                            .background(fillColor),
-                )
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = borderColor,
+                                shape = CircleShape,
+                            ).tapSoundClickable(
+                                onClick = { onSelectPreset(spec.source) },
+                                indication = ripple(bounded = true),
+                                interactionSource = remember { MutableInteractionSource() },
+                            ).semantics { role = Role.RadioButton },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ThemeAccentCircleContent(spec = spec, size = innerSwatchSize)
+                }
             }
-        }
-        item(key = "add_custom_seed") {
-            val addCustomColorCd = stringResource(R.string.appearance_add_custom_color_cd)
-            val addBorder = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
-            Box(
-                modifier =
-                    Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .border(width = 1.dp, color = addBorder, shape = CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
-                        .tapSoundClickable(
-                            onClick = onAddCustomHexClick,
-                            indication = ripple(bounded = true),
-                            interactionSource = remember { MutableInteractionSource() },
-                        ).semantics { role = Role.Button },
-                contentAlignment = Alignment.Center,
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = if (customColorPickerOpen) "chevron_right" else "add",
-                    size = if (customColorPickerOpen) 22.dp else 26.dp,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    weight = FontWeight.Medium,
+            items(savedCustomSeedHexes, key = { "hex_$it" }) { storedHex ->
+                val isSelected = customHexSwatchSelected(colorSource, activeCustomSeedHex, storedHex)
+                val borderColor =
+                    if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                    }
+                val fillColor =
+                    runCatching {
+                        Color((normalizeHex(storedHex) ?: storedHex).toColorInt())
+                    }.getOrDefault(MaterialTheme.colorScheme.surfaceVariant)
+                Box(
                     modifier =
                         Modifier
-                            .graphicsLayer { rotationZ = if (customColorPickerOpen) 90f else 0f }
-                            .semantics { contentDescription = addCustomColorCd },
-                )
+                            .size(swatchSize)
+                            .clip(CircleShape)
+                            .border(
+                                width = if (isSelected) 3.dp else 1.dp,
+                                color = borderColor,
+                                shape = CircleShape,
+                            ).tapSoundCombinedClickable(
+                                onClick = { onSelectCustomHex(storedHex) },
+                                onLongClick = { onCustomHexLongPress(storedHex) },
+                                indication = ripple(bounded = true),
+                                interactionSource = remember { MutableInteractionSource() },
+                            ).semantics { role = Role.RadioButton },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(innerSwatchSize)
+                                .clip(CircleShape)
+                                .background(fillColor),
+                    )
+                }
+            }
+            item(key = "add_custom_seed") {
+                val addCustomColorCd = stringResource(R.string.appearance_add_custom_color_cd)
+                val addBorder = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                Box(
+                    modifier =
+                        Modifier
+                            .size(swatchSize)
+                            .clip(CircleShape)
+                            .border(width = 1.dp, color = addBorder, shape = CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
+                            .tapSoundClickable(
+                                onClick = onAddCustomHexClick,
+                                indication = ripple(bounded = true),
+                                interactionSource = remember { MutableInteractionSource() },
+                            ).semantics { role = Role.Button },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = if (customColorPickerOpen) "chevron_right" else "add",
+                        size = if (customColorPickerOpen) swatchSize * 0.42f else swatchSize * 0.50f,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        weight = FontWeight.Medium,
+                        modifier =
+                            Modifier
+                                .graphicsLayer { rotationZ = if (customColorPickerOpen) 90f else 0f }
+                                .semantics { contentDescription = addCustomColorCd },
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun ThemeAccentCircleContent(spec: ColorSourceSpec) {
+private fun ThemeAccentCircleContent(
+    spec: ColorSourceSpec,
+    size: androidx.compose.ui.unit.Dp,
+) {
     when (spec.swatchType) {
         ColorSourceSwatchType.MATERIAL_YOU ->
             Box(
                 modifier =
                     Modifier
-                        .size(44.dp)
+                        .size(size)
                         .clip(CircleShape)
                         .background(
                             Brush.linearGradient(
@@ -213,7 +228,7 @@ private fun ThemeAccentCircleContent(spec: ColorSourceSpec) {
             ) {
                 RememberMaterialRoundedSymbol(
                     name = "palette",
-                    size = 22.dp,
+                    size = size * 0.50f,
                     tint = Color.White.copy(alpha = 0.92f),
                     weight = FontWeight.Medium,
                 )
@@ -224,13 +239,14 @@ private fun ThemeAccentCircleContent(spec: ColorSourceSpec) {
                 primary = triplet.primary,
                 secondary = triplet.secondary,
                 tertiary = triplet.tertiary,
+                size = size,
             )
         }
         ColorSourceSwatchType.SOLID ->
             Box(
                 modifier =
                     Modifier
-                        .size(44.dp)
+                        .size(size)
                         .clip(CircleShape)
                         .background(spec.representativeColor),
             )
@@ -248,11 +264,12 @@ private fun CuratedTripletSwatch(
     primary: Color,
     secondary: Color,
     tertiary: Color,
+    size: androidx.compose.ui.unit.Dp,
 ) {
     Column(
         modifier =
             Modifier
-                .size(44.dp)
+                .size(size)
                 .clip(CircleShape),
     ) {
         Box(
@@ -282,35 +299,59 @@ fun ThemePaletteStyleRow(
     onSelect: (PaletteStyleOpt) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyRow(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(paletteStyleOrder, key = { it.name }) { style ->
-            RememberFilterChip(
-                selected = selected == style,
-                onClick = { if (enabled) onSelect(style) },
-                enabled = enabled,
-                label = {
-                    Text(
-                        text = paletteStyleLabel(style),
-                        style = MaterialTheme.typography.labelMedium,
-                        maxLines = 1,
-                    )
-                },
-                colors =
-                    FilterChipDefaults.filterChipColors(
-                        disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                        disabledLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-                    ),
-            )
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val compact = maxWidth < 340.dp
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),
+        ) {
+            items(paletteStyleOrder, key = { it.name }) { style ->
+                RememberFilterChip(
+                    selected = selected == style,
+                    onClick = { if (enabled) onSelect(style) },
+                    enabled = enabled,
+                    label = {
+                        Text(
+                            text = paletteStyleLabel(style, compact),
+                            style =
+                                if (compact) {
+                                    MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
+                                } else {
+                                    MaterialTheme.typography.labelMedium
+                                },
+                            maxLines = 1,
+                        )
+                    },
+                    colors =
+                        FilterChipDefaults.filterChipColors(
+                            disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            disabledLabelColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                        ),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun paletteStyleLabel(style: PaletteStyleOpt): String =
-    stringResource(
+private fun paletteStyleLabel(
+    style: PaletteStyleOpt,
+    compact: Boolean,
+): String {
+    if (compact) {
+        return when (style) {
+            PaletteStyleOpt.TONAL_SPOT -> "Tonal"
+            PaletteStyleOpt.NEUTRAL -> "Neutral"
+            PaletteStyleOpt.VIBRANT -> "Vibrant"
+            PaletteStyleOpt.EXPRESSIVE -> "Express"
+            PaletteStyleOpt.RAINBOW -> "Rainbow"
+            PaletteStyleOpt.FRUIT_SALAD -> "Fruit"
+            PaletteStyleOpt.MONOCHROME -> "Mono"
+            PaletteStyleOpt.FIDELITY -> "Fidelity"
+            PaletteStyleOpt.CONTENT -> "Content"
+        }
+    }
+    return stringResource(
         when (style) {
             PaletteStyleOpt.TONAL_SPOT -> R.string.palette_style_tonal_spot
             PaletteStyleOpt.NEUTRAL -> R.string.palette_style_neutral
@@ -323,6 +364,7 @@ private fun paletteStyleLabel(style: PaletteStyleOpt): String =
             PaletteStyleOpt.CONTENT -> R.string.palette_style_content
         },
     )
+}
 
 /**
  * User-facing name for a color source - shown in the preview card title and accessibility

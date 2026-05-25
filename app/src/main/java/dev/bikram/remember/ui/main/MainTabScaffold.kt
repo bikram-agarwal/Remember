@@ -62,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -94,6 +95,7 @@ import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.RoundedPolygonShape
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 /**
  * Bottom tabs. Each [symbolName] must be listed by `font_subset/harvest_ligatures.py`
@@ -506,9 +508,10 @@ private fun RememberFloatingNavPill(
 
 /**
  * Bottom-strip layout: pill horizontally centered against the strip's full width, FAB
- * placed just to the right of the pill (or clamped to the strip's right edge if a wide
- * pill would push it off-screen). Both children share a vertical centerline so the FAB
- * and the pill optically sit on the same baseline.
+ * placed just to the right of the pill. On very narrow displays the whole chrome row
+ * scales down just enough to preserve the side-by-side relationship without overlap.
+ * Children share a vertical centerline so the FAB and the pill optically sit on the
+ * same baseline.
  *
  * Designed to host an M3 Expressive [FloatingActionButtonMenu] in the [fab] slot
  * without letting the menu's expansion push the pill. Two tricks:
@@ -577,18 +580,45 @@ private fun CenteredPillWithSideFab(
             } else {
                 pillPlaceable.width + gapPx + fabPlaceable.width
             }
+        val sideRoomPx =
+            maxOf(
+                gapPx + fabCorePx,
+                if (leadingFabPlaceable != null) leadingGapPx + fabCorePx else 0,
+            )
+        val rowNaturalWidth = pillPlaceable.width + sideRoomPx * 2
+        val chromeScale =
+            if (rowNaturalWidth > width && rowNaturalWidth > 0) {
+                width.toFloat() / rowNaturalWidth.toFloat()
+            } else {
+                1f
+            }
+        val scaledPillWidth = (pillPlaceable.width * chromeScale).roundToInt()
+        val scaledPillHeight = (pillPlaceable.height * chromeScale).roundToInt()
+        val scaledFabWidth = (fabPlaceable.width * chromeScale).roundToInt()
+        val scaledFabHeight = (fabPlaceable.height * chromeScale).roundToInt()
+        val scaledFabCore = (fabCorePx * chromeScale).roundToInt()
+        val scaledGap = (gapPx * chromeScale).roundToInt()
+        val scaledFabRightInset = (fabRightInsetPx * chromeScale).roundToInt()
+        val scaledFabBottomInset = (fabBottomInsetPx * chromeScale).roundToInt()
+        val scaledLeadingGap = (leadingGapPx * chromeScale).roundToInt()
+        val scaledLeadingFabLeftInset = (leadingFabLeftInsetPx * chromeScale).roundToInt()
+        val scaledLeadingFabBottomInset = (leadingFabBottomInsetPx * chromeScale).roundToInt()
         // Strip height tracks the FAB's *core* size rather than the wrapper's measured
         // height. When the menu is expanded the wrapper is much taller; we deliberately
         // ignore that so the parent layout doesn't see the bigger height and re-center
         // the strip (which would push the pill).
-        val stripHeight = maxOf(pillPlaceable.height, fabCorePx)
+        val stripHeight = maxOf(scaledPillHeight, scaledFabCore)
 
         layout(width, stripHeight) {
             // Pill: horizontally centered against the strip's full width and vertically
             // centered within the strip.
-            val pillX = (width - pillPlaceable.width) / 2
-            val pillY = (stripHeight - pillPlaceable.height) / 2
-            pillPlaceable.place(pillX, pillY)
+            val pillX = (width - scaledPillWidth) / 2
+            val pillY = (stripHeight - scaledPillHeight) / 2
+            pillPlaceable.placeWithLayer(pillX, pillY) {
+                scaleX = chromeScale
+                scaleY = chromeScale
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
 
             // FAB child: anchored by the FAB *element* rather than by the wrapper's
             // outer bounds.
@@ -602,20 +632,30 @@ private fun CenteredPillWithSideFab(
             // Vertically: the FAB element's center sits at the strip's vertical center
             // (same as pill's). FloatingActionButtonMenu places the button 16.dp above
             // the wrapper bottom, so Notes passes that as [fabBottomInset].
-            val desiredFabElementRight =
-                pillX + pillPlaceable.width + gapPx + fabCorePx
+            val desiredFabElementRight = pillX + scaledPillWidth + scaledGap + scaledFabCore
             val fabElementRight = desiredFabElementRight.coerceAtMost(width)
-            val fabX = (fabElementRight - fabPlaceable.width + fabRightInsetPx).coerceAtLeast(0)
-            val fabBottomY = (stripHeight + fabCorePx) / 2 + fabBottomInsetPx
-            val fabY = fabBottomY - fabPlaceable.height
-            fabPlaceable.place(fabX, fabY)
+            val fabX = (fabElementRight - scaledFabWidth + scaledFabRightInset).coerceAtLeast(0)
+            val fabBottomY = (stripHeight + scaledFabCore) / 2 + scaledFabBottomInset
+            val fabY = fabBottomY - scaledFabHeight
+            fabPlaceable.placeWithLayer(fabX, fabY) {
+                scaleX = chromeScale
+                scaleY = chromeScale
+                transformOrigin = TransformOrigin(0f, 0f)
+            }
 
             leadingFabPlaceable?.let { leadingPlaceable ->
-                val leadingFabElementLeft = (pillX - leadingGapPx - fabCorePx).coerceAtLeast(0)
-                val leadingX = (leadingFabElementLeft - leadingFabLeftInsetPx).coerceAtLeast(0)
-                val leadingFabBottomY = (stripHeight + fabCorePx) / 2 + leadingFabBottomInsetPx
-                val leadingY = leadingFabBottomY - leadingPlaceable.height
-                leadingPlaceable.place(leadingX, leadingY)
+                val leadingFabElementLeft =
+                    (pillX - scaledLeadingGap - scaledFabCore).coerceAtLeast(0)
+                val leadingX = (leadingFabElementLeft - scaledLeadingFabLeftInset).coerceAtLeast(0)
+                val leadingFabBottomY = (stripHeight + scaledFabCore) / 2 + scaledLeadingFabBottomInset
+                val leadingY =
+                    leadingFabBottomY -
+                        (leadingPlaceable.height * chromeScale).roundToInt()
+                leadingPlaceable.placeWithLayer(leadingX, leadingY) {
+                    scaleX = chromeScale
+                    scaleY = chromeScale
+                    transformOrigin = TransformOrigin(0f, 0f)
+                }
             }
         }
     }

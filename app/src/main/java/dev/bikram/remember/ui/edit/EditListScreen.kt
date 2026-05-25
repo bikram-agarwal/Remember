@@ -708,7 +708,7 @@ fun EditListScreen(
                         Modifier
                             .fillMaxSize()
                             .then(blurMod)
-                            .padding(horizontal = 20.dp),
+                            .padding(horizontal = EditorContentBodyDefaults.HorizontalPadding),
                 ) {
                     // Order: hero image -> shelf banner -> list items. The banner sits right above the
                     // list body so the "why is this read-only" hint is adjacent to the items it gates.
@@ -1040,7 +1040,6 @@ fun EditListScreen(
                 deleteForeverConfirmOpen = deleteForeverConfirmOpen,
                 pendingHeroSession = pendingHeroSession,
                 pictureViewer = pictureViewer,
-                currentPictureUri = pictureUri,
                 currentPictureHeroFraming = pictureHeroFraming,
                 readOnly = readOnly,
                 activeTagSuggestions = activeTagSuggestions,

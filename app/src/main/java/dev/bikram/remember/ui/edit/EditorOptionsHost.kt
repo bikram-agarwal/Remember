@@ -90,7 +90,6 @@ fun EditorOptionSheets(
     deleteForeverConfirmOpen: Boolean,
     pendingHeroSession: Pair<String, File?>?,
     pictureViewer: Pair<String, Long>?,
-    currentPictureUri: String?,
     currentPictureHeroFraming: String?,
     readOnly: Boolean,
     activeTagSuggestions: List<String>,

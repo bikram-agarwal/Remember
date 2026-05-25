@@ -40,4 +40,19 @@ fun String?.toNoteActionIconBitmap(): Bitmap? {
     }.getOrNull()
 }
 
-fun String?.toNoteActionIconDrawable(resources: Resources): Drawable? = toNoteActionIconBitmap()?.let { BitmapDrawable(resources, it) }
+fun String?.toNoteActionIconDrawable(resources: Resources): Drawable? = toNoteActionIconBitmap()?.let { bitmap -> NoteActionIconDrawable(resources, bitmap) }
+
+fun Drawable.recycleNoteActionIconBitmap() {
+    (this as? NoteActionIconDrawable)?.recycleBitmap()
+}
+
+private class NoteActionIconDrawable(
+    resources: Resources,
+    private val ownedBitmap: Bitmap,
+) : BitmapDrawable(resources, ownedBitmap) {
+    fun recycleBitmap() {
+        if (!ownedBitmap.isRecycled) {
+            ownedBitmap.recycle()
+        }
+    }
+}

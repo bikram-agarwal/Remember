@@ -106,6 +106,7 @@ import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -1136,9 +1137,11 @@ private fun ControlPillRow(
             onChange = onOverwriteChange,
         )
         val allSelected = visibleCount > 0 && selectedVisibleCount >= visibleCount
+        val actionButtonSize = rememberResponsiveActionButtonSize()
         RememberFilledTonalIconButton(
             onClick = onSelectAllToggle,
             enabled = visibleCount > 0 && !allSelected,
+            modifier = Modifier.size(actionButtonSize),
             tooltipLabel = stringResource(R.string.home_select_all),
         ) {
             RememberMaterialRoundedSymbol(
@@ -1149,6 +1152,7 @@ private fun ControlPillRow(
         RememberFilledTonalIconButton(
             onClick = onClearSelection,
             enabled = selectedVisibleCount > 0,
+            modifier = Modifier.size(actionButtonSize),
             tooltipLabel = stringResource(R.string.home_unselect_all),
         ) {
             RememberMaterialRoundedSymbol(

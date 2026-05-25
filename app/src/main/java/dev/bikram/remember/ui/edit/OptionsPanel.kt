@@ -1,14 +1,14 @@
 package dev.bikram.remember.ui.edit
 
-import android.content.Intent
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +28,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,6 +63,7 @@ import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.data.labelRes
+import dev.bikram.remember.data.recycleNoteActionIconBitmap
 import dev.bikram.remember.data.toNoteActionIconDrawable
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -128,6 +130,11 @@ fun OptionsPanel(
         remember(firstAction?.type, firstAction?.details, firstAction?.iconData) {
             firstAction?.let { action -> actionOptionsIcon(context, action) }
         }
+    DisposableEffect(firstActionIcon) {
+        onDispose {
+            firstActionIcon?.recycleNoteActionIconBitmap()
+        }
+    }
 
     val baseContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
     val starredCueSpec =

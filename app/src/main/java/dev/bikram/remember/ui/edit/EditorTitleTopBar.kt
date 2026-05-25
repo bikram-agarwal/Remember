@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -54,6 +55,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -139,7 +141,10 @@ internal fun EditorTitleTopBar(
                 colors = transparentLargeTopAppBarColors(),
                 title = {},
                 navigationIcon = {
-                    RememberIconButton(onClick = onBack) {
+                    RememberIconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(rememberResponsiveActionButtonSize()),
+                    ) {
                         RememberMaterialRoundedSymbol(
                             name = "arrow_back",
                             size = 24.dp,
@@ -161,7 +166,10 @@ internal fun EditorTitleTopBar(
                             )
                         RememberIconButton(
                             onClick = onToggleMarkdownDisplayMode,
-                            modifier = Modifier.semantics { contentDescription = toggleCd },
+                            modifier =
+                                Modifier
+                                    .size(rememberResponsiveActionButtonSize())
+                                    .semantics { contentDescription = toggleCd },
                         ) {
                             RememberMaterialRoundedSymbol(
                                 name =
@@ -180,7 +188,10 @@ internal fun EditorTitleTopBar(
                         val saveCd = stringResource(R.string.edit_save_cd)
                         RememberIconButton(
                             onClick = onSave,
-                            modifier = Modifier.semantics { contentDescription = saveCd },
+                            modifier =
+                                Modifier
+                                    .size(rememberResponsiveActionButtonSize())
+                                    .semantics { contentDescription = saveCd },
                         ) {
                             RememberMaterialRoundedSymbol(
                                 name = "check",
@@ -197,7 +208,7 @@ internal fun EditorTitleTopBar(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(start = 24.dp, end = 24.dp, bottom = 20.dp),
+                        .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
             ) {
                 EditorHeaderIcon(
                     iconKey = iconKey,

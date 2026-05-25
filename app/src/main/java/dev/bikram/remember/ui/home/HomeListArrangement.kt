@@ -112,9 +112,17 @@ private fun arrangeMiddle(
     val zone = ZoneId.systemDefault()
     val today = ZonedDateTime.now(zone).toLocalDate()
     val tomorrowMidnightMillis =
-        today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
+        today
+            .plusDays(1)
+            .atStartOfDay(zone)
+            .toInstant()
+            .toEpochMilli()
     val laterFromMillis =
-        today.plusDays(8).atStartOfDay(zone).toInstant().toEpochMilli()
+        today
+            .plusDays(8)
+            .atStartOfDay(zone)
+            .toInstant()
+            .toEpochMilli()
 
     val todayNotes = mutableListOf<NoteWithItems>()
     val upcomingNotes = mutableListOf<NoteWithItems>()

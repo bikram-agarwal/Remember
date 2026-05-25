@@ -4,10 +4,10 @@ import android.content.res.Resources
 import android.widget.Toast
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -77,9 +77,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -114,8 +114,8 @@ import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -293,7 +293,7 @@ fun IconPicker(
             } else {
                 R.string.icon_picker_added_to_favorites
             }
-        Toast.makeText(context, context.getString(messageRes, label), Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, resources.getString(messageRes, label), Toast.LENGTH_SHORT).show()
         scope.launch {
             iconPickerPrefs.setStarredIconKeys(nextStarredIconKeys)
         }
@@ -319,7 +319,7 @@ fun IconPicker(
             } else {
                 R.string.icon_picker_added_to_favorites
             }
-        Toast.makeText(context, context.getString(messageRes, label), Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, resources.getString(messageRes, label), Toast.LENGTH_SHORT).show()
         scope.launch {
             iconPickerPrefs.setStarredEmojis(nextStarredEmojis)
         }
@@ -1841,8 +1841,7 @@ private fun IconTile(
                 .graphicsLayer {
                     scaleX = pulseScale.value
                     scaleY = pulseScale.value
-                }
-                .tapSoundCombinedClickable(
+                }.tapSoundCombinedClickable(
                     onClick = onClick,
                     onLongClick = {
                         pulseAdding = !favorite
@@ -1930,8 +1929,7 @@ private fun EmojiTile(
                 .graphicsLayer {
                     scaleX = pulseScale.value
                     scaleY = pulseScale.value
-                }
-                .tapSoundCombinedClickable(
+                }.tapSoundCombinedClickable(
                     onClick = {
                         if (hasVariants) {
                             expanded = true

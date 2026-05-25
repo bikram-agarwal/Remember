@@ -9,6 +9,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -30,6 +31,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -93,6 +95,7 @@ internal fun HomeSelectionActionBar(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     )
+                val actionButtonSize = rememberResponsiveActionButtonSize()
                 ButtonGroup(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     overflowIndicator = { menuState ->
@@ -103,7 +106,7 @@ internal fun HomeSelectionActionBar(
                         buttonGroupContent = {
                             RememberFilledTonalIconButton(
                                 onClick = onClearSelection,
-                                modifier = Modifier.animateWidth(exitInteractionSource),
+                                modifier = Modifier.size(actionButtonSize).animateWidth(exitInteractionSource),
                                 interactionSource = exitInteractionSource,
                                 tooltipLabel = exitLabel,
                                 colors = exitColors,
@@ -129,7 +132,7 @@ internal fun HomeSelectionActionBar(
                         buttonGroupContent = {
                             RememberFilledTonalIconButton(
                                 onClick = onTagSelected,
-                                modifier = Modifier.animateWidth(tagInteractionSource),
+                                modifier = Modifier.size(actionButtonSize).animateWidth(tagInteractionSource),
                                 interactionSource = tagInteractionSource,
                                 tooltipLabel = tagLabel,
                             ) {
@@ -154,7 +157,7 @@ internal fun HomeSelectionActionBar(
                         buttonGroupContent = {
                             RememberFilledTonalIconButton(
                                 onClick = onMarkDoneSelected,
-                                modifier = Modifier.animateWidth(markDoneInteractionSource),
+                                modifier = Modifier.size(actionButtonSize).animateWidth(markDoneInteractionSource),
                                 interactionSource = markDoneInteractionSource,
                                 tooltipLabel = markDoneLabel,
                             ) {
@@ -179,7 +182,7 @@ internal fun HomeSelectionActionBar(
                         buttonGroupContent = {
                             RememberFilledTonalIconButton(
                                 onClick = onArchiveSelected,
-                                modifier = Modifier.animateWidth(archiveInteractionSource),
+                                modifier = Modifier.size(actionButtonSize).animateWidth(archiveInteractionSource),
                                 interactionSource = archiveInteractionSource,
                                 tooltipLabel = archiveLabel,
                             ) {
@@ -204,7 +207,7 @@ internal fun HomeSelectionActionBar(
                         buttonGroupContent = {
                             RememberFilledTonalIconButton(
                                 onClick = onTrashSelected,
-                                modifier = Modifier.animateWidth(trashInteractionSource),
+                                modifier = Modifier.size(actionButtonSize).animateWidth(trashInteractionSource),
                                 interactionSource = trashInteractionSource,
                                 tooltipLabel = trashLabel,
                                 colors = trashColors,
