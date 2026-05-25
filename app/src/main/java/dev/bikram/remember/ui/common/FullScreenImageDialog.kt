@@ -5,7 +5,10 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -139,6 +142,7 @@ fun FullScreenHeroImageOverlay(
     modifier: Modifier = Modifier,
     sharedElementKey: String? = null,
     onDelete: (() -> Unit)? = null,
+    onEdit: (() -> Unit)? = null,
 ) {
     var retainedImageUri by remember { mutableStateOf(imageUri) }
     var retainedCacheRevision by remember { mutableLongStateOf(imageCacheRevision) }
@@ -179,7 +183,13 @@ fun FullScreenHeroImageOverlay(
             remember(deleteLabel) {
                 Modifier.semantics { contentDescription = deleteLabel }
             }
+        val editLabel = stringResource(R.string.edit_picture_framing_cd)
+        val editSemantics =
+            remember(editLabel) {
+                Modifier.semantics { contentDescription = editLabel }
+            }
         val imageRequest = rememberHeroImageRequest(visibleImageUri, retainedCacheRevision, maxSidePx = 2048)
+        val overlayInteractionSource = remember { MutableInteractionSource() }
         val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
         val imageModifier =
             if (sharedScope != null && effectiveSharedKey != null) {
@@ -203,7 +213,12 @@ fun FullScreenHeroImageOverlay(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.82f)),
+                    .background(Color.Black.copy(alpha = 0.82f))
+                    .clickable(
+                        interactionSource = overlayInteractionSource,
+                        indication = null,
+                        onClick = {},
+                    ),
         ) {
             Surface(
                 color = Color.Transparent,
@@ -219,30 +234,53 @@ fun FullScreenHeroImageOverlay(
                     modifier = Modifier.fillMaxSize(),
                 )
             }
-            if (onDelete != null) {
-                RememberIconButton(
-                    onClick = {
-                        onDelete()
-                        onDismiss()
-                    },
+            if (onDelete != null || onEdit != null) {
+                Row(
                     modifier =
                         Modifier
                             .align(Alignment.TopStart)
                             .padding(8.dp)
-                            .windowInsetsPadding(WindowInsets.systemBars)
-                            .then(deleteSemantics),
-                    colors =
-                        IconButtonDefaults.iconButtonColors(
-                            containerColor = Color.Black.copy(alpha = 0.45f),
-                            contentColor = Color.White,
-                        ),
+                            .windowInsetsPadding(WindowInsets.systemBars),
                 ) {
-                    RememberMaterialRoundedSymbol(
-                        name = "delete_outline",
-                        size = 24.dp,
-                        tint = Color.White,
-                        weight = FontWeight.Medium,
-                    )
+                    if (onDelete != null) {
+                        RememberIconButton(
+                            onClick = {
+                                onDelete()
+                                onDismiss()
+                            },
+                            modifier = deleteSemantics,
+                            colors =
+                                IconButtonDefaults.iconButtonColors(
+                                    containerColor = Color.Black.copy(alpha = 0.45f),
+                                    contentColor = Color.White,
+                                ),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "delete_outline",
+                                size = 24.dp,
+                                tint = Color.White,
+                                weight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                    if (onEdit != null) {
+                        RememberIconButton(
+                            onClick = onEdit,
+                            modifier = editSemantics,
+                            colors =
+                                IconButtonDefaults.iconButtonColors(
+                                    containerColor = Color.Black.copy(alpha = 0.45f),
+                                    contentColor = Color.White,
+                                ),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "edit",
+                                size = 24.dp,
+                                tint = Color.White,
+                                weight = FontWeight.Medium,
+                            )
+                        }
+                    }
                 }
             }
             RememberIconButton(

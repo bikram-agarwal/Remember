@@ -5,6 +5,10 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import dev.bikram.remember.R
 import dev.bikram.remember.data.Importance
@@ -90,6 +94,8 @@ fun EditorOptionSheets(
     deleteForeverConfirmOpen: Boolean,
     pendingHeroSession: Pair<String, File?>?,
     pictureViewer: Pair<String, Long>?,
+    currentPictureUri: String?,
+    currentPictureHeroFraming: String?,
     readOnly: Boolean,
     activeTagSuggestions: List<String>,
     attachments: List<NoteAttachmentEntity>,
@@ -119,6 +125,8 @@ fun EditorOptionSheets(
     onDismissDeleteForever: () -> Unit,
     onDismissPictureViewer: () -> Unit,
 ) {
+    var editingCurrentHero by remember { mutableStateOf(false) }
+
     if (reminderPickerOpen) {
         ReminderPickerSheet(
             initialMillis = currentReminderAt,
@@ -190,6 +198,23 @@ fun EditorOptionSheets(
             },
         )
     }
+    if (editingCurrentHero && currentPictureUri != null) {
+        HeroFramingEditorDialog(
+            imageUri = currentPictureUri,
+            pendingCopiedFile = null,
+            initialFraming =
+                remember(currentPictureHeroFraming) {
+                    HeroFraming.fromJsonString(currentPictureHeroFraming)
+                },
+            onDismiss = {
+                editingCurrentHero = false
+            },
+            onConfirm = { framing ->
+                onHeroCommitted(currentPictureUri, framing)
+                editingCurrentHero = false
+            },
+        )
+    }
     if (deleteForeverConfirmOpen) {
         AlertDialog(
             onDismissRequest = onDismissDeleteForever,
@@ -226,6 +251,15 @@ fun EditorOptionSheets(
             } else {
                 {
                     onPictureChange(null)
+                    onDismissPictureViewer()
+                }
+            },
+        onEdit =
+            if (readOnly) {
+                null
+            } else {
+                {
+                    editingCurrentHero = true
                     onDismissPictureViewer()
                 }
             },

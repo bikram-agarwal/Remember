@@ -316,6 +316,13 @@ fun EditNoteScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val launchAttachmentPicker = rememberAttachmentPicker(onAdd = vm::addAttachment)
     val hasPersistedEditorRow = existing || persistedForToolbar
+    val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
+    val pictureHeroFraming by vm.pictureHeroFraming.collectAsStateWithLifecycle()
+    val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
+    val recurrence by vm.recurrence.collectAsStateWithLifecycle()
+    val iconKey by vm.iconKey.collectAsStateWithLifecycle()
+    val actions by vm.actions.collectAsStateWithLifecycle()
+    val tags by vm.tags.collectAsStateWithLifecycle()
     val saveAndExitEditMode: () -> Unit = {
         isEditMode = false
         appScope.launch {
@@ -330,272 +337,269 @@ fun EditNoteScreen(
         }
     }
 
-    Scaffold(
-        // The title header stays expanded; this nested scroll only hides/shows the bottom
-        // action bar with a source filter so overscroll spring-back doesn't flash it back in.
-        modifier =
-            Modifier
-                .nestedScroll(barVisibilityNestedScroll),
-        containerColor = Color.Transparent,
-        topBar = {
-            val title by vm.title.collectAsStateWithLifecycle()
-            val iconKey by vm.iconKey.collectAsStateWithLifecycle()
-            EditorTitleTopBar(
-                contentKind = NoteKind.NOTE,
-                title = title,
-                titlePlaceholder = titlePlaceholder,
-                iconKey = iconKey,
-                existing = hasPersistedEditorRow,
+    Box(Modifier.fillMaxSize()) {
+        Scaffold(
+            // The title header stays expanded; this nested scroll only hides/shows the bottom
+            // action bar with a source filter so overscroll spring-back doesn't flash it back in.
+            modifier =
+                Modifier
+                    .nestedScroll(barVisibilityNestedScroll),
+            containerColor = Color.Transparent,
+            topBar = {
+                val title by vm.title.collectAsStateWithLifecycle()
+                val iconKey by vm.iconKey.collectAsStateWithLifecycle()
+                EditorTitleTopBar(
+                    contentKind = NoteKind.NOTE,
+                    title = title,
+                    titlePlaceholder = titlePlaceholder,
+                    iconKey = iconKey,
+                    existing = hasPersistedEditorRow,
+                    isEditMode = isEditMode,
+                    readOnly = readOnly,
+                    hasUnsavedChanges = hasUnsavedChanges,
+                    titleFocusOffset = pendingTitleFocusOffset,
+                    onTitleChange = vm::setTitle,
+                    onBack = handleNavigateUp,
+                    onTitleTappedInViewMode = { titleOffset ->
+                        suppressBodyAutoFocusOnEdit = true
+                        pendingTitleFocusOffset = titleOffset
+                        isEditMode = true
+                    },
+                    onTitleFocusOffsetConsumed = {
+                        pendingTitleFocusOffset = null
+                    },
+                    onTitleFocusChanged = { focused ->
+                        titleFocused = focused
+                        if (focused) bodyFocused = false
+                    },
+                    onSave = saveAndExitEditMode,
+                    onOpenIcon = { iconPickerOpen = true },
+                    markdownDisplayMode = if (bodyEditorFocused) markdownDisplayMode else null,
+                    onToggleMarkdownDisplayMode = {
+                        markdownDisplayMode =
+                            if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
+                                MarkdownEditorDisplayMode.LivePreview
+                            } else {
+                                MarkdownEditorDisplayMode.MarkdownCode
+                            }
+                    },
+                )
+            },
+            bottomBar = {
+                // Previously this slot rendered as:
+                //     Column {
+                //         EditNoteBottomBarSection(... AnimatedVisibility(isEditMode) ...)
+                //         NoteActionBottomBar(... AnimatedVisibility(actionBarVisible) ...)
+                //     }
+                // which meant when the user tapped Edit, BOTH bars' visibility animations ran
+                // at the same time. The format bar expanded in above the (still visible) action
+                // bar, which then collapsed, leaving the format bar to drop into the now-empty
+                // space - a multi-phase transition that reads as a glitch.
+                //
+                // AnimatedContent gives us a single-slot swap: whichever of Format / Action /
+                // None is the target, only that one is mounted. The enter/exit animations run
+                // against one another on the same surface, driven by the M3E default spatial
+                // spring, so the swap is one smooth vertical cross-fade instead of two
+                // overlapping vertical expand/collapse passes.
+                // Stable callbacks - the MarkdownToolbar / action item rows are lambda-heavy
+                // and re-allocating on every recomposition defeats their skippable-composable
+                // optimization.
+                val onUndo =
+                    remember(markdownEditorState, undoController, bridge) {
+                        {
+                            undoController.undo(markdownEditorState.markdown)?.let { previous ->
+                                markdownEditorState.setMarkdown(previous)
+                                bridge.replaceFromHistory(previous)
+                            }
+                            Unit
+                        }
+                    }
+                val onRedo =
+                    remember(markdownEditorState, undoController, bridge) {
+                        {
+                            undoController.redo(markdownEditorState.markdown)?.let { next ->
+                                markdownEditorState.setMarkdown(next)
+                                bridge.replaceFromHistory(next)
+                            }
+                            Unit
+                        }
+                    }
+                EditorBottomBarSlot(
+                    isEditMode = bodyEditorFocused,
+                    actionBarVisible = actionBarVisible,
+                    formatContent = {
+                        EditNoteFormatBarContent(
+                            markdownEditorState = markdownEditorState,
+                            undoController = undoController,
+                            onUndo = onUndo,
+                            onRedo = onRedo,
+                            imeVisible = imeVisible,
+                        )
+                    },
+                    actionContent = {
+                        NoteActionBottomBarContent(
+                            shelfState = shelfState,
+                            existing = persistedForToolbar,
+                            isEditMode = isEditMode,
+                            starred = starred,
+                            completed = completed,
+                            onToggleEdit = {
+                                // Outside edit mode this turns edit mode ON. The SAVE path is
+                                // owned by the top-bar Save icon (edit mode) or by
+                                // back/lifecycle (view mode flush), so there's no save
+                                // side-effect to run here.
+                                if (!isEditMode) isEditMode = true else saveAndExitEditMode()
+                            },
+                            onToggleStar = { vm.toggleStar() },
+                            onToggleCompleted = {
+                                appScope.launch { vm.toggleCompleted() }
+                            },
+                            onArchive = {
+                                // Archive follows the same leave-editor flow as Trash: pop
+                                // back immediately, then let the root snackbar host offer Undo.
+                                val archiveStartedFromTrash = trashed
+                                appScope.launch {
+                                    vm.archiveCurrent(untitledName)
+                                    val result =
+                                        snackbarHostState.showSnackbar(
+                                            message = msgArchived,
+                                            actionLabel = undoMsg,
+                                            withDismissAction = true,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                        if (archiveStartedFromTrash) {
+                                            vm.trashCurrent()
+                                        } else {
+                                            vm.unarchiveCurrent()
+                                        }
+                                    }
+                                }
+                                onBack()
+                            },
+                            onNotification = {
+                                if (canPostNotifications(context)) {
+                                    appScope.launch { vm.fireNotification(context, untitledName) }
+                                } else {
+                                    notificationPermissionSheetOpen = true
+                                }
+                            },
+                            onUnarchive = {
+                                appScope.launch {
+                                    vm.unarchiveCurrent()
+                                    val result =
+                                        snackbarHostState.showSnackbar(
+                                            message = msgUnarchived,
+                                            actionLabel = undoMsg,
+                                            withDismissAction = true,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                        vm.archiveCurrent(untitledName)
+                                    }
+                                }
+                            },
+                            onTrash = {
+                                // Trash + back navigation. The snackbar host is at the
+                                // scaffold root so it survives the screen pop and shows
+                                // up on Home. Undo route hits vm.restoreFromTrashCurrent
+                                // even after the screen is gone - the suspend doesn't
+                                // depend on viewModelScope and the VM's loadedId field
+                                // is still in memory long enough to complete the call.
+                                val trashStartedFromArchive = archived
+                                appScope.launch {
+                                    vm.trashCurrent()
+                                    val result =
+                                        snackbarHostState.showSnackbar(
+                                            message = msgTrashed,
+                                            actionLabel = undoMsg,
+                                            withDismissAction = true,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                        if (trashStartedFromArchive) {
+                                            vm.archiveCurrent(untitledName)
+                                        } else {
+                                            vm.restoreFromTrashCurrent()
+                                        }
+                                    }
+                                }
+                                onBack()
+                            },
+                            onRestore = {
+                                appScope.launch {
+                                    vm.restoreFromTrashCurrent()
+                                    val result =
+                                        snackbarHostState.showSnackbar(
+                                            message = msgRestored,
+                                            actionLabel = undoMsg,
+                                            withDismissAction = true,
+                                            duration = androidx.compose.material3.SnackbarDuration.Short,
+                                        )
+                                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
+                                        vm.trashCurrent()
+                                    }
+                                }
+                            },
+                            onDeleteForever = { deleteForeverConfirmOpen = true },
+                            showEditAction = false,
+                        )
+                    },
+                )
+            },
+        ) { padding ->
+
+            EditNoteScrollableContent(
+                vm = vm,
+                modifier = blurMod,
+                horizontalPadding = 20.dp,
+                padding = padding,
+                markdownEditorState = markdownEditorState,
+                bodyPlaceholder = bodyPlaceholder,
                 isEditMode = isEditMode,
-                readOnly = readOnly,
-                hasUnsavedChanges = hasUnsavedChanges,
-                titleFocusOffset = pendingTitleFocusOffset,
-                onTitleChange = vm::setTitle,
-                onBack = handleNavigateUp,
-                onTitleTappedInViewMode = { titleOffset ->
+                markdownDisplayMode = markdownDisplayMode,
+                existing = hasPersistedEditorRow,
+                autoFocusBodyOnEdit = hasPersistedEditorRow && !suppressBodyAutoFocusOnEdit,
+                shelfState = shelfState,
+                pictureViewerOpen = pictureViewer != null,
+                onOpenReminder = {
+                    reminderPickerOpen = true
+                },
+                notificationsAllowed = notificationsAllowed,
+                onOpenPicture = launchHeroImagePick,
+                onViewPictureFull = { uri, revision ->
+                    pictureViewer = uri to revision
+                },
+                onOpenActions = { actionsPickerOpen = true },
+                onOpenTags = { tagsPickerOpen = true },
+                onOpenAttachments = {
+                    if (attachments.isEmpty()) {
+                        launchAttachmentPicker()
+                    } else {
+                        attachmentsPickerOpen = true
+                    }
+                },
+                onEnterEditModeAtOffset = { markdownOffset ->
                     suppressBodyAutoFocusOnEdit = true
-                    pendingTitleFocusOffset = titleOffset
+                    pendingTitleFocusOffset = null
+                    markdownEditorState.focusAtOffsetAndShowKeyboard(markdownOffset)
                     isEditMode = true
                 },
-                onTitleFocusOffsetConsumed = {
+                onEnterEditModeSelectingRange = { startOffset, endOffset ->
+                    suppressBodyAutoFocusOnEdit = true
                     pendingTitleFocusOffset = null
+                    markdownEditorState.focusRangeAndShowKeyboard(startOffset, endOffset)
+                    isEditMode = true
                 },
-                onTitleFocusChanged = { focused ->
-                    titleFocused = focused
-                    if (focused) bodyFocused = false
+                onBodyFocusChanged = { focused ->
+                    bodyFocused = focused
+                    if (focused) titleFocused = false
                 },
-                onSave = saveAndExitEditMode,
-                onOpenIcon = { iconPickerOpen = true },
-                markdownDisplayMode = if (bodyEditorFocused) markdownDisplayMode else null,
-                onToggleMarkdownDisplayMode = {
-                    markdownDisplayMode =
-                        if (markdownDisplayMode == MarkdownEditorDisplayMode.MarkdownCode) {
-                            MarkdownEditorDisplayMode.LivePreview
-                        } else {
-                            MarkdownEditorDisplayMode.MarkdownCode
-                        }
-                },
+                scrollState = contentScrollState,
+                scrollEnabled = !markdownSelectionActive,
             )
-        },
-        bottomBar = {
-            // Previously this slot rendered as:
-            //     Column {
-            //         EditNoteBottomBarSection(... AnimatedVisibility(isEditMode) ...)
-            //         NoteActionBottomBar(... AnimatedVisibility(actionBarVisible) ...)
-            //     }
-            // which meant when the user tapped Edit, BOTH bars' visibility animations ran
-            // at the same time. The format bar expanded in above the (still visible) action
-            // bar, which then collapsed, leaving the format bar to drop into the now-empty
-            // space - a multi-phase transition that reads as a glitch.
-            //
-            // AnimatedContent gives us a single-slot swap: whichever of Format / Action /
-            // None is the target, only that one is mounted. The enter/exit animations run
-            // against one another on the same surface, driven by the M3E default spatial
-            // spring, so the swap is one smooth vertical cross-fade instead of two
-            // overlapping vertical expand/collapse passes.
-            // Stable callbacks - the MarkdownToolbar / action item rows are lambda-heavy
-            // and re-allocating on every recomposition defeats their skippable-composable
-            // optimization.
-            val onUndo =
-                remember(markdownEditorState, undoController, bridge) {
-                    {
-                        undoController.undo(markdownEditorState.markdown)?.let { previous ->
-                            markdownEditorState.setMarkdown(previous)
-                            bridge.replaceFromHistory(previous)
-                        }
-                        Unit
-                    }
-                }
-            val onRedo =
-                remember(markdownEditorState, undoController, bridge) {
-                    {
-                        undoController.redo(markdownEditorState.markdown)?.let { next ->
-                            markdownEditorState.setMarkdown(next)
-                            bridge.replaceFromHistory(next)
-                        }
-                        Unit
-                    }
-                }
-            EditorBottomBarSlot(
-                isEditMode = bodyEditorFocused,
-                actionBarVisible = actionBarVisible,
-                formatContent = {
-                    EditNoteFormatBarContent(
-                        markdownEditorState = markdownEditorState,
-                        undoController = undoController,
-                        onUndo = onUndo,
-                        onRedo = onRedo,
-                        imeVisible = imeVisible,
-                    )
-                },
-                actionContent = {
-                    NoteActionBottomBarContent(
-                        shelfState = shelfState,
-                        existing = persistedForToolbar,
-                        isEditMode = isEditMode,
-                        starred = starred,
-                        completed = completed,
-                        onToggleEdit = {
-                            // Outside edit mode this turns edit mode ON. The SAVE path is
-                            // owned by the top-bar Save icon (edit mode) or by
-                            // back/lifecycle (view mode flush), so there's no save
-                            // side-effect to run here.
-                            if (!isEditMode) isEditMode = true else saveAndExitEditMode()
-                        },
-                        onToggleStar = { vm.toggleStar() },
-                        onToggleCompleted = {
-                            appScope.launch { vm.toggleCompleted() }
-                        },
-                        onArchive = {
-                            // Archive follows the same leave-editor flow as Trash: pop
-                            // back immediately, then let the root snackbar host offer Undo.
-                            val archiveStartedFromTrash = trashed
-                            appScope.launch {
-                                vm.archiveCurrent(untitledName)
-                                val result =
-                                    snackbarHostState.showSnackbar(
-                                        message = msgArchived,
-                                        actionLabel = undoMsg,
-                                        withDismissAction = true,
-                                        duration = androidx.compose.material3.SnackbarDuration.Short,
-                                    )
-                                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                                    if (archiveStartedFromTrash) {
-                                        vm.trashCurrent()
-                                    } else {
-                                        vm.unarchiveCurrent()
-                                    }
-                                }
-                            }
-                            onBack()
-                        },
-                        onNotification = {
-                            if (canPostNotifications(context)) {
-                                appScope.launch { vm.fireNotification(context, untitledName) }
-                            } else {
-                                notificationPermissionSheetOpen = true
-                            }
-                        },
-                        onUnarchive = {
-                            appScope.launch {
-                                vm.unarchiveCurrent()
-                                val result =
-                                    snackbarHostState.showSnackbar(
-                                        message = msgUnarchived,
-                                        actionLabel = undoMsg,
-                                        withDismissAction = true,
-                                        duration = androidx.compose.material3.SnackbarDuration.Short,
-                                    )
-                                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                                    vm.archiveCurrent(untitledName)
-                                }
-                            }
-                        },
-                        onTrash = {
-                            // Trash + back navigation. The snackbar host is at the
-                            // scaffold root so it survives the screen pop and shows
-                            // up on Home. Undo route hits vm.restoreFromTrashCurrent
-                            // even after the screen is gone - the suspend doesn't
-                            // depend on viewModelScope and the VM's loadedId field
-                            // is still in memory long enough to complete the call.
-                            val trashStartedFromArchive = archived
-                            appScope.launch {
-                                vm.trashCurrent()
-                                val result =
-                                    snackbarHostState.showSnackbar(
-                                        message = msgTrashed,
-                                        actionLabel = undoMsg,
-                                        withDismissAction = true,
-                                        duration = androidx.compose.material3.SnackbarDuration.Short,
-                                    )
-                                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                                    if (trashStartedFromArchive) {
-                                        vm.archiveCurrent(untitledName)
-                                    } else {
-                                        vm.restoreFromTrashCurrent()
-                                    }
-                                }
-                            }
-                            onBack()
-                        },
-                        onRestore = {
-                            appScope.launch {
-                                vm.restoreFromTrashCurrent()
-                                val result =
-                                    snackbarHostState.showSnackbar(
-                                        message = msgRestored,
-                                        actionLabel = undoMsg,
-                                        withDismissAction = true,
-                                        duration = androidx.compose.material3.SnackbarDuration.Short,
-                                    )
-                                if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                                    vm.trashCurrent()
-                                }
-                            }
-                        },
-                        onDeleteForever = { deleteForeverConfirmOpen = true },
-                        showEditAction = false,
-                    )
-                },
-            )
-        },
-    ) { padding ->
+        }
 
-        EditNoteScrollableContent(
-            vm = vm,
-            modifier = blurMod,
-            horizontalPadding = 20.dp,
-            padding = padding,
-            markdownEditorState = markdownEditorState,
-            bodyPlaceholder = bodyPlaceholder,
-            isEditMode = isEditMode,
-            markdownDisplayMode = markdownDisplayMode,
-            existing = hasPersistedEditorRow,
-            autoFocusBodyOnEdit = hasPersistedEditorRow && !suppressBodyAutoFocusOnEdit,
-            shelfState = shelfState,
-            pictureViewerOpen = pictureViewer != null,
-            onOpenReminder = {
-                reminderPickerOpen = true
-            },
-            notificationsAllowed = notificationsAllowed,
-            onOpenPicture = launchHeroImagePick,
-            onViewPictureFull = { uri, revision ->
-                pictureViewer = uri to revision
-            },
-            onOpenActions = { actionsPickerOpen = true },
-            onOpenTags = { tagsPickerOpen = true },
-            onOpenAttachments = {
-                if (attachments.isEmpty()) {
-                    launchAttachmentPicker()
-                } else {
-                    attachmentsPickerOpen = true
-                }
-            },
-            onEnterEditModeAtOffset = { markdownOffset ->
-                suppressBodyAutoFocusOnEdit = true
-                pendingTitleFocusOffset = null
-                markdownEditorState.focusAtOffsetAndShowKeyboard(markdownOffset)
-                isEditMode = true
-            },
-            onEnterEditModeSelectingRange = { startOffset, endOffset ->
-                suppressBodyAutoFocusOnEdit = true
-                pendingTitleFocusOffset = null
-                markdownEditorState.focusRangeAndShowKeyboard(startOffset, endOffset)
-                isEditMode = true
-            },
-            onBodyFocusChanged = { focused ->
-                bodyFocused = focused
-                if (focused) titleFocused = false
-            },
-            scrollState = contentScrollState,
-            scrollEnabled = !markdownSelectionActive,
-        )
-
-        val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
-        val recurrence by vm.recurrence.collectAsStateWithLifecycle()
-        val iconKey by vm.iconKey.collectAsStateWithLifecycle()
-        val actions by vm.actions.collectAsStateWithLifecycle()
-        val tags by vm.tags.collectAsStateWithLifecycle()
         EditorOptionSheets(
             contentKind = NoteKind.NOTE,
             reminderPickerOpen = reminderPickerOpen,
@@ -607,6 +611,8 @@ fun EditNoteScreen(
             deleteForeverConfirmOpen = deleteForeverConfirmOpen,
             pendingHeroSession = pendingHeroSession,
             pictureViewer = pictureViewer,
+            currentPictureUri = pictureUri,
+            currentPictureHeroFraming = pictureHeroFraming,
             readOnly = readOnly,
             activeTagSuggestions = activeTagSuggestions,
             attachments = attachments,
