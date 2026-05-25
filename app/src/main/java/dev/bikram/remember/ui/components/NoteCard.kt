@@ -358,6 +358,7 @@ fun NoteCard(
                                     size = 18.dp,
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     weight = FontWeight.Medium,
+                                    filled = headerIcon.filled,
                                     modifier = Modifier.alpha(0.75f),
                                 )
                             is NoteIcon.Drawable ->

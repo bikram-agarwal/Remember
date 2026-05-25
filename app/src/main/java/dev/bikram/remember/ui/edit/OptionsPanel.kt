@@ -1,8 +1,13 @@
 package dev.bikram.remember.ui.edit
 
+import android.content.Intent
+import android.content.Context
+import android.content.pm.PackageManager
+import android.graphics.drawable.Drawable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -34,7 +39,9 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalContext
@@ -45,6 +52,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.AppMediaStorage
@@ -54,6 +62,7 @@ import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.data.labelRes
+import dev.bikram.remember.data.toNoteActionIconDrawable
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
@@ -113,6 +122,11 @@ fun OptionsPanel(
                 storedCount = storedAttachmentCount,
                 linkedCount = linkedAttachmentCount,
             )
+        }
+    val firstAction = actions.firstOrNull()
+    val firstActionIcon =
+        remember(firstAction?.type, firstAction?.details, firstAction?.iconData) {
+            firstAction?.let { action -> actionOptionsIcon(context, action) }
         }
 
     val baseContainerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -206,7 +220,8 @@ fun OptionsPanel(
                         },
                     )
                     OptionCell(
-                        symbolName = actions.firstOrNull()?.type?.materialSymbolName() ?: "bolt",
+                        symbolName = firstAction?.type?.materialSymbolName() ?: "bolt",
+                        icon = firstActionIcon,
                         title = stringResource(R.string.options_actions),
                         summary = actionsSummary(actions),
                         onClick = onOpenActions,
@@ -449,6 +464,7 @@ private fun BehaviorOptionSummary(
 @Composable
 private fun OptionCell(
     symbolName: String,
+    icon: Drawable? = null,
     title: String,
     summary: String,
     modifier: Modifier = Modifier,
@@ -483,11 +499,10 @@ private fun OptionCell(
                     .padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RememberMaterialRoundedSymbol(
-                name = symbolName,
-                size = 19.dp,
-                tint = iconTint,
-                weight = FontWeight.Medium,
+            OptionCellIcon(
+                symbolName = symbolName,
+                icon = icon,
+                iconTint = iconTint,
             )
             Spacer(Modifier.size(8.dp))
             Column(
@@ -519,6 +534,36 @@ private fun OptionCell(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun OptionCellIcon(
+    symbolName: String,
+    icon: Drawable?,
+    iconTint: Color,
+) {
+    val painter =
+        remember(icon) {
+            icon?.let {
+                runCatching {
+                    BitmapPainter(it.toBitmap(96, 96).asImageBitmap())
+                }.getOrNull()
+            }
+        }
+    if (painter != null) {
+        Image(
+            painter = painter,
+            contentDescription = null,
+            modifier = Modifier.size(22.dp),
+        )
+    } else {
+        RememberMaterialRoundedSymbol(
+            name = symbolName,
+            size = 19.dp,
+            tint = iconTint,
+            weight = FontWeight.Medium,
+        )
     }
 }
 
@@ -890,6 +935,43 @@ private fun String.removePrefixIgnoreCase(prefix: String): String =
     } else {
         this
     }
+
+private fun actionOptionsIcon(
+    context: Context,
+    action: NoteAction,
+): Drawable? =
+    when (action.type) {
+        ActionType.OPEN_APP -> appIcon(context.packageManager, action.details)
+        ActionType.OPEN_SHORTCUT ->
+            action.iconData.toNoteActionIconDrawable(context.resources)
+                ?: shortcutFallbackIcon(context.packageManager, action.details)
+        else -> null
+    }
+
+private fun appIcon(
+    packageManager: PackageManager,
+    packageName: String,
+): Drawable? =
+    if (packageName.isBlank()) {
+        null
+    } else {
+        runCatching { packageManager.getApplicationIcon(packageName) }.getOrNull()
+    }
+
+private fun shortcutFallbackIcon(
+    packageManager: PackageManager,
+    intentUri: String,
+): Drawable? {
+    if (intentUri.isBlank()) return null
+    val intent =
+        runCatching { Intent.parseUri(intentUri, Intent.URI_INTENT_SCHEME) }
+            .getOrNull() ?: return null
+    val packageName =
+        intent.component?.packageName
+            ?: intent.`package`
+            ?: intent.resolveActivity(packageManager)?.packageName
+    return packageName?.let { appIcon(packageManager, it) }
+}
 
 @Composable
 private fun attachmentStorageSummary(

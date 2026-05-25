@@ -130,6 +130,7 @@ class BackupIo(
                                 put("title", a.title)
                                 put("details", a.details)
                                 a.extra?.let { put("extra", it) }
+                                a.iconData?.let { put("iconData", it) }
                             },
                         )
                     }
@@ -798,6 +799,7 @@ class BackupIo(
                     title = o.optString("title", ""),
                     details = o.optString("details", ""),
                     extra = o.optStringOrNull("extra"),
+                    iconData = o.optStringOrNull("iconData"),
                 ),
             )
         }

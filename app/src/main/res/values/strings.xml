@@ -630,6 +630,10 @@
     <string name="icon_picker_starred">Favorites</string>
     <string name="icon_picker_add_starred_cd">Edit favorites</string>
     <string name="icon_picker_max_starred">Max 30 favorites</string>
+    <string name="icon_picker_added_to_favorites">%1$s added to favorites</string>
+    <string name="icon_picker_removed_from_favorites">%1$s removed from favorites</string>
+    <string name="icon_picker_symbol_style_filled">Filled icons</string>
+    <string name="icon_picker_symbol_style_outlined">Outlined icons</string>
     <string name="icon_picker_results_heading">Matches</string>
     <string name="icon_picker_no_results">No icons match that search</string>
     <string name="icon_picker_tab_icons">Icons</string>

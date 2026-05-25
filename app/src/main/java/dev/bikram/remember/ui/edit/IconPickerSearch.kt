@@ -31,8 +31,8 @@ private const val STEMMED_WORD_SCORE = 0.85f
 private const val WORD_PREFIX_SCORE = 0.75f
 private const val FUZZY_ONE_EDIT_SCORE = 0.5f
 
-/** Minimum query token length before fuzzy matching engages (avoid 'cat' == 'bat'). */
-private const val FUZZY_MIN_TOKEN_LENGTH = 4
+/** Minimum query token length before fuzzy matching engages (avoid 'cake' == 'care'). */
+private const val FUZZY_MIN_TOKEN_LENGTH = 5
 
 private val WHITESPACE_SPLIT = Regex("\\s+")
 

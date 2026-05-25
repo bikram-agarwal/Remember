@@ -8,9 +8,11 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.ImageDecoder
 import android.graphics.Rect
+import android.graphics.drawable.Drawable
 import android.net.Uri
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.IconCompat
 import androidx.core.net.toUri
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.MainActivity
@@ -25,6 +27,7 @@ import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.Visibility
 import dev.bikram.remember.data.labelRes
+import dev.bikram.remember.data.toNoteActionIconBitmap
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.notifications.canPostNotifications
@@ -520,7 +523,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 }
             return NotificationCompat.Action
                 .Builder(
-                    R.drawable.ic_stat_remember,
+                    actionNotificationIcon(context, action),
                     actionLabel,
                     pi,
                 ).build()
@@ -581,5 +584,67 @@ class ReminderReceiver : BroadcastReceiver() {
         }
 
         private fun normalizeUrl(s: String): String = if (s.startsWith("http://") || s.startsWith("https://")) s else "https://$s"
+
+        private fun actionNotificationIcon(
+            context: Context,
+            action: NoteAction,
+        ): IconCompat {
+            val bitmap =
+                when (action.type) {
+                    ActionType.OPEN_APP -> appNotificationIconBitmap(context, action.details)
+                    ActionType.OPEN_SHORTCUT ->
+                        action.iconData.toNoteActionIconBitmap()
+                            ?: shortcutNotificationIconBitmap(context, action.details)
+                    else -> null
+                }
+            return if (bitmap != null) {
+                IconCompat.createWithBitmap(bitmap)
+            } else {
+                IconCompat.createWithResource(context, R.drawable.ic_stat_remember)
+            }
+        }
+
+        private fun appNotificationIconBitmap(
+            context: Context,
+            packageName: String,
+        ): Bitmap? =
+            if (packageName.isBlank()) {
+                null
+            } else {
+                runCatching {
+                    context.packageManager
+                        .getApplicationIcon(packageName)
+                        .toNotificationActionBitmap()
+                }.getOrNull()
+            }
+
+        private fun shortcutNotificationIconBitmap(
+            context: Context,
+            intentUri: String,
+        ): Bitmap? {
+            if (intentUri.isBlank()) return null
+            val intent =
+                runCatching { Intent.parseUri(intentUri, Intent.URI_INTENT_SCHEME) }
+                    .getOrNull() ?: return null
+            val packageManager = context.packageManager
+            val packageName =
+                intent.component?.packageName
+                    ?: intent.`package`
+                    ?: intent.resolveActivity(packageManager)?.packageName
+                    ?: return null
+            return appNotificationIconBitmap(context, packageName)
+        }
+
+        private fun Drawable.toNotificationActionBitmap(): Bitmap {
+            val bitmap = createBitmap(NOTIFICATION_ACTION_ICON_SIZE_PX, NOTIFICATION_ACTION_ICON_SIZE_PX)
+            val canvas = Canvas(bitmap)
+            val oldBounds = Rect(bounds)
+            setBounds(0, 0, canvas.width, canvas.height)
+            draw(canvas)
+            setBounds(oldBounds)
+            return bitmap
+        }
+
+        private const val NOTIFICATION_ACTION_ICON_SIZE_PX = 96
     }
 }

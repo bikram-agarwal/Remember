@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,6 +52,7 @@ fun AppBottomSheet(
     titleAccessory: (@Composable RowScope.() -> Unit)? = null,
     titleActions: (@Composable RowScope.() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    actionsImePadding: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     ModalBottomSheet(
@@ -60,7 +62,7 @@ fun AppBottomSheet(
         dragHandle = { AppBottomSheetDragHandle() },
     ) {
         RememberPredictiveBackHandler(onBack = onDismiss)
-        Column(modifier = Modifier.navigationBarsPadding()) {
+        Column(modifier = Modifier.navigationBarsPadding().imePadding()) {
             if (showTitleBar) {
                 Column(
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp),
@@ -105,6 +107,7 @@ fun AppBottomSheet(
                     modifier =
                         Modifier
                             .fillMaxWidth()
+                            .let { if (actionsImePadding) it.imePadding() else it }
                             .padding(horizontal = 20.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
                     verticalAlignment = Alignment.CenterVertically,

@@ -61,7 +61,7 @@ class IconPickerSearchTest {
     }
 
     @Test
-    fun fuzzyMatchEngagesOnFourPlusCharacterTypos() {
+    fun fuzzyMatchEngagesOnFivePlusCharacterTypos() {
         val fields = listOf(SearchableField("calendar", weight = 3.0f))
         assertTrue(scoreSearchable(tokenizeQuery("calender"), fields) > 0f)
     }
@@ -70,6 +70,12 @@ class IconPickerSearchTest {
     fun fuzzyMatchDoesNotEngageOnShortTokens() {
         val fields = listOf(SearchableField("bat", weight = 3.0f))
         assertEquals(0f, scoreSearchable(tokenizeQuery("cat"), fields))
+    }
+
+    @Test
+    fun fourCharacterQueriesDoNotFuzzyMatchNearbyUnrelatedWords() {
+        val fields = listOf(SearchableField("care case came", weight = 3.0f))
+        assertEquals(0f, scoreSearchable(tokenizeQuery("cake"), fields))
     }
 
     @Test
