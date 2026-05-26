@@ -84,7 +84,7 @@ internal fun arrangeItems(
 
 /**
  * The "middle" between Overdue and Done. With Group by Date we explode this into
- * Today / Upcoming / No date sections. Otherwise, we use the selected group mode.
+ * Today / Upcoming (≤7 days) / Later / No date sections. Otherwise, we use the selected group mode.
  */
 private fun arrangeMiddle(
     activeNotes: List<NoteWithItems>,
@@ -110,24 +110,31 @@ private fun arrangeMiddle(
     }
 
     val zone = ZoneId.systemDefault()
+    val today = ZonedDateTime.now(zone).toLocalDate()
     val tomorrowMidnightMillis =
-        ZonedDateTime
-            .now(zone)
-            .toLocalDate()
+        today
             .plusDays(1)
+            .atStartOfDay(zone)
+            .toInstant()
+            .toEpochMilli()
+    val laterFromMillis =
+        today
+            .plusDays(8)
             .atStartOfDay(zone)
             .toInstant()
             .toEpochMilli()
 
     val todayNotes = mutableListOf<NoteWithItems>()
     val upcomingNotes = mutableListOf<NoteWithItems>()
+    val laterNotes = mutableListOf<NoteWithItems>()
     val noDateNotes = mutableListOf<NoteWithItems>()
     activeNotes.forEach { noteWithItems ->
         val reminderAt = noteWithItems.note.reminderAt
         when {
             reminderAt == null -> noDateNotes += noteWithItems
             reminderAt < tomorrowMidnightMillis -> todayNotes += noteWithItems
-            else -> upcomingNotes += noteWithItems
+            reminderAt < laterFromMillis -> upcomingNotes += noteWithItems
+            else -> laterNotes += noteWithItems
         }
     }
 
@@ -141,12 +148,14 @@ private fun arrangeMiddle(
         listOf(
             SectionDef("", "TODAY", todayNotes),
             SectionDef("", "UPCOMING", upcomingNotes),
+            SectionDef("", "LATER", laterNotes),
             SectionDef("", "NO_DATE", noDateNotes),
         )
     val sectionLabelRes =
         mapOf(
             "TODAY" to R.string.home_section_today,
             "UPCOMING" to R.string.home_section_upcoming,
+            "LATER" to R.string.home_section_later,
             "NO_DATE" to R.string.home_section_no_date,
         )
     val orderedSections =
@@ -310,7 +319,7 @@ private fun arrangeByTag(activeNotes: List<NoteWithItems>): List<HomeListItem> {
     }
 }
 
-private fun sortNotes(
+internal fun sortNotes(
     notes: List<NoteWithItems>,
     opts: ViewOptions,
 ): List<NoteWithItems> = notes.sortedWith(buildComparator(opts))

@@ -182,6 +182,7 @@
     <string name="notecard_cd_selected">Selected</string>
     <string name="hero_framing_title">Position cover</string>
     <string name="viewer_cover_image_cd">Cover image</string>
+    <string name="hero_image_picker_browse_with_app">Browse with app</string>
     <string name="toast_saved_to_downloads">Saved to Downloads</string>
     <string name="toast_save_download_failed">Could not save file</string>
     <string name="toast_open_attachment_failed">No app can open this file</string>
@@ -244,6 +245,10 @@
     <string name="edit_bottom_bar_delete_forever_cd">Delete forever</string>
     <string name="edit_bottom_bar_restore_cd">Restore from trash</string>
     <string name="edit_save_cd">Save changes</string>
+    <string name="edit_picture_framing_cd">Edit picture framing</string>
+    <string name="edit_picture_reframe">Reframe</string>
+    <string name="edit_picture_replace">Replace</string>
+    <string name="edit_replace_picture_cd">Replace picture</string>
     <string name="edit_delete_forever_dialog_title">Delete forever?</string>
     <string name="edit_delete_forever_dialog_body">This note will be permanently deleted and cannot be recovered</string>
     <string name="edit_delete_forever_dialog_confirm">Delete</string>
@@ -284,6 +289,7 @@
     <string name="home_section_done">Done</string>
     <string name="home_section_today">Today</string>
     <string name="home_section_upcoming">Upcoming</string>
+    <string name="home_section_later">Later</string>
     <string name="home_section_no_date">No date</string>
     <string name="home_section_notes">Notes</string>
     <string name="home_section_lists">Lists</string>
@@ -630,6 +636,10 @@
     <string name="icon_picker_starred">Favorites</string>
     <string name="icon_picker_add_starred_cd">Edit favorites</string>
     <string name="icon_picker_max_starred">Max 30 favorites</string>
+    <string name="icon_picker_added_to_favorites">%1$s added to favorites</string>
+    <string name="icon_picker_removed_from_favorites">%1$s removed from favorites</string>
+    <string name="icon_picker_symbol_style_filled">Filled icons</string>
+    <string name="icon_picker_symbol_style_outlined">Outlined icons</string>
     <string name="icon_picker_results_heading">Matches</string>
     <string name="icon_picker_no_results">No icons match that search</string>
     <string name="icon_picker_tab_icons">Icons</string>
@@ -684,9 +694,11 @@
     <string name="appearance_gradient_subtitle">Show a subtle accent gradient behind the app</string>
     <string name="appearance_black_theme_effect_disabled">Can\'t change this in Black theme</string>
     <string name="appearance_blur_title">Progressive blur</string>
-    <string name="appearance_blur_subtitle">Blur content behind the top and bottom bars</string>
-    <string name="appearance_hero_title">Hero image on cards</string>
-    <string name="appearance_hero_subtitle">Use the note picture as a faded background of the card</string>
+    <string name="appearance_blur_subtitle">Blur content at bottom of screen &amp; other places</string>
+    <string name="appearance_cover_title">Cover image on cards</string>
+    <string name="appearance_cover_subtitle">Use the note picture as a faded background of the card</string>
+    <string name="appearance_adaptive_note_themes_title">Adaptive note themes</string>
+    <string name="appearance_adaptive_note_themes_subtitle">Use color from cover image to tint the note page</string>
     <string name="appearance_shading_title">Enhanced shading</string>
     <string name="appearance_shading_subtitle">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>

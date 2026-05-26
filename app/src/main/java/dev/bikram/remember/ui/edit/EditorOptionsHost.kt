@@ -5,6 +5,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import dev.bikram.remember.R
 import dev.bikram.remember.data.Importance
@@ -14,7 +15,6 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFraming
-import dev.bikram.remember.ui.common.HeroFramingEditorDialog
 import java.io.File
 import dev.bikram.remember.data.Visibility as NoteVisibility
 
@@ -40,6 +40,7 @@ fun EditorOptionsPanel(
     onImportanceChange: (Importance) -> Unit,
     onVisibilityChange: (NoteVisibility) -> Unit,
     onOpenPicture: () -> Unit,
+    onBrowsePictureWithApp: () -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachmentsSheet: () -> Unit,
@@ -59,6 +60,7 @@ fun EditorOptionsPanel(
         onSetImportance = if (readOnly) ({ _ -> }) else onImportanceChange,
         onSetVisibility = if (readOnly) ({ _ -> }) else onVisibilityChange,
         onOpenPicture = if (readOnly) ({}) else onOpenPicture,
+        onBrowsePictureWithApp = if (readOnly) ({}) else onBrowsePictureWithApp,
         onOpenActions = if (readOnly) ({}) else onOpenActions,
         onOpenTags = if (readOnly) ({}) else onOpenTags,
         onOpenAttachments =
@@ -88,8 +90,10 @@ fun EditorOptionSheets(
     attachmentsPickerOpen: Boolean,
     notificationPermissionSheetOpen: Boolean,
     deleteForeverConfirmOpen: Boolean,
+    heroImagePicker: HeroImagePickerController,
     pendingHeroSession: Pair<String, File?>?,
     pictureViewer: Pair<String, Long>?,
+    currentPictureHeroFraming: String?,
     readOnly: Boolean,
     activeTagSuggestions: List<String>,
     attachments: List<NoteAttachmentEntity>,
@@ -175,21 +179,6 @@ fun EditorOptionSheets(
             bodyRes = R.string.notification_permission_required_body,
         )
     }
-    pendingHeroSession?.let { (pickedUri, copiedFile) ->
-        HeroFramingEditorDialog(
-            imageUri = pickedUri,
-            pendingCopiedFile = copiedFile,
-            initialFraming = null,
-            onDismiss = {
-                copiedFile?.delete()
-                onDismissPendingHero()
-            },
-            onConfirm = { framing ->
-                onHeroCommitted(pickedUri, framing)
-                onDismissPendingHero()
-            },
-        )
-    }
     if (deleteForeverConfirmOpen) {
         AlertDialog(
             onDismissRequest = onDismissDeleteForever,
@@ -213,21 +202,88 @@ fun EditorOptionSheets(
         )
     }
 
+    val pendingHeroUri = pendingHeroSession?.first
+    val activeViewerUri = pendingHeroUri ?: pictureViewer?.first
     FullScreenHeroImageOverlay(
-        visible = pictureViewer != null,
-        imageUri = pictureViewer?.first,
-        imageCacheRevision = pictureViewer?.second ?: 0L,
+        visible = activeViewerUri != null,
+        imageUri = activeViewerUri,
+        imageCacheRevision = if (pendingHeroUri != null) 0L else pictureViewer?.second ?: 0L,
         imageContentDescription = heroImageContentDescription,
-        sharedElementKey = pictureViewer?.first?.let { uri -> "hero-image-$uri" },
-        onDismiss = onDismissPictureViewer,
+        sharedElementKey = activeViewerUri?.let { uri -> "hero-image-$uri" },
+        initialFraming =
+            if (pendingHeroUri == null) {
+                remember(currentPictureHeroFraming) {
+                    HeroFraming.fromJsonString(currentPictureHeroFraming)
+                }
+            } else {
+                null
+            },
+        startInReframeMode = pendingHeroUri != null,
+        dismissOnCancelReframe = pendingHeroUri != null,
+        dismissAfterCommit = pendingHeroUri == null,
+        onDismiss = {
+            pendingHeroSession?.second?.delete()
+            if (pendingHeroUri != null) {
+                onDismissPendingHero()
+            } else {
+                onDismissPictureViewer()
+            }
+        },
+        onReplace =
+            if (readOnly) {
+                null
+            } else {
+                {
+                    pendingHeroSession?.second?.delete()
+                    if (pendingHeroUri != null) {
+                        onDismissPendingHero()
+                    } else {
+                        onDismissPictureViewer()
+                    }
+                    heroImagePicker.pickWithPhotoPicker()
+                }
+            },
+        onReplaceLongClick =
+            if (readOnly) {
+                null
+            } else {
+                {
+                    pendingHeroSession?.second?.delete()
+                    if (pendingHeroUri != null) {
+                        onDismissPendingHero()
+                    } else {
+                        onDismissPictureViewer()
+                    }
+                    heroImagePicker.browseWithApp()
+                }
+            },
+        onCommitFraming = { framing ->
+            activeViewerUri?.let { uri ->
+                onHeroCommitted(uri, framing)
+            }
+            if (pendingHeroUri != null) {
+                onDismissPendingHero()
+            }
+        },
         onDelete =
             if (readOnly) {
                 null
             } else {
                 {
-                    onPictureChange(null)
-                    onDismissPictureViewer()
+                    pendingHeroSession?.second?.delete()
+                    if (pendingHeroUri != null) {
+                        onDismissPendingHero()
+                    } else {
+                        onPictureChange(null)
+                        onDismissPictureViewer()
+                    }
                 }
+            },
+        onEdit =
+            if (readOnly) {
+                null
+            } else {
+                {}
             },
     )
 }

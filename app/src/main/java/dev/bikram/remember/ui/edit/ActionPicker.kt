@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,6 +45,9 @@ import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.dataLabelRes
 import dev.bikram.remember.data.labelRes
+import dev.bikram.remember.data.recycleNoteActionIconBitmap
+import dev.bikram.remember.data.toNoteActionIconData
+import dev.bikram.remember.data.toNoteActionIconDrawable
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
@@ -100,6 +104,16 @@ fun ActionPicker(
     var details by remember(initialAction) { mutableStateOf(initialAction?.details.orEmpty()) }
     var extra by remember(initialAction) { mutableStateOf(initialAction?.extra) }
     var targetIcon by remember(initialAction) { mutableStateOf<Drawable?>(null) }
+    val savedShortcutIcon =
+        remember(initialAction?.iconData, resources) {
+            initialAction?.iconData.toNoteActionIconDrawable(resources)
+        }
+    DisposableEffect(savedShortcutIcon) {
+        val iconToRecycle = savedShortcutIcon
+        onDispose {
+            iconToRecycle?.recycleNoteActionIconBitmap()
+        }
+    }
 
     val targetDisplayName =
         when (selectedType) {
@@ -118,14 +132,14 @@ fun ActionPicker(
             else -> ""
         }
     val targetDisplayIcon =
-        remember(selectedType, details, targetIcon) {
+        remember(selectedType, details, targetIcon, savedShortcutIcon) {
             when (selectedType) {
                 ActionType.CALL_NUMBER,
                 ActionType.SEND_MESSAGE,
                 ActionType.SEND_EMAIL,
                 -> targetIcon
                 ActionType.OPEN_APP -> targetIcon ?: appIcon(packageManager, details)
-                ActionType.OPEN_SHORTCUT -> targetIcon ?: shortcutFallbackIcon(packageManager, details)
+                ActionType.OPEN_SHORTCUT -> targetIcon ?: savedShortcutIcon ?: shortcutFallbackIcon(packageManager, details)
                 else -> null
             }
         }
@@ -170,7 +184,16 @@ fun ActionPicker(
                 -> extra?.trim()?.takeIf { it.isNotBlank() && it != LEGACY_CONTACT_MANUAL_ENTRY_EXTRA }
                 else -> extra?.trim()?.takeIf { it.isNotBlank() }
             }
-        return NoteAction(type, cleanTitle, cleanDetails, extra = cleanExtra)
+        val cleanIconData =
+            if (type == ActionType.OPEN_SHORTCUT) {
+                targetIcon?.toNoteActionIconData()
+                    ?: initialAction
+                        ?.takeIf { it.type == ActionType.OPEN_SHORTCUT && it.details == cleanDetails }
+                        ?.iconData
+            } else {
+                null
+            }
+        return NoteAction(type, cleanTitle, cleanDetails, extra = cleanExtra, iconData = cleanIconData)
     }
 
     val phoneLauncher =
@@ -231,6 +254,7 @@ fun ActionPicker(
         subtitle = if (screen == ActionPickerScreen.ChooseType) stringResource(R.string.actions_sheet_subtitle) else null,
         onDismiss = onDismiss,
         scrollable = !pickingInSheet,
+        actionsImePadding = screen == ActionPickerScreen.EditAction,
         actions = {
             RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
             if (screen == ActionPickerScreen.EditAction && selectedType != null) {

@@ -6,6 +6,8 @@ import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -23,9 +25,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -74,8 +79,10 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -108,6 +115,7 @@ import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -126,6 +134,7 @@ fun IconPicker(
     val context = LocalContext.current
     val resources = LocalResources.current
     val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -145,10 +154,19 @@ fun IconPicker(
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     var searchFocusRequestKey by rememberSaveable { mutableIntStateOf(0) }
     var selectedTab by rememberSaveable { mutableStateOf(defaultIconPickerTab(current)) }
+    var symbolStyle by rememberSaveable(current) {
+        mutableStateOf(initialIconPickerSymbolStyle(current ?: selectionKey))
+    }
     var starredSelectionTab by rememberSaveable { mutableStateOf<IconPickerTab?>(null) }
     var pendingStarredIconKeys by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var pendingStarredEmojis by rememberSaveable { mutableStateOf(emptyList<String>()) }
-    val iconSheetContentHeight = 644.dp
+    val imeBottom = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+    val iconSheetContentHeight =
+        if (imeBottom > 0.dp) {
+            (configuration.screenHeightDp.dp - imeBottom - 116.dp).coerceIn(360.dp, 644.dp)
+        } else {
+            644.dp
+        }
 
     DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
         val observer =
@@ -169,6 +187,10 @@ fun IconPicker(
     val iconKeywords =
         remember(configuration) {
             loadIconKeywords(resources)
+        }
+    val iconAliases =
+        remember(configuration) {
+            loadIconAliases(resources)
         }
     // Build the skin-tone group index once; rebuilding it on every sub-tab
     // switch was the main culprit behind the laggy category change.
@@ -197,7 +219,10 @@ fun IconPicker(
 
     fun beginStarredSelection(tab: IconPickerTab) {
         starredSelectionTab = tab
-        pendingStarredIconKeys = starredState.iconKeys
+        pendingStarredIconKeys =
+            starredState.iconKeys
+                .map { normalizeFavoriteIconKey(it) }
+                .distinct()
         pendingStarredEmojis = starredState.emojis
         selectedTab = tab
     }
@@ -220,14 +245,15 @@ fun IconPicker(
     }
 
     fun togglePendingStarredIcon(iconKey: String) {
+        val savedIconKey = normalizeIconKey(iconKey) ?: iconKey
         pendingStarredIconKeys =
-            if (iconKey in pendingStarredIconKeys) {
-                pendingStarredIconKeys - iconKey
+            if (savedIconKey in pendingStarredIconKeys) {
+                pendingStarredIconKeys - savedIconKey
             } else if (pendingStarredIconKeys.size >= ICON_PICKER_MAX_STARRED) {
                 Toast.makeText(context, maxStarredMessage, Toast.LENGTH_SHORT).show()
                 pendingStarredIconKeys
             } else {
-                pendingStarredIconKeys + iconKey
+                pendingStarredIconKeys + savedIconKey
             }
     }
 
@@ -241,6 +267,62 @@ fun IconPicker(
             } else {
                 pendingStarredEmojis + emoji
             }
+    }
+
+    fun toggleSavedStarredIcon(
+        iconKey: String,
+        label: String,
+    ) {
+        val savedIconKeys =
+            starredState.iconKeys
+                .map { normalizeFavoriteIconKey(it) }
+                .distinct()
+        val nextStarredIconKeys =
+            if (iconKey in savedIconKeys) {
+                savedIconKeys - iconKey
+            } else if (savedIconKeys.size >= ICON_PICKER_MAX_STARRED) {
+                Toast.makeText(context, maxStarredMessage, Toast.LENGTH_SHORT).show()
+                return
+            } else {
+                savedIconKeys + iconKey
+            }
+        pendingStarredIconKeys = nextStarredIconKeys
+        val messageRes =
+            if (iconKey in savedIconKeys) {
+                R.string.icon_picker_removed_from_favorites
+            } else {
+                R.string.icon_picker_added_to_favorites
+            }
+        Toast.makeText(context, resources.getString(messageRes, label), Toast.LENGTH_SHORT).show()
+        scope.launch {
+            iconPickerPrefs.setStarredIconKeys(nextStarredIconKeys)
+        }
+    }
+
+    fun toggleSavedStarredEmoji(
+        emoji: String,
+        label: String,
+    ) {
+        val nextStarredEmojis =
+            if (emoji in starredState.emojis) {
+                starredState.emojis - emoji
+            } else if (starredState.emojis.size >= ICON_PICKER_MAX_STARRED) {
+                Toast.makeText(context, maxStarredMessage, Toast.LENGTH_SHORT).show()
+                return
+            } else {
+                starredState.emojis + emoji
+            }
+        pendingStarredEmojis = nextStarredEmojis
+        val messageRes =
+            if (emoji in starredState.emojis) {
+                R.string.icon_picker_removed_from_favorites
+            } else {
+                R.string.icon_picker_added_to_favorites
+            }
+        Toast.makeText(context, resources.getString(messageRes, label), Toast.LENGTH_SHORT).show()
+        scope.launch {
+            iconPickerPrefs.setStarredEmojis(nextStarredEmojis)
+        }
     }
 
     // Debounced trimmed query. Without this, every keystroke re-runs the linear scan
@@ -258,11 +340,11 @@ fun IconPicker(
         }
     }
     val filteredOrdered =
-        remember(trimmedQuery, configuration, iconKeywords) {
+        remember(trimmedQuery, configuration, iconKeywords, iconAliases) {
             if (trimmedQuery.isEmpty()) {
                 emptyList()
             } else {
-                iconChoicesRankedForSearch(resources, iconKeywords, trimmedQuery)
+                iconChoicesRankedForSearch(resources, iconKeywords, iconAliases, trimmedQuery)
             }
         }
     val activeStarredEmojis =
@@ -287,20 +369,6 @@ fun IconPicker(
         showTitleBar = false,
         scrollable = false,
         contentPadding = PaddingValues(vertical = 8.dp),
-        actions = {
-            if (starredModeActive) {
-                RememberTextButton(onClick = ::cancelStarredSelection) { Text(stringResource(R.string.common_cancel)) }
-                StarredDoneButton(
-                    count = pendingStarredCount,
-                    onClick = ::saveStarredSelection,
-                )
-            } else if (current != null) {
-                RememberTextButton(onClick = { onPick(null) }) { Text(stringResource(R.string.common_remove)) }
-                RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
-            } else {
-                RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done)) }
-            }
-        },
     ) {
         Box(
             modifier =
@@ -308,13 +376,21 @@ fun IconPicker(
                     .fillMaxWidth()
                     .height(iconSheetContentHeight),
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
+            Column(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = IconPickerActionToolbarHeight),
+            ) {
                 IconPickerSearchTitleRow(
                     searchExpanded = searchExpanded,
                     focusRequestKey = searchFocusRequestKey,
                     title = stringResource(titleRes),
                     query = searchQuery,
                     onQueryChange = { searchQuery = it },
+                    symbolStyle = symbolStyle,
+                    showSymbolStyleToggle = selectedTab == IconPickerTab.ICONS && !starredModeActive,
+                    onToggleSymbolStyle = { symbolStyle = symbolStyle.toggled() },
                     onToggleSearch = {
                         if (searchExpanded && searchQuery.isNotEmpty()) {
                             searchQuery = ""
@@ -381,9 +457,11 @@ fun IconPicker(
                                 starredIconKeys = starredState.iconKeys,
                                 pendingStarredIconKeys = pendingStarredIconKeys,
                                 starredSelectionActive = starredSelectionTab == IconPickerTab.ICONS,
+                                symbolStyle = symbolStyle,
                                 selectedGridIndex = selectedIconGridIndex(selectionKey, starredState.iconKeys),
                                 onStartStarredSelection = { beginStarredSelection(IconPickerTab.ICONS) },
                                 onToggleStarIcon = ::togglePendingStarredIcon,
+                                onToggleSavedStarIcon = ::toggleSavedStarredIcon,
                                 onPick = onPick,
                             )
                         IconPickerTab.EMOJIS ->
@@ -393,15 +471,75 @@ fun IconPicker(
                                 emojiSkinToneIndex = emojiSkinToneIndex,
                                 selectedCategoryKey = selectedEmojiCategoryKey,
                                 selectedEmoji = selectedEmoji,
+                                starredEmojis = starredState.emojis,
                                 pendingStarredEmojis = pendingStarredEmojis,
                                 starredSelectionActive = starredSelectionTab == IconPickerTab.EMOJIS,
                                 onCategorySelected = { selectedEmojiCategoryKey = it },
                                 onStartStarredSelection = { beginStarredSelection(IconPickerTab.EMOJIS) },
                                 onToggleStarEmoji = ::togglePendingStarredEmoji,
+                                onToggleSavedStarEmoji = ::toggleSavedStarredEmoji,
                                 onEmojiSelected = { emoji -> onPick("$ICON_EMOJI_PREFIX$emoji") },
                             )
                     }
                 }
+            }
+            IconPickerActionToolbar(
+                starredModeActive = starredModeActive,
+                pendingStarredCount = pendingStarredCount,
+                current = current,
+                onCancelStarredSelection = ::cancelStarredSelection,
+                onSaveStarredSelection = ::saveStarredSelection,
+                onRemove = { onPick(null) },
+                onDismiss = onDismiss,
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .imePadding(),
+            )
+        }
+    }
+}
+
+private val IconPickerActionToolbarHeight = 64.dp
+
+@Composable
+private fun IconPickerActionToolbar(
+    starredModeActive: Boolean,
+    pendingStarredCount: Int,
+    current: String?,
+    onCancelStarredSelection: () -> Unit,
+    onSaveStarredSelection: () -> Unit,
+    onRemove: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .height(IconPickerActionToolbarHeight)
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (starredModeActive) {
+            RememberTextButton(onClick = onCancelStarredSelection) {
+                Text(stringResource(R.string.common_cancel))
+            }
+            StarredDoneButton(
+                count = pendingStarredCount,
+                onClick = onSaveStarredSelection,
+            )
+        } else if (current != null) {
+            RememberTextButton(onClick = onRemove) {
+                Text(stringResource(R.string.common_remove))
+            }
+            RememberTextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_done))
+            }
+        } else {
+            RememberTextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_done))
             }
         }
     }
@@ -415,6 +553,9 @@ private fun IconPickerSearchTitleRow(
     title: String,
     query: String,
     onQueryChange: (String) -> Unit,
+    symbolStyle: IconPickerSymbolStyle,
+    showSymbolStyleToggle: Boolean,
+    onToggleSymbolStyle: () -> Unit,
     onToggleSearch: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -473,6 +614,36 @@ private fun IconPickerSearchTitleRow(
                     modifier =
                         Modifier.semantics {
                             contentDescription = if (expanded) cdCloseSearch else cdSearch
+                        },
+                )
+            }
+        }
+        if (showSymbolStyleToggle) {
+            Spacer(Modifier.width(8.dp))
+            val symbolStyleLabel =
+                stringResource(
+                    if (symbolStyle == IconPickerSymbolStyle.FILLED) {
+                        R.string.icon_picker_symbol_style_filled
+                    } else {
+                        R.string.icon_picker_symbol_style_outlined
+                    },
+                )
+            RememberFilledTonalIconButton(
+                onClick = onToggleSymbolStyle,
+                tooltipLabel = symbolStyleLabel,
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name =
+                        if (symbolStyle == IconPickerSymbolStyle.FILLED) {
+                            "radio_button_checked"
+                        } else {
+                            "radio_button_unchecked"
+                        },
+                    weight = FontWeight.Medium,
+                    filled = symbolStyle.filled,
+                    modifier =
+                        Modifier.semantics {
+                            contentDescription = symbolStyleLabel
                         },
                 )
             }
@@ -651,9 +822,11 @@ private fun IconPickerIconsContent(
     starredIconKeys: List<String>,
     pendingStarredIconKeys: List<String>,
     starredSelectionActive: Boolean,
+    symbolStyle: IconPickerSymbolStyle,
     selectedGridIndex: Int,
     onStartStarredSelection: () -> Unit,
     onToggleStarIcon: (String) -> Unit,
+    onToggleSavedStarIcon: (String, String) -> Unit,
     onPick: (String?) -> Unit,
 ) {
     val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = selectedGridIndex)
@@ -662,6 +835,10 @@ private fun IconPickerIconsContent(
             pendingStarredIconKeys
         } else {
             starredIconKeys
+        }
+    val normalizedStarredIconKeys =
+        remember(starredIconKeys) {
+            starredIconKeys.map { normalizeFavoriteIconKey(it) }.distinct()
         }
     val starredChoices = starredIconChoices(displayedStarredKeys)
     when {
@@ -678,6 +855,7 @@ private fun IconPickerIconsContent(
                     starredSelectionActive = starredSelectionActive,
                     onStartStarredSelection = onStartStarredSelection,
                     onToggleStarIcon = onToggleStarIcon,
+                    onToggleSavedStarIcon = onToggleSavedStarIcon,
                     onPick = onPick,
                 )
                 iconCatalog.forEach { category ->
@@ -690,7 +868,8 @@ private fun IconPickerIconsContent(
                     itemsIndexed(
                         category.icons,
                         key = { index, _ -> "${category.nameRes}_$index" },
-                    ) { _, choice ->
+                    ) { _, catalogChoice ->
+                        val choice = catalogChoice.withSymbolStyle(symbolStyle)
                         val pendingStarred = choice.key in pendingStarredIconKeys
                         IconTile(
                             choice = choice,
@@ -698,18 +877,23 @@ private fun IconPickerIconsContent(
                                 if (starredSelectionActive) {
                                     pendingStarred
                                 } else {
-                                    choice.key == selectionKey
+                                    iconChoiceMatchesSelection(choice, selectionKey) ||
+                                        (catalogChoice.key == defaultCatalogKey && selectionKey == defaultCatalogKey)
                                 },
+                            favorite = choice.key in normalizedStarredIconKeys,
                             onClick = {
                                 if (starredSelectionActive) {
                                     onToggleStarIcon(choice.key)
                                 } else {
-                                    if (choice.key == defaultCatalogKey) {
+                                    if (catalogChoice.key == defaultCatalogKey) {
                                         onPick(null)
                                     } else {
                                         onPick(choice.key)
                                     }
                                 }
+                            },
+                            onLongClick = {
+                                onToggleSavedStarIcon(choice.key, humanizeIconKey(choice.key))
                             },
                         )
                     }
@@ -732,7 +916,8 @@ private fun IconPickerIconsContent(
                 itemsIndexed(
                     filteredOrdered,
                     key = { index, choice -> "icon_picker_search_${index}_${choice.key}" },
-                ) { _, choice ->
+                ) { _, catalogChoice ->
+                    val choice = catalogChoice.withSymbolStyle(symbolStyle)
                     val pendingStarred = choice.key in pendingStarredIconKeys
                     IconTile(
                         choice = choice,
@@ -740,18 +925,22 @@ private fun IconPickerIconsContent(
                             if (starredSelectionActive) {
                                 pendingStarred
                             } else {
-                                choice.key == selectionKey
+                                iconChoiceMatchesSelection(choice, selectionKey)
                             },
+                        favorite = choice.key in normalizedStarredIconKeys,
                         onClick = {
                             if (starredSelectionActive) {
                                 onToggleStarIcon(choice.key)
                             } else {
-                                if (choice.key == defaultCatalogKey) {
+                                if (catalogChoice.key == defaultCatalogKey) {
                                     onPick(null)
                                 } else {
                                     onPick(choice.key)
                                 }
                             }
+                        },
+                        onLongClick = {
+                            onToggleSavedStarIcon(choice.key, humanizeIconKey(choice.key))
                         },
                     )
                 }
@@ -766,11 +955,13 @@ private fun IconPickerEmojiContent(
     emojiSkinToneIndex: EmojiSkinToneIndex,
     selectedCategoryKey: String,
     selectedEmoji: String?,
+    starredEmojis: List<String>,
     pendingStarredEmojis: List<String>,
     starredSelectionActive: Boolean,
     onCategorySelected: (String) -> Unit,
     onStartStarredSelection: () -> Unit,
     onToggleStarEmoji: (String) -> Unit,
+    onToggleSavedStarEmoji: (String, String) -> Unit,
     onEmojiSelected: (String) -> Unit,
 ) {
     val displayEmojis =
@@ -889,21 +1080,26 @@ private fun IconPickerEmojiContent(
                         val pendingStarred = variantValues.any { it in pendingStarredEmojis }
                         val selectedVariant = variantValues.firstOrNull { it == selectedEmoji }
                         val pendingVariant = variantValues.firstOrNull { it in pendingStarredEmojis }
+                        val displayEmoji = selectedVariant ?: pendingVariant ?: entry.displayEmoji
                         EmojiTile(
-                            emoji = selectedVariant ?: pendingVariant ?: entry.displayEmoji,
-                            variants = variantValues,
+                            emoji = displayEmoji,
+                            variants = entry.variants,
                             selected =
                                 if (starredSelectionActive) {
                                     pendingStarred
                                 } else {
                                     selectedVariant != null
                                 },
+                            favorite = variantValues.any { it in starredEmojis },
                             onClick = { selectedEmojiValue ->
                                 if (starredSelectionActive) {
                                     onToggleStarEmoji(selectedEmojiValue)
                                 } else {
                                     onEmojiSelected(selectedEmojiValue)
                                 }
+                            },
+                            onLongClick = { emojiValue, label ->
+                                onToggleSavedStarEmoji(emojiValue, label)
                             },
                         )
                     }
@@ -928,6 +1124,56 @@ private enum class IconPickerTab(
     EMOJIS(R.string.icon_picker_tab_emojis),
 }
 
+private enum class IconPickerSymbolStyle(
+    val filled: Boolean,
+) {
+    FILLED(true),
+    OUTLINED(false),
+}
+
+private fun IconPickerSymbolStyle.toggled(): IconPickerSymbolStyle =
+    when (this) {
+        IconPickerSymbolStyle.FILLED -> IconPickerSymbolStyle.OUTLINED
+        IconPickerSymbolStyle.OUTLINED -> IconPickerSymbolStyle.FILLED
+    }
+
+private fun initialIconPickerSymbolStyle(iconKey: String): IconPickerSymbolStyle =
+    if (resolvedSymbolFilled(iconKey) == false) {
+        IconPickerSymbolStyle.OUTLINED
+    } else {
+        IconPickerSymbolStyle.FILLED
+    }
+
+private fun IconChoice.withSymbolStyle(symbolStyle: IconPickerSymbolStyle): IconChoice =
+    if (symbolName == null) {
+        this
+    } else {
+        copy(
+            key = iconKeyWithSymbolFilled(key, symbolStyle.filled),
+            filled = symbolStyle.filled,
+        )
+    }
+
+private fun iconChoiceMatchesSelection(
+    choice: IconChoice,
+    selectionKey: String,
+): Boolean {
+    if (choice.key == selectionKey) return true
+    val choiceCatalogKey = iconSymbolCatalogKey(choice.key) ?: return false
+    val selectionCatalogKey = iconSymbolCatalogKey(selectionKey) ?: return false
+    return choiceCatalogKey == selectionCatalogKey &&
+        choice.filled == (resolvedSymbolFilled(selectionKey) ?: true)
+}
+
+private fun normalizeFavoriteIconKey(iconKey: String): String {
+    val normalized = normalizeIconKey(iconKey) ?: iconKey
+    return if (isSymbolIconKey(normalized)) {
+        iconKeyWithSymbolFilled(normalized, resolvedSymbolFilled(normalized) ?: true)
+    } else {
+        normalized
+    }
+}
+
 private fun defaultIconPickerTab(current: String?): IconPickerTab =
     if (current?.startsWith(ICON_EMOJI_PREFIX) == true) {
         IconPickerTab.EMOJIS
@@ -943,12 +1189,13 @@ private fun selectedIconGridIndex(
     if (starredChoices.any { it.key == selectionKey }) {
         return 0
     }
+    val selectedCatalogKey = iconSymbolCatalogKey(selectionKey) ?: selectionKey
     var gridIndex = 1 + starredChoices.size + 1
     iconCatalog.forEach { category ->
         if (category.nameRes == R.string.icon_section_brand_google) {
             gridIndex += 1
         }
-        if (category.icons.any { it.key == selectionKey }) {
+        if (category.icons.any { it.key == selectedCatalogKey }) {
             return gridIndex
         }
         gridIndex += 1 + category.icons.size
@@ -971,6 +1218,7 @@ private fun LazyGridScope.iconStarredSection(
     starredSelectionActive: Boolean,
     onStartStarredSelection: () -> Unit,
     onToggleStarIcon: (String) -> Unit,
+    onToggleSavedStarIcon: (String, String) -> Unit,
     onPick: (String?) -> Unit,
 ) {
     iconHeader(R.string.icon_picker_starred, topPadding = 4.dp)
@@ -986,6 +1234,7 @@ private fun LazyGridScope.iconStarredSection(
                 } else {
                     choice.key == selectedKey
                 },
+            favorite = true,
             onClick = {
                 if (starredSelectionActive) {
                     onToggleStarIcon(choice.key)
@@ -994,6 +1243,9 @@ private fun LazyGridScope.iconStarredSection(
                 } else {
                     onPick(choice.key)
                 }
+            },
+            onLongClick = {
+                onToggleSavedStarIcon(choice.key, humanizeIconKey(choice.key))
             },
         )
     }
@@ -1030,7 +1282,20 @@ private fun starredIconChoices(starredIconKeys: List<String>): List<IconChoice> 
             choicesByKey.putIfAbsent(choice.key, choice)
         }
     }
-    return starredIconKeys.mapNotNull { choicesByKey[it] }
+    return starredIconKeys.mapNotNull { iconKey ->
+        val normalized = normalizeFavoriteIconKey(iconKey)
+        val catalogKey = iconSymbolCatalogKey(normalized) ?: normalized
+        choicesByKey[catalogKey]?.let { choice ->
+            if (isSymbolIconKey(normalized)) {
+                choice.copy(
+                    key = normalized,
+                    filled = resolvedSymbolFilled(normalized) ?: choice.filled,
+                )
+            } else {
+                choice
+            }
+        }
+    }
 }
 
 private fun starredEmojiEntries(
@@ -1272,6 +1537,20 @@ private fun loadIconKeywords(resources: Resources): Map<String, List<String>> =
         }
 
 /**
+ * Loads hand-curated search aliases keyed by icon ligature (e.g.
+ * `sports_esports` -> [controller, gamepad, gaming]). Edited in
+ * `app/src/main/res/raw/icon_aliases.json`; aliases carry the highest field
+ * weight so they surface the icon even on partial queries.
+ */
+private fun loadIconAliases(resources: Resources): Map<String, List<String>> =
+    resources
+        .openRawResource(R.raw.icon_aliases)
+        .bufferedReader()
+        .use { reader ->
+            emojiJson.decodeFromString<Map<String, List<String>>>(reader.readText())
+        }
+
+/**
  * Wait this long after the last keystroke before re-running the in-memory icon /
  * emoji filter. Matches the home search debounce so typing feel is consistent.
  */
@@ -1283,12 +1562,14 @@ private const val ICON_PICKER_SEARCH_DEBOUNCE_MILLIS = 300L
  */
 private const val FIELD_WEIGHT_NAME: Float = 3.0f
 private const val FIELD_WEIGHT_SLUG: Float = 2.0f
+private const val FIELD_WEIGHT_ALIAS: Float = 4.0f
 private const val FIELD_WEIGHT_KEYWORDS: Float = 1.5f
 private const val FIELD_WEIGHT_CATEGORY: Float = 0.8f
 
 private fun iconChoicesRankedForSearch(
     resources: Resources,
     iconKeywords: Map<String, List<String>>,
+    iconAliases: Map<String, List<String>>,
     rawQuery: String,
 ): List<IconChoice> {
     val tokens = tokenizeQuery(rawQuery)
@@ -1297,7 +1578,7 @@ private fun iconChoicesRankedForSearch(
     iconCatalog.forEach { category ->
         val categoryLabel = resources.getString(category.nameRes)
         category.icons.forEach { choice ->
-            val score = scoreSearchable(tokens, buildIconSearchFields(choice, categoryLabel, iconKeywords))
+            val score = scoreSearchable(tokens, buildIconSearchFields(choice, categoryLabel, iconKeywords, iconAliases))
             if (score > 0f) scored += choice to score
         }
     }
@@ -1316,13 +1597,16 @@ private fun buildIconSearchFields(
     choice: IconChoice,
     categoryLabel: String,
     iconKeywords: Map<String, List<String>>,
+    iconAliases: Map<String, List<String>>,
 ): List<SearchableField> {
     val tags = choice.symbolName?.let { iconKeywords[it] }.orEmpty()
+    val aliases = choice.symbolName?.let { iconAliases[it] }.orEmpty()
     return listOf(
         SearchableField(text = humanizeIconKey(choice.key), weight = FIELD_WEIGHT_NAME),
         SearchableField(text = iconKeyToSearchWords(choice.key), weight = FIELD_WEIGHT_SLUG),
-        SearchableField(text = tags.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS),
-        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY),
+        SearchableField(text = aliases.joinToString(" "), weight = FIELD_WEIGHT_ALIAS),
+        SearchableField(text = tags.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS, prefixMatchEnabled = false),
+        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY, prefixMatchEnabled = false),
     )
 }
 
@@ -1355,15 +1639,26 @@ private fun buildEmojiSearchFields(emoji: BundledEmoji): List<SearchableField> {
     return listOf(
         SearchableField(text = emoji.name, weight = FIELD_WEIGHT_NAME),
         SearchableField(text = emoji.slug.replace('_', ' '), weight = FIELD_WEIGHT_SLUG),
-        SearchableField(text = emoji.keywords.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS),
-        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY),
+        SearchableField(text = emoji.keywords.joinToString(" "), weight = FIELD_WEIGHT_KEYWORDS, prefixMatchEnabled = false),
+        SearchableField(text = categoryLabel, weight = FIELD_WEIGHT_CATEGORY, prefixMatchEnabled = false),
     )
 }
+
+private fun favoriteLabelForEmoji(emoji: BundledEmoji): String =
+    emoji.name
+        .split(' ')
+        .joinToString(" ") { word ->
+            word.replaceFirstChar { character ->
+                if (character.isLowerCase()) character.titlecase(Locale.US) else character.toString()
+            }
+        }
 
 private fun iconKeyToSearchWords(key: String): String {
     val raw =
         when {
             key.startsWith(ICON_SYMBOL_PREFIX) -> key.removePrefix(ICON_SYMBOL_PREFIX)
+            key.startsWith(ICON_SYMBOL_FILLED_PREFIX) -> key.removePrefix(ICON_SYMBOL_FILLED_PREFIX)
+            key.startsWith(ICON_SYMBOL_OUTLINED_PREFIX) -> key.removePrefix(ICON_SYMBOL_OUTLINED_PREFIX)
             key.startsWith(ICON_DRAWABLE_PREFIX) -> key.removePrefix(ICON_DRAWABLE_PREFIX)
             else -> key
         }
@@ -1473,7 +1768,7 @@ private fun EditStarredTile(
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier =
                 Modifier
-                    .size(44.dp)
+                    .size(cellSize)
                     .clip(CircleShape)
                     .tapSoundClickable(onClick = onClick)
                     .semantics { this.contentDescription = contentDescription },
@@ -1497,29 +1792,66 @@ private fun EditStarredTile(
 private fun IconTile(
     choice: IconChoice,
     selected: Boolean,
+    favorite: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
 ) {
     val label = humanizeIconKey(choice.key)
+    val pulseScale = remember { Animatable(1f) }
+    var pulseKey by remember { mutableIntStateOf(0) }
+    var pulseAdding by remember { mutableStateOf(true) }
+    var favoriteBorderVisible by remember { mutableStateOf(favorite) }
+    LaunchedEffect(favorite) {
+        if (!favorite) {
+            favoriteBorderVisible = false
+        } else if (pulseKey == 0 || !pulseAdding) {
+            favoriteBorderVisible = true
+        }
+    }
+    LaunchedEffect(pulseKey) {
+        if (pulseKey == 0) return@LaunchedEffect
+        val target = if (pulseAdding) 1.14f else 0.86f
+        pulseScale.animateTo(target, tween(durationMillis = 90))
+        pulseScale.animateTo(1f, tween(durationMillis = 170))
+        if (pulseAdding) {
+            favoriteBorderVisible = true
+        }
+    }
     val bg =
         if (selected) {
             MaterialTheme.colorScheme.primaryContainer
         } else {
             MaterialTheme.colorScheme.surfaceContainerHigh
         }
-    val fg =
-        if (selected) {
-            MaterialTheme.colorScheme.onPrimaryContainer
+    val fg = MaterialTheme.colorScheme.primary
+    val border =
+        if (favoriteBorderVisible) {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
         } else {
-            MaterialTheme.colorScheme.onSurface
+            null
         }
     Surface(
         shape = CircleShape,
         color = bg,
+        border = border,
         modifier =
             Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .tapSoundClickable(onClick = onClick),
+                .graphicsLayer {
+                    scaleX = pulseScale.value
+                    scaleY = pulseScale.value
+                }.tapSoundCombinedClickable(
+                    onClick = onClick,
+                    onLongClick = {
+                        pulseAdding = !favorite
+                        if (!favorite) {
+                            favoriteBorderVisible = false
+                        }
+                        pulseKey += 1
+                        onLongClick()
+                    },
+                ),
     ) {
         Box(contentAlignment = Alignment.Center) {
             val symbolName = choice.symbolName
@@ -1529,6 +1861,7 @@ private fun IconTile(
                     size = 21.dp,
                     tint = fg,
                     weight = FontWeight.Medium,
+                    filled = choice.filled,
                     modifier = Modifier.size(24.dp),
                 )
             } else {
@@ -1559,24 +1892,60 @@ private val variantCornerShape =
 @Composable
 private fun EmojiTile(
     emoji: String,
-    variants: List<String>,
+    variants: List<BundledEmoji>,
     selected: Boolean,
+    favorite: Boolean,
     onClick: (String) -> Unit,
+    onLongClick: (String, String) -> Unit,
 ) {
-    val uniqueVariants = variants.distinct()
+    val uniqueVariants = variants.distinctBy { it.emoji }
     val hasVariants = uniqueVariants.size > 1
+    val displayVariant = uniqueVariants.firstOrNull { it.emoji == emoji } ?: uniqueVariants.first()
     var expanded by rememberSaveable(emoji) { mutableStateOf(false) }
+    val pulseScale = remember { Animatable(1f) }
+    var pulseKey by remember { mutableIntStateOf(0) }
+    var pulseAdding by remember { mutableStateOf(true) }
+    var favoriteBorderVisible by remember { mutableStateOf(favorite) }
+    LaunchedEffect(favorite) {
+        if (!favorite) {
+            favoriteBorderVisible = false
+        } else if (pulseKey == 0 || !pulseAdding) {
+            favoriteBorderVisible = true
+        }
+    }
+    LaunchedEffect(pulseKey) {
+        if (pulseKey == 0) return@LaunchedEffect
+        val target = if (pulseAdding) 1.14f else 0.86f
+        pulseScale.animateTo(target, tween(durationMillis = 90))
+        pulseScale.animateTo(1f, tween(durationMillis = 170))
+        if (pulseAdding) {
+            favoriteBorderVisible = true
+        }
+    }
     Box(
         modifier =
             Modifier
                 .size(56.dp)
-                .tapSoundClickable {
-                    if (hasVariants) {
-                        expanded = true
-                    } else {
-                        onClick(emoji)
-                    }
-                },
+                .graphicsLayer {
+                    scaleX = pulseScale.value
+                    scaleY = pulseScale.value
+                }.tapSoundCombinedClickable(
+                    onClick = {
+                        if (hasVariants) {
+                            expanded = true
+                        } else {
+                            onClick(displayVariant.emoji)
+                        }
+                    },
+                    onLongClick = {
+                        pulseAdding = !favorite
+                        if (!favorite) {
+                            favoriteBorderVisible = false
+                        }
+                        pulseKey += 1
+                        onLongClick(displayVariant.emoji, favoriteLabelForEmoji(displayVariant))
+                    },
+                ),
         contentAlignment = Alignment.Center,
     ) {
         if (selected) {
@@ -1584,6 +1953,19 @@ private fun EmojiTile(
                 modifier = Modifier.size(44.dp),
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
+                border =
+                    if (favoriteBorderVisible) {
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f))
+                    } else {
+                        null
+                    },
+            ) {}
+        } else if (favoriteBorderVisible) {
+            Surface(
+                modifier = Modifier.size(44.dp),
+                shape = CircleShape,
+                color = Color.Transparent,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.55f)),
             ) {}
         }
         Text(
@@ -1620,14 +2002,20 @@ private fun EmojiTile(
                             Modifier
                                 .size(44.dp)
                                 .clip(CircleShape)
-                                .tapSoundClickable {
-                                    expanded = false
-                                    onClick(variant)
-                                },
+                                .tapSoundCombinedClickable(
+                                    onClick = {
+                                        expanded = false
+                                        onClick(variant.emoji)
+                                    },
+                                    onLongClick = {
+                                        expanded = false
+                                        onLongClick(variant.emoji, favoriteLabelForEmoji(variant))
+                                    },
+                                ),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            text = variant,
+                            text = variant.emoji,
                             style = MaterialTheme.typography.headlineLarge.copy(fontSize = 30.sp),
                         )
                     }

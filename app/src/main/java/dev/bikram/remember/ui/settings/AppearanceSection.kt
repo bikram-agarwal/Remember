@@ -12,6 +12,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -75,6 +76,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
@@ -163,19 +165,34 @@ fun AppearanceSection(
             }
             GroupedListItem(position = GroupPosition.MIDDLE) {
                 AppearanceSettingsToggleItem(
+                    title = stringResource(R.string.appearance_adaptive_note_themes_title),
+                    subtitle = stringResource(R.string.appearance_adaptive_note_themes_subtitle),
+                    checked = state.adaptiveNoteThemes && !blackThemeEffectsDisabled,
+                    enabled = !blackThemeEffectsDisabled,
+                    onDisabledClick = {
+                        scope.launch {
+                            snackbarHostState.currentSnackbarData?.dismiss()
+                            snackbarHostState.showSnackbar(blackThemeEffectsDisabledMessage)
+                        }
+                    },
+                    onCheckedChange = { scope.launch { prefs.setAdaptiveNoteThemes(it) } },
+                )
+            }
+            GroupedListItem(position = GroupPosition.MIDDLE) {
+                AppearanceSettingsToggleItem(
+                    title = stringResource(R.string.appearance_cover_title),
+                    subtitle = stringResource(R.string.appearance_cover_subtitle),
+                    checked = state.heroOnCards,
+                    onCheckedChange = { scope.launch { prefs.setHeroOnCards(it) } },
+                )
+            }
+            GroupedListItem(position = GroupPosition.LAST) {
+                AppearanceSettingsToggleItem(
                     title = stringResource(R.string.appearance_blur_title),
                     subtitle = stringResource(R.string.appearance_blur_subtitle),
                     checked = state.blurBars,
                     leadingMaterialSymbolName = "blur_on",
                     onCheckedChange = { scope.launch { prefs.setBlurBars(it) } },
-                )
-            }
-            GroupedListItem(position = GroupPosition.LAST) {
-                AppearanceSettingsToggleItem(
-                    title = stringResource(R.string.appearance_hero_title),
-                    subtitle = stringResource(R.string.appearance_hero_subtitle),
-                    checked = state.heroOnCards,
-                    onCheckedChange = { scope.launch { prefs.setHeroOnCards(it) } },
                 )
             }
         }
@@ -218,51 +235,54 @@ private fun AppearanceStudioControls(
     val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
 
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        ThemeModeSegmentedRow(
-            selected = state.themeMode,
-            onSelect = onThemeModeChange,
-        )
-        ThemeAccentRow(
-            colorSource = state.colorSource,
-            activeCustomSeedHex = state.activeCustomSeed,
-            savedCustomSeedHexes = state.customSeeds,
-            customColorPickerOpen = customColorPickerOpen,
-            onSelectPreset = onSelectPreset,
-            onSelectCustomHex = onSelectCustomHex,
-            onCustomHexLongPress = onCustomHexLongPress,
-            onAddCustomHexClick = onAddCustomHexClick,
-        )
-        AnimatedVisibility(
-            visible = customColorPickerOpen,
-            enter = fadeIn(animationSpec = fadeInSpec) + expandVertically(animationSpec = spatialSpec),
-            exit = fadeOut(animationSpec = fadeOutSpec) + shrinkVertically(animationSpec = spatialSpec),
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 340.dp
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = if (compact) 10.dp else 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 14.dp),
         ) {
-            CustomColorSlider(
-                initialSeedHex = customSliderInitialSeedHex(state, MaterialTheme.colorScheme.primary),
-                onPreviewColor = onPreviewCustomHex,
-                onSaveColor = onSaveCustomHex,
+            ThemeModeSegmentedRow(
+                selected = state.themeMode,
+                onSelect = onThemeModeChange,
             )
-        }
-        AppearanceStudioSection(
-            title = stringResource(R.string.appearance_palette_style),
-        ) {
-            ThemePaletteStyleRow(
-                selected = state.paletteStyle,
-                enabled = colorSourcePaletteChipsEnabled(state.colorSource),
-                onSelect = onPaletteStyleChange,
+            ThemeAccentRow(
+                colorSource = state.colorSource,
+                activeCustomSeedHex = state.activeCustomSeed,
+                savedCustomSeedHexes = state.customSeeds,
+                customColorPickerOpen = customColorPickerOpen,
+                onSelectPreset = onSelectPreset,
+                onSelectCustomHex = onSelectCustomHex,
+                onCustomHexLongPress = onCustomHexLongPress,
+                onAddCustomHexClick = onAddCustomHexClick,
             )
+            AnimatedVisibility(
+                visible = customColorPickerOpen,
+                enter = fadeIn(animationSpec = fadeInSpec) + expandVertically(animationSpec = spatialSpec),
+                exit = fadeOut(animationSpec = fadeOutSpec) + shrinkVertically(animationSpec = spatialSpec),
+            ) {
+                CustomColorSlider(
+                    initialSeedHex = customSliderInitialSeedHex(state, MaterialTheme.colorScheme.primary),
+                    onPreviewColor = onPreviewCustomHex,
+                    onSaveColor = onSaveCustomHex,
+                )
+            }
+            AppearanceStudioSection(
+                title = stringResource(R.string.appearance_palette_style),
+            ) {
+                ThemePaletteStyleRow(
+                    selected = state.paletteStyle,
+                    enabled = colorSourcePaletteChipsEnabled(state.colorSource),
+                    onSelect = onPaletteStyleChange,
+                )
+            }
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
+            )
+            ThemePreviewPanel(colorSource = state.colorSource)
         }
-        HorizontalDivider(
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
-        )
-        ThemePreviewPanel(colorSource = state.colorSource)
     }
 }
 
@@ -271,60 +291,77 @@ private fun ThemeModeSegmentedRow(
     selected: ThemeMode,
     onSelect: (ThemeMode) -> Unit,
 ) {
-    val colors =
-        ToggleButtonDefaults.toggleButtonColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-    val labels = themePickerOrder.map { mode -> themeModeLabel(mode) }
-    val shapes =
-        themePickerOrder.mapIndexed { index, _ ->
-            when (index) {
-                0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-            }
-        }
-    ButtonGroup(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
-        overflowIndicator = { menuState ->
-            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
-        },
-    ) {
-        themePickerOrder.forEachIndexed { index, mode ->
-            val label = labels[index]
-            val itemModifier = Modifier.weight(1f).semantics { role = Role.RadioButton }
-            customItem(
-                buttonGroupContent = {
-                    RememberToggleButton(
-                        checked = selected == mode,
-                        onCheckedChange = { checked ->
-                            if (checked) onSelect(mode)
-                        },
-                        modifier = itemModifier,
-                        shapes = shapes[index],
-                        colors = colors,
-                    ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelMedium,
-                            maxLines = 1,
-                        )
-                    }
-                },
-                menuContent = { menuState ->
-                    RememberDropdownMenuItem(
-                        text = { Text(label) },
-                        onClick = {
-                            onSelect(mode)
-                            menuState.dismiss()
-                        },
-                    )
-                },
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 340.dp
+        val ultraCompact = maxWidth < 300.dp
+        val colors =
+            ToggleButtonDefaults.toggleButtonColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                contentColor = MaterialTheme.colorScheme.onSurface,
+                checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             )
+        val labels = themePickerOrder.map { mode -> themeModeLabel(mode, compact) }
+        val menuLabels = themePickerOrder.map { mode -> themeModeLabel(mode, compact = false) }
+        val shapes =
+            themePickerOrder.mapIndexed { index, _ ->
+                when (index) {
+                    0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
+                    themePickerOrder.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
+                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
+                }
+            }
+        ButtonGroup(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+            overflowIndicator = { menuState ->
+                ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+            },
+        ) {
+            themePickerOrder.forEachIndexed { index, mode ->
+                val label = labels[index]
+                val menuLabel = menuLabels[index]
+                val itemModifier = Modifier.weight(1f).semantics { role = Role.RadioButton }
+                customItem(
+                    buttonGroupContent = {
+                        RememberToggleButton(
+                            checked = selected == mode,
+                            onCheckedChange = { checked ->
+                                if (checked) onSelect(mode)
+                            },
+                            modifier = itemModifier,
+                            shapes = shapes[index],
+                            colors = colors,
+                            contentPadding =
+                                androidx.compose.foundation.layout.PaddingValues(
+                                    horizontal = if (compact) 4.dp else 8.dp,
+                                    vertical = 8.dp,
+                                ),
+                        ) {
+                            Text(
+                                text = label,
+                                style =
+                                    if (ultraCompact) {
+                                        MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
+                                    } else {
+                                        MaterialTheme.typography.labelMedium
+                                    },
+                                maxLines = 1,
+                                overflow = TextOverflow.Clip,
+                            )
+                        }
+                    },
+                    menuContent = { menuState ->
+                        RememberDropdownMenuItem(
+                            text = { Text(menuLabel) },
+                            onClick = {
+                                onSelect(mode)
+                                menuState.dismiss()
+                            },
+                        )
+                    },
+                )
+            }
         }
     }
 }
@@ -731,8 +768,19 @@ private val themePickerOrder =
     )
 
 @Composable
-private fun themeModeLabel(mode: ThemeMode): String =
-    stringResource(
+private fun themeModeLabel(
+    mode: ThemeMode,
+    compact: Boolean,
+): String {
+    if (compact) {
+        return when (mode) {
+            ThemeMode.SYSTEM -> "Sys"
+            ThemeMode.LIGHT -> "Light"
+            ThemeMode.DARK -> "Dark"
+            ThemeMode.BLACK -> "Black"
+        }
+    }
+    return stringResource(
         when (mode) {
             ThemeMode.SYSTEM -> R.string.appearance_theme_system
             ThemeMode.LIGHT -> R.string.appearance_theme_light
@@ -740,6 +788,7 @@ private fun themeModeLabel(mode: ThemeMode): String =
             ThemeMode.BLACK -> R.string.appearance_theme_black
         },
     )
+}
 
 /**
  * Live preview card showing how the active palette + style produce surface and accent
@@ -807,39 +856,72 @@ private fun PreviewSubsection(
 
 @Composable
 private fun SurfaceLadderStrip(scheme: ColorScheme) {
-    val swatches =
-        listOf(
-            scheme.surfaceContainerLowest to stringResource(R.string.appearance_preview_label_lowest),
-            scheme.surface to stringResource(R.string.appearance_preview_label_surface),
-            scheme.surfaceContainerLow to stringResource(R.string.appearance_preview_label_low),
-            scheme.surfaceContainer to stringResource(R.string.appearance_preview_label_base),
-            scheme.surfaceContainerHigh to stringResource(R.string.appearance_preview_label_high),
-            scheme.surfaceContainerHighest to stringResource(R.string.appearance_preview_label_highest),
-        )
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(36.dp)
-                    .clip(MaterialTheme.shapes.small)
-                    .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small),
-        ) {
-            swatches.forEach { (color, label) ->
-                Box(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .background(color),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = contrastingTextColor(color),
-                        maxLines = 1,
-                    )
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 340.dp
+        val swatches =
+            listOf(
+                scheme.surfaceContainerLowest to
+                    if (compact) {
+                        "Lo-"
+                    } else {
+                        stringResource(R.string.appearance_preview_label_lowest)
+                    },
+                scheme.surface to stringResource(R.string.appearance_preview_label_surface),
+                scheme.surfaceContainerLow to
+                    if (compact) {
+                        "Low"
+                    } else {
+                        stringResource(R.string.appearance_preview_label_low)
+                    },
+                scheme.surfaceContainer to
+                    if (compact) {
+                        "Base"
+                    } else {
+                        stringResource(R.string.appearance_preview_label_base)
+                    },
+                scheme.surfaceContainerHigh to
+                    if (compact) {
+                        "High"
+                    } else {
+                        stringResource(R.string.appearance_preview_label_high)
+                    },
+                scheme.surfaceContainerHighest to
+                    if (compact) {
+                        "Hi+"
+                    } else {
+                        stringResource(R.string.appearance_preview_label_highest)
+                    },
+            )
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(if (compact) 32.dp else 36.dp)
+                        .clip(MaterialTheme.shapes.small)
+                        .border(0.5.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.small),
+            ) {
+                swatches.forEach { (color, label) ->
+                    Box(
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .background(color),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = label,
+                            style =
+                                if (compact) {
+                                    MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp)
+                                } else {
+                                    MaterialTheme.typography.labelSmall
+                                },
+                            color = contrastingTextColor(color),
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }

@@ -18,7 +18,7 @@ fun rememberHeroImageRequest(
     maxSidePx: Int,
 ): ImageRequest {
     val context = LocalContext.current
-    val cacheKey = "$uri#$revision"
+    val cacheKey = "$uri#$revision@$maxSidePx"
     return remember(uri, revision, maxSidePx) {
         ImageRequest
             .Builder(context)
@@ -35,7 +35,7 @@ fun heroImageRequestForCard(
     uri: String,
     revision: Long,
 ): ImageRequest {
-    val cacheKey = "$uri#$revision"
+    val cacheKey = "$uri#$revision@original"
     return ImageRequest
         .Builder(context)
         .data(uri)

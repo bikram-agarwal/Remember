@@ -27,8 +27,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemeState
@@ -61,6 +64,15 @@ fun RememberTheme(
 
     val context = LocalContext.current
     val reducedMotion = rememberSystemReducedMotionEnabled(context)
+    val baseDensity = LocalDensity.current
+    val responsiveTextScale = responsiveTextScaleForScreenWidth()
+    val responsiveDensity =
+        remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale) {
+            Density(
+                density = baseDensity.density,
+                fontScale = baseDensity.fontScale * responsiveTextScale,
+            )
+        }
     val wallpaperTint = rememberWallpaperTintColor(context, enabled = effectiveUseGradient)
     val colorResolution =
         rememberResolvedColorScheme(
@@ -81,6 +93,7 @@ fun RememberTheme(
     }
 
     CompositionLocalProvider(
+        LocalDensity provides responsiveDensity,
         LocalIsDark provides darkTheme,
         LocalUseGradient provides effectiveUseGradient,
         LocalHeroOnCards provides themeState.heroOnCards,
@@ -110,6 +123,17 @@ fun RememberTheme(
                 content()
             }
         }
+    }
+}
+
+@Composable
+private fun responsiveTextScaleForScreenWidth(): Float {
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    return when {
+        screenWidthDp < 320 -> 0.84f
+        screenWidthDp < 360 -> 0.88f
+        screenWidthDp < 430 -> 0.93f
+        else -> 1f
     }
 }
 

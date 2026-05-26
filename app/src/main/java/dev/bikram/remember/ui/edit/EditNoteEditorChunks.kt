@@ -616,25 +616,6 @@ private fun LinkActionsSheet(
     }
 }
 
-private fun String.withChecklistLineToggled(
-    lineIndex: Int,
-    checked: Boolean,
-): String {
-    val lines = lines().toMutableList()
-    val line = lines.getOrNull(lineIndex) ?: return this
-    val match = Regex("""^(\s*- \[)[ xX](]\s+)""").find(line) ?: return this
-    val updatedLine =
-        match.groupValues[1] +
-            (if (checked) "x" else " ") +
-            match.groupValues[2] +
-            line.substring(match.range.last + 1)
-    if (updatedLine == line) {
-        return this
-    }
-    lines[lineIndex] = updatedLine
-    return lines.joinToString("\n")
-}
-
 /**
  * Scrollable column for the body of the edit screen. Only reads [padding] / [blurModifier]
  * directly; mutable note state is collected by leaf sections so that, e.g., title typing
@@ -661,6 +642,7 @@ internal fun EditNoteScrollableContent(
     onOpenReminder: () -> Unit,
     notificationsAllowed: Boolean,
     onOpenPicture: () -> Unit,
+    onBrowsePictureWithApp: () -> Unit,
     onViewPictureFull: (String, Long) -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
@@ -714,10 +696,12 @@ internal fun EditNoteScrollableContent(
                 onOpenReminder = if (readOnly) ({}) else onOpenReminder,
                 notificationsAllowed = notificationsAllowed,
                 onOpenPicture = if (readOnly) ({}) else onOpenPicture,
+                onBrowsePictureWithApp = if (readOnly) ({}) else onBrowsePictureWithApp,
                 onOpenActions = if (readOnly) ({}) else onOpenActions,
                 onOpenTags = if (readOnly) ({}) else onOpenTags,
                 onOpenAttachments = if (readOnly) ({}) else onOpenAttachments,
             )
+            Spacer(Modifier.height(36.dp))
         },
     )
 }
@@ -753,6 +737,7 @@ private fun OptionsPanelSection(
     onOpenReminder: () -> Unit,
     notificationsAllowed: Boolean,
     onOpenPicture: () -> Unit,
+    onBrowsePictureWithApp: () -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
@@ -783,6 +768,7 @@ private fun OptionsPanelSection(
         onImportanceChange = vm::setImportance,
         onVisibilityChange = vm::setVisibility,
         onOpenPicture = onOpenPicture,
+        onBrowsePictureWithApp = onBrowsePictureWithApp,
         onOpenActions = onOpenActions,
         onOpenTags = onOpenTags,
         onOpenAttachmentsSheet = onOpenAttachments,

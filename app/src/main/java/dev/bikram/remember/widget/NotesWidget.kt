@@ -2,6 +2,12 @@ package dev.bikram.remember.widget
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.RectF
+import android.graphics.Typeface
 import androidx.annotation.Keep
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -10,7 +16,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.net.toUri
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -27,6 +35,7 @@ import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.action.actionStartActivity
+import androidx.glance.appwidget.components.CircleIconButton
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.provideContent
@@ -45,14 +54,20 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
 import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.remember.MainActivity
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.data.Visibility
 import dev.bikram.remember.di.NotesWidgetEntryPoint
-import dev.bikram.remember.ui.edit.iconEmojiPayload
+import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
+import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
+import dev.bikram.remember.ui.edit.NoteIcon
+import dev.bikram.remember.ui.edit.resolveNoteIcon
+import dev.bikram.remember.ui.home.sortNotes
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
@@ -121,13 +136,18 @@ class StarredWidget : GlanceAppWidget() {
         context: Context,
         id: GlanceId,
     ) {
-        val noteRepository = widgetEntryPoint(context).noteRepository()
+        val entryPoint = widgetEntryPoint(context)
+        val noteRepository = entryPoint.noteRepository()
+        val viewOptionsPrefs = entryPoint.viewOptionsPrefs()
         val initialNotes = noteRepository.observeActive().first()
+        val initialViewOptions = viewOptionsPrefs.state.first()
         provideContent {
             GlanceTheme {
                 val activeNotesFlow = remember(noteRepository) { noteRepository.observeActive() }
                 val activeNotes by activeNotesFlow.collectAsState(initial = initialNotes)
-                val starred = starredWidgetItems(activeNotes)
+                val viewOptionsFlow = remember(viewOptionsPrefs) { viewOptionsPrefs.state }
+                val viewOptions by viewOptionsFlow.collectAsState(initial = initialViewOptions)
+                val starred = starredWidgetItems(activeNotes, viewOptions)
                 StarredWidgetContent(starred = starred)
             }
         }
@@ -359,17 +379,17 @@ private fun WidgetHeader(
                 widgetKind = widgetKind,
             )
             Spacer(GlanceModifier.width(if (compact) 6.dp else 8.dp))
-            HeaderAction(
+            WidgetIconButton(
                 provider = ImageProvider(R.drawable.ic_widget_note_add),
                 contentDescription = context.getString(R.string.widget_create_new_note),
-                intent = newNoteIntent(context),
+                action = actionStartActivity(newNoteIntent(context)),
                 compact = compact,
             )
             Spacer(GlanceModifier.width(if (compact) 6.dp else 8.dp))
-            HeaderAction(
+            WidgetIconButton(
                 provider = ImageProvider(R.drawable.ic_widget_list_add),
                 contentDescription = context.getString(R.string.widget_create_new_list),
-                intent = newListIntent(context),
+                action = actionStartActivity(newListIntent(context)),
                 compact = compact,
             )
         }
@@ -382,7 +402,7 @@ private fun RefreshHeaderAction(
     widgetKind: String,
 ) {
     val context = LocalContext.current
-    IconAction(
+    WidgetIconButton(
         provider = ImageProvider(R.drawable.ic_widget_refresh),
         contentDescription = context.getString(R.string.widget_refresh_cd),
         action =
@@ -394,48 +414,22 @@ private fun RefreshHeaderAction(
 }
 
 @Composable
-private fun HeaderAction(
-    provider: ImageProvider,
-    contentDescription: String,
-    intent: Intent,
-    compact: Boolean,
-) {
-    Image(
-        provider = provider,
-        contentDescription = contentDescription,
-        modifier =
-            GlanceModifier
-                .size(if (compact) 26.dp else 28.dp)
-                .background(GlanceTheme.colors.primaryContainer)
-                .cornerRadius(14.dp)
-                .clickable(actionStartActivity(intent))
-                .padding(4.dp),
-    )
-}
-
-@Composable
-private fun IconAction(
+private fun WidgetIconButton(
     provider: ImageProvider,
     contentDescription: String,
     action: Action,
     compact: Boolean,
 ) {
-    Box(
+    CircleIconButton(
+        imageProvider = provider,
+        contentDescription = contentDescription,
+        onClick = action,
         modifier =
             GlanceModifier
-                .size(if (compact) 26.dp else 28.dp)
-                .background(GlanceTheme.colors.primaryContainer)
-                .cornerRadius(14.dp)
-                .clickable(action)
-                .padding(5.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Image(
-            provider = provider,
-            contentDescription = contentDescription,
-            modifier = GlanceModifier.fillMaxSize(),
-        )
-    }
+                .size(if (compact) 26.dp else 28.dp),
+        backgroundColor = GlanceTheme.colors.primaryContainer,
+        contentColor = GlanceTheme.colors.onPrimaryContainer,
+    )
 }
 
 @Composable
@@ -459,6 +453,7 @@ private fun QuickCaptureButton(
             provider = imageProvider,
             contentDescription = null,
             modifier = GlanceModifier.size(22.dp),
+            colorFilter = ColorFilter.tint(GlanceTheme.colors.onPrimaryContainer),
         )
         Spacer(GlanceModifier.width(10.dp))
         Text(
@@ -600,14 +595,9 @@ private fun ReminderCard(
                     .background(if (overdue) GlanceTheme.colors.error else GlanceTheme.colors.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = noteWidgetGlyph(note),
-                style =
-                    TextStyle(
-                        color = if (overdue) GlanceTheme.colors.onError else GlanceTheme.colors.primary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
+            NoteWidgetIcon(
+                note = note,
+                tint = if (overdue) GlanceTheme.colors.onError else GlanceTheme.colors.primary,
             )
         }
         Spacer(GlanceModifier.width(if (compact) 8.dp else 10.dp))
@@ -648,7 +638,7 @@ private fun ReminderCard(
             }
         }
         Spacer(GlanceModifier.width(8.dp))
-        IconAction(
+        WidgetIconButton(
             provider = ImageProvider(R.drawable.ic_widget_done),
             contentDescription = context.getString(R.string.widget_mark_done_cd),
             action =
@@ -684,14 +674,9 @@ private fun StarredCard(
                     .background(GlanceTheme.colors.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = noteWidgetGlyph(note),
-                style =
-                    TextStyle(
-                        color = GlanceTheme.colors.primary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
+            NoteWidgetIcon(
+                note = note,
+                tint = GlanceTheme.colors.primary,
             )
         }
         Spacer(GlanceModifier.width(if (compact) 8.dp else 10.dp))
@@ -784,11 +769,17 @@ private fun quickCaptureWidgetCounts(
     )
 }
 
-private fun starredWidgetItems(notes: List<NoteWithItems>): List<NoteWithItems> =
-    notes
-        .filter { it.note.visibility != Visibility.SECRET }
-        .filter { it.note.starred }
-        .sortedByDescending { it.note.updatedAt }
+private fun starredWidgetItems(
+    notes: List<NoteWithItems>,
+    viewOptions: ViewOptions,
+): List<NoteWithItems> =
+    sortNotes(
+        notes =
+            notes
+                .filter { it.note.visibility != Visibility.SECRET }
+                .filter { it.note.starred },
+        opts = viewOptions,
+    )
 
 private fun openNotesIntent(context: Context): Intent =
     Intent(context, MainActivity::class.java).apply {
@@ -831,10 +822,161 @@ private fun Intent.addWidgetLaunchFlags(clearTask: Boolean = false) {
     addFlags(flags)
 }
 
-private fun noteWidgetGlyph(note: NoteWithItems): String {
-    val emoji = iconEmojiPayload(note.note.iconKey)
-    if (emoji != null) return emoji
-    return if (note.note.kind == NoteKind.LIST) "L" else "N"
+@Composable
+private fun NoteWidgetIcon(
+    note: NoteWithItems,
+    tint: ColorProvider,
+) {
+    val context = LocalContext.current
+    when (val icon = resolveNoteIcon(note.note.iconKey, note.note.kind)) {
+        is NoteIcon.Emoji ->
+            Text(
+                text = icon.text,
+                style =
+                    TextStyle(
+                        color = tint,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                    ),
+            )
+        is NoteIcon.Drawable ->
+            Image(
+                provider = ImageProvider(icon.resId),
+                contentDescription = null,
+                modifier = GlanceModifier.size(18.dp),
+                colorFilter = ColorFilter.tint(tint),
+            )
+        is NoteIcon.Symbol ->
+            MaterialSymbolWidgetImage(
+                context = context,
+                name = icon.name,
+                filled = icon.filled,
+                tint = tint,
+            )
+        NoteIcon.ListPlaceholder ->
+            MaterialSymbolWidgetImage(
+                context = context,
+                name = DEFAULT_LIST_HEADER_SYMBOL,
+                filled = true,
+                tint = tint,
+            )
+        NoteIcon.NotePlaceholder ->
+            MaterialSymbolWidgetImage(
+                context = context,
+                name = DEFAULT_NOTE_HEADER_SYMBOL,
+                filled = true,
+                tint = tint,
+            )
+    }
+}
+
+@Composable
+private fun MaterialSymbolWidgetImage(
+    context: Context,
+    name: String,
+    filled: Boolean,
+    tint: ColorProvider,
+) {
+    val appContext = context.applicationContext
+    val bitmap =
+        remember(appContext, name, filled) {
+            materialSymbolBitmap(
+                context = appContext,
+                name = name,
+                filled = filled,
+            )
+        }
+    if (bitmap != null) {
+        Image(
+            provider = ImageProvider(bitmap),
+            contentDescription = null,
+            modifier = GlanceModifier.size(18.dp),
+            colorFilter = ColorFilter.tint(tint),
+        )
+    } else {
+        Text(
+            text = "\u2022",
+            style =
+                TextStyle(
+                    color = tint,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+        )
+    }
+}
+
+private fun materialSymbolBitmap(
+    context: Context,
+    name: String,
+    filled: Boolean,
+): Bitmap? {
+    val typeface =
+        ResourcesCompat.getFont(
+            context,
+            if (filled) R.font.material_symbols_rounded else R.font.material_symbols_rounded_outlined,
+        ) ?: return null
+    return materialSymbolBitmap(
+        name = name,
+        typeface = typeface,
+    )
+}
+
+private fun materialSymbolBitmap(
+    name: String,
+    typeface: Typeface,
+): Bitmap {
+    val source = Bitmap.createBitmap(WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX, WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(source)
+    val paint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textAlign = Paint.Align.CENTER
+            textSize = WIDGET_SYMBOL_TEXT_SIZE_PX
+            this.typeface = typeface
+            fontFeatureSettings = "\"rlig\" 1, \"liga\" 1"
+        }
+    val baseline =
+        (WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX / 2f) -
+            ((paint.fontMetrics.ascent + paint.fontMetrics.descent) / 2f)
+    canvas.drawText(name, WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX / 2f, baseline, paint)
+    val bounds = source.nonTransparentBounds() ?: return source
+    val output = Bitmap.createBitmap(WIDGET_SYMBOL_BITMAP_SIZE_PX, WIDGET_SYMBOL_BITMAP_SIZE_PX, Bitmap.Config.ARGB_8888)
+    Canvas(output).drawBitmap(
+        source,
+        bounds,
+        RectF(
+            WIDGET_SYMBOL_OUTPUT_PADDING_PX,
+            WIDGET_SYMBOL_OUTPUT_PADDING_PX,
+            WIDGET_SYMBOL_BITMAP_SIZE_PX - WIDGET_SYMBOL_OUTPUT_PADDING_PX,
+            WIDGET_SYMBOL_BITMAP_SIZE_PX - WIDGET_SYMBOL_OUTPUT_PADDING_PX,
+        ),
+        null,
+    )
+    source.recycle()
+    return output
+}
+
+private fun Bitmap.nonTransparentBounds(): Rect? {
+    var left = width
+    var top = height
+    var right = -1
+    var bottom = -1
+    for (y in 0 until height) {
+        for (x in 0 until width) {
+            if ((getPixel(x, y) ushr 24) != 0) {
+                if (x < left) left = x
+                if (x > right) right = x
+                if (y < top) top = y
+                if (y > bottom) bottom = y
+            }
+        }
+    }
+    return if (right >= left && bottom >= top) {
+        Rect(left, top, right + 1, bottom + 1)
+    } else {
+        null
+    }
 }
 
 private fun noteWidgetTitle(
@@ -851,15 +993,40 @@ private fun noteWidgetTitle(
 
 private fun noteWidgetSubline(note: NoteWithItems): String =
     if (note.note.visibility == Visibility.DEFAULT) {
-        note.note.body.ifBlank {
+        note.note.body.toWidgetPlainText().ifBlank {
             note.items
                 .firstOrNull()
                 ?.text
+                ?.toWidgetPlainText()
                 .orEmpty()
         }
     } else {
         ""
     }
+
+private fun String.toWidgetPlainText(): String = widgetPlainText(this)
+
+internal fun widgetPlainText(markdown: String): String =
+    markdown
+        .lineSequence()
+        .filterNot { line -> widgetMarkdownCodeFenceRegex.matches(line) }
+        .map { line ->
+            line
+                .replace(widgetMarkdownHeadingRegex, "")
+                .replace(widgetMarkdownChecklistRegex, "")
+                .replace(widgetMarkdownBulletRegex, "")
+                .replace(widgetMarkdownQuoteRegex, "")
+                .replace(widgetMarkdownLinkRegex, "$1")
+                .replace(widgetMarkdownInlineCodeRegex, "$1")
+                .replace(widgetMarkdownBoldItalicRegex, "$1")
+                .replace(widgetMarkdownBoldRegex, "$1")
+                .replace(widgetMarkdownItalicRegex, "$1")
+                .replace(widgetMarkdownStrikeRegex, "$1")
+                .replace(widgetMarkdownUnderlineOpenRegex, "")
+                .replace(widgetMarkdownUnderlineCloseRegex, "")
+                .trim()
+        }.firstOrNull { line -> line.isNotBlank() }
+        .orEmpty()
 
 private fun quickCaptureStatus(
     context: Context,
@@ -949,6 +1116,19 @@ private fun daysBetween(
 
 private val WidgetNoteIdKey = ActionParameters.Key<Long>("note_id")
 private val WidgetKindKey = ActionParameters.Key<String>("widget_kind")
+private val widgetMarkdownHeadingRegex = Regex("""^\s*#{1,6}\s+""")
+private val widgetMarkdownChecklistRegex = Regex("""^\s*[-*+]\s+\[[ xX]\]\s+""")
+private val widgetMarkdownBulletRegex = Regex("""^\s*[-*+]\s+""")
+private val widgetMarkdownQuoteRegex = Regex("""^\s*>\s?""")
+private val widgetMarkdownCodeFenceRegex = Regex("""^\s*```.*$""")
+private val widgetMarkdownLinkRegex = Regex("""\[([^]]+)]\([^)]+\)""")
+private val widgetMarkdownInlineCodeRegex = Regex("""`([^`]+)`""")
+private val widgetMarkdownBoldItalicRegex = Regex("""\*\*\*(.+?)\*\*\*""")
+private val widgetMarkdownBoldRegex = Regex("""\*\*(.+?)\*\*""")
+private val widgetMarkdownItalicRegex = Regex("""(?<!\*)\*(?!\s)(.+?)(?<!\s)\*(?!\*)""")
+private val widgetMarkdownStrikeRegex = Regex("""~~(.+?)~~""")
+private val widgetMarkdownUnderlineOpenRegex = Regex("""<u>""", RegexOption.IGNORE_CASE)
+private val widgetMarkdownUnderlineCloseRegex = Regex("""</u>""", RegexOption.IGNORE_CASE)
 
 private const val HOUR_MILLIS = 60L * 60L * 1000L
 private const val DAY_MILLIS = 24L * HOUR_MILLIS
@@ -956,3 +1136,7 @@ private const val UPCOMING_WINDOW_MILLIS = 7L * DAY_MILLIS
 private const val WIDGET_KIND_AGENDA = "agenda"
 private const val WIDGET_KIND_QUICK_CAPTURE = "quick_capture"
 private const val WIDGET_KIND_STARRED = "starred"
+private const val WIDGET_SYMBOL_BITMAP_SIZE_PX = 64
+private const val WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX = 192
+private const val WIDGET_SYMBOL_TEXT_SIZE_PX = 144f
+private const val WIDGET_SYMBOL_OUTPUT_PADDING_PX = 4f

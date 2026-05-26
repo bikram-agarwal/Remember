@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="360dp"
     android:layout_height="180dp"
     android:background="@drawable/widget_preview_background"
     android:orientation="vertical"
     android:padding="10dp"
-    tools:ignore="HardcodedText,SmallSp">
+    tools:ignore="HardcodedText,SmallSp,UseAppTint">
 
     <LinearLayout
         android:layout_width="match_parent"
@@ -34,7 +33,7 @@
             android:contentDescription="@string/widget_refresh_cd"
             android:padding="4dp"
             android:src="@drawable/ic_widget_refresh"
-            app:tint="@color/widget_preview_on_surface" />
+            android:tint="@color/widget_preview_on_surface" />
 
         <ImageView
             android:layout_width="20dp"
@@ -44,7 +43,7 @@
             android:contentDescription="@string/widget_create_new_note"
             android:padding="4dp"
             android:src="@drawable/ic_widget_note_add"
-            app:tint="@color/widget_preview_on_surface" />
+            android:tint="@color/widget_preview_on_surface" />
 
         <ImageView
             android:layout_width="20dp"
@@ -54,7 +53,7 @@
             android:contentDescription="@string/widget_create_new_list"
             android:padding="4dp"
             android:src="@drawable/ic_widget_list_add"
-            app:tint="@color/widget_preview_on_surface" />
+            android:tint="@color/widget_preview_on_surface" />
     </LinearLayout>
 
     <TextView
@@ -74,15 +73,14 @@
         android:orientation="horizontal"
         android:paddingHorizontal="10dp">
 
-        <TextView
+        <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:background="@drawable/widget_preview_icon_circle_error"
-            android:gravity="center"
-            android:text="!"
-            android:textColor="@color/widget_preview_on_error"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            android:contentDescription="@null"
+            android:padding="5dp"
+            android:src="@drawable/ic_widget_preview_lightbulb"
+            android:tint="@color/widget_preview_on_error" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -127,7 +125,7 @@
             android:contentDescription="@string/widget_mark_done_cd"
             android:padding="3dp"
             android:src="@drawable/ic_widget_done"
-            app:tint="@color/widget_preview_on_surface" />
+            android:tint="@color/widget_preview_on_surface" />
     </LinearLayout>
 
     <TextView
@@ -148,15 +146,14 @@
         android:orientation="horizontal"
         android:paddingHorizontal="10dp">
 
-        <TextView
+        <ImageView
             android:layout_width="24dp"
             android:layout_height="24dp"
             android:background="@drawable/widget_preview_icon_circle"
-            android:gravity="center"
-            android:text="N"
-            android:textColor="@color/widget_preview_on_surface"
-            android:textSize="10sp"
-            android:textStyle="bold" />
+            android:contentDescription="@null"
+            android:padding="5dp"
+            android:src="@drawable/ic_widget_preview_luggage"
+            android:tint="@color/widget_preview_on_surface" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -201,6 +198,6 @@
             android:contentDescription="@string/widget_mark_done_cd"
             android:padding="3dp"
             android:src="@drawable/ic_widget_done"
-            app:tint="@color/widget_preview_on_surface" />
+            android:tint="@color/widget_preview_on_surface" />
     </LinearLayout>
 </LinearLayout>

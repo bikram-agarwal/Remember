@@ -1156,6 +1156,7 @@
         "wrench"
     ],
     "business": [
+        "work",
         "communication",
         "address",
         "apartment",
@@ -1193,6 +1194,7 @@
         "world"
     ],
     "business_center": [
+        "work",
         "places",
         "accessory",
         "assets",
@@ -1223,8 +1225,7 @@
         "storage",
         "strap",
         "suitcase",
-        "travel",
-        "work"
+        "travel"
     ],
     "cake": [
         "social",

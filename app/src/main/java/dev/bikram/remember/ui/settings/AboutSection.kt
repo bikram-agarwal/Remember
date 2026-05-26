@@ -54,6 +54,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.AboutAuthorPhoto
 import dev.bikram.remember.ui.components.AppIconImage
 import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
@@ -87,7 +88,14 @@ internal fun AboutSection(
                 RememberIconButton(
                     onClick = shareDiagnostics,
                     tooltipLabel = stringResource(R.string.settings_share_diagnostics),
-                    modifier = Modifier.size(40.dp),
+                    modifier =
+                        Modifier.size(
+                            rememberResponsiveActionButtonSize(
+                                defaultSize = 40.dp,
+                                compactSize = 38.dp,
+                                ultraCompactSize = 36.dp,
+                            ),
+                        ),
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = "bug_report",

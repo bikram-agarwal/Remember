@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_preview_bg">@android:color/system_neutral1_900</color>
+    <color name="widget_preview_surface">@android:color/system_neutral2_800</color>
+    <color name="widget_preview_surface_overdue">#7D2722</color>
+    <color name="widget_preview_primary">@android:color/system_accent1_100</color>
+    <color name="widget_preview_on_surface">@android:color/system_neutral1_100</color>
+    <color name="widget_preview_on_error">#FCEDEA</color>
+    <color name="widget_preview_muted">@android:color/system_neutral1_300</color>
+    <color name="widget_preview_error">#FFDAD6</color>
+    <color name="widget_preview_error_muted">#FFB4AB</color>
+    <color name="widget_preview_action">@android:color/system_accent2_700</color>
+    <color name="widget_preview_error_action">#BA1A1A</color>
+</resources>

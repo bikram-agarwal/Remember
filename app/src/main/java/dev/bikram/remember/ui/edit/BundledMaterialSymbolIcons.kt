@@ -214,6 +214,16 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         drawableRes = null,
                     ),
                     IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}event_busy",
+                        symbolName = "event_busy",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}free_cancellation",
+                        symbolName = "free_cancellation",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}dashboard",
                         symbolName = "dashboard",
                         drawableRes = null,
@@ -276,6 +286,11 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                     IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}cancel",
                         symbolName = "cancel",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}do_not_disturb_on",
+                        symbolName = "do_not_disturb_on",
                         drawableRes = null,
                     ),
                 ),
@@ -401,8 +416,8 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
             icons =
                 listOf(
                     IconChoice(
-                        key = "${ICON_SYMBOL_PREFIX}home",
-                        symbolName = "home",
+                        key = "${ICON_SYMBOL_PREFIX}house",
+                        symbolName = "house",
                         drawableRes = null,
                     ),
                     IconChoice(
@@ -501,11 +516,6 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         drawableRes = null,
                     ),
                     IconChoice(
-                        key = "${ICON_SYMBOL_PREFIX}shopping_bag",
-                        symbolName = "shopping_bag",
-                        drawableRes = null,
-                    ),
-                    IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}cleaning_services",
                         symbolName = "cleaning_services",
                         drawableRes = null,
@@ -536,6 +546,11 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         drawableRes = null,
                     ),
                     IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}storefront",
+                        symbolName = "storefront",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}shopping_basket",
                         symbolName = "shopping_basket",
                         drawableRes = null,
@@ -543,6 +558,26 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                     IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}shopping_cart",
                         symbolName = "shopping_cart",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}shopping_bag",
+                        symbolName = "shopping_bag",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}local_mall",
+                        symbolName = "local_mall",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}featured_seasonal_and_gifts",
+                        symbolName = "featured_seasonal_and_gifts",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}card_giftcard",
+                        symbolName = "card_giftcard",
                         drawableRes = null,
                     ),
                     IconChoice(
@@ -667,8 +702,8 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         drawableRes = null,
                     ),
                     IconChoice(
-                        key = "${ICON_SYMBOL_PREFIX}directions_car",
-                        symbolName = "directions_car",
+                        key = "${ICON_SYMBOL_PREFIX}local_taxi",
+                        symbolName = "local_taxi",
                         drawableRes = null,
                     ),
                     IconChoice(
@@ -752,6 +787,16 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         drawableRes = null,
                     ),
                     IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}domain_disabled",
+                        symbolName = "domain_disabled",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}enterprise_off",
+                        symbolName = "enterprise_off",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}school",
                         symbolName = "school",
                         drawableRes = null,
@@ -764,6 +809,11 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                     IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}factory",
                         symbolName = "factory",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}stadium",
+                        symbolName = "stadium",
                         drawableRes = null,
                     ),
                     IconChoice(
@@ -830,6 +880,11 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                     IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}lunch_dining",
                         symbolName = "lunch_dining",
+                        drawableRes = null,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}fastfood",
+                        symbolName = "fastfood",
                         drawableRes = null,
                     ),
                     IconChoice(
@@ -1372,6 +1427,12 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
             icons =
                 listOf(
                     IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}mobile",
+                        symbolName = "mobile",
+                        drawableRes = null,
+                        filled = false,
+                    ),
+                    IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}watch",
                         symbolName = "watch",
                         drawableRes = null,
@@ -1380,16 +1441,19 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         key = "${ICON_SYMBOL_PREFIX}laptop",
                         symbolName = "laptop",
                         drawableRes = null,
+                        filled = false,
                     ),
                     IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}monitor",
                         symbolName = "monitor",
                         drawableRes = null,
+                        filled = false,
                     ),
                     IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}devices",
                         symbolName = "devices",
                         drawableRes = null,
+                        filled = false,
                     ),
                     IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}important_devices",
@@ -1405,6 +1469,13 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         key = "${ICON_SYMBOL_PREFIX}tv",
                         symbolName = "tv",
                         drawableRes = null,
+                        filled = false,
+                    ),
+                    IconChoice(
+                        key = "${ICON_SYMBOL_PREFIX}computer_cancel",
+                        symbolName = "computer_cancel",
+                        drawableRes = null,
+                        filled = false,
                     ),
                     IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}keyboard",
@@ -1785,11 +1856,6 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                     IconChoice(
                         key = "${ICON_SYMBOL_PREFIX}celebration",
                         symbolName = "celebration",
-                        drawableRes = null,
-                    ),
-                    IconChoice(
-                        key = "${ICON_SYMBOL_PREFIX}card_giftcard",
-                        symbolName = "card_giftcard",
                         drawableRes = null,
                     ),
                     IconChoice(
@@ -2526,7 +2592,7 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_epicgames",
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_epicgames,
-                        label = "Epicgames",
+                        label = "Epic Games",
                     ),
                     IconChoice(
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_humblebundle",
@@ -2565,10 +2631,10 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         label = "Twitch",
                     ),
                     IconChoice(
-                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_unrealengine",
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_ubisoft",
                         symbolName = null,
-                        drawableRes = R.drawable.ic_brand_unrealengine,
-                        label = "Unrealengine",
+                        drawableRes = R.drawable.ic_brand_ubisoft,
+                        label = "Ubisoft",
                     ),
                 ),
         ),

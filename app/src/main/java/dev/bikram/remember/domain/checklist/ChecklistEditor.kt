@@ -21,6 +21,50 @@ data class ChecklistEditResult(
 )
 
 object ChecklistEditor {
+    fun insertAfter(
+        items: List<EditableItem>,
+        targetLocalId: Long,
+        newLocalId: Long,
+    ): ChecklistEditResult {
+        val sortedItems = items.sortedBy { item -> item.sortOrder }
+        val targetIndex = sortedItems.indexOfFirst { item -> item.localId == targetLocalId }
+        if (targetIndex < 0) {
+            return ChecklistEditResult(items = items, changed = false)
+        }
+        val target = sortedItems[targetIndex]
+        val anchor =
+            if (target.depth == 0) {
+                sortedItems
+                    .filter { item -> item.localId == target.localId || item.parentLocalId == target.localId }
+                    .maxBy { item -> item.sortOrder }
+            } else {
+                target
+            }
+        val anchorIndex = sortedItems.indexOfFirst { item -> item.localId == anchor.localId }
+        val nextOrder = sortedItems.getOrNull(anchorIndex + 1)?.sortOrder
+        val newSortOrder =
+            if (nextOrder != null) {
+                (anchor.sortOrder + nextOrder) / 2.0
+            } else {
+                anchor.sortOrder + 1.0
+            }
+        val newParentLocalId = target.parentLocalId.takeIf { target.depth == 1 }
+        val newDepth = if (newParentLocalId != null) 1 else 0
+        return ChecklistEditResult(
+            items =
+                items +
+                    EditableItem(
+                        localId = newLocalId,
+                        text = "",
+                        checked = false,
+                        sortOrder = newSortOrder,
+                        parentLocalId = newParentLocalId,
+                        depth = newDepth,
+                    ),
+            changed = true,
+        )
+    }
+
     /**
      * Parent-context toggle:
      *
@@ -102,6 +146,26 @@ object ChecklistEditor {
         val movingItem =
             items.firstOrNull { item -> item.localId == movingId }
                 ?: return ChecklistEditResult(items = items, changed = false)
+        val itemsByLocalId = items.associateBy { item -> item.localId }
+        val movingGroupIds =
+            if (movingItem.depth == 0) {
+                items
+                    .sortedBy { item -> item.sortOrder }
+                    .filter { item -> item.localId == movingId || item.parentLocalId == movingId }
+                    .map { item -> item.localId }
+            } else {
+                listOf(movingId)
+            }
+        if (movingGroupIds.size > 1) {
+            return reorderVisibleGroup(
+                items = items,
+                visibleIds = visibleIds,
+                movingGroupIds = movingGroupIds,
+                movingVisibleGroupIds = movingGroupIds.filter { id -> id in itemsByLocalId && id in visibleIds },
+                fromIndex = fromIndex,
+                toIndex = toIndex,
+            )
+        }
 
         val rearrangedIds =
             visibleIds.toMutableList().apply {
@@ -134,6 +198,52 @@ object ChecklistEditor {
                     } else {
                         item
                     }
+                },
+            changed = true,
+        )
+    }
+
+    private fun reorderVisibleGroup(
+        items: List<EditableItem>,
+        visibleIds: List<Long>,
+        movingGroupIds: List<Long>,
+        movingVisibleGroupIds: List<Long>,
+        fromIndex: Int,
+        toIndex: Int,
+    ): ChecklistEditResult {
+        val targetId = visibleIds[toIndex]
+        if (targetId in movingVisibleGroupIds) {
+            return ChecklistEditResult(items = items, changed = false)
+        }
+        val remainingIds = visibleIds.filterNot { id -> id in movingVisibleGroupIds }
+        val targetIndex = remainingIds.indexOf(targetId)
+        if (targetIndex < 0) {
+            return ChecklistEditResult(items = items, changed = false)
+        }
+        val insertionIndex =
+            if (toIndex > fromIndex) {
+                targetIndex + 1
+            } else {
+                targetIndex
+            }
+        val reorderedIds =
+            remainingIds.toMutableList().apply {
+                // Reinsert the full persisted group, not just visible rows. During a parent drag
+                // the UI may collapse active children, and checked children live in the completed
+                // section; both still need new sort orders so they remain attached after drop.
+                addAll(insertionIndex, movingGroupIds)
+            }
+        val sortOrdersById =
+            reorderedIds
+                .mapIndexed { index, id ->
+                    id to (index + 1).toDouble()
+                }.toMap()
+        return ChecklistEditResult(
+            items =
+                items.map { item ->
+                    sortOrdersById[item.localId]?.let { sortOrder ->
+                        item.copy(sortOrder = sortOrder)
+                    } ?: item
                 },
             changed = true,
         )

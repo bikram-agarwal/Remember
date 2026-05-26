@@ -28,6 +28,7 @@ import androidx.compose.material3.FloatingActionButtonElevation
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
 import androidx.compose.material3.MenuItemColors
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
@@ -42,12 +43,14 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TooltipState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.coroutineScope
@@ -56,6 +59,38 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 private const val FLOATING_ACTION_TOOLTIP_DISMISS_MILLIS = 5_000L
+
+@Composable
+fun rememberResponsiveActionButtonSize(
+    defaultSize: Dp = 40.dp,
+    compactSize: Dp = 34.dp,
+    ultraCompactSize: Dp = 30.dp,
+): Dp {
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val targetSize =
+        when {
+            screenWidth < 360.dp -> ultraCompactSize
+            screenWidth < 430.dp -> compactSize
+            else -> defaultSize
+        }
+    return targetSize
+}
+
+@Composable
+fun rememberResponsiveActionIconSize(
+    defaultSize: Dp = 20.dp,
+    compactSize: Dp = 17.dp,
+    ultraCompactSize: Dp = 15.dp,
+): Dp {
+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val targetSize =
+        when {
+            screenWidth < 360.dp -> ultraCompactSize
+            screenWidth < 430.dp -> compactSize
+            else -> defaultSize
+        }
+    return targetSize
+}
 
 @Composable
 private fun RememberLongPressLabelTooltip(
@@ -180,16 +215,18 @@ fun RememberIconButton(
         label = tooltipLabel,
         enabled = enabled,
     ) {
-        IconButton(
-            onClick = {
-                onClick()
-            },
-            modifier = modifier,
-            enabled = enabled,
-            colors = colors,
-            interactionSource = interactionSource,
-            content = content,
-        )
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+            IconButton(
+                onClick = {
+                    onClick()
+                },
+                modifier = modifier,
+                enabled = enabled,
+                colors = colors,
+                interactionSource = interactionSource,
+                content = content,
+            )
+        }
     }
 }
 
@@ -208,17 +245,19 @@ fun RememberFilledIconButton(
         label = tooltipLabel,
         enabled = enabled,
     ) {
-        FilledIconButton(
-            onClick = {
-                onClick()
-            },
-            modifier = modifier,
-            enabled = enabled,
-            shape = shape,
-            colors = colors,
-            interactionSource = interactionSource,
-            content = content,
-        )
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+            FilledIconButton(
+                onClick = {
+                    onClick()
+                },
+                modifier = modifier,
+                enabled = enabled,
+                shape = shape,
+                colors = colors,
+                interactionSource = interactionSource,
+                content = content,
+            )
+        }
     }
 }
 
@@ -237,17 +276,19 @@ fun RememberFilledTonalIconButton(
         label = tooltipLabel,
         enabled = enabled,
     ) {
-        FilledTonalIconButton(
-            onClick = {
-                onClick()
-            },
-            modifier = modifier,
-            enabled = enabled,
-            shape = shape,
-            colors = colors,
-            interactionSource = interactionSource,
-            content = content,
-        )
+        CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+            FilledTonalIconButton(
+                onClick = {
+                    onClick()
+                },
+                modifier = modifier,
+                enabled = enabled,
+                shape = shape,
+                colors = colors,
+                interactionSource = interactionSource,
+                content = content,
+            )
+        }
     }
 }
 

@@ -13,7 +13,9 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
 import dev.bikram.remember.R
@@ -29,30 +31,49 @@ fun rememberImagePicker(onPicked: (Uri) -> Unit): ActivityResultLauncher<PickVis
     }
 
 /**
- * Opens the photo picker, copies the selection into app-private `note_heroes/` when possible,
- * then invokes [onImageReady] with the stored URI string and the private file when copy succeeded.
+ * Provides shared hero image pickers. Both launch paths copy the selected image into
+ * app-private `note_heroes/` when possible, then invoke [onImageReady].
  */
 @Composable
 fun rememberHeroImagePickThenCopy(
     onImageReady: (uriString: String, copiedPrivateFile: File?) -> Unit,
-): () -> Unit {
+): HeroImagePickerController {
     val context = LocalContext.current
-    val pickLauncher =
+    val currentOnImageReady by rememberUpdatedState(onImageReady)
+    val photoPickerLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.PickVisualMedia(),
         ) { picked: Uri? ->
             if (picked == null) return@rememberLauncherForActivityResult
             persistReadPermission(context, picked)
-            finalizeHeroImageToPrivateStorage(context, picked, onImageReady)
+            finalizeHeroImageToPrivateStorage(context, picked, currentOnImageReady)
         }
-    return remember(pickLauncher) {
-        {
-            pickLauncher.launch(
-                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
-            )
+    val documentPickerLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts.OpenDocument(),
+        ) { picked: Uri? ->
+            if (picked == null) return@rememberLauncherForActivityResult
+            persistReadPermission(context, picked)
+            finalizeHeroImageToPrivateStorage(context, picked, currentOnImageReady)
         }
+    return remember(photoPickerLauncher, documentPickerLauncher) {
+        HeroImagePickerController(
+            pickWithPhotoPicker = {
+                photoPickerLauncher.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly),
+                )
+            },
+            browseWithApp = {
+                documentPickerLauncher.launch(arrayOf("image/*"))
+            },
+        )
     }
 }
+
+class HeroImagePickerController internal constructor(
+    val pickWithPhotoPicker: () -> Unit,
+    val browseWithApp: () -> Unit,
+)
 
 /**
  * Copies [sourceUri] into [filesDir]/note_heroes/ when possible.

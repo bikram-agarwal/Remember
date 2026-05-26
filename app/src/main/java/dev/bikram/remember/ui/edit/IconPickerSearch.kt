@@ -19,10 +19,17 @@ import kotlin.math.abs
  *   the item's final rank value.
  */
 
-/** A weighted slice of searchable text attached to one icon/emoji entry. */
+/**
+ * A weighted slice of searchable text attached to one icon/emoji entry.
+ *
+ * [prefixMatchEnabled] should be true for name/slug fields (where typing "fire" should surface
+ * "fireworks") and false for keyword/category fields (where tags like "control" would otherwise
+ * flood results for any query starting with "contr", burying the actual controller icon).
+ */
 internal data class SearchableField(
     val text: String,
     val weight: Float,
+    val prefixMatchEnabled: Boolean = true,
 )
 
 /** Score buckets per match style; multiplied by [SearchableField.weight]. */
@@ -31,8 +38,8 @@ private const val STEMMED_WORD_SCORE = 0.85f
 private const val WORD_PREFIX_SCORE = 0.75f
 private const val FUZZY_ONE_EDIT_SCORE = 0.5f
 
-/** Minimum query token length before fuzzy matching engages (avoid 'cat' == 'bat'). */
-private const val FUZZY_MIN_TOKEN_LENGTH = 4
+/** Minimum query token length before fuzzy matching engages (avoid 'cake' == 'care'). */
+private const val FUZZY_MIN_TOKEN_LENGTH = 5
 
 private val WHITESPACE_SPLIT = Regex("\\s+")
 
@@ -91,6 +98,11 @@ private fun scoreFieldForToken(
             if (candidate > bestScore) bestScore = candidate
             continue
         }
+        // Word prefix and fuzzy matching only apply to name/slug fields, not keyword/category
+        // fields. Keywords are semantic tags — "control" is a tag on 30+ icons (alarm, AC,
+        // brightness, …) because they're controllable; prefix-matching it against "contr" floods
+        // results with unrelated icons while burying the actual controller icon.
+        if (!field.prefixMatchEnabled) continue
         // Word prefix (e.g. user typed "fire" against "fireworks"). Excludes the
         // false-positive case of the token being a substring _inside_ a word
         // (e.g. "lit" inside "light").

@@ -58,12 +58,14 @@ import dev.bikram.remember.ui.common.HeroFramedImage
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.rememberImageDerivedColors
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
+import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.elevatedCardColors
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -113,7 +115,15 @@ fun NoteCard(
     val heroEnabled = LocalHeroOnCards.current
     val heroPictureUri = model.pictureUri?.takeIf { heroEnabled }
     val showHero = heroPictureUri != null
+    val adaptiveNoteThemes = LocalThemeState.current.adaptiveNoteThemes
     val surface = MaterialTheme.colorScheme.surface
+    val imageDerivedColors =
+        rememberImageDerivedColors(
+            imageUri = if (adaptiveNoteThemes) heroPictureUri else null,
+            cacheRevision = model.pictureCacheRevision,
+        )
+    val cardContentColor = imageDerivedColors?.onImageColor ?: cardColors.contentColor
+    val heroScrimColor = if (showHero) imageDerivedColors?.imageScrimColor ?: Color.Black else surface
     val cardShape = MaterialTheme.shapes.medium
     val starredIconDescription = stringResource(R.string.notecard_starred_cd)
 
@@ -286,7 +296,7 @@ fun NoteCard(
                 },
         shape = cardShape,
         color = completedContainerColor,
-        contentColor = cardColors.contentColor,
+        contentColor = cardContentColor,
         tonalElevation = 1.dp,
         shadowElevation = 0.dp,
     ) {
@@ -309,8 +319,8 @@ fun NoteCard(
                             HeroFraming.fromJsonString(model.pictureHeroFraming)
                         },
                     cacheRevision = model.pictureCacheRevision,
-                    scrimTop = surface.copy(alpha = 0.20f),
-                    scrimBottom = surface.copy(alpha = 0.48f),
+                    scrimTop = heroScrimColor.copy(alpha = 0.28f),
+                    scrimBottom = heroScrimColor.copy(alpha = 0.56f),
                 )
             }
             // Watermark star for starred cards. Tilted ~-15deg, low alpha, parked at
@@ -356,15 +366,16 @@ fun NoteCard(
                                 RememberMaterialRoundedSymbol(
                                     name = headerIcon.name,
                                     size = 18.dp,
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = cardContentColor,
                                     weight = FontWeight.Medium,
+                                    filled = headerIcon.filled,
                                     modifier = Modifier.alpha(0.75f),
                                 )
                             is NoteIcon.Drawable ->
                                 Icon(
                                     painterResource(headerIcon.resId),
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = cardContentColor,
                                     modifier =
                                         Modifier
                                             .size(18.dp)
@@ -380,7 +391,7 @@ fun NoteCard(
                                 RememberMaterialRoundedSymbol(
                                     name = DEFAULT_LIST_HEADER_SYMBOL,
                                     size = 18.dp,
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = cardContentColor,
                                     weight = FontWeight.Medium,
                                     modifier = Modifier.alpha(0.65f),
                                 )
@@ -388,7 +399,7 @@ fun NoteCard(
                                 RememberMaterialRoundedSymbol(
                                     name = DEFAULT_NOTE_HEADER_SYMBOL,
                                     size = 18.dp,
-                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    tint = cardContentColor,
                                     weight = FontWeight.Medium,
                                     modifier = Modifier.alpha(0.65f),
                                 )
@@ -459,7 +470,7 @@ fun NoteCard(
                             if (model.body.isNotBlank()) {
                                 MarkdownText(
                                     markdown = model.body,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodyMedium.copy(color = cardContentColor),
                                     maxLines = 3,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.alpha(0.82f),
@@ -467,7 +478,7 @@ fun NoteCard(
                             } else {
                                 Text(
                                     text = stringResource(R.string.common_empty_note),
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodyMedium.copy(color = cardContentColor),
                                     modifier = Modifier.alpha(0.5f),
                                 )
                             }
@@ -476,12 +487,14 @@ fun NoteCard(
                             ChecklistPreview(
                                 items = model.checklistPreviewItems,
                                 hiddenCount = model.checklistHiddenItemCount,
+                                contentColor = cardContentColor,
                             )
                     }
                     MetadataRow(
                         model = model,
                         visibleTags = visibleTags,
                         reminderNotificationsAllowed = reminderNotificationsAllowed,
+                        contentColor = cardContentColor,
                     )
                 }
             }
@@ -573,6 +586,7 @@ private fun MetadataRow(
     model: NoteCardUiModel,
     visibleTags: List<String>,
     reminderNotificationsAllowed: Boolean,
+    contentColor: Color,
 ) {
     val tags = visibleTags.take(3)
     val extraTags = (visibleTags.size - tags.size).coerceAtLeast(0)
@@ -598,6 +612,7 @@ private fun MetadataRow(
                 Text(
                     text = stringResource(R.string.notecard_extra_tags, extraTags),
                     style = MaterialTheme.typography.labelSmall,
+                    color = contentColor,
                     modifier = Modifier.alpha(0.7f),
                 )
             }
@@ -611,7 +626,7 @@ private fun MetadataRow(
                 RememberMaterialRoundedSymbol(
                     name = "image",
                     size = 14.dp,
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    tint = contentColor,
                     weight = FontWeight.Medium,
                     modifier =
                         Modifier
@@ -624,7 +639,7 @@ private fun MetadataRow(
                 RememberMaterialRoundedSymbol(
                     name = "attach_file",
                     size = 14.dp,
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    tint = contentColor,
                     weight = FontWeight.Medium,
                     modifier =
                         Modifier
@@ -646,7 +661,7 @@ private fun MetadataRow(
                         if (reminderPermissionMissing) {
                             MaterialTheme.colorScheme.error
                         } else {
-                            MaterialTheme.colorScheme.onSurface
+                            contentColor
                         },
                     weight = FontWeight.Medium,
                     modifier =
@@ -659,7 +674,7 @@ private fun MetadataRow(
                     RememberMaterialRoundedSymbol(
                         name = "repeat",
                         size = 14.dp,
-                        tint = MaterialTheme.colorScheme.onSurface,
+                        tint = contentColor,
                         weight = FontWeight.Medium,
                         modifier =
                             Modifier
@@ -674,7 +689,7 @@ private fun MetadataRow(
                         if (reminderPermissionMissing) {
                             MaterialTheme.colorScheme.error
                         } else {
-                            MaterialTheme.colorScheme.onSurface
+                            contentColor
                         },
                     fontWeight = FontWeight.Medium,
                     modifier =
@@ -709,11 +724,12 @@ private fun TagMini(label: String) {
 private fun ChecklistPreview(
     items: List<NoteCardChecklistItemUiModel>,
     hiddenCount: Int,
+    contentColor: Color,
 ) {
     if (items.isEmpty()) {
         Text(
             text = stringResource(R.string.common_empty_list),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MaterialTheme.typography.bodyMedium.copy(color = contentColor),
             modifier = Modifier.alpha(0.5f),
         )
         return
@@ -726,14 +742,14 @@ private fun ChecklistPreview(
                 RememberMaterialRoundedSymbol(
                     name = if (item.checked) "check_circle" else "radio_button_unchecked",
                     size = 16.dp,
-                    tint = MaterialTheme.colorScheme.onSurface,
+                    tint = contentColor,
                     weight = FontWeight.Medium,
                     modifier = Modifier.alpha(if (item.checked) 0.6f else 0.85f),
                 )
                 Spacer(Modifier.width(10.dp))
                 Text(
                     text = item.text,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.bodyMedium.copy(color = contentColor),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
@@ -745,7 +761,7 @@ private fun ChecklistPreview(
             Spacer(Modifier.height(2.dp))
             Text(
                 text = pluralStringResource(R.plurals.notecard_extra_items, hiddenCount, hiddenCount),
-                style = MaterialTheme.typography.labelMedium,
+                style = MaterialTheme.typography.labelMedium.copy(color = contentColor),
                 modifier = Modifier.alpha(0.6f),
             )
         }

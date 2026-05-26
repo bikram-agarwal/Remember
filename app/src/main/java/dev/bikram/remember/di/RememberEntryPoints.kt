@@ -75,6 +75,8 @@ interface NotesWidgetEntryPoint {
     fun noteRepository(): NoteRepository
 
     fun notesWidgetUpdater(): NotesWidgetUpdater
+
+    fun viewOptionsPrefs(): ViewOptionsPrefs
 }
 
 @EntryPoint

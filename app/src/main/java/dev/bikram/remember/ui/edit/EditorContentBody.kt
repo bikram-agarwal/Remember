@@ -40,7 +40,7 @@ import dev.bikram.remember.ui.modifiers.rememberExpressiveOverscrollEffect
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 internal object EditorContentBodyDefaults {
-    val HorizontalPadding = 20.dp
+    val HorizontalPadding = 24.dp
     val HeroTopSpacing = 16.dp
     val ShelfNoticeTopSpacing = 16.dp
     val BodyTopSpacing = 16.dp

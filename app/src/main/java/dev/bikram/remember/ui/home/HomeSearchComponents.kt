@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
@@ -58,6 +59,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.NoteCardUiModel
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
@@ -126,7 +128,10 @@ internal fun SearchableTopBarTitle(
         // expansion animation isn't gated on the icon swap.
         val cdCloseSearch = stringResource(R.string.cd_close_search)
         val cdSearch = stringResource(R.string.cd_search)
-        RememberFilledTonalIconButton(onClick = onToggleSearch) {
+        RememberFilledTonalIconButton(
+            onClick = onToggleSearch,
+            modifier = Modifier.size(rememberResponsiveActionButtonSize()),
+        ) {
             AnimatedContent(
                 targetState = searchOpen,
                 transitionSpec = {

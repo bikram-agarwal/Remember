@@ -96,6 +96,7 @@ import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.SwipeRevealTile
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.toNoteCardUiModel
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
@@ -798,6 +799,7 @@ private fun HistorySelectionActionBar(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     )
+                val actionButtonSize = rememberResponsiveActionButtonSize()
                 ButtonGroup(
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                     overflowIndicator = { menuState ->
@@ -808,7 +810,7 @@ private fun HistorySelectionActionBar(
                         buttonGroupContent = {
                             RememberFilledTonalIconButton(
                                 onClick = onClearSelection,
-                                modifier = Modifier.animateWidth(exitInteractionSource),
+                                modifier = Modifier.size(actionButtonSize).animateWidth(exitInteractionSource),
                                 interactionSource = exitInteractionSource,
                                 tooltipLabel = exitLabel,
                                 colors = exitColors,
@@ -832,13 +834,14 @@ private fun HistorySelectionActionBar(
                     )
                     customItem(
                         buttonGroupContent = {
-                            Box(modifier = Modifier.size(48.dp)) {
+                            Box(modifier = Modifier.size(actionButtonSize)) {
                                 RememberFilledTonalIconButton(
                                     onClick = onSelectAll,
                                     enabled = selectableVisibleIds.isNotEmpty(),
                                     modifier =
                                         Modifier
                                             .align(Alignment.Center)
+                                            .size(actionButtonSize)
                                             .animateWidth(selectAllInteractionSource),
                                     interactionSource = selectAllInteractionSource,
                                     tooltipLabel = cdSelectAll,
@@ -879,7 +882,7 @@ private fun HistorySelectionActionBar(
                             RememberFilledTonalIconButton(
                                 onClick = onUnselectAll,
                                 enabled = selectedCount > 0,
-                                modifier = Modifier.animateWidth(unselectAllInteractionSource),
+                                modifier = Modifier.size(actionButtonSize).animateWidth(unselectAllInteractionSource),
                                 interactionSource = unselectAllInteractionSource,
                                 tooltipLabel = cdUnselectAll,
                             ) {
@@ -905,7 +908,7 @@ private fun HistorySelectionActionBar(
                             buttonGroupContent = {
                                 RememberFilledTonalIconButton(
                                     onClick = onRestoreSelected,
-                                    modifier = Modifier.animateWidth(restoreInteractionSource),
+                                    modifier = Modifier.size(actionButtonSize).animateWidth(restoreInteractionSource),
                                     interactionSource = restoreInteractionSource,
                                     tooltipLabel = restoreLabel,
                                 ) {
@@ -930,7 +933,7 @@ private fun HistorySelectionActionBar(
                             buttonGroupContent = {
                                 RememberFilledTonalIconButton(
                                     onClick = onArchiveSelected,
-                                    modifier = Modifier.animateWidth(archiveInteractionSource),
+                                    modifier = Modifier.size(actionButtonSize).animateWidth(archiveInteractionSource),
                                     interactionSource = archiveInteractionSource,
                                     tooltipLabel = archiveLabel,
                                 ) {
@@ -956,7 +959,7 @@ private fun HistorySelectionActionBar(
                             buttonGroupContent = {
                                 RememberFilledTonalIconButton(
                                     onClick = onUnarchiveSelected,
-                                    modifier = Modifier.animateWidth(unarchiveInteractionSource),
+                                    modifier = Modifier.size(actionButtonSize).animateWidth(unarchiveInteractionSource),
                                     interactionSource = unarchiveInteractionSource,
                                     tooltipLabel = unarchiveLabel,
                                 ) {
@@ -981,7 +984,7 @@ private fun HistorySelectionActionBar(
                             buttonGroupContent = {
                                 RememberFilledTonalIconButton(
                                     onClick = onTrashSelected,
-                                    modifier = Modifier.animateWidth(trashInteractionSource),
+                                    modifier = Modifier.size(actionButtonSize).animateWidth(trashInteractionSource),
                                     interactionSource = trashInteractionSource,
                                     tooltipLabel = trashLabel,
                                 ) {
@@ -1007,7 +1010,7 @@ private fun HistorySelectionActionBar(
                         buttonGroupContent = {
                             RememberFilledTonalIconButton(
                                 onClick = onDeleteForeverSelected,
-                                modifier = Modifier.animateWidth(deleteForeverInteractionSource),
+                                modifier = Modifier.size(actionButtonSize).animateWidth(deleteForeverInteractionSource),
                                 interactionSource = deleteForeverInteractionSource,
                                 tooltipLabel = deleteForeverLabel,
                                 colors = deleteForeverColors,

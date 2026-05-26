@@ -57,6 +57,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -69,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -683,6 +685,16 @@ internal fun CalendarPickerDialog(
 ) {
     val state = rememberDatePickerState(initialSelectedDateMillis = initial)
     val datePickerContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    LaunchedEffect(state.displayedMonthMillis) {
+        val carriedSelection =
+            selectedDateMillisInDisplayedMonth(
+                selectedDateMillis = state.selectedDateMillis,
+                displayedMonthMillis = state.displayedMonthMillis,
+            )
+        if (carriedSelection != null && carriedSelection != state.selectedDateMillis) {
+            state.selectedDateMillis = carriedSelection
+        }
+    }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -1272,6 +1284,7 @@ private fun CompactDigitField(
             enabled = enabled,
             singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             textStyle =
                 MaterialTheme.typography.bodyLarge.copy(
                     color = textColor,
@@ -1479,6 +1492,24 @@ private fun pickerDayMillisForLocalWallClock(wallClockEpochMillis: Long): Long {
     val zone = ZoneId.systemDefault()
     val localDate = Instant.ofEpochMilli(wallClockEpochMillis).atZone(zone).toLocalDate()
     return localDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+}
+
+private fun selectedDateMillisInDisplayedMonth(
+    selectedDateMillis: Long?,
+    displayedMonthMillis: Long,
+): Long? {
+    val selectedMillis = selectedDateMillis ?: return null
+    val selectedDate = Instant.ofEpochMilli(selectedMillis).atZone(ZoneOffset.UTC).toLocalDate()
+    val displayedMonth = Instant.ofEpochMilli(displayedMonthMillis).atZone(ZoneOffset.UTC).toLocalDate()
+    if (selectedDate.year == displayedMonth.year && selectedDate.month == displayedMonth.month) {
+        return selectedMillis
+    }
+    val carriedDay = minOf(selectedDate.dayOfMonth, displayedMonth.lengthOfMonth())
+    return displayedMonth
+        .withDayOfMonth(carriedDay)
+        .atStartOfDay(ZoneOffset.UTC)
+        .toInstant()
+        .toEpochMilli()
 }
 
 // Material DatePicker encodes the chosen calendar day at UTC midnight. Format using that UTC

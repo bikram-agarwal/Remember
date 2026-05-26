@@ -73,6 +73,7 @@ internal fun EditorHeaderIcon(
                     size = iconSize,
                     tint = MaterialTheme.colorScheme.primary,
                     weight = FontWeight.Medium,
+                    filled = headerIcon.filled,
                 )
             is NoteIcon.Drawable ->
                 Icon(

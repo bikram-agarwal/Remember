@@ -65,6 +65,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.tapSoundClickable
@@ -193,7 +194,10 @@ fun HelpScreen(
                                 helpVm.expandAll(allSubsectionKeys)
                             }
                         },
-                        modifier = Modifier.semantics { contentDescription = expandCollapseLabel },
+                        modifier =
+                            Modifier
+                                .size(rememberResponsiveActionButtonSize())
+                                .semantics { contentDescription = expandCollapseLabel },
                         tooltipLabel = expandCollapseLabel,
                     ) {
                         RememberMaterialRoundedSymbol(

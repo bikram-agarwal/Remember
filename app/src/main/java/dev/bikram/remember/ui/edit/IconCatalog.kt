@@ -26,6 +26,12 @@ fun defaultIconCatalogKey(isChecklist: Boolean): String =
 /** Stored in note `iconKey`; [Material Symbols](https://fonts.google.com/icons) ligature name. */
 const val ICON_SYMBOL_PREFIX: String = "symbol:"
 
+/** Stored in note `iconKey`; forces a filled Material Symbols variant. */
+const val ICON_SYMBOL_FILLED_PREFIX: String = "symbol_filled:"
+
+/** Stored in note `iconKey`; forces an outlined Material Symbols variant. */
+const val ICON_SYMBOL_OUTLINED_PREFIX: String = "symbol_outlined:"
+
 /** Stored in note `iconKey`; bundled raster (brand marks omitted from Symbols). */
 const val ICON_DRAWABLE_PREFIX: String = "drawable:"
 
@@ -34,6 +40,7 @@ data class IconChoice(
     val symbolName: String?,
     @param:DrawableRes val drawableRes: Int?,
     val label: String? = null,
+    val filled: Boolean = true,
 ) {
     init {
         require((symbolName != null) xor (drawableRes != null)) {
@@ -51,6 +58,7 @@ data class IconCategory(
 sealed class NoteIcon {
     data class Symbol(
         val name: String,
+        val filled: Boolean = true,
     ) : NoteIcon()
 
     data class Drawable(
@@ -82,6 +90,13 @@ private val symbolNameByKey: Map<String, String> =
             choice.symbolName?.let { symbol -> choice.key to symbol }
         }.toMap()
 
+private val symbolFilledByKey: Map<String, Boolean> =
+    iconCatalog
+        .flatMap { it.icons }
+        .mapNotNull { choice ->
+            choice.symbolName?.let { choice.key to choice.filled }
+        }.toMap()
+
 private val drawableResByKey: Map<String, Int> =
     iconCatalog
         .flatMap { it.icons }
@@ -98,7 +113,15 @@ private val labelByKey: Map<String, String> =
 
 private val legacySymbolIconKeyNormalizations: Map<String, String> =
     mapOf(
+        "${ICON_SYMBOL_PREFIX}directions_car" to "${ICON_SYMBOL_PREFIX}local_taxi",
+        "${ICON_SYMBOL_FILLED_PREFIX}directions_car" to "${ICON_SYMBOL_FILLED_PREFIX}local_taxi",
+        "${ICON_SYMBOL_OUTLINED_PREFIX}directions_car" to "${ICON_SYMBOL_OUTLINED_PREFIX}local_taxi",
+        "${ICON_SYMBOL_PREFIX}home" to "${ICON_SYMBOL_PREFIX}house",
+        "${ICON_SYMBOL_FILLED_PREFIX}home" to "${ICON_SYMBOL_FILLED_PREFIX}house",
+        "${ICON_SYMBOL_OUTLINED_PREFIX}home" to "${ICON_SYMBOL_OUTLINED_PREFIX}house",
         "${ICON_SYMBOL_PREFIX}try" to "${ICON_SYMBOL_PREFIX}currency_lira",
+        "${ICON_SYMBOL_FILLED_PREFIX}try" to "${ICON_SYMBOL_FILLED_PREFIX}currency_lira",
+        "${ICON_SYMBOL_OUTLINED_PREFIX}try" to "${ICON_SYMBOL_OUTLINED_PREFIX}currency_lira",
     )
 
 /**
@@ -110,11 +133,52 @@ fun normalizeIconKey(iconKey: String?): String? {
     return legacySymbolIconKeyNormalizations[iconKey] ?: iconKey
 }
 
+fun isSymbolIconKey(iconKey: String?): Boolean =
+    iconKey?.startsWith(ICON_SYMBOL_PREFIX) == true ||
+        iconKey?.startsWith(ICON_SYMBOL_FILLED_PREFIX) == true ||
+        iconKey?.startsWith(ICON_SYMBOL_OUTLINED_PREFIX) == true
+
+fun iconSymbolVariantFilled(iconKey: String?): Boolean? =
+    when {
+        iconKey?.startsWith(ICON_SYMBOL_FILLED_PREFIX) == true -> true
+        iconKey?.startsWith(ICON_SYMBOL_OUTLINED_PREFIX) == true -> false
+        else -> null
+    }
+
+fun iconSymbolCatalogKey(iconKey: String?): String? {
+    val normalized = normalizeIconKey(iconKey) ?: return null
+    val symbolName =
+        when {
+            normalized.startsWith(ICON_SYMBOL_PREFIX) -> normalized.removePrefix(ICON_SYMBOL_PREFIX)
+            normalized.startsWith(ICON_SYMBOL_FILLED_PREFIX) -> normalized.removePrefix(ICON_SYMBOL_FILLED_PREFIX)
+            normalized.startsWith(ICON_SYMBOL_OUTLINED_PREFIX) -> normalized.removePrefix(ICON_SYMBOL_OUTLINED_PREFIX)
+            else -> return null
+        }
+    return "$ICON_SYMBOL_PREFIX$symbolName"
+}
+
+fun iconKeyWithSymbolFilled(
+    iconKey: String,
+    filled: Boolean,
+): String {
+    val catalogKey = iconSymbolCatalogKey(iconKey) ?: return iconKey
+    val symbolName = catalogKey.removePrefix(ICON_SYMBOL_PREFIX)
+    return if (filled) {
+        "$ICON_SYMBOL_FILLED_PREFIX$symbolName"
+    } else {
+        "$ICON_SYMBOL_OUTLINED_PREFIX$symbolName"
+    }
+}
+
+fun resolvedSymbolFilled(iconKey: String?): Boolean? {
+    val normalized = normalizeIconKey(iconKey) ?: return null
+    val catalogKey = iconSymbolCatalogKey(normalized) ?: return null
+    return iconSymbolVariantFilled(normalized) ?: symbolFilledByKey[catalogKey] ?: true
+}
+
 fun iconSymbolName(key: String?): String? {
-    val normalized = normalizeIconKey(key) ?: return null
-    if (normalized.startsWith(ICON_EMOJI_PREFIX)) return null
-    if (!normalized.startsWith(ICON_SYMBOL_PREFIX)) return null
-    return symbolNameByKey[normalized]
+    val catalogKey = iconSymbolCatalogKey(key) ?: return null
+    return symbolNameByKey[catalogKey]
 }
 
 @DrawableRes
@@ -146,9 +210,9 @@ fun resolveNoteIcon(
     val emoji = iconEmojiPayload(normalized)
     if (emoji != null) return NoteIcon.Emoji(emoji)
 
-    if (normalized?.startsWith(ICON_SYMBOL_PREFIX) == true) {
-        symbolNameByKey[normalized]?.let { symbolName ->
-            return NoteIcon.Symbol(symbolName)
+    iconSymbolCatalogKey(normalized)?.let { catalogKey ->
+        symbolNameByKey[catalogKey]?.let { symbolName ->
+            return NoteIcon.Symbol(symbolName, filled = resolvedSymbolFilled(normalized) ?: true)
         }
     }
 
@@ -170,6 +234,10 @@ fun humanizeIconKey(iconKey: String): String {
         when {
             iconKey.startsWith(ICON_SYMBOL_PREFIX) ->
                 iconKey.removePrefix(ICON_SYMBOL_PREFIX)
+            iconKey.startsWith(ICON_SYMBOL_FILLED_PREFIX) ->
+                iconKey.removePrefix(ICON_SYMBOL_FILLED_PREFIX)
+            iconKey.startsWith(ICON_SYMBOL_OUTLINED_PREFIX) ->
+                iconKey.removePrefix(ICON_SYMBOL_OUTLINED_PREFIX)
             iconKey.startsWith(ICON_DRAWABLE_PREFIX) ->
                 iconKey
                     .removePrefix(ICON_DRAWABLE_PREFIX)
@@ -194,7 +262,7 @@ fun iconLabelFor(key: String?): String? {
     val normalized = normalizeIconKey(key) ?: return null
     return when {
         normalized.startsWith(ICON_EMOJI_PREFIX) -> iconEmojiPayload(normalized)
-        normalized.startsWith(ICON_SYMBOL_PREFIX) -> humanizeIconKey(normalized)
+        isSymbolIconKey(normalized) -> humanizeIconKey(normalized)
         normalized.startsWith(ICON_DRAWABLE_PREFIX) -> humanizeIconKey(normalized)
         else -> null
     }

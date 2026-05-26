@@ -34,6 +34,7 @@ fun PinSetupDialog(
         title = stringResource(R.string.pin_setup_title),
         subtitle = stringResource(R.string.pin_setup_subtitle),
         onDismiss = onDismiss,
+        actionsImePadding = true,
         actions = {
             RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
             RememberTextButton(enabled = ready, onClick = { onConfirm(pin) }) { Text(stringResource(R.string.common_save)) }

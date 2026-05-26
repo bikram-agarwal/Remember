@@ -88,6 +88,7 @@ data class NoteAction(
     val title: String,
     val details: String,
     val extra: String? = null,
+    val iconData: String? = null,
 )
 
 @Entity(tableName = "notes")

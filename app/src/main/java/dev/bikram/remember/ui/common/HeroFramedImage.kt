@@ -49,16 +49,30 @@ fun HeroFramedImage(
             } else {
                 containerW / HERO_MASK_ASPECT_RATIO
             }.coerceIn(1f, 4096f)
-        val requestWidthPx = (containerW * 2f).coerceIn(1f, 2048f).roundToInt()
-        val requestHeightPx = (containerH * 2f).coerceIn(1f, 2048f).roundToInt()
+        val containerRatio = containerW / containerH
+        val viewportW: Float
+        val viewportH: Float
+        if (framing != null && containerRatio > HERO_MASK_ASPECT_RATIO) {
+            viewportW = containerW
+            viewportH = containerW / HERO_MASK_ASPECT_RATIO
+        } else if (framing != null) {
+            viewportH = containerH
+            viewportW = containerH * HERO_MASK_ASPECT_RATIO
+        } else {
+            viewportW = containerW
+            viewportH = containerH
+        }
+        val requestWidthPx = (viewportW * 2f).coerceIn(1f, 2048f).roundToInt()
+        val requestHeightPx = (viewportH * 2f).coerceIn(1f, 2048f).roundToInt()
+        val cacheKey = "$imageUri#$cacheRevision@$requestWidthPx:$requestHeightPx"
         val model =
-            remember(imageUri, cacheRevision, requestWidthPx, requestHeightPx) {
+            remember(cacheKey) {
                 ImageRequest
                     .Builder(context)
                     .data(imageUri)
                     .size(Size(requestWidthPx, requestHeightPx))
-                    .memoryCacheKey("$imageUri#$cacheRevision")
-                    .diskCacheKey("$imageUri#$cacheRevision")
+                    .memoryCacheKey(cacheKey)
+                    .diskCacheKey(cacheKey)
                     .build()
             }
         val painter = rememberAsyncImagePainter(model)
@@ -81,16 +95,6 @@ fun HeroFramedImage(
         } else {
             val imageWidthPx = intrinsic.width
             val imageHeightPx = intrinsic.height
-            val containerRatio = containerW / containerH
-            val viewportW: Float
-            val viewportH: Float
-            if (containerRatio > HERO_MASK_ASPECT_RATIO) {
-                viewportW = containerW
-                viewportH = containerW / HERO_MASK_ASPECT_RATIO
-            } else {
-                viewportH = containerH
-                viewportW = containerH * HERO_MASK_ASPECT_RATIO
-            }
 
             val coverScale = max(viewportW / imageWidthPx, viewportH / imageHeightPx)
             val displayScale = coverScale * framing.zoom.coerceIn(1f, 8f)
