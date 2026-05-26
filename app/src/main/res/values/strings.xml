@@ -182,6 +182,7 @@
     <string name="notecard_cd_selected">Selected</string>
     <string name="hero_framing_title">Position cover</string>
     <string name="viewer_cover_image_cd">Cover image</string>
+    <string name="hero_image_picker_browse_with_app">Browse with app</string>
     <string name="toast_saved_to_downloads">Saved to Downloads</string>
     <string name="toast_save_download_failed">Could not save file</string>
     <string name="toast_open_attachment_failed">No app can open this file</string>

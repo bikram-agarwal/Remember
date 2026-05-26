@@ -111,6 +111,77 @@ class ChecklistEditorTest {
     }
 
     @Test
+    fun reordering_parent_moves_visible_children_with_it() {
+        val items =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 4L, sortOrder = 40.0),
+                editableItem(localId = 5L, sortOrder = 50.0),
+            )
+
+        val result =
+            ChecklistEditor.reorderWithin(
+                items = items,
+                visibleIds = listOf(1L, 2L, 3L, 4L, 5L),
+                fromIndex = 0,
+                toIndex = 4,
+            )
+        val sortedIds = result.items.sortedBy { item -> item.sortOrder }.map { item -> item.localId }
+
+        assertTrue(result.changed)
+        assertEquals(listOf(4L, 5L, 1L, 2L, 3L), sortedIds)
+        assertEquals(1L, result.items.first { item -> item.localId == 2L }.parentLocalId)
+        assertEquals(1L, result.items.first { item -> item.localId == 3L }.parentLocalId)
+    }
+
+    @Test
+    fun reordering_parent_moves_checked_child_with_it_even_when_child_is_not_visible() {
+        val items =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, checked = true, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0),
+                editableItem(localId = 4L, sortOrder = 40.0),
+            )
+
+        val result =
+            ChecklistEditor.reorderWithin(
+                items = items,
+                visibleIds = listOf(1L, 3L, 4L),
+                fromIndex = 0,
+                toIndex = 2,
+            )
+        val sortedIds = result.items.sortedBy { item -> item.sortOrder }.map { item -> item.localId }
+
+        assertTrue(result.changed)
+        assertEquals(listOf(3L, 4L, 1L, 2L), sortedIds)
+        assertEquals(1L, result.items.first { item -> item.localId == 2L }.parentLocalId)
+    }
+
+    @Test
+    fun reordering_parent_within_own_children_is_no_op() {
+        val items =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0),
+            )
+
+        val result =
+            ChecklistEditor.reorderWithin(
+                items = items,
+                visibleIds = listOf(1L, 2L, 3L),
+                fromIndex = 0,
+                toIndex = 1,
+            )
+
+        assertFalse(result.changed)
+        assertEquals(items, result.items)
+    }
+
+    @Test
     fun single_visible_row_reorder_is_no_op() {
         val items =
             listOf(

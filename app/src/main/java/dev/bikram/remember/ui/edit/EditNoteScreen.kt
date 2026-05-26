@@ -116,7 +116,7 @@ fun EditNoteScreen(
     val notificationsAllowed = rememberNotificationsAllowed()
 
     var pendingHeroSession by remember { mutableStateOf<Pair<String, File?>?>(null) }
-    val launchHeroImagePick =
+    val heroImagePicker =
         rememberHeroImagePickThenCopy { uriString, copiedFile ->
             pendingHeroSession = uriString to copiedFile
         }
@@ -442,7 +442,8 @@ fun EditNoteScreen(
                         reminderPickerOpen = true
                     },
                     notificationsAllowed = notificationsAllowed,
-                    onOpenPicture = launchHeroImagePick,
+                    onOpenPicture = heroImagePicker.pickWithPhotoPicker,
+                    onBrowsePictureWithApp = heroImagePicker.browseWithApp,
                     onViewPictureFull = { uri, revision ->
                         pictureViewer = uri to revision
                     },
@@ -485,6 +486,7 @@ fun EditNoteScreen(
                 attachmentsPickerOpen = attachmentsPickerOpen,
                 notificationPermissionSheetOpen = notificationPermissionSheetOpen,
                 deleteForeverConfirmOpen = deleteForeverConfirmOpen,
+                heroImagePicker = heroImagePicker,
                 pendingHeroSession = pendingHeroSession,
                 pictureViewer = pictureViewer,
                 currentPictureHeroFraming = pictureHeroFraming,
@@ -506,7 +508,6 @@ fun EditNoteScreen(
                 onRemoveAttachment = vm::removeAttachment,
                 onHeroCommitted = vm::setHeroWithFraming,
                 onPictureChange = vm::setPictureUri,
-                onOpenPicture = launchHeroImagePick,
                 onDeleteForever = editorActions.deleteForeverAndBack,
                 onDismissReminder = { reminderPickerOpen = false },
                 onDismissIcon = { iconPickerOpen = false },

@@ -146,7 +146,7 @@ fun EditListScreen(
     val notificationsAllowed = rememberNotificationsAllowed()
 
     var pendingHeroSession by remember { mutableStateOf<Pair<String, File?>?>(null) }
-    val launchHeroImagePick =
+    val heroImagePicker =
         rememberHeroImagePickThenCopy { uriString, copiedFile ->
             pendingHeroSession = uriString to copiedFile
         }
@@ -765,7 +765,8 @@ fun EditListScreen(
                             onOpenReminder = { reminderPickerOpen = true },
                             onImportanceChange = vm::setImportance,
                             onVisibilityChange = vm::setVisibility,
-                            onOpenPicture = launchHeroImagePick,
+                            onOpenPicture = heroImagePicker.pickWithPhotoPicker,
+                            onBrowsePictureWithApp = heroImagePicker.browseWithApp,
                             onOpenActions = { actionsPickerOpen = true },
                             onOpenTags = { tagsPickerOpen = true },
                             onOpenAttachmentsSheet = { attachmentsPickerOpen = true },
@@ -784,6 +785,7 @@ fun EditListScreen(
                 attachmentsPickerOpen = attachmentsPickerOpen,
                 notificationPermissionSheetOpen = notificationPermissionSheetOpen,
                 deleteForeverConfirmOpen = deleteForeverConfirmOpen,
+                heroImagePicker = heroImagePicker,
                 pendingHeroSession = pendingHeroSession,
                 pictureViewer = pictureViewer,
                 currentPictureHeroFraming = pictureHeroFraming,
@@ -805,7 +807,6 @@ fun EditListScreen(
                 onRemoveAttachment = vm::removeAttachment,
                 onHeroCommitted = vm::setHeroWithFraming,
                 onPictureChange = vm::setPictureUri,
-                onOpenPicture = launchHeroImagePick,
                 onDeleteForever = editorActions.deleteForeverAndBack,
                 onDismissReminder = { reminderPickerOpen = false },
                 onDismissIcon = { iconPickerOpen = false },

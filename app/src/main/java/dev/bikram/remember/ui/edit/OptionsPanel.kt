@@ -71,6 +71,7 @@ import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import java.text.DateFormat
 import java.util.Date
@@ -94,6 +95,7 @@ fun OptionsPanel(
     onSetImportance: (Importance) -> Unit,
     onSetVisibility: (NoteVisibility) -> Unit,
     onOpenPicture: () -> Unit,
+    onBrowsePictureWithApp: () -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
@@ -258,6 +260,8 @@ fun OptionsPanel(
                                     stringResource(R.string.options_picture_attached)
                                 },
                             onClick = onOpenPicture,
+                            onLongClick = onBrowsePictureWithApp,
+                            onLongClickLabel = stringResource(R.string.hero_image_picker_browse_with_app),
                             modifier = Modifier.weight(1f),
                         )
                         OptionCell(
@@ -477,6 +481,8 @@ private fun OptionCell(
     summary: String,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
     iconTint: Color = MaterialTheme.colorScheme.primary,
     fixedHeight: Boolean = true,
     summaryContent: (@Composable () -> Unit)? = null,
@@ -503,8 +509,18 @@ private fun OptionCell(
                 Modifier
                     .fillMaxWidth()
                     .let { if (fixedHeight) it.fillMaxHeight() else it }
-                    .let { if (onClick != null) it.tapSoundClickable(onClick = onClick) else it }
-                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                    .let {
+                        when {
+                            onClick == null -> it
+                            onLongClick != null ->
+                                it.tapSoundCombinedClickable(
+                                    onClick = onClick,
+                                    onLongClick = onLongClick,
+                                    onLongClickLabel = onLongClickLabel,
+                                )
+                            else -> it.tapSoundClickable(onClick = onClick)
+                        }
+                    }.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             OptionCellIcon(

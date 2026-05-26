@@ -40,6 +40,7 @@ fun EditorOptionsPanel(
     onImportanceChange: (Importance) -> Unit,
     onVisibilityChange: (NoteVisibility) -> Unit,
     onOpenPicture: () -> Unit,
+    onBrowsePictureWithApp: () -> Unit,
     onOpenActions: () -> Unit,
     onOpenTags: () -> Unit,
     onOpenAttachmentsSheet: () -> Unit,
@@ -59,6 +60,7 @@ fun EditorOptionsPanel(
         onSetImportance = if (readOnly) ({ _ -> }) else onImportanceChange,
         onSetVisibility = if (readOnly) ({ _ -> }) else onVisibilityChange,
         onOpenPicture = if (readOnly) ({}) else onOpenPicture,
+        onBrowsePictureWithApp = if (readOnly) ({}) else onBrowsePictureWithApp,
         onOpenActions = if (readOnly) ({}) else onOpenActions,
         onOpenTags = if (readOnly) ({}) else onOpenTags,
         onOpenAttachments =
@@ -88,6 +90,7 @@ fun EditorOptionSheets(
     attachmentsPickerOpen: Boolean,
     notificationPermissionSheetOpen: Boolean,
     deleteForeverConfirmOpen: Boolean,
+    heroImagePicker: HeroImagePickerController,
     pendingHeroSession: Pair<String, File?>?,
     pictureViewer: Pair<String, Long>?,
     currentPictureHeroFraming: String?,
@@ -109,7 +112,6 @@ fun EditorOptionSheets(
     onRemoveAttachment: (Long) -> Unit,
     onHeroCommitted: (String, HeroFraming) -> Unit,
     onPictureChange: (String?) -> Unit,
-    onOpenPicture: () -> Unit,
     onDeleteForever: () -> Unit,
     onDismissReminder: () -> Unit,
     onDismissIcon: () -> Unit,
@@ -238,7 +240,21 @@ fun EditorOptionSheets(
                     } else {
                         onDismissPictureViewer()
                     }
-                    onOpenPicture()
+                    heroImagePicker.pickWithPhotoPicker()
+                }
+            },
+        onReplaceLongClick =
+            if (readOnly) {
+                null
+            } else {
+                {
+                    pendingHeroSession?.second?.delete()
+                    if (pendingHeroUri != null) {
+                        onDismissPendingHero()
+                    } else {
+                        onDismissPictureViewer()
+                    }
+                    heroImagePicker.browseWithApp()
                 }
             },
         onCommitFraming = { framing ->

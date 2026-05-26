@@ -67,6 +67,7 @@ import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -201,6 +202,7 @@ fun FullScreenHeroImageOverlay(
     onDelete: (() -> Unit)? = null,
     onEdit: (() -> Unit)? = null,
     onReplace: (() -> Unit)? = null,
+    onReplaceLongClick: (() -> Unit)? = null,
     initialFraming: HeroFraming? = null,
     startInReframeMode: Boolean = false,
     dismissOnCancelReframe: Boolean = false,
@@ -260,6 +262,7 @@ fun FullScreenHeroImageOverlay(
                 Modifier.semantics { contentDescription = editLabel }
             }
         val replaceLabel = stringResource(R.string.edit_replace_picture_cd)
+        val browseWithAppLabel = stringResource(R.string.hero_image_picker_browse_with_app)
         val replaceSemantics =
             remember(replaceLabel) {
                 Modifier.semantics { contentDescription = replaceLabel }
@@ -602,6 +605,8 @@ fun FullScreenHeroImageOverlay(
                                 icon = "undo",
                                 contentDescriptionModifier = replaceSemantics,
                                 onClick = onReplace,
+                                onLongClick = onReplaceLongClick,
+                                onLongClickLabel = browseWithAppLabel,
                             )
                         }
                         if (onDelete != null) {
@@ -631,6 +636,8 @@ private fun PhotoOverlayActionPill(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentDescriptionModifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
+    onLongClickLabel: String? = null,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
@@ -647,10 +654,12 @@ private fun PhotoOverlayActionPill(
         modifier =
             modifier
                 .then(contentDescriptionModifier)
-                .clickable(
+                .tapSoundCombinedClickable(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = onClick,
+                    onLongClick = onLongClick,
+                    onLongClickLabel = onLongClickLabel,
                 ),
     ) {
         Row(
