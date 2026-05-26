@@ -46,6 +46,48 @@ Notes are stored on-device. No Remember servers. Manual backup and restore let y
 
 ---
 
+## 🖼️ Screenshots
+
+<table>
+<tr>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/1_home.png" alt="Home Page: All notes, sorted the way you choose" width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/2_note_page.png" alt="Note page: rich in UI & functionality" width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/3_markdown.png" alt="Notes support markdown with live preview" width="300" /><br />
+</td>
+</tr>
+
+<tr>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/4_checklist.png" alt="Checklist with nesting and drag & drop" width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/5_icons.png" alt="Assign icon to your notes. Choose from hundreds of symbols and entire emoji set" width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/6_actions.png" alt="Act on reminders directly from the notification" width="300" /><br />
+</td>
+</tr>
+
+<tr>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/7_reminders.png" alt="Extensive flexibilty in setting recurring reminders" width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/8_settings.png" alt="Extensive theming options. Make it your own." width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/9_notification.png" alt="Rich notifications with media support and quick actions" width="300" /><br />
+</td>
+</tr>
+</table>
+
+--- 
+
 ## Download
 
 Coming soon

@@ -26,7 +26,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -356,18 +355,7 @@ fun EditListScreen(
                     blurStyle?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier)
                         ?: Modifier
                 val focusRequesters = remember { mutableMapOf<Long, FocusRequester>() }
-                var previousItemCount by remember { mutableIntStateOf(items.size) }
-                var expectingNewItem by remember { mutableStateOf(false) }
-
-                LaunchedEffect(items) {
-                    if (expectingNewItem && items.size > previousItemCount) {
-                        items.lastOrNull()?.localId?.let { id ->
-                            focusRequesters[id]?.requestFocus()
-                        }
-                        expectingNewItem = false
-                    }
-                    previousItemCount = items.size
-                }
+                var draggingParentLocalId by remember { mutableStateOf<Long?>(null) }
                 LaunchedEffect(isEditMode, pendingFocusItemId, readOnly) {
                     val itemId = pendingFocusItemId
                     if (isEditMode && itemId != null && !readOnly) {
@@ -424,7 +412,38 @@ fun EditListScreen(
                             checkedParents = checkedParentLookup,
                         )
                     }
-                val activeIds = remember(activeList) { activeList.map { it.localId } }
+                val visibleActiveEntries =
+                    remember(activeEntries, draggingParentLocalId) {
+                        val parentLocalId = draggingParentLocalId
+                        if (parentLocalId == null) {
+                            activeEntries
+                        } else {
+                            activeEntries.filterNot { entry ->
+                                entry is ActiveEntry.Row && entry.item.parentLocalId == parentLocalId
+                            }
+                        }
+                    }
+                val visibleCompletedEntries =
+                    remember(completedEntries, draggingParentLocalId) {
+                        val parentLocalId = draggingParentLocalId
+                        if (parentLocalId == null) {
+                            completedEntries
+                        } else {
+                            completedEntries.filterNot { entry ->
+                                when (entry) {
+                                    is CompletedEntry.Ghost -> entry.header.realParentLocalId == parentLocalId
+                                    is CompletedEntry.Row -> entry.item.parentLocalId == parentLocalId
+                                }
+                            }
+                        }
+                    }
+                val activeIds =
+                    remember(activeList, draggingParentLocalId) {
+                        val parentLocalId = draggingParentLocalId
+                        activeList
+                            .filterNot { item -> parentLocalId != null && item.parentLocalId == parentLocalId }
+                            .map { item -> item.localId }
+                    }
                 val completedRowIds = remember(completedItems) { completedItems.map { it.localId } }
 
                 var showChecked by rememberSaveable { mutableStateOf(true) }
@@ -513,7 +532,7 @@ fun EditListScreen(
                     }
 
                     items(
-                        items = activeEntries,
+                        items = visibleActiveEntries,
                         key = { entry ->
                             when (entry) {
                                 is ActiveEntry.Ghost -> "ghost-active-${entry.header.realParentLocalId}"
@@ -544,6 +563,13 @@ fun EditListScreen(
                                             placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                         ),
                                 ) { isDragging ->
+                                    LaunchedEffect(isDragging, item.localId, item.depth) {
+                                        if (isDragging && item.depth == 0) {
+                                            draggingParentLocalId = item.localId
+                                        } else if (!isDragging && draggingParentLocalId == item.localId) {
+                                            draggingParentLocalId = null
+                                        }
+                                    }
                                     val focusRequester = remember(item.localId) { FocusRequester() }
                                     DisposableEffect(item.localId, focusRequester) {
                                         focusRequesters[item.localId] = focusRequester
@@ -568,8 +594,8 @@ fun EditListScreen(
                                             } else {
                                                 (
                                                     {
-                                                        expectingNewItem = true
-                                                        vm.addItem()
+                                                        pendingFocusItemId = vm.addItemAfter(item.localId)
+                                                        isEditMode = true
                                                     }
                                                 )
                                             },
@@ -620,8 +646,8 @@ fun EditListScreen(
                                         .animateItem(
                                             placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                         ).tapSoundClickable {
-                                            expectingNewItem = true
-                                            vm.addItem()
+                                            pendingFocusItemId = vm.addItem()
+                                            isEditMode = true
                                         }.padding(vertical = 14.dp),
                             ) {
                                 RememberMaterialRoundedSymbol(
@@ -670,7 +696,7 @@ fun EditListScreen(
 
                         if (showChecked) {
                             items(
-                                items = completedEntries,
+                                items = visibleCompletedEntries,
                                 key = { entry ->
                                     when (entry) {
                                         is CompletedEntry.Ghost -> "ghost-${entry.header.realParentLocalId}"
@@ -722,8 +748,8 @@ fun EditListScreen(
                                                 } else {
                                                     (
                                                         {
-                                                            expectingNewItem = true
-                                                            vm.addItem()
+                                                            pendingFocusItemId = vm.addItemAfter(item.localId)
+                                                            isEditMode = true
                                                         }
                                                     )
                                                 },

@@ -21,6 +21,50 @@ data class ChecklistEditResult(
 )
 
 object ChecklistEditor {
+    fun insertAfter(
+        items: List<EditableItem>,
+        targetLocalId: Long,
+        newLocalId: Long,
+    ): ChecklistEditResult {
+        val sortedItems = items.sortedBy { item -> item.sortOrder }
+        val targetIndex = sortedItems.indexOfFirst { item -> item.localId == targetLocalId }
+        if (targetIndex < 0) {
+            return ChecklistEditResult(items = items, changed = false)
+        }
+        val target = sortedItems[targetIndex]
+        val anchor =
+            if (target.depth == 0) {
+                sortedItems
+                    .filter { item -> item.localId == target.localId || item.parentLocalId == target.localId }
+                    .maxBy { item -> item.sortOrder }
+            } else {
+                target
+            }
+        val anchorIndex = sortedItems.indexOfFirst { item -> item.localId == anchor.localId }
+        val nextOrder = sortedItems.getOrNull(anchorIndex + 1)?.sortOrder
+        val newSortOrder =
+            if (nextOrder != null) {
+                (anchor.sortOrder + nextOrder) / 2.0
+            } else {
+                anchor.sortOrder + 1.0
+            }
+        val newParentLocalId = target.parentLocalId.takeIf { target.depth == 1 }
+        val newDepth = if (newParentLocalId != null) 1 else 0
+        return ChecklistEditResult(
+            items =
+                items +
+                    EditableItem(
+                        localId = newLocalId,
+                        text = "",
+                        checked = false,
+                        sortOrder = newSortOrder,
+                        parentLocalId = newParentLocalId,
+                        depth = newDepth,
+                    ),
+            changed = true,
+        )
+    }
+
     /**
      * Parent-context toggle:
      *
@@ -184,6 +228,9 @@ object ChecklistEditor {
             }
         val reorderedIds =
             remainingIds.toMutableList().apply {
+                // Reinsert the full persisted group, not just visible rows. During a parent drag
+                // the UI may collapse active children, and checked children live in the completed
+                // section; both still need new sort orders so they remain attached after drop.
                 addAll(insertionIndex, movingGroupIds)
             }
         val sortOrdersById =

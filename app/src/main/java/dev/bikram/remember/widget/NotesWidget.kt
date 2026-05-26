@@ -2,6 +2,10 @@ package dev.bikram.remember.widget
 
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.annotation.Keep
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -10,7 +14,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.net.toUri
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -45,6 +51,7 @@ import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
+import androidx.glance.unit.ColorProvider
 import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.remember.MainActivity
 import dev.bikram.remember.R
@@ -52,7 +59,10 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.Visibility
 import dev.bikram.remember.di.NotesWidgetEntryPoint
-import dev.bikram.remember.ui.edit.iconEmojiPayload
+import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
+import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
+import dev.bikram.remember.ui.edit.NoteIcon
+import dev.bikram.remember.ui.edit.resolveNoteIcon
 import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
@@ -600,14 +610,9 @@ private fun ReminderCard(
                     .background(if (overdue) GlanceTheme.colors.error else GlanceTheme.colors.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = noteWidgetGlyph(note),
-                style =
-                    TextStyle(
-                        color = if (overdue) GlanceTheme.colors.onError else GlanceTheme.colors.primary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
+            NoteWidgetIcon(
+                note = note,
+                tint = if (overdue) GlanceTheme.colors.onError else GlanceTheme.colors.primary,
             )
         }
         Spacer(GlanceModifier.width(if (compact) 8.dp else 10.dp))
@@ -684,14 +689,9 @@ private fun StarredCard(
                     .background(GlanceTheme.colors.primaryContainer),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                text = noteWidgetGlyph(note),
-                style =
-                    TextStyle(
-                        color = GlanceTheme.colors.primary,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                    ),
+            NoteWidgetIcon(
+                note = note,
+                tint = GlanceTheme.colors.primary,
             )
         }
         Spacer(GlanceModifier.width(if (compact) 8.dp else 10.dp))
@@ -831,10 +831,125 @@ private fun Intent.addWidgetLaunchFlags(clearTask: Boolean = false) {
     addFlags(flags)
 }
 
-private fun noteWidgetGlyph(note: NoteWithItems): String {
-    val emoji = iconEmojiPayload(note.note.iconKey)
-    if (emoji != null) return emoji
-    return if (note.note.kind == NoteKind.LIST) "L" else "N"
+@Composable
+private fun NoteWidgetIcon(
+    note: NoteWithItems,
+    tint: ColorProvider,
+) {
+    val context = LocalContext.current
+    when (val icon = resolveNoteIcon(note.note.iconKey, note.note.kind)) {
+        is NoteIcon.Emoji ->
+            Text(
+                text = icon.text,
+                style =
+                    TextStyle(
+                        color = tint,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                    ),
+            )
+        is NoteIcon.Drawable ->
+            Image(
+                provider = ImageProvider(icon.resId),
+                contentDescription = null,
+                modifier = GlanceModifier.size(18.dp),
+                colorFilter = ColorFilter.tint(tint),
+            )
+        is NoteIcon.Symbol ->
+            MaterialSymbolWidgetImage(
+                context = context,
+                name = icon.name,
+                filled = icon.filled,
+                tint = tint,
+            )
+        NoteIcon.ListPlaceholder ->
+            MaterialSymbolWidgetImage(
+                context = context,
+                name = DEFAULT_LIST_HEADER_SYMBOL,
+                filled = true,
+                tint = tint,
+            )
+        NoteIcon.NotePlaceholder ->
+            MaterialSymbolWidgetImage(
+                context = context,
+                name = DEFAULT_NOTE_HEADER_SYMBOL,
+                filled = true,
+                tint = tint,
+            )
+    }
+}
+
+@Composable
+private fun MaterialSymbolWidgetImage(
+    context: Context,
+    name: String,
+    filled: Boolean,
+    tint: ColorProvider,
+) {
+    val appContext = context.applicationContext
+    val bitmap =
+        remember(appContext, name, filled) {
+            materialSymbolBitmap(
+                context = appContext,
+                name = name,
+                filled = filled,
+            )
+        }
+    if (bitmap != null) {
+        Image(
+            provider = ImageProvider(bitmap),
+            contentDescription = null,
+            modifier = GlanceModifier.size(18.dp),
+            colorFilter = ColorFilter.tint(tint),
+        )
+    } else {
+        Text(
+            text = "\u2022",
+            style =
+                TextStyle(
+                    color = tint,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                ),
+        )
+    }
+}
+
+private fun materialSymbolBitmap(
+    context: Context,
+    name: String,
+    filled: Boolean,
+): Bitmap? {
+    val typeface =
+        ResourcesCompat.getFont(
+            context,
+            if (filled) R.font.material_symbols_rounded else R.font.material_symbols_rounded_outlined,
+        ) ?: return null
+    return materialSymbolBitmap(
+        name = name,
+        typeface = typeface,
+    )
+}
+
+private fun materialSymbolBitmap(
+    name: String,
+    typeface: Typeface,
+): Bitmap {
+    val bitmap = Bitmap.createBitmap(WIDGET_SYMBOL_BITMAP_SIZE_PX, WIDGET_SYMBOL_BITMAP_SIZE_PX, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    val paint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            textAlign = Paint.Align.CENTER
+            textSize = WIDGET_SYMBOL_TEXT_SIZE_PX
+            this.typeface = typeface
+            fontFeatureSettings = "\"rlig\" 1, \"liga\" 1"
+        }
+    val baseline =
+        (WIDGET_SYMBOL_BITMAP_SIZE_PX / 2f) -
+            ((paint.fontMetrics.ascent + paint.fontMetrics.descent) / 2f)
+    canvas.drawText(name, WIDGET_SYMBOL_BITMAP_SIZE_PX / 2f, baseline, paint)
+    return bitmap
 }
 
 private fun noteWidgetTitle(
@@ -956,3 +1071,5 @@ private const val UPCOMING_WINDOW_MILLIS = 7L * DAY_MILLIS
 private const val WIDGET_KIND_AGENDA = "agenda"
 private const val WIDGET_KIND_QUICK_CAPTURE = "quick_capture"
 private const val WIDGET_KIND_STARRED = "starred"
+private const val WIDGET_SYMBOL_BITMAP_SIZE_PX = 64
+private const val WIDGET_SYMBOL_TEXT_SIZE_PX = 48f

@@ -319,11 +319,12 @@ class EditListViewModel
          * [max(sortOrder) + 1.0] per the weighted-position spec. Uses fresh negative [localId] so
          * drafts have stable identity until the row is persisted.
          */
-        fun addItem() {
+        fun addItem(): Long {
+            val localId = nextLocalId--
             val max = _items.value.maxOfOrNull { it.sortOrder } ?: 0.0
             _items.value = _items.value +
                 EditableItem(
-                    localId = nextLocalId--,
+                    localId = localId,
                     text = "",
                     checked = false,
                     sortOrder = max + 1.0,
@@ -331,6 +332,18 @@ class EditListViewModel
                     depth = 0,
                 )
             markDirty()
+            return localId
+        }
+
+        fun addItemAfter(localId: Long): Long {
+            val newLocalId = nextLocalId
+            val result = ChecklistEditor.insertAfter(_items.value, localId, newLocalId)
+            if (result.changed) {
+                nextLocalId--
+                applyChecklistEdit(result)
+                return newLocalId
+            }
+            return addItem()
         }
 
         fun updateItemText(
