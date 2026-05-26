@@ -109,8 +109,9 @@ fun ActionPicker(
             initialAction?.iconData.toNoteActionIconDrawable(resources)
         }
     DisposableEffect(savedShortcutIcon) {
+        val iconToRecycle = savedShortcutIcon
         onDispose {
-            savedShortcutIcon?.recycleNoteActionIconBitmap()
+            iconToRecycle?.recycleNoteActionIconBitmap()
         }
     }
 

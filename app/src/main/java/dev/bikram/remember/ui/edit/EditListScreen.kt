@@ -1,7 +1,5 @@
 package dev.bikram.remember.ui.edit
 
-import android.net.Uri
-import androidx.compose.animation.BoundsTransform
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -58,14 +55,8 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
-import dev.bikram.remember.data.Importance
-import dev.bikram.remember.data.NoteAction
-import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteKind
-import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.domain.checklist.EditableItem
-import dev.bikram.remember.notifications.canPostNotifications
-import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.common.NoteAdaptiveTheme
 import dev.bikram.remember.ui.common.NotePageBackground
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -85,7 +76,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
 import java.io.File
-import dev.bikram.remember.data.Visibility as NoteVisibility
 
 @Composable
 fun EditListRoute(
@@ -97,6 +87,36 @@ fun EditListRoute(
 ) {
     val vm: EditListViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
+    val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
+    val sharedModifier = rememberEditorSharedBoundsModifier(noteId)
+
+    androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
+        EditListScreen(
+            vm = vm,
+            appScope = appScope,
+            existing = noteId != null,
+            persistedForToolbar = hasPersistedRow,
+            activeTagSuggestions = activeTagSuggestions,
+            forceEdit = forceEdit,
+            onBack = onBack,
+            onNavigateUp = onNavigateUp,
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Suppress("CyclomaticComplexMethod")
+@Composable
+fun EditListScreen(
+    vm: EditListViewModel,
+    appScope: CoroutineScope,
+    existing: Boolean,
+    persistedForToolbar: Boolean,
+    activeTagSuggestions: List<String>,
+    forceEdit: Boolean = false,
+    onBack: () -> Unit,
+    onNavigateUp: () -> Unit = onBack,
+) {
     val title by vm.title.collectAsStateWithLifecycle()
     val starred by vm.starred.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
@@ -112,335 +132,28 @@ fun EditListRoute(
     val actions by vm.actions.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
     val attachments by vm.attachments.collectAsStateWithLifecycle()
-    val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
     val archived by vm.archived.collectAsStateWithLifecycle()
     val trashed by vm.trashed.collectAsStateWithLifecycle()
     val hasUnsavedChanges by vm.hasUnsavedChanges.collectAsStateWithLifecycle()
 
-    val snackbarHostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current
-    val changesSavedMsg =
-        androidx.compose.ui.res
-            .stringResource(dev.bikram.remember.R.string.changes_saved)
-    val undoMsg =
-        androidx.compose.ui.res
-            .stringResource(dev.bikram.remember.R.string.common_undo)
-    val untitledName =
-        androidx.compose.ui.res
-            .stringResource(dev.bikram.remember.R.string.edit_list_title_new)
-    // Snackbar templates for the bottom-bar actions. Reused from the bulk-action
-    // plurals since the count placeholder reads naturally with 1.
-    val msgArchived =
-        androidx.compose.ui.res
-            .pluralStringResource(dev.bikram.remember.R.plurals.bulk_action_archived, 1, 1)
-    val msgTrashed =
-        androidx.compose.ui.res
-            .pluralStringResource(dev.bikram.remember.R.plurals.bulk_action_trashed, 1, 1)
-    val msgUnarchived =
-        androidx.compose.ui.res
-            .pluralStringResource(dev.bikram.remember.R.plurals.bulk_action_unarchived, 1, 1)
-    val msgRestored =
-        androidx.compose.ui.res
-            .pluralStringResource(dev.bikram.remember.R.plurals.bulk_action_restored, 1, 1)
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var notificationPermissionSheetOpen by rememberSaveable { mutableStateOf(false) }
-    val notificationsAllowed = rememberNotificationsAllowed()
-    // BackHandler fires synchronously on back commit, where PredictiveBackHandler
-    // would suspend on its progress flow until the gesture finishes - producing a
-    // visible delay before the navigation reverse animation begins.
-    androidx.activity.compose.BackHandler(onBack = onBack)
-
-    val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
-    val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
-    val sharedBoundsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Rect>())
-    val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
-    val sharedModifier =
-        if (sharedScope != null && navScope != null && noteId != null) {
-            with(sharedScope) {
-                Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(key = "note-card-$noteId"),
-                    animatedVisibilityScope = navScope,
-                    boundsTransform = sharedBoundsTransform,
-                )
-            }
-        } else {
-            Modifier
-        }
-
-    // Save path used by the top-bar Save icon while in edit mode. Runs saveIfNeeded
-    // explicitly (vs. waiting for dispose) and flashes a toast so users get feedback
-    // that their Save tap did something beyond flipping edit mode off.
-    val onExplicitSave: () -> Unit = {
-        appScope.launch {
-            if (vm.saveIfNeeded(untitledName) != null) {
-                android.widget.Toast
-                    .makeText(
-                        context,
-                        changesSavedMsg,
-                        android.widget.Toast.LENGTH_SHORT,
-                    ).show()
-            }
-        }
-    }
-
-    DisposableEffect(vm) {
-        onDispose {
-            appScope.launch {
-                val undoAction = vm.saveIfNeeded(untitledName)
-                if (undoAction != null) {
-                    val result =
-                        snackbarHostState.showSnackbar(
-                            message = changesSavedMsg,
-                            actionLabel = undoMsg,
-                            withDismissAction = true,
-                            duration = androidx.compose.material3.SnackbarDuration.Short,
-                        )
-                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                        undoAction()
-                    }
-                }
-            }
-        }
-    }
-
-    androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
-        EditListScreen(
-            title = title,
-            starred = starred,
-            items = items,
-            reminderAt = reminderAt,
-            recurrence = recurrence,
-            importance = importance,
-            visibility = visibility,
-            pictureUri = pictureUri,
-            pictureRevision = pictureRevision,
-            pictureHeroFraming = pictureHeroFraming,
-            iconKey = iconKey,
-            actions = actions,
-            tags = tags,
-            activeTagSuggestions = activeTagSuggestions,
-            attachments = attachments,
-            archived = archived,
-            trashed = trashed,
-            existing = noteId != null,
-            persistedForToolbar = hasPersistedRow,
-            hasUnsavedChanges = hasUnsavedChanges,
-            forceEdit = forceEdit,
-            notificationsAllowed = notificationsAllowed,
-            onTitleChange = vm::setTitle,
-            onToggleStar = vm::toggleStar,
-            completed = completed,
-            onToggleCompleted = { appScope.launch { vm.toggleCompleted() } },
-            onAddItem = vm::addItem,
-            onItemTextChange = vm::updateItemText,
-            onItemToggle = vm::toggleChecked,
-            onItemRemove = vm::removeItem,
-            onReorderWithin = vm::reorderWithin,
-            onIndent = vm::indent,
-            onOutdent = vm::outdent,
-            onReminderChange = vm::setReminder,
-            onImportanceChange = vm::setImportance,
-            onVisibilityChange = vm::setVisibility,
-            onPictureChange = vm::setPictureUri,
-            onHeroCommitted = vm::setHeroWithFraming,
-            onIconKeyChange = vm::setIconKey,
-            onActionsChange = vm::setActions,
-            onTagsWithColorsChange = vm::saveTagsWithColors,
-            onEditExistingTag = vm::editExistingTag,
-            onAddAttachment = vm::addAttachment,
-            onRemoveAttachment = vm::removeAttachment,
-            onTrash = {
-                // Trash + back navigation. Snackbar host lives at the scaffold root
-                // and survives the screen pop, so the message appears on whichever
-                // screen is now on top (typically Home). Undo route calls
-                // restoreFromTrashCurrent on the (now disposed) VM; the suspend itself
-                // doesn't depend on viewModelScope so the call still completes.
-                val trashStartedFromArchive = archived
-                appScope.launch {
-                    vm.trashCurrent()
-                    val result =
-                        snackbarHostState.showSnackbar(
-                            message = msgTrashed,
-                            actionLabel = undoMsg,
-                            withDismissAction = true,
-                            duration = androidx.compose.material3.SnackbarDuration.Short,
-                        )
-                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                        if (trashStartedFromArchive) {
-                            vm.archiveCurrent(untitledName)
-                        } else {
-                            vm.restoreFromTrashCurrent()
-                        }
-                    }
-                }
-                onBack()
-            },
-            onArchive = {
-                // Archive follows the same leave-editor flow as Trash: pop back
-                // immediately, then let the root snackbar host offer Undo.
-                val archiveStartedFromTrash = trashed
-                appScope.launch {
-                    vm.archiveCurrent(untitledName)
-                    val result =
-                        snackbarHostState.showSnackbar(
-                            message = msgArchived,
-                            actionLabel = undoMsg,
-                            withDismissAction = true,
-                            duration = androidx.compose.material3.SnackbarDuration.Short,
-                        )
-                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                        if (archiveStartedFromTrash) {
-                            vm.trashCurrent()
-                        } else {
-                            vm.unarchiveCurrent()
-                        }
-                    }
-                }
-                onBack()
-            },
-            onNotification = {
-                if (canPostNotifications(context)) {
-                    appScope.launch { vm.fireNotification(context, untitledName) }
-                } else {
-                    notificationPermissionSheetOpen = true
-                }
-            },
-            onUnarchive = {
-                appScope.launch {
-                    vm.unarchiveCurrent()
-                    val result =
-                        snackbarHostState.showSnackbar(
-                            message = msgUnarchived,
-                            actionLabel = undoMsg,
-                            withDismissAction = true,
-                            duration = androidx.compose.material3.SnackbarDuration.Short,
-                        )
-                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                        vm.archiveCurrent(untitledName)
-                    }
-                }
-            },
-            onRestore = {
-                appScope.launch {
-                    vm.restoreFromTrashCurrent()
-                    val result =
-                        snackbarHostState.showSnackbar(
-                            message = msgRestored,
-                            actionLabel = undoMsg,
-                            withDismissAction = true,
-                            duration = androidx.compose.material3.SnackbarDuration.Short,
-                        )
-                    if (result == androidx.compose.material3.SnackbarResult.ActionPerformed) {
-                        vm.trashCurrent()
-                    }
-                }
-            },
-            onDeleteForever = {
-                // Delete-forever has no undo path, so no snackbar fires after - the
-                // AlertDialog inside [EditListScreen] is the user's confirmation moment.
-                appScope.launch { vm.deleteForeverCurrent() }
-                onBack()
-            },
-            onBack = onBack,
-            onNavigateUp = onNavigateUp,
-            onSave = onExplicitSave,
-        )
-    }
-    if (notificationPermissionSheetOpen) {
-        NotificationPermissionRequiredSheet(
-            onDismiss = { notificationPermissionSheetOpen = false },
-            titleRes = R.string.notification_permission_required_title,
-            bodyRes = R.string.notification_permission_required_body,
-        )
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Suppress("CyclomaticComplexMethod")
-@Composable
-fun EditListScreen(
-    title: String,
-    starred: Boolean,
-    items: List<EditableItem>,
-    reminderAt: Long?,
-    recurrence: RecurrenceRule?,
-    importance: Importance,
-    visibility: NoteVisibility,
-    pictureUri: String?,
-    pictureRevision: Long,
-    pictureHeroFraming: String?,
-    iconKey: String?,
-    actions: List<NoteAction>,
-    tags: List<String>,
-    activeTagSuggestions: List<String>,
-    attachments: List<NoteAttachmentEntity>,
-    archived: Boolean,
-    trashed: Boolean,
-    existing: Boolean,
-    persistedForToolbar: Boolean,
-    hasUnsavedChanges: Boolean,
-    forceEdit: Boolean = false,
-    notificationsAllowed: Boolean,
-    completed: Boolean,
-    onTitleChange: (String) -> Unit,
-    onToggleStar: () -> Unit,
-    onToggleCompleted: () -> Unit,
-    onAddItem: () -> Unit,
-    onItemTextChange: (Long, String) -> Unit,
-    onItemToggle: (Long) -> Unit,
-    onItemRemove: (Long) -> Unit,
-    /** Reorders within a single sublist. [visibleIds] is the filtered+sorted ordering the user
-     *  actually sees (active OR completed), and from/to are indices within that list. */
-    onReorderWithin: (visibleIds: List<Long>, fromIndex: Int, toIndex: Int) -> Unit,
-    /**
-     * Horizontal swipe-right indent. Picks the anchor parent from the CURRENT ViewModel state
-     * so it can't see a stale `activeList` snapshot captured by a pointerInput closure. Swipe-
-     * left is [onOutdent]. These replace the old "compute anchor in the UI" approach that
-     * silently reparented rows under the wrong sibling after a drag reorder.
-     */
-    onIndent: (localId: Long) -> Unit,
-    onOutdent: (localId: Long) -> Unit,
-    onReminderChange: (Long?, RecurrenceRule?) -> Unit,
-    onImportanceChange: (Importance) -> Unit,
-    onVisibilityChange: (NoteVisibility) -> Unit,
-    onPictureChange: (String?) -> Unit,
-    onHeroCommitted: (String, HeroFraming) -> Unit,
-    onIconKeyChange: (String?) -> Unit,
-    onActionsChange: (List<NoteAction>) -> Unit,
-    onTagsWithColorsChange: (List<String>, Map<String, String>) -> Unit,
-    onEditExistingTag: (String, String, String?, Boolean) -> Unit,
-    onAddAttachment: (Uri, String, String?) -> Unit,
-    onRemoveAttachment: (Long) -> Unit,
-    onTrash: () -> Unit,
-    onArchive: () -> Unit,
-    onNotification: () -> Unit,
-    onUnarchive: () -> Unit,
-    onRestore: () -> Unit,
-    onDeleteForever: () -> Unit,
-    onBack: () -> Unit,
-    onNavigateUp: () -> Unit = onBack,
-    onSave: () -> Unit = {},
-) {
     var reminderPickerOpen by rememberSaveable { mutableStateOf(false) }
     var iconPickerOpen by rememberSaveable { mutableStateOf(false) }
     var actionsPickerOpen by rememberSaveable { mutableStateOf(false) }
     var tagsPickerOpen by rememberSaveable { mutableStateOf(false) }
     var attachmentsPickerOpen by rememberSaveable { mutableStateOf(false) }
+    var notificationPermissionSheetOpen by rememberSaveable { mutableStateOf(false) }
     var deleteForeverConfirmOpen by rememberSaveable { mutableStateOf(false) }
+    val notificationsAllowed = rememberNotificationsAllowed()
 
     var pendingHeroSession by remember { mutableStateOf<Pair<String, File?>?>(null) }
     val launchHeroImagePick =
         rememberHeroImagePickThenCopy { uriString, copiedFile ->
             pendingHeroSession = uriString to copiedFile
         }
-    val launchAttachmentPicker = rememberAttachmentPicker(onAdd = onAddAttachment)
+    val launchAttachmentPicker = rememberAttachmentPicker(onAdd = vm::addAttachment)
     var pictureViewer by remember { mutableStateOf<Pair<String, Long>?>(null) }
 
-    val titlePlaceholder =
-        if (existing) {
-            stringResource(R.string.common_title)
-        } else {
-            stringResource(R.string.edit_list_title_new)
-        }
+    val titlePlaceholder = stringResource(R.string.common_title)
     val blurStyle =
         rememberProgressiveBlurStyle(
             bottomExtra = 0.dp,
@@ -512,6 +225,35 @@ fun EditListScreen(
 
     val density = LocalDensity.current
     val imeVisible = WindowInsets.ime.getBottom(density) > 0
+    val untitledName = stringResource(R.string.edit_list_title_new)
+    val editorActions =
+        rememberEditorActionHandlers(
+            appScope = appScope,
+            archived = archived,
+            trashed = trashed,
+            untitledName = untitledName,
+            onBack = onBack,
+            onNavigateUp = onNavigateUp,
+            onNotificationPermissionRequired = { notificationPermissionSheetOpen = true },
+            saveIfNeeded = vm::saveIfNeeded,
+            archiveCurrent = vm::archiveCurrent,
+            trashCurrent = vm::trashCurrent,
+            unarchiveCurrent = vm::unarchiveCurrent,
+            restoreFromTrashCurrent = vm::restoreFromTrashCurrent,
+            deleteForeverCurrent = vm::deleteForeverCurrent,
+            fireNotification = vm::fireNotification,
+        )
+    val titleCollapseProgress by remember(lazyListStateForVisibility) {
+        derivedStateOf {
+            if (lazyListStateForVisibility.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                val offsetPx = lazyListStateForVisibility.firstVisibleItemScrollOffset.toFloat()
+                val thresholdPx = with(density) { 72.dp.toPx() }
+                (offsetPx / thresholdPx).coerceIn(0f, 1f)
+            }
+        }
+    }
 
     // Edit mode replaces the action bar: the list's inline "Add item" and the top-bar Save
     // action take over, and the keyboard toolbar stays on the bottom unobstructed. Stacking
@@ -524,8 +266,9 @@ fun EditListScreen(
     // users get feedback that their Save tap did something beyond dismissing the toolbar.
     val saveAndExitEditMode: () -> Unit = {
         isEditMode = false
-        onSave()
+        editorActions.saveAndShowToast()
     }
+    androidx.activity.compose.BackHandler(onBack = editorActions.saveAndBack)
 
     val adaptiveNoteThemes = LocalThemeState.current.adaptiveNoteThemes
     val imageDerivedColors =
@@ -553,8 +296,8 @@ fun EditListScreen(
                         readOnly = readOnly,
                         hasUnsavedChanges = hasUnsavedChanges,
                         titleFocusOffset = pendingTitleFocusOffset,
-                        onTitleChange = onTitleChange,
-                        onBack = onNavigateUp,
+                        onTitleChange = vm::setTitle,
+                        onBack = editorActions.saveAndNavigateUp,
                         onTitleTappedInViewMode = { titleOffset ->
                             pendingTitleFocusOffset = titleOffset
                             isEditMode = true
@@ -565,6 +308,7 @@ fun EditListScreen(
                         onOpenIcon = { iconPickerOpen = true },
                         onSave = saveAndExitEditMode,
                         showEditableWhenTitleEmpty = true,
+                        titleCollapseProgress = titleCollapseProgress,
                     )
                 },
                 bottomBar = {
@@ -581,13 +325,15 @@ fun EditListScreen(
                                 // Action bar is hidden while isEditMode, so this callback only fires from
                                 // view mode - always turning edit mode ON. Save is owned by the top bar.
                                 onToggleEdit = { if (!isEditMode) isEditMode = true else saveAndExitEditMode() },
-                                onToggleStar = onToggleStar,
-                                onToggleCompleted = onToggleCompleted,
-                                onArchive = onArchive,
-                                onNotification = onNotification,
-                                onUnarchive = onUnarchive,
-                                onTrash = onTrash,
-                                onRestore = onRestore,
+                                onToggleStar = { vm.toggleStar() },
+                                onToggleCompleted = {
+                                    appScope.launch { vm.toggleCompleted() }
+                                },
+                                onArchive = editorActions.archiveAndBack,
+                                onNotification = editorActions.notifyOrRequestPermission,
+                                onUnarchive = editorActions.unarchive,
+                                onTrash = editorActions.trashAndBack,
+                                onRestore = editorActions.restore,
                                 onDeleteForever = { deleteForeverConfirmOpen = true },
                                 showEditAction = false,
                             )
@@ -699,7 +445,7 @@ fun EditListScreen(
                                     Triple(completedRowIds, completedRowIds.indexOf(fromId), completedRowIds.indexOf(toId))
                                 else -> return@rememberReorderableLazyListState
                             }
-                        if (fromIdx >= 0 && toIdx >= 0) onReorderWithin(list, fromIdx, toIdx)
+                        if (fromIdx >= 0 && toIdx >= 0) vm.reorderWithin(list, fromIdx, toIdx)
                     }
 
                 androidx.compose.foundation.lazy.LazyColumn(
@@ -813,9 +559,9 @@ fun EditListScreen(
                                         focusRequester = focusRequester,
                                         isDragging = isDragging,
                                         dragHandleModifier = if (readOnly) Modifier else Modifier.draggableHandle(),
-                                        onTextChange = if (readOnly) ({ _ -> }) else ({ onItemTextChange(item.localId, it) }),
-                                        onToggle = if (readOnly) ({}) else ({ onItemToggle(item.localId) }),
-                                        onRemove = if (readOnly) ({}) else ({ onItemRemove(item.localId) }),
+                                        onTextChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemText(item.localId, it) }),
+                                        onToggle = if (readOnly) ({}) else ({ vm.toggleChecked(item.localId) }),
+                                        onRemove = if (readOnly) ({}) else ({ vm.removeItem(item.localId) }),
                                         onNext =
                                             if (readOnly) {
                                                 ({})
@@ -823,7 +569,7 @@ fun EditListScreen(
                                                 (
                                                     {
                                                         expectingNewItem = true
-                                                        onAddItem()
+                                                        vm.addItem()
                                                     }
                                                 )
                                             },
@@ -851,9 +597,9 @@ fun EditListScreen(
                                                         // siblings are reordered, so swiping right after a drag
                                                         // picked the wrong prior top-level row as the anchor.
                                                         if (deltaDepth > 0) {
-                                                            onIndent(item.localId)
+                                                            vm.indent(item.localId)
                                                         } else if (deltaDepth < 0) {
-                                                            onOutdent(item.localId)
+                                                            vm.outdent(item.localId)
                                                         }
                                                     }
                                                 )
@@ -875,7 +621,7 @@ fun EditListScreen(
                                             placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                         ).tapSoundClickable {
                                             expectingNewItem = true
-                                            onAddItem()
+                                            vm.addItem()
                                         }.padding(vertical = 14.dp),
                             ) {
                                 RememberMaterialRoundedSymbol(
@@ -967,9 +713,9 @@ fun EditListScreen(
                                             isDragging = false,
                                             dragHandleModifier = Modifier,
                                             showDragHandle = false,
-                                            onTextChange = if (readOnly) ({ _ -> }) else ({ onItemTextChange(item.localId, it) }),
-                                            onToggle = if (readOnly) ({}) else ({ onItemToggle(item.localId) }),
-                                            onRemove = if (readOnly) ({}) else ({ onItemRemove(item.localId) }),
+                                            onTextChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemText(item.localId, it) }),
+                                            onToggle = if (readOnly) ({}) else ({ vm.toggleChecked(item.localId) }),
+                                            onRemove = if (readOnly) ({}) else ({ vm.removeItem(item.localId) }),
                                             onNext =
                                                 if (readOnly) {
                                                     ({})
@@ -977,7 +723,7 @@ fun EditListScreen(
                                                     (
                                                         {
                                                             expectingNewItem = true
-                                                            onAddItem()
+                                                            vm.addItem()
                                                         }
                                                     )
                                                 },
@@ -1017,8 +763,8 @@ fun EditListScreen(
                             readOnly = readOnly,
                             starred = starred,
                             onOpenReminder = { reminderPickerOpen = true },
-                            onImportanceChange = onImportanceChange,
-                            onVisibilityChange = onVisibilityChange,
+                            onImportanceChange = vm::setImportance,
+                            onVisibilityChange = vm::setVisibility,
                             onOpenPicture = launchHeroImagePick,
                             onOpenActions = { actionsPickerOpen = true },
                             onOpenTags = { tagsPickerOpen = true },
@@ -1036,7 +782,7 @@ fun EditListScreen(
                 actionsPickerOpen = actionsPickerOpen,
                 tagsPickerOpen = tagsPickerOpen,
                 attachmentsPickerOpen = attachmentsPickerOpen,
-                notificationPermissionSheetOpen = false,
+                notificationPermissionSheetOpen = notificationPermissionSheetOpen,
                 deleteForeverConfirmOpen = deleteForeverConfirmOpen,
                 pendingHeroSession = pendingHeroSession,
                 pictureViewer = pictureViewer,
@@ -1050,23 +796,23 @@ fun EditListScreen(
                 currentActions = actions,
                 currentTags = tags,
                 heroImageContentDescription = stringResource(R.string.viewer_cover_image_cd),
-                onReminderChange = onReminderChange,
-                onIconKeyChange = onIconKeyChange,
-                onActionsChange = onActionsChange,
-                onTagsWithColorsChange = onTagsWithColorsChange,
-                onEditExistingTag = onEditExistingTag,
-                onAddAttachment = onAddAttachment,
-                onRemoveAttachment = onRemoveAttachment,
-                onHeroCommitted = onHeroCommitted,
-                onPictureChange = onPictureChange,
+                onReminderChange = vm::setReminder,
+                onIconKeyChange = vm::setIconKey,
+                onActionsChange = vm::setActions,
+                onTagsWithColorsChange = vm::saveTagsWithColors,
+                onEditExistingTag = vm::editExistingTag,
+                onAddAttachment = vm::addAttachment,
+                onRemoveAttachment = vm::removeAttachment,
+                onHeroCommitted = vm::setHeroWithFraming,
+                onPictureChange = vm::setPictureUri,
                 onOpenPicture = launchHeroImagePick,
-                onDeleteForever = onDeleteForever,
+                onDeleteForever = editorActions.deleteForeverAndBack,
                 onDismissReminder = { reminderPickerOpen = false },
                 onDismissIcon = { iconPickerOpen = false },
                 onDismissActions = { actionsPickerOpen = false },
                 onDismissTags = { tagsPickerOpen = false },
                 onDismissAttachments = { attachmentsPickerOpen = false },
-                onDismissNotificationPermission = {},
+                onDismissNotificationPermission = { notificationPermissionSheetOpen = false },
                 onDismissPendingHero = { pendingHeroSession = null },
                 onDismissDeleteForever = { deleteForeverConfirmOpen = false },
                 onDismissPictureViewer = { pictureViewer = null },

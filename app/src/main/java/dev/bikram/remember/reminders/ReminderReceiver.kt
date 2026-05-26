@@ -36,6 +36,7 @@ import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.edit.iconEmojiPayload
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -598,11 +599,32 @@ class ReminderReceiver : BroadcastReceiver() {
                     else -> null
                 }
             return if (bitmap != null) {
-                IconCompat.createWithBitmap(bitmap)
+                bitmap.toNotificationIconCompatOrNull()
+                    ?: IconCompat.createWithResource(context, R.drawable.ic_stat_remember)
             } else {
                 IconCompat.createWithResource(context, R.drawable.ic_stat_remember)
             }
         }
+
+        private fun Bitmap.toNotificationIconCompatOrNull(): IconCompat? =
+            try {
+                ByteArrayOutputStream().use { output ->
+                    if (!compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                        null
+                    } else {
+                        val bytes = output.toByteArray()
+                        if (bytes.isEmpty()) {
+                            null
+                        } else {
+                            IconCompat.createWithData(bytes, 0, bytes.size)
+                        }
+                    }
+                }
+            } catch (_: Throwable) {
+                null
+            } finally {
+                recycle()
+            }
 
         private fun appNotificationIconBitmap(
             context: Context,

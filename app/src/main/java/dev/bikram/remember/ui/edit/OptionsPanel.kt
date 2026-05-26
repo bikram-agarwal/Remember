@@ -131,8 +131,9 @@ fun OptionsPanel(
             firstAction?.let { action -> actionOptionsIcon(context, action) }
         }
     DisposableEffect(firstActionIcon) {
+        val iconToRecycle = firstActionIcon
         onDispose {
-            firstActionIcon?.recycleNoteActionIconBitmap()
+            iconToRecycle?.recycleNoteActionIconBitmap()
         }
     }
 

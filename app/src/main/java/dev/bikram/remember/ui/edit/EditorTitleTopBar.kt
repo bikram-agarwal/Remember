@@ -28,12 +28,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -59,6 +61,7 @@ import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
 private const val EDITOR_TITLE_MAX_LINES = 2
 
@@ -83,6 +86,7 @@ internal fun EditorTitleTopBar(
     modifier: Modifier = Modifier,
     onTitleFocusChanged: (Boolean) -> Unit = {},
     showEditableWhenTitleEmpty: Boolean = false,
+    titleCollapseProgress: Float = 0f,
     markdownDisplayMode: MarkdownEditorDisplayMode? = null,
     onToggleMarkdownDisplayMode: (() -> Unit)? = null,
 ) {
@@ -129,6 +133,8 @@ internal fun EditorTitleTopBar(
     LaunchedEffect(titleEditable) {
         if (!titleEditable) onTitleFocusChanged(false)
     }
+    val clampedTitleCollapseProgress = titleCollapseProgress.coerceIn(0f, 1f)
+    val expandedTitleProgress = 1f - clampedTitleCollapseProgress
 
     Box(modifier = modifier) {
         val titleStyle =
@@ -136,10 +142,31 @@ internal fun EditorTitleTopBar(
                 color = MaterialTheme.colorScheme.onSurface,
                 lineBreak = LineBreak.Simple,
             )
+        val collapsedTitle = title.ifEmpty { titlePlaceholder }
+        val collapsedTitleStyle =
+            MaterialTheme.typography.titleMedium.copy(
+                color =
+                    if (title.isEmpty()) {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            )
         Column {
             TopAppBar(
                 colors = transparentLargeTopAppBarColors(),
-                title = {},
+                title = {
+                    Text(
+                        text = collapsedTitle,
+                        style = collapsedTitleStyle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer { alpha = clampedTitleCollapseProgress },
+                    )
+                },
                 navigationIcon = {
                     RememberIconButton(
                         onClick = onBack,
@@ -208,7 +235,14 @@ internal fun EditorTitleTopBar(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
+                        .clipToBounds()
+                        .verticalCollapse(expandedTitleProgress)
+                        .graphicsLayer {
+                            alpha = expandedTitleProgress
+                            translationY = -12.dp.toPx() * clampedTitleCollapseProgress
+                            scaleX = 1f - (0.06f * clampedTitleCollapseProgress)
+                            scaleY = 1f - (0.06f * clampedTitleCollapseProgress)
+                        }.padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
             ) {
                 EditorHeaderIcon(
                     iconKey = iconKey,
@@ -348,6 +382,15 @@ internal fun EditorTitleTopBar(
         }
     }
 }
+
+private fun Modifier.verticalCollapse(progress: Float): Modifier =
+    layout { measurable, constraints ->
+        val placeable = measurable.measure(constraints)
+        val height = (placeable.height * progress.coerceIn(0f, 1f)).roundToInt()
+        layout(placeable.width, height) {
+            placeable.placeRelative(0, 0)
+        }
+    }
 
 private fun sanitizeEditorTitle(text: String): String = text.replace('\r', ' ').replace('\n', ' ')
 

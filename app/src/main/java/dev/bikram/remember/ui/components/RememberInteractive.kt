@@ -73,7 +73,7 @@ fun rememberResponsiveActionButtonSize(
             screenWidth < 430.dp -> compactSize
             else -> defaultSize
         }
-    return minOf(defaultSize, targetSize)
+    return targetSize
 }
 
 @Composable
@@ -89,7 +89,7 @@ fun rememberResponsiveActionIconSize(
             screenWidth < 430.dp -> compactSize
             else -> defaultSize
         }
-    return minOf(defaultSize, targetSize)
+    return targetSize
 }
 
 @Composable

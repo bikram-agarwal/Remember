@@ -65,6 +65,7 @@ import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
+import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.elevatedCardColors
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -114,8 +115,13 @@ fun NoteCard(
     val heroEnabled = LocalHeroOnCards.current
     val heroPictureUri = model.pictureUri?.takeIf { heroEnabled }
     val showHero = heroPictureUri != null
+    val adaptiveNoteThemes = LocalThemeState.current.adaptiveNoteThemes
     val surface = MaterialTheme.colorScheme.surface
-    val imageDerivedColors = rememberImageDerivedColors(heroPictureUri, model.pictureCacheRevision)
+    val imageDerivedColors =
+        rememberImageDerivedColors(
+            imageUri = if (adaptiveNoteThemes) heroPictureUri else null,
+            cacheRevision = model.pictureCacheRevision,
+        )
     val cardContentColor = if (showHero) imageDerivedColors?.onImageColor ?: Color.White else cardColors.contentColor
     val heroScrimColor = if (showHero) imageDerivedColors?.imageScrimColor ?: Color.Black else surface
     val cardShape = MaterialTheme.shapes.medium
