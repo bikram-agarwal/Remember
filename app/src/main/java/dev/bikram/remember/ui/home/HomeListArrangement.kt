@@ -319,7 +319,7 @@ private fun arrangeByTag(activeNotes: List<NoteWithItems>): List<HomeListItem> {
     }
 }
 
-private fun sortNotes(
+internal fun sortNotes(
     notes: List<NoteWithItems>,
     opts: ViewOptions,
 ): List<NoteWithItems> = notes.sortedWith(buildComparator(opts))

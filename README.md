@@ -6,45 +6,71 @@
 
 You're clearing your notification shade — swiping away emails, messages, news — and a reminder goes with them. You didn't mean to. Now you're not sure what it said, just that it was probably important. That brief flash of *"wait, what was that?"* is the problem Remember solves.
 
-If a reminder notification gets swiped away without being marked `Done`, Remember brings it back. Not as nagging — just a quiet signal that something is still waiting. Mark it done and it's gone for good.
+If a reminder notification gets swiped away without being marked Done, Remember brings it back. Not as nagging — just a quiet signal that something is still waiting. Mark it done and it's gone for good.
 
----
+## ✨ Features
 
-## Reminders that actually work
+### ⏰ Reminders that actually work
 
 - **Keep reminders until done.** The feature the app is built around. Enable it, and accidental dismissals stop mattering — Remember re-posts the notification until the note is marked done.
+- **Snooze that speaks human.** Presets like *soon*, *later today*, *this evening*, *tomorrow morning*, or pick a custom date and time — not arbitrary minute counts.
 - **Action buttons in the notification.** A reminder to call someone shows a call button right there. A reminder to pick something up shows directions. You can act on the reminder right from the notification.
-- **Snooze that speaks human.** Presets like *soon*, *later today*, *this evening*, and *tomorrow morning* — not arbitrary minute counts.
 - **High-importance mode.** Heads-up alerts, sound, and vibration for the things that cannot wait.
-- **Recurring reminders.** Simple intervals (*daily, weekly, monthly, yearly*) or calendar-grade patterns like *the last Friday of every month* — the kind most reminder apps can't do. With an end date or count. When you mark one done, the next is already scheduled.
+- **Recurring reminders.** Simple intervals (*daily, weekly, monthly, yearly*) or calendar-grade patterns like *the last Friday of every month* — the kind most reminder apps can't do. With an end date or repeat count. When you mark one done, the next is automatically scheduled.
 - **Reminder summary.** A silent, persistent notification in the shade showing everything overdue and coming up — no sound, no interruption, just always there to keep you informed.
 - **Reliable on Android.** Remember requests the permissions that make scheduled reminders actually fire — exact alarm access, battery optimization exemptions — and walks you through enabling them.
 
----
 
-## Notes and lists that carry the full context
+### 📝 Notes and lists that carry the full context
 
 Reminders are more useful when they carry information. Remember's notes and lists are the container for that.
 
 - **Markdown notes** with headings, formatting, links, and code blocks — so a reminder about a meeting can include the agenda.
-- **Checklists** with nested items and reordering — so a grocery run or a packing list can live inside the reminder itself.
-- **Attachments and pictures** show up on the note card and inside reminder notifications.
-- Tags, favorites, archive, search, filters, and flexible sorting keep everything findable.
-- Home-screen widgets for upcoming reminders, quick capture, and starred notes.
+- **Checklists** with nested items and drag-to-reorder — so a grocery run or a packing list can live inside the reminder itself.
+- **Attachments and pictures** show up on the note card and inside reminder notifications. Cover images can be repositioned to frame exactly how you want.
+- **Note icons** from hundreds of Material Symbols or the full emoji set — so every note is visually distinct at a glance.
 
----
 
-## Looks the way you want it to
+### 🗂️ Always findable
 
-Remember has a deep theme engine — Material You wallpaper colors, eight hand-tuned presets, custom hex color input, nine palette styles, gradient backgrounds, progressive blur bars, and more. Keep it minimal, make it colorful, or match it to your phone. It's a personal app; it should feel personal.
+- **Full-text search** across note titles, bodies, checklist items, tags, and action details.
+- **Tags with colors** for grouping notes any way you like.
+- **Star** notes for quick access. **Archive** ones you want to keep but not see. Or send to **Trash** that clears after 30 days automatically.
+- **Filter** by type, tag, starred status, has-reminder, has-picture, or has-attachment.
+- **Sort and group** by last modified, created date, or reminder time — grouped by date, type, or tag.
 
----
 
-## No account required
+### 🎨 Looks the way you want it to
 
-Notes are stored on-device. No Remember servers. Manual backup and restore let you move or protect your data on your own terms. Import from Google Tasks if you're switching over.
+Remember has a deep theme engine — keep it minimal, make it colorful, or match it to your phone exactly.
 
----
+- **Theme modes:** System, Light, Dark, or Black (OLED-optimized).
+- **Color sources:** Material You wallpaper colors (Android 12+), eight hand-tuned presets, or custom hex input with multiple saved values.
+- **Nine palette styles** — Tonal Spot, Vibrant, Expressive, Monochrome, and more.
+- **Visual effects:** gradient backgrounds, enhanced shading, frosted-glass blur bars, and cover images on cards.
+- **Adaptive note themes:** note cards can pick up colors from their cover image automatically.
+
+### 🔒 Privacy and security
+
+- **App lock** with device credential unlock, and biometric authentication. No need to create a new PIN. 
+- **Note visibility levels:** Default (full notification), Private (hides notification body), or Secret (hides everything — no widget or notification content).
+- **No account required.** Notes are stored on-device. No Remember servers, no cloud sync unless you set it up yourself.
+
+### 💾 Backup and import
+
+- **Manual backup and restore**: export to any folder, including cloud drives.
+- **Auto-export** on every change, or on a schedule via background worker.
+- **Media inclusion**: optionally embed pictures and attachments in the backup file.
+- **Import from Google Tasks**: via OAuth sign-in or a Takeout JSON file, with three import modes: one note per task, grouped by list, or a list as a checklist.
+
+
+### 🏠 Widgets and shortcuts
+
+- **Agenda widget**: upcoming and overdue reminders at a glance, in a 7-day window.
+- **Starred widget**: your favorite notes on the home screen.
+- **Quick capture widget**: one tap to create a new note or list.
+- **Launcher shortcuts**: long-press the app icon to jump straight to a new note or list.
+
 
 ## 🖼️ Screenshots
 
@@ -81,16 +107,17 @@ Notes are stored on-device. No Remember servers. Manual backup and restore let y
 <img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/8_settings.png" alt="Extensive theming options. Make it your own." width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/9_notification.png" alt="Rich notifications with media support and quick actions" width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/9_widgets.png" alt="Widgets to keep you informed and in control." width="300" /><br />
 </td>
 </tr>
 </table>
 
---- 
-
-## Download
-
-Coming soon
 ---
 
-**Links:** [Project site](https://bikram-agarwal.github.io/remember/) · [Privacy policy](https://bikram-agarwal.github.io/remember/privacy)
+## 📥 Download / links
+
+- [**Play Store**](https://play.google.com/store/apps/details?id=dev.bikram.remember) (Not live yet. Coming soon.)
+- [**GitHub**](https://bikram-agarwal.github.io/remember/releases/latest) 
+
+- [Project site](https://bikram-agarwal.github.io/remember/)
+- [Privacy policy](https://bikram-agarwal.github.io/remember/privacy)
