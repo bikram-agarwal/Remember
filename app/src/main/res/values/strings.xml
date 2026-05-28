@@ -299,7 +299,9 @@
     <string name="home_bulk_trash">Move to trash</string>
     <string name="home_bulk_tag">Tag / untag</string>
     <string name="home_bulk_tag_sheet_title">Bulk edit tags</string>
-    <string name="home_bulk_tag_sheet_subtitle">Tap to cycle: (+) Add to all, (x) Remove from all, tap again to reset</string>
+    <string name="home_bulk_tag_sheet_subtitle_intro">Tap to cycle:</string>
+    <string name="home_bulk_tag_sheet_subtitle_add">Add to all,</string>
+    <string name="home_bulk_tag_sheet_subtitle_remove">Remove from all, tap again to reset</string>
     <string name="home_bulk_tag_apply">Apply</string>
     <string name="home_bulk_tag_create_pill">+ Create new tag</string>
     <string name="home_bulk_tag_create_pill_cd">Create a new tag</string>
@@ -706,7 +708,7 @@
     <string name="appearance_shading_title">Enhanced shading</string>
     <string name="appearance_shading_subtitle">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="appearance_shading_intensity_title">Surface shading</string>
-    <string name="appearance_shading_intensity_subtitle">Adjust the amount of color tint mixed into backgrounds</string>
+    <string name="appearance_shading_intensity_subtitle">Adjust how strongly theme colors tint surfaces</string>
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>
     <string name="appearance_remove_custom_color_message">It will be removed from your saved custom colors</string>
     <string name="appearance_add_custom_color_cd">Add custom color</string>

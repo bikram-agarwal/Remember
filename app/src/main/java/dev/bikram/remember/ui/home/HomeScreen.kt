@@ -294,6 +294,21 @@ fun HomeScreen(
     LaunchedEffect(selectableVisibleIds) {
         onPruneSelection(selectableVisibleIds)
     }
+    val bulkTagCoverage by
+        remember(displayedItems, state.availableTags, state.selectedIds) {
+            derivedStateOf {
+                val selectedTagsByNoteId = LinkedHashMap<Long, List<String>>()
+                displayedItems.forEach { item ->
+                    if (item is HomeListItem.NoteRow && item.card.id in state.selectedIds) {
+                        selectedTagsByNoteId.putIfAbsent(item.card.id, item.note.note.tags)
+                    }
+                }
+                buildBulkTagCoverage(
+                    availableTags = state.availableTags,
+                    selectedNoteTags = selectedTagsByNoteId.values.toList(),
+                )
+            }
+        }
     // Note ids that appear in more than one row of [displayedItems]. Only multi-tag
     // notes under the by-tag grouping land here; everything else is mutually exclusive
     // (a note is either active or done, either overdue or upcoming). For unique ids we
@@ -732,7 +747,8 @@ fun HomeScreen(
 
     if (tagSheetOpen) {
         BulkTagSheet(
-            availableTags = state.availableTags,
+            tagCoverage = bulkTagCoverage,
+            selectedNoteCount = state.selectedIds.size,
             onApply = onApplyTagsToSelection,
             onDismiss = { tagSheetOpen = false },
         )

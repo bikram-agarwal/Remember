@@ -49,6 +49,7 @@ fun AppBottomSheet(
     scrollable: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
     subtitleSpacing: Dp = 6.dp,
+    subtitleContent: (@Composable () -> Unit)? = null,
     titleAccessory: (@Composable RowScope.() -> Unit)? = null,
     titleActions: (@Composable RowScope.() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
@@ -85,13 +86,17 @@ fun AppBottomSheet(
                         titleAccessory?.invoke(this)
                         titleActions?.invoke(this)
                     }
-                    if (subtitle != null) {
+                    if (subtitle != null || subtitleContent != null) {
                         Spacer(Modifier.size(subtitleSpacing))
-                        Text(
-                            subtitle,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
+                        if (subtitleContent != null) {
+                            subtitleContent()
+                        } else if (subtitle != null) {
+                            Text(
+                                subtitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
                     }
                 }
                 Spacer(Modifier.size(8.dp))

@@ -56,6 +56,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.data.normalizeHex
+import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
@@ -78,12 +79,83 @@ import kotlinx.coroutines.delay
  * alone on every selected note", [ADD] forces the tag onto every selection, [REMOVE] strips it
  * from every selection that had it.
  */
-private enum class BulkTagIntent { NEUTRAL, ADD, REMOVE }
+internal enum class BulkTagIntent { NEUTRAL, ADD, REMOVE }
 
-private fun BulkTagIntent.next(): BulkTagIntent =
+internal data class BulkTagIntentActions(
+    val addTags: Set<String>,
+    val removeTags: Set<String>,
+    val newTagColors: Map<String, String>,
+)
+
+internal fun bulkTagIntentKey(tag: String): String = normalizeTagName(tag)
+
+internal fun resolveBulkTagIntentActions(
+    coverage: List<BulkTagCoverage>,
+    extraAddedTags: List<String>,
+    tagIntents: Map<String, BulkTagIntent>,
+    newTagColorsByKey: Map<String, String>,
+): BulkTagIntentActions {
+    val tagLabelsByKey = LinkedHashMap<String, String>()
+    coverage.forEach { item ->
+        val trimmedTag = item.tag.trim()
+        if (trimmedTag.isNotBlank()) {
+            tagLabelsByKey.putIfAbsent(bulkTagIntentKey(trimmedTag), trimmedTag)
+        }
+    }
+    extraAddedTags.forEach { tag ->
+        val trimmedTag = tag.trim()
+        if (trimmedTag.isNotBlank()) {
+            tagLabelsByKey.putIfAbsent(bulkTagIntentKey(trimmedTag), trimmedTag)
+        }
+    }
+
+    val addKeys =
+        tagIntents
+            .filterValues { intent -> intent == BulkTagIntent.ADD }
+            .keys
+            .toSet()
+    val removeKeys =
+        tagIntents
+            .filterValues { intent -> intent == BulkTagIntent.REMOVE }
+            .keys
+            .toSet()
+    val addTags = addKeys.mapNotNull { key -> tagLabelsByKey[key] }.toSet()
+    val removeTags = removeKeys.mapNotNull { key -> tagLabelsByKey[key] }.toSet()
+    val newTagColors =
+        addKeys
+            .mapNotNull { key ->
+                val tag = tagLabelsByKey[key]
+                val hex = newTagColorsByKey[key]
+                if (tag != null && hex != null) tag to hex else null
+            }.toMap()
+
+    return BulkTagIntentActions(
+        addTags = addTags,
+        removeTags = removeTags,
+        newTagColors = newTagColors,
+    )
+}
+
+private fun BulkTagCoverageState.neutralTapIntent(): BulkTagIntent =
     when (this) {
-        BulkTagIntent.NEUTRAL -> BulkTagIntent.ADD
-        BulkTagIntent.ADD -> BulkTagIntent.REMOVE
+        BulkTagCoverageState.ALL -> BulkTagIntent.REMOVE
+        BulkTagCoverageState.SOME -> BulkTagIntent.ADD
+        BulkTagCoverageState.NONE -> BulkTagIntent.ADD
+    }
+
+private fun nextBulkTagIntent(
+    coverageState: BulkTagCoverageState,
+    intent: BulkTagIntent,
+): BulkTagIntent =
+    when (intent) {
+        BulkTagIntent.NEUTRAL -> coverageState.neutralTapIntent()
+        BulkTagIntent.ADD ->
+            when (coverageState) {
+                BulkTagCoverageState.SOME -> BulkTagIntent.REMOVE
+                BulkTagCoverageState.ALL,
+                BulkTagCoverageState.NONE,
+                -> BulkTagIntent.NEUTRAL
+            }
         BulkTagIntent.REMOVE -> BulkTagIntent.NEUTRAL
     }
 
@@ -96,26 +168,55 @@ private fun BulkTagIntent.next(): BulkTagIntent =
  */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun BulkTagSheet(
-    availableTags: List<String>,
+internal fun BulkTagSheet(
+    tagCoverage: List<BulkTagCoverage>,
+    selectedNoteCount: Int,
     onApply: (addTags: Set<String>, removeTags: Set<String>, newTagColors: Map<String, String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val extraAdded = remember { mutableStateListOf<String>() }
-    val mergedTags by remember {
+    val mergedCoverage by remember(tagCoverage, selectedNoteCount) {
         derivedStateOf {
-            (availableTags + extraAdded).distinct().sortedBy { it.lowercase() }
+            val existingCoverage = LinkedHashMap<String, BulkTagCoverage>()
+            (
+                tagCoverage +
+                    extraAdded.map { tag ->
+                        BulkTagCoverage(
+                            tag = tag,
+                            matchCount = 0,
+                            totalCount = selectedNoteCount,
+                            state = BulkTagCoverageState.NONE,
+                        )
+                    }
+            ).forEach { coverage ->
+                val trimmedTag = coverage.tag.trim()
+                if (trimmedTag.isNotBlank()) {
+                    existingCoverage.putIfAbsent(bulkTagIntentKey(trimmedTag), coverage.copy(tag = trimmedTag))
+                }
+            }
+            existingCoverage.values.sortedWith(bulkTagCoverageSheetOrder)
         }
     }
     val tagIntents = remember { mutableStateMapOf<String, BulkTagIntent>() }
-    LaunchedEffect(mergedTags) {
-        mergedTags.forEach { tag ->
-            if (!tagIntents.containsKey(tag)) {
-                tagIntents[tag] = BulkTagIntent.NEUTRAL
+    LaunchedEffect(mergedCoverage) {
+        mergedCoverage.forEach { coverage ->
+            val tagKey = bulkTagIntentKey(coverage.tag)
+            if (!tagIntents.containsKey(tagKey)) {
+                tagIntents[tagKey] = BulkTagIntent.NEUTRAL
             }
         }
     }
     val newTagColorsState = remember { mutableStateMapOf<String, String>() }
+    val pendingActions by remember {
+        derivedStateOf {
+            resolveBulkTagIntentActions(
+                coverage = mergedCoverage,
+                extraAddedTags = extraAdded,
+                tagIntents = tagIntents,
+                newTagColorsByKey = newTagColorsState,
+            )
+        }
+    }
 
     var createExpanded by rememberSaveable { mutableStateOf(false) }
     var draftName by rememberSaveable { mutableStateOf("") }
@@ -129,14 +230,14 @@ fun BulkTagSheet(
     var hexEditorBoundsInRoot by remember { mutableStateOf<Rect?>(null) }
 
     val trimmedDraft = draftName.trim()
-    val normalizedLowerTags = mergedTags.map { it.lowercase() }.toSet()
+    val normalizedTags = mergedCoverage.map { coverage -> bulkTagIntentKey(coverage.tag) }.toSet()
     val draftIsDuplicate =
         trimmedDraft.isNotBlank() &&
-            normalizedLowerTags.contains(trimmedDraft.lowercase())
+            normalizedTags.contains(bulkTagIntentKey(trimmedDraft))
     val chosenColor: Color = parseHexColor(lastValidHex) ?: TagPalette.presets[0]
     val canStageNewTag = trimmedDraft.isNotBlank() && !draftIsDuplicate && !RememberReservedTags.isSuggestionReserved(trimmedDraft)
 
-    val hasPending = tagIntents.values.any { it != BulkTagIntent.NEUTRAL }
+    val hasPending = pendingActions.addTags.isNotEmpty() || pendingActions.removeTags.isNotEmpty()
 
     fun commitHexEditing(): String {
         val draftHex =
@@ -156,9 +257,10 @@ fun BulkTagSheet(
     fun stageNewTag() {
         if (!canStageNewTag) return
         val committedHex = commitHexEditing()
+        val tagKey = bulkTagIntentKey(trimmedDraft)
         extraAdded.add(trimmedDraft)
-        tagIntents[trimmedDraft] = BulkTagIntent.ADD
-        newTagColorsState[trimmedDraft] = committedHex
+        tagIntents[tagKey] = BulkTagIntent.ADD
+        newTagColorsState[tagKey] = committedHex
         draftName = ""
     }
 
@@ -178,7 +280,7 @@ fun BulkTagSheet(
 
     AppBottomSheet(
         title = stringResource(R.string.home_bulk_tag_sheet_title),
-        subtitle = stringResource(R.string.home_bulk_tag_sheet_subtitle),
+        subtitleContent = { BulkTagSheetSubtitle() },
         onDismiss = onDismiss,
         actionsImePadding = true,
         actions = {
@@ -187,21 +289,7 @@ fun BulkTagSheet(
             }
             RememberButton(
                 onClick = {
-                    val adds =
-                        tagIntents
-                            .filterValues { it == BulkTagIntent.ADD }
-                            .keys
-                            .toSet()
-                    val removes =
-                        tagIntents
-                            .filterValues { it == BulkTagIntent.REMOVE }
-                            .keys
-                            .toSet()
-                    val colors =
-                        newTagColorsState
-                            .filterKeys { key -> adds.any { tag -> tag.equals(key, ignoreCase = true) } }
-                            .toMap()
-                    onApply(adds, removes, colors)
+                    onApply(pendingActions.addTags, pendingActions.removeTags, pendingActions.newTagColors)
                     // Selection mode exits after apply (VM clears selectedIds) - the sheet must
                     // close with it, otherwise any follow-up Apply lands on an empty selection
                     // and silently no-ops.
@@ -235,7 +323,7 @@ fun BulkTagSheet(
                     },
         ) {
             // --- Primary section: existing tag chips, tri-state cycling ---
-            if (mergedTags.isEmpty()) {
+            if (mergedCoverage.isEmpty()) {
                 Text(
                     text = stringResource(R.string.home_bulk_tag_no_existing),
                     style = MaterialTheme.typography.bodyMedium,
@@ -243,32 +331,11 @@ fun BulkTagSheet(
                     modifier = Modifier.padding(vertical = 12.dp),
                 )
             } else {
-                FlowRow(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    mergedTags.forEach { tag ->
-                        val intent = tagIntents[tag] ?: BulkTagIntent.NEUTRAL
-                        // A tag staged during this sheet session has its color in newTagColorsState
-                        // but NOT yet in LocalTagColors (that only updates post-apply). Prefer the
-                        // pending color so the chip matches what the user just picked in the form.
-                        val pendingHex =
-                            newTagColorsState.entries
-                                .firstOrNull { (tagName) -> tagName.equals(tag, ignoreCase = true) }
-                                ?.value
-                        val chipColor = pendingHex?.let { parseHexColor(it) } ?: tagColor(tag)
-                        TriStateTagChip(
-                            tag = tag,
-                            color = chipColor,
-                            intent = intent,
-                            onCycle = { tagIntents[tag] = intent.next() },
-                        )
-                    }
-                }
+                BulkTagCoverageFlow(
+                    coverage = mergedCoverage,
+                    tagIntents = tagIntents,
+                    newTagColors = newTagColorsState,
+                )
             }
 
             Spacer(Modifier.height(4.dp))
@@ -366,6 +433,85 @@ fun BulkTagSheet(
 
 private const val TAG_BULK_HEX_INPUT_DEBOUNCE_MILLIS = 450L
 
+private val bulkTagCoverageSheetOrder =
+    compareBy<BulkTagCoverage> { coverage ->
+        when (coverage.state) {
+            BulkTagCoverageState.ALL,
+            BulkTagCoverageState.SOME,
+            -> 0
+            BulkTagCoverageState.NONE -> 1
+        }
+    }.thenBy { coverage -> coverage.tag.lowercase() }
+
+@Composable
+private fun BulkTagSheetSubtitle() {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.home_bulk_tag_sheet_subtitle_intro),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        RememberMaterialRoundedSymbol(
+            name = "add",
+            size = 16.dp,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            weight = FontWeight.Medium,
+        )
+        Text(
+            text = stringResource(R.string.home_bulk_tag_sheet_subtitle_add),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        RememberMaterialRoundedSymbol(
+            name = "close",
+            size = 16.dp,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            weight = FontWeight.Medium,
+        )
+        Text(
+            text = stringResource(R.string.home_bulk_tag_sheet_subtitle_remove),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun BulkTagCoverageFlow(
+    coverage: List<BulkTagCoverage>,
+    tagIntents: MutableMap<String, BulkTagIntent>,
+    newTagColors: Map<String, String>,
+) {
+    if (coverage.isEmpty()) return
+
+    FlowRow(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        coverage.forEach { tagCoverage ->
+            val tagKey = bulkTagIntentKey(tagCoverage.tag)
+            val intent = tagIntents[tagKey] ?: BulkTagIntent.NEUTRAL
+            val pendingHex = newTagColors[tagKey]
+            val chipColor = pendingHex?.let { parseHexColor(it) } ?: tagColor(tagCoverage.tag)
+            TriStateTagChip(
+                coverage = tagCoverage,
+                color = chipColor,
+                intent = intent,
+                onCycle = {
+                    tagIntents[tagKey] = nextBulkTagIntent(tagCoverage.state, intent)
+                },
+            )
+        }
+    }
+}
+
 /**
  * "Pull-tab on divider" disclosure (Option D). A horizontal line crosses the full width with a
  * centered pill sitting astride it - a visual metaphor for "pull me down, there's more below".
@@ -430,22 +576,21 @@ private fun CreateNewTagPullTab(
  * Tri-state chip: visual weight differs by operation to make ADD (additive, constructive) and
  * REMOVE (subtractive, destructive) read distinctly at a glance.
  *
- *  - [BulkTagIntent.NEUTRAL]: ghosted - faded tag color, no icon. "Leave alone."
+ *  - [BulkTagIntent.NEUTRAL]: shows the tag's current coverage in the selected notes.
  *  - [BulkTagIntent.ADD]: fully filled in the tag's color, leading '+' glyph, bolder label.
  *    Reads as "claimed / committed to every selected note."
  *  - [BulkTagIntent.REMOVE]: transparent interior, 2 dp border in the tag's color, leading 'x'
  *    glyph, strikethrough label. Reads as "stripped / negative space - being removed."
- *
- * Tapping cycles NEUTRAL -> ADD -> REMOVE -> NEUTRAL.
  */
 @Composable
 private fun TriStateTagChip(
-    tag: String,
+    coverage: BulkTagCoverage,
     color: Color,
     intent: BulkTagIntent,
     onCycle: () -> Unit,
 ) {
     val baseColor = color
+    val tag = coverage.tag
 
     // All per-intent visual parameters resolved here so the layout block stays clean.
     val containerColor: Color
@@ -453,17 +598,37 @@ private fun TriStateTagChip(
     val iconColor: Color
     val dotColor: Color
     val textDecoration: TextDecoration
-    val leadingIcon: String?
+    val leadingIcon: String
     val textWeight: FontWeight
     when (intent) {
         BulkTagIntent.NEUTRAL -> {
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-            textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-            iconColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-            dotColor = baseColor.copy(alpha = 0.4f)
             textDecoration = TextDecoration.None
-            leadingIcon = null
-            textWeight = FontWeight.Medium
+            when (coverage.state) {
+                BulkTagCoverageState.ALL -> {
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                    textColor = MaterialTheme.colorScheme.onSurface
+                    iconColor = baseColor
+                    dotColor = baseColor
+                    leadingIcon = "radio_button_checked"
+                    textWeight = FontWeight.SemiBold
+                }
+                BulkTagCoverageState.SOME -> {
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f)
+                    textColor = MaterialTheme.colorScheme.onSurface
+                    iconColor = baseColor
+                    dotColor = baseColor.copy(alpha = 0.72f)
+                    leadingIcon = "radio_button_partial"
+                    textWeight = FontWeight.Medium
+                }
+                BulkTagCoverageState.NONE -> {
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    textColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                    iconColor = baseColor.copy(alpha = 0.55f)
+                    dotColor = baseColor.copy(alpha = 0.35f)
+                    leadingIcon = "radio_button_unchecked"
+                    textWeight = FontWeight.Medium
+                }
+            }
         }
         BulkTagIntent.ADD -> {
             containerColor = MaterialTheme.colorScheme.surfaceVariant
@@ -495,14 +660,12 @@ private fun TriStateTagChip(
                 .tapSoundClickable(onClick = onCycle)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
-        if (leadingIcon != null) {
-            RememberMaterialRoundedSymbol(
-                name = leadingIcon,
-                size = 14.dp,
-                tint = iconColor,
-                weight = FontWeight.Medium,
-            )
-        }
+        RememberMaterialRoundedSymbol(
+            name = leadingIcon,
+            size = 14.dp,
+            tint = iconColor,
+            weight = FontWeight.Medium,
+        )
         Box(
             modifier =
                 Modifier
