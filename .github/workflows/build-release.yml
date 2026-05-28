@@ -69,14 +69,6 @@ jobs:
           packages: ''
           log-accepted-android-sdk-licenses: false
 
-      - name: Cache Android SDK packages
-        uses: actions/cache@v5
-        with:
-          path: |
-            /usr/local/lib/android/sdk/platforms/android-37.0
-            /usr/local/lib/android/sdk/build-tools/37.0.0
-          key: android-sdk-${{ runner.os }}-platform-37.0-build-tools-37.0.0
-
       - name: Install Android SDK packages
         run: |
           if [ ! -d "$ANDROID_HOME/platforms/android-37.0" ] || [ ! -d "$ANDROID_HOME/build-tools/37.0.0" ]; then

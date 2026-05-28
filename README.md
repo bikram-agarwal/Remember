@@ -80,7 +80,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 <img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/1_home.png" alt="Home Page: All notes, sorted the way you choose" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/2_note_page.png" alt="Note page: rich in UI & functionality" width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/2_note_page.png" alt="Note page: every reminder carries the full story" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
 <img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/3_markdown.png" alt="Notes support markdown with live preview" width="300" /><br />
@@ -101,7 +101,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 
 <tr>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/7_reminders.png" alt="Extensive flexibilty in setting recurring reminders" width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/7_reminders.png" alt="Extensive flexibility in setting recurring reminders" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
 <img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/8_settings.png" alt="Extensive theming options. Make it your own." width="300" /><br />
@@ -117,7 +117,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 ## 📥 Download / links
 
 - [**Play Store**](https://play.google.com/store/apps/details?id=dev.bikram.remember) (Not live yet. Coming soon.)
-- [**GitHub**](https://bikram-agarwal.github.io/remember/releases/latest) 
+- [**GitHub**](https://github.com/bikram-agarwal/Remember/releases/latest) 
 
-- [Project site](https://bikram-agarwal.github.io/remember/)
-- [Privacy policy](https://bikram-agarwal.github.io/remember/privacy)
+- [Project site](https://bikram101.qzz.io/remember/)
+- [Privacy policy](https://bikram101.qzz.io/remember/privacy)

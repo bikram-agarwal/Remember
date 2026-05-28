@@ -182,6 +182,8 @@
     <string name="notecard_cd_selected">Selected</string>
     <string name="hero_framing_title">Position cover</string>
     <string name="viewer_cover_image_cd">Cover image</string>
+    <string name="cover_zoom_in_cd">Zoom in</string>
+    <string name="cover_zoom_out_cd">Zoom out</string>
     <string name="hero_image_picker_browse_with_app">Browse with app</string>
     <string name="toast_saved_to_downloads">Saved to Downloads</string>
     <string name="toast_save_download_failed">Could not save file</string>
@@ -667,7 +669,9 @@
     <string name="appearance_theme_dark">Dark</string>
     <string name="appearance_theme_black">Black</string>
     <string name="appearance_palette_style">Palette style</string>
+    <string name="appearance_palette">Palette</string>
     <string name="appearance_preview_title_named">Preview · %1$s</string>
+    <string name="appearance_preview_customize">Customize</string>
     <string name="color_source_material_you">Material You</string>
     <string name="color_source_forest">Forest</string>
     <string name="color_source_ember">Ember</string>
@@ -704,7 +708,9 @@
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>
     <string name="appearance_remove_custom_color_message">It will be removed from your saved custom colors</string>
     <string name="appearance_add_custom_color_cd">Add custom color</string>
-    <string name="appearance_select_color">Select a color</string>
+    <string name="appearance_select_color">Select primary color</string>
+    <string name="appearance_select_color_secondary">Select secondary color</string>
+    <string name="appearance_select_color_tertiary">Select tertiary color</string>
 
     <!-- Palette style names (shared) -->
     <string name="palette_style_tonal_spot">Tonal spot</string>
@@ -941,9 +947,9 @@
     <string name="settings_about_website">Website</string>
     <string name="settings_about_privacy_policy">Privacy policy</string>
     <string name="settings_about_terms">Terms</string>
-    <string name="settings_about_remember_website_url" translatable="false">https://bikram-agarwal.github.io/remember/</string>
-    <string name="settings_about_remember_privacy_url" translatable="false">https://bikram-agarwal.github.io/remember/privacy/</string>
-    <string name="settings_about_remember_terms_url" translatable="false">https://bikram-agarwal.github.io/remember/terms/</string>
+    <string name="settings_about_remember_website_url" translatable="false">https://bikram101.qzz.io/remember/</string>
+    <string name="settings_about_remember_privacy_url" translatable="false">https://bikram101.qzz.io/remember/privacy/</string>
+    <string name="settings_about_remember_terms_url" translatable="false">https://bikram101.qzz.io/remember/terms/</string>
     <string name="settings_about_filepipe_play_store_url" translatable="false">https://play.google.com/store/apps/details?id=dev.bikram.filepipe</string>
     <string name="settings_about_filepipe_github_url" translatable="false">https://github.com/bikram-agarwal/filepipe/releases/latest</string>
     <string name="settings_about_obtainx_github_url" translatable="false">https://github.com/bikram-agarwal/ObtainX/releases/latest</string>
@@ -1084,19 +1090,5 @@
     <string name="dev_options_test_notif_summary_line1">Buy milk — overdue</string>
     <string name="dev_options_test_notif_summary_line2">Call doctor — overdue</string>
     <string name="dev_options_test_notif_summary_line3">Pack for trip — today</string>
-
-    <!-- Developer options: mock note content -->
-    <string name="dev_options_mock_checklist_title" translatable="false">Dev: Mock Checklist</string>
-    <string name="dev_options_mock_checklist_tag1" translatable="false">Testing</string>
-    <string name="dev_options_mock_checklist_item_groceries">Groceries</string>
-    <string name="dev_options_mock_checklist_item_milk">Milk</string>
-    <string name="dev_options_mock_checklist_item_eggs">Eggs</string>
-    <string name="dev_options_mock_checklist_item_bread">Bread</string>
-    <string name="dev_options_mock_checklist_item_work">Work tasks</string>
-    <string name="dev_options_mock_checklist_item_report">Write report</string>
-    <string name="dev_options_mock_checklist_item_pr">Review PR</string>
-    <string name="dev_options_mock_checklist_item_dentist">Book dentist</string>
-    <string name="dev_options_mock_note_title" translatable="false">Dev: Markdown Showcase</string>
-    <string name="dev_options_mock_note_body" translatable="false"># Heading 1\n## Heading 2\n\n**Bold**, *italic*, &lt;u&gt;underline&lt;/u&gt;, ~~strikethrough~~\n\n`inline code` and [a link](https://example.com)\n\n> A blockquote line\n\n- Bullet item 1\n- Bullet item 2\n\n1. Ordered item 1\n2. Ordered item 2</string>
 
 </resources>
