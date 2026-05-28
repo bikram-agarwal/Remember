@@ -808,7 +808,6 @@ fun SettingsRoute(
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
-                onCheckAgain = { beginUpdateCheck(true) },
                 onDownloadClick = downloadUpdate,
                 onSkipVersionClick = skipVersion@{
                     val availableUpdate = updateInfo ?: return@skipVersion

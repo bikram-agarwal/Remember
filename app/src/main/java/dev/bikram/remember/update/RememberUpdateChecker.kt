@@ -76,7 +76,9 @@ class RememberUpdateChecker
                 val remoteVersionName = release.tagName.trim().removePrefix("v")
                 if (remoteVersionName.isBlank()) return null
                 val apkAsset = release.assets.firstOrNull { asset -> asset.name.endsWith(".apk", ignoreCase = true) } ?: return null
-                val currentFingerprint = "$remoteVersionName|${apkAsset.updatedAt}"
+                if (!isGithubReleaseNewerThanInstalled(remoteVersionName, currentVersionName)) return null
+
+                val remoteReleaseFingerprint = "$remoteVersionName|${apkAsset.updatedAt}"
                 val ack = updatePrefs.readGithubReleaseAck()
                 val effectiveFingerprint =
                     if (ack.forInstalledVersion == currentVersionName) {
@@ -84,25 +86,10 @@ class RememberUpdateChecker
                     } else {
                         null
                     }
-                val versionComparison = compareVersionNames(remoteVersionName, currentVersionName)
-                when {
-                    versionComparison < 0 -> null
-                    versionComparison > 0 -> {
-                        if (effectiveFingerprint == currentFingerprint) {
-                            null
-                        } else {
-                            release.toUpdateInfo(remoteVersionName, apkAsset)
-                        }
-                    }
-                    effectiveFingerprint == null -> {
-                        updatePrefs.writeGithubReleaseAck(
-                            fingerprint = currentFingerprint,
-                            installedVersionName = currentVersionName,
-                        )
-                        null
-                    }
-                    effectiveFingerprint == currentFingerprint -> null
-                    else -> release.toUpdateInfo(remoteVersionName, apkAsset)
+                if (effectiveFingerprint == remoteReleaseFingerprint) {
+                    null
+                } else {
+                    release.toUpdateInfo(remoteVersionName, apkAsset)
                 }
             } finally {
                 connection.disconnect()
@@ -120,28 +107,33 @@ class RememberUpdateChecker
                 remoteApkFileName = apkAsset.name,
                 remoteApkAssetUpdatedAt = apkAsset.updatedAt,
             )
-
-        private fun compareVersionNames(
-            left: String,
-            right: String,
-        ): Int {
-            val leftParts = left.trim().removePrefix("v").split('.', '-', limit = 10)
-            val rightParts = right.trim().removePrefix("v").split('.', '-', limit = 10)
-            val maxLength = maxOf(leftParts.size, rightParts.size)
-            for (partIndex in 0 until maxLength) {
-                val leftToken = leftParts.getOrNull(partIndex).orEmpty()
-                val rightToken = rightParts.getOrNull(partIndex).orEmpty()
-                val leftNumber = leftToken.toIntOrNull()
-                val rightNumber = rightToken.toIntOrNull()
-                val comparison =
-                    when {
-                        leftNumber != null && rightNumber != null -> leftNumber.compareTo(rightNumber)
-                        leftNumber != null -> -1
-                        rightNumber != null -> 1
-                        else -> leftToken.compareTo(rightToken)
-                    }
-                if (comparison != 0) return comparison
-            }
-            return 0
-        }
     }
+
+internal fun compareGithubVersionNames(
+    left: String,
+    right: String,
+): Int {
+    val leftParts = left.trim().removePrefix("v").split('.', '-', limit = 10)
+    val rightParts = right.trim().removePrefix("v").split('.', '-', limit = 10)
+    val maxLength = maxOf(leftParts.size, rightParts.size)
+    for (partIndex in 0 until maxLength) {
+        val leftToken = leftParts.getOrNull(partIndex).orEmpty()
+        val rightToken = rightParts.getOrNull(partIndex).orEmpty()
+        val leftNumber = leftToken.toIntOrNull()
+        val rightNumber = rightToken.toIntOrNull()
+        val comparison =
+            when {
+                leftNumber != null && rightNumber != null -> leftNumber.compareTo(rightNumber)
+                leftNumber != null -> -1
+                rightNumber != null -> 1
+                else -> leftToken.compareTo(rightToken)
+            }
+        if (comparison != 0) return comparison
+    }
+    return 0
+}
+
+internal fun isGithubReleaseNewerThanInstalled(
+    remoteVersionName: String,
+    currentVersionName: String,
+): Boolean = compareGithubVersionNames(remoteVersionName, currentVersionName) > 0

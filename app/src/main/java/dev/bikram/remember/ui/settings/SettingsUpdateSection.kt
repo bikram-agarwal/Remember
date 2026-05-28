@@ -74,7 +74,6 @@ internal fun UpdateCheckBottomSheetContent(
     changelogState: ChangelogUiState,
     showGithubExtraUi: Boolean,
     usePlayInAppUpdates: Boolean,
-    onCheckAgain: () -> Unit,
     onDownloadClick: (RememberUpdateInfo) -> Unit,
     onSkipVersionClick: () -> Unit,
 ) {
@@ -172,10 +171,6 @@ internal fun UpdateCheckBottomSheetContent(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
                         )
-                        Spacer(Modifier.height(12.dp))
-                        RememberOutlinedButton(onClick = onCheckAgain) {
-                            Text(stringResource(R.string.settings_check_for_updates))
-                        }
                     }
                 }
             }
