@@ -603,7 +603,6 @@ class ChecklistEditorTest {
         assertEquals(1, movedItem.depth)
     }
 
-
     private fun editableItem(
         localId: Long,
         checked: Boolean = false,

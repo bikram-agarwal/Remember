@@ -40,6 +40,7 @@ import androidx.core.graphics.toColorInt
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
+import dev.bikram.remember.data.normalizeCustomSeed
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilterChip
@@ -47,8 +48,11 @@ import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.ColorSourceSpec
 import dev.bikram.remember.ui.theme.ColorSourceSwatchType
+import dev.bikram.remember.ui.theme.CuratedPalette
 import dev.bikram.remember.ui.theme.colorSourceSpecFor
 import dev.bikram.remember.ui.theme.colorSourceSpecsInPickerOrder
+import dev.bikram.remember.ui.theme.generateTripletForSeed
+import dev.bikram.remember.ui.theme.parseCustomTriplet
 
 // Material You leads the row when available so the wallpaper-driven option is what users
 // see first. DEFAULT (Forest - the green/teal/lime triplet baked into the app) sits next as
@@ -70,8 +74,8 @@ private fun customHexSwatchSelected(
     storedHex: String,
 ): Boolean {
     if (colorSource != ColorSource.CUSTOM) return false
-    val activeNorm = normalizeHex(activeCustomSeedHex)
-    val storedNorm = normalizeHex(storedHex)
+    val activeNorm = normalizeCustomSeed(activeCustomSeedHex)
+    val storedNorm = normalizeCustomSeed(storedHex)
     return when {
         activeNorm != null && storedNorm != null -> activeNorm == storedNorm
         else -> activeCustomSeedHex.trim() == storedHex.trim()
@@ -140,9 +144,14 @@ fun ThemeAccentRow(
                     } else {
                         MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
                     }
+                val triplet =
+                    runCatching {
+                        parseCustomTriplet(storedHex)
+                    }.getOrNull()
                 val fillColor =
                     runCatching {
-                        Color((normalizeHex(storedHex) ?: storedHex).toColorInt())
+                        val primaryHex = storedHex.split("|").first()
+                        Color((normalizeHex(primaryHex) ?: primaryHex).toColorInt())
                     }.getOrDefault(MaterialTheme.colorScheme.surfaceVariant)
                 Box(
                     modifier =
@@ -161,13 +170,22 @@ fun ThemeAccentRow(
                             ).semantics { role = Role.RadioButton },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(innerSwatchSize)
-                                .clip(CircleShape)
-                                .background(fillColor),
-                    )
+                    if (triplet != null) {
+                        CuratedTripletSwatch(
+                            primary = triplet.primary,
+                            secondary = triplet.secondary,
+                            tertiary = triplet.tertiary,
+                            size = innerSwatchSize,
+                        )
+                    } else {
+                        Box(
+                            modifier =
+                                Modifier
+                                    .size(innerSwatchSize)
+                                    .clip(CircleShape)
+                                    .background(fillColor),
+                        )
+                    }
                 }
             }
             item(key = "add_custom_seed") {

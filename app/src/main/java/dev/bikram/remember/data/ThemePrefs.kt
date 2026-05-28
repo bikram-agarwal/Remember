@@ -3,6 +3,7 @@ package dev.bikram.remember.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -94,6 +95,13 @@ enum class PaletteStyleOpt {
     CONTENT,
 }
 
+enum class ShadingIntensity {
+    NONE,
+    SUBTLE,
+    MEDIUM,
+    INTENSE,
+}
+
 data class ThemeState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val colorSource: ColorSource = ColorSource.MATERIAL_YOU,
@@ -101,11 +109,14 @@ data class ThemeState(
     val customSeeds: List<String> = emptyList(),
     val activeCustomSeed: String = "",
     val useGradient: Boolean = true,
-    val useEnhancedShading: Boolean = false,
+    val shadingIntensity: Float = 0.0f,
     val heroOnCards: Boolean = true,
     val adaptiveNoteThemes: Boolean = true,
     val blurBars: Boolean = true,
-)
+) {
+    val useEnhancedShading: Boolean
+        get() = shadingIntensity > 0.0f
+}
 
 class ThemePrefs(
     private val context: Context,
@@ -118,6 +129,8 @@ class ThemePrefs(
         val ACTIVE_CUSTOM_SEED = stringPreferencesKey("active_custom_seed")
         val USE_GRADIENT = booleanPreferencesKey("use_gradient")
         val USE_ENHANCED_SHADING = booleanPreferencesKey("use_enhanced_shading")
+        val SHADING_INTENSITY = stringPreferencesKey("shading_intensity")
+        val SHADING_INTENSITY_FACTOR = floatPreferencesKey("shading_intensity_factor")
         val HERO_ON_CARDS = booleanPreferencesKey("hero_on_cards")
         val ADAPTIVE_NOTE_THEMES = booleanPreferencesKey("adaptive_note_themes")
         val BLUR_BARS = booleanPreferencesKey("blur_bars")
@@ -137,9 +150,25 @@ class ThemePrefs(
                     runCatching { PaletteStyleOpt.valueOf(p[Keys.PALETTE_STYLE] ?: "") }
                         .getOrDefault(PaletteStyleOpt.TONAL_SPOT),
                 customSeeds = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty()),
-                activeCustomSeed = normalizeHex(p[Keys.ACTIVE_CUSTOM_SEED].orEmpty()).orEmpty(),
+                activeCustomSeed = normalizeCustomSeed(p[Keys.ACTIVE_CUSTOM_SEED].orEmpty()).orEmpty(),
                 useGradient = p[Keys.USE_GRADIENT] ?: true,
-                useEnhancedShading = p[Keys.USE_ENHANCED_SHADING] ?: false,
+                shadingIntensity =
+                    p[Keys.SHADING_INTENSITY_FACTOR]
+                        ?: runCatching {
+                            val legacyEnum = ShadingIntensity.valueOf(p[Keys.SHADING_INTENSITY] ?: "")
+                            when (legacyEnum) {
+                                ShadingIntensity.NONE -> 0.0f
+                                ShadingIntensity.SUBTLE -> 0.4f
+                                ShadingIntensity.MEDIUM -> 1.0f
+                                ShadingIntensity.INTENSE -> 1.8f
+                            }
+                        }.getOrElse {
+                            if (p[Keys.USE_ENHANCED_SHADING] == true) {
+                                0.0f
+                            } else {
+                                1.0f
+                            }
+                        },
                 heroOnCards = p[Keys.HERO_ON_CARDS] ?: true,
                 adaptiveNoteThemes = p[Keys.ADAPTIVE_NOTE_THEMES] ?: true,
                 blurBars = p[Keys.BLUR_BARS] ?: true,
@@ -169,27 +198,27 @@ class ThemePrefs(
     }
 
     suspend fun setActiveCustomSeed(hex: String) {
-        val normalized = normalizeHex(hex) ?: return
+        val normalized = normalizeCustomSeed(hex) ?: return
         context.themePrefsDataStore.edit { p ->
             val storedSeeds = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty())
             val matchedStored =
                 storedSeeds
                     .firstOrNull { stored ->
-                        normalizeHex(stored) == normalized
+                        normalizeCustomSeed(stored) == normalized
                     }
             if (matchedStored == null) {
                 p[Keys.CUSTOM_SEEDS] = encodeSeeds(storedSeeds + normalized)
             }
             p[Keys.ACTIVE_CUSTOM_SEED] =
                 matchedStored?.let { stored ->
-                    normalizeHex(stored) ?: stored
+                    normalizeCustomSeed(stored) ?: stored
                 } ?: normalized
             p[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
         }
     }
 
     suspend fun previewCustomSeed(hex: String) {
-        val normalized = normalizeHex(hex) ?: return
+        val normalized = normalizeCustomSeed(hex) ?: return
         context.themePrefsDataStore.edit { p ->
             p[Keys.ACTIVE_CUSTOM_SEED] = normalized
             p[Keys.COLOR_SOURCE] = ColorSource.CUSTOM.name
@@ -197,7 +226,7 @@ class ThemePrefs(
     }
 
     suspend fun addCustomSeed(hex: String) {
-        val normalized = normalizeHex(hex) ?: return
+        val normalized = normalizeCustomSeed(hex) ?: return
         context.themePrefsDataStore.edit { p ->
             val current = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty())
             if (current.contains(normalized)) {
@@ -211,7 +240,7 @@ class ThemePrefs(
     }
 
     suspend fun removeCustomSeed(hex: String) {
-        val normalized = normalizeHex(hex) ?: return
+        val normalized = normalizeCustomSeed(hex) ?: return
         context.themePrefsDataStore.edit { p ->
             val current = decodeSeeds(p[Keys.CUSTOM_SEEDS].orEmpty())
             val next = current.filterNot { it.equals(normalized, ignoreCase = true) }
@@ -231,8 +260,18 @@ class ThemePrefs(
         context.themePrefsDataStore.edit { it[Keys.USE_GRADIENT] = value }
     }
 
-    suspend fun setUseEnhancedShading(value: Boolean) {
-        context.themePrefsDataStore.edit { it[Keys.USE_ENHANCED_SHADING] = value }
+    suspend fun setShadingIntensity(intensity: Float) {
+        context.themePrefsDataStore.edit {
+            it[Keys.SHADING_INTENSITY_FACTOR] = intensity
+            val legacyEnum =
+                when {
+                    intensity <= 0.2f -> ShadingIntensity.NONE
+                    intensity <= 0.7f -> ShadingIntensity.SUBTLE
+                    intensity <= 1.4f -> ShadingIntensity.MEDIUM
+                    else -> ShadingIntensity.INTENSE
+                }
+            it[Keys.SHADING_INTENSITY] = legacyEnum.name
+        }
     }
 
     suspend fun setHeroOnCards(value: Boolean) {
@@ -258,7 +297,7 @@ class ThemePrefs(
             val jsonArray = JSONArray(value)
             buildList {
                 for (index in 0 until jsonArray.length()) {
-                    val normalized = normalizeHex(jsonArray.getString(index)) ?: continue
+                    val normalized = normalizeCustomSeed(jsonArray.getString(index)) ?: continue
                     if (!contains(normalized)) {
                         add(normalized)
                     }
@@ -282,7 +321,16 @@ class ThemePrefs(
             put(Keys.CUSTOM_SEEDS.name, prefs[Keys.CUSTOM_SEEDS].orEmpty())
             put(Keys.ACTIVE_CUSTOM_SEED.name, prefs[Keys.ACTIVE_CUSTOM_SEED].orEmpty())
             put(Keys.USE_GRADIENT.name, prefs[Keys.USE_GRADIENT] ?: true)
-            put(Keys.USE_ENHANCED_SHADING.name, prefs[Keys.USE_ENHANCED_SHADING] ?: false)
+            val intensity = prefs[Keys.SHADING_INTENSITY_FACTOR] ?: 0.0f
+            put("shading_intensity_factor", intensity.toDouble())
+            val legacyEnum =
+                when {
+                    intensity <= 0.2f -> ShadingIntensity.NONE
+                    intensity <= 0.7f -> ShadingIntensity.SUBTLE
+                    intensity <= 1.4f -> ShadingIntensity.MEDIUM
+                    else -> ShadingIntensity.INTENSE
+                }
+            put(Keys.SHADING_INTENSITY.name, legacyEnum.name)
             put(Keys.HERO_ON_CARDS.name, prefs[Keys.HERO_ON_CARDS] ?: true)
             put(Keys.BLUR_BARS.name, prefs[Keys.BLUR_BARS] ?: true)
         }
@@ -322,7 +370,7 @@ class ThemePrefs(
                 stringOrNull(Keys.PALETTE_STYLE.name)?.let { raw ->
                     runCatching { PaletteStyleOpt.valueOf(raw) }.getOrNull()
                 }
-            val activeCustomSeed = stringOrNull(Keys.ACTIVE_CUSTOM_SEED.name)?.let { normalizeHex(it) }
+            val activeCustomSeed = stringOrNull(Keys.ACTIVE_CUSTOM_SEED.name)?.let { normalizeCustomSeed(it) }
             val customSeeds =
                 stringOrNull(Keys.CUSTOM_SEEDS.name)?.let { rawSeeds ->
                     decodeNormalizedSeeds(rawSeeds)
@@ -344,8 +392,31 @@ class ThemePrefs(
             booleanOrNull(Keys.USE_GRADIENT.name)?.let { value ->
                 mutable[Keys.USE_GRADIENT] = value
             }
-            booleanOrNull(Keys.USE_ENHANCED_SHADING.name)?.let { value ->
-                mutable[Keys.USE_ENHANCED_SHADING] = value
+            val intensityFactor =
+                if (json.has("shading_intensity_factor")) {
+                    runCatching { json.getDouble("shading_intensity_factor").toFloat() }.getOrNull()
+                } else {
+                    stringOrNull(Keys.SHADING_INTENSITY.name)?.let { raw ->
+                        runCatching { ShadingIntensity.valueOf(raw) }.getOrNull()?.let {
+                            when (it) {
+                                ShadingIntensity.NONE -> 0.0f
+                                ShadingIntensity.SUBTLE -> 0.4f
+                                ShadingIntensity.MEDIUM -> 1.0f
+                                ShadingIntensity.INTENSE -> 1.8f
+                            }
+                        }
+                    }
+                }
+            intensityFactor?.let { value ->
+                mutable[Keys.SHADING_INTENSITY_FACTOR] = value
+                val legacyEnum =
+                    when {
+                        value <= 0.2f -> ShadingIntensity.NONE
+                        value <= 0.7f -> ShadingIntensity.SUBTLE
+                        value <= 1.4f -> ShadingIntensity.MEDIUM
+                        else -> ShadingIntensity.INTENSE
+                    }
+                mutable[Keys.SHADING_INTENSITY] = legacyEnum.name
             }
             booleanOrNull(Keys.HERO_ON_CARDS.name)?.let { value ->
                 mutable[Keys.HERO_ON_CARDS] = value
@@ -375,4 +446,19 @@ fun normalizeHex(raw: String): String? {
         }
     if (!hex.all { it.isDigit() || it in 'a'..'f' || it in 'A'..'F' }) return null
     return "#" + hex.uppercase()
+}
+
+/**
+ * Normalize a custom seed, which can be a single hex or a pipe-separated triplet of hexes.
+ */
+fun normalizeCustomSeed(raw: String): String? {
+    if (raw.contains("|")) {
+        val parts = raw.split("|")
+        val normalizedParts =
+            parts.map { part ->
+                normalizeHex(part) ?: return null
+            }
+        return normalizedParts.joinToString("|")
+    }
+    return normalizeHex(raw)
 }

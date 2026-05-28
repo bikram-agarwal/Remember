@@ -5,6 +5,8 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
+import androidx.core.graphics.toColorInt
 import com.materialkolor.rememberDynamicColorScheme
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
@@ -24,6 +26,12 @@ internal fun rememberResolvedColorScheme(
 ): RememberColorResolution {
     val spec = colorSourceSpecFor(themeState.colorSource)
     val materialYouAvailable = spec.source == ColorSource.MATERIAL_YOU
+    val customTriplet =
+        if (spec.source == ColorSource.CUSTOM) {
+            parseCustomTriplet(themeState.activeCustomSeed)
+        } else {
+            null
+        }
     val base =
         when {
             materialYouAvailable -> {
@@ -34,12 +42,13 @@ internal fun rememberResolvedColorScheme(
                 }
             }
             spec.triplet != null -> rememberCuratedColorScheme(spec.triplet, themeState, darkTheme, black)
+            customTriplet != null -> rememberCuratedColorScheme(customTriplet, themeState, darkTheme, black)
             else -> rememberSeededColorScheme(spec, themeState, darkTheme, black)
         }
     val oledAdjusted = if (black) base.toOled() else base
     val tinted =
-        if (!themeState.useEnhancedShading && !black) {
-            oledAdjusted.tintSurfacesTowardPrimary(darkTheme)
+        if (!black) {
+            oledAdjusted.tintSurfacesTowardPrimary(darkTheme, themeState.shadingIntensity)
         } else {
             oledAdjusted
         }
@@ -98,4 +107,22 @@ private fun rememberSeededColorScheme(
         style = themeState.paletteStyle.toLib(),
         isAmoled = black,
     )
+}
+
+internal fun parseCustomTriplet(activeCustomSeed: String): CuratedPalette? {
+    if (activeCustomSeed.isBlank()) return null
+    val parts = activeCustomSeed.split("|")
+    val primaryHex = parts.getOrNull(0) ?: return null
+    val primaryColor = runCatching { Color(primaryHex.toColorInt()) }.getOrNull() ?: return null
+
+    if (parts.size >= 3) {
+        val secondaryHex = parts[1]
+        val tertiaryHex = parts[2]
+        val secondaryColor = runCatching { Color(secondaryHex.toColorInt()) }.getOrNull()
+        val tertiaryColor = runCatching { Color(tertiaryHex.toColorInt()) }.getOrNull()
+        if (secondaryColor != null && tertiaryColor != null) {
+            return CuratedPalette(primaryColor, secondaryColor, tertiaryColor)
+        }
+    }
+    return generateTripletForSeed(primaryColor)
 }

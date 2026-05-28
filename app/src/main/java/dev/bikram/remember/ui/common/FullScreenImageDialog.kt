@@ -410,8 +410,7 @@ fun FullScreenHeroImageOverlay(
                                         baseImageOffsetXDp.roundToPx(),
                                         baseImageOffsetYDp.roundToPx(),
                                     )
-                                }
-                                .pointerInput(maskW, maskH, intrinsicWidth, intrinsicHeight) {
+                                }.pointerInput(maskW, maskH, intrinsicWidth, intrinsicHeight) {
                                     detectTransformGestures { _, pan, zoomChange, _ ->
                                         val nextZoom = (currentZoom.value * zoomChange).coerceIn(1f, 8f)
                                         zoom = nextZoom

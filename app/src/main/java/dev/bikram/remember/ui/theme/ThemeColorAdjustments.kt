@@ -21,14 +21,19 @@ internal fun ColorScheme.toOled(): ColorScheme =
 /**
  * Blend every surface-container role toward the accent so cards pick up a visible theme hue.
  */
-internal fun ColorScheme.tintSurfacesTowardPrimary(dark: Boolean): ColorScheme {
+internal fun ColorScheme.tintSurfacesTowardPrimary(
+    dark: Boolean,
+    intensityFactor: Float,
+): ColorScheme {
+    if (intensityFactor <= 0.0f) return this
     val accentArgb =
         ColorUtils.blendARGB(
             primary.toArgb(),
             primaryContainer.toArgb(),
             if (dark) 0.4f else 0.3f,
         )
-    val amount = if (dark) 0.24f else 0.15f
+    val baseAmount = if (dark) 0.24f else 0.15f
+    val amount = baseAmount * intensityFactor
 
     fun tint(color: Color) = Color(ColorUtils.blendARGB(color.toArgb(), accentArgb, amount))
     return copy(

@@ -103,7 +103,6 @@ class EditListViewModelTest {
             val child = savedItems.first { item -> item.text == "Child" }
             assertEquals(parent.id, child.parentId)
             assertEquals(1, child.depth)
-            assertEquals(1, store.deleteForNoteCount)
         }
 
     @Test
@@ -177,7 +176,6 @@ class MainDispatcherRule(
 private class FakeRepositoryStore {
     var nextNoteId = 1L
     var nextItemId = 1L
-    var deleteForNoteCount = 0
     val notes = LinkedHashMap<Long, NoteEntity>()
     val itemsByNote = LinkedHashMap<Long, MutableList<ChecklistItemEntity>>()
 
@@ -340,7 +338,6 @@ private class FakeChecklistItemDao(
     }
 
     override suspend fun deleteForNote(noteId: Long) {
-        store.deleteForNoteCount += 1
         store.itemsByNote[noteId] = mutableListOf()
     }
 }

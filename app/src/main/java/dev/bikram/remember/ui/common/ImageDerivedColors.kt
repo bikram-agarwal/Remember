@@ -81,11 +81,11 @@ fun rememberImageDerivedColorScheme(imageColors: ImageDerivedColors?): ImageDeri
             style = themeState.paletteStyle.toLib(),
             isAmoled = black,
         )
-    return remember(generated, darkTheme, black, themeState.useEnhancedShading) {
+    return remember(generated, darkTheme, black, themeState.shadingIntensity) {
         val base = if (black) generated.toOled() else generated
         val shaded =
-            if (!themeState.useEnhancedShading && !black) {
-                base.tintSurfacesTowardPrimary(darkTheme)
+            if (!black) {
+                base.tintSurfacesTowardPrimary(darkTheme, themeState.shadingIntensity)
             } else {
                 base
             }

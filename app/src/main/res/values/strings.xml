@@ -705,6 +705,8 @@
     <string name="appearance_adaptive_note_themes_subtitle">Use color from cover image to tint the note page</string>
     <string name="appearance_shading_title">Enhanced shading</string>
     <string name="appearance_shading_subtitle">Makes cards darker in dark mode and lighter in light mode</string>
+    <string name="appearance_shading_intensity_title">Surface shading</string>
+    <string name="appearance_shading_intensity_subtitle">Adjust the amount of color tint mixed into backgrounds</string>
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>
     <string name="appearance_remove_custom_color_message">It will be removed from your saved custom colors</string>
     <string name="appearance_add_custom_color_cd">Add custom color</string>

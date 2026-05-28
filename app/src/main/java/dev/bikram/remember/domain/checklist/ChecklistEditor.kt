@@ -162,29 +162,15 @@ object ChecklistEditor {
             val targetId = visibleIds[toIndex]
             val targetItem = itemsByLocalId[targetId] ?: return ChecklistEditResult(items = items, changed = false)
 
-            var resolvedToIndex = toIndex
-            // If target item belongs to a parent group with children, coerce toIndex to avoid splitting the group
-            if (!isDragging) {
-                val targetParentId = if (targetItem.depth == 0) targetItem.localId else targetItem.parentLocalId
-                if (targetParentId != null) {
-                    val visibleItems = visibleIds.mapNotNull { id -> itemsByLocalId[id] }
-                    val parentIdx = visibleItems.indexOfFirst { it.localId == targetParentId }
-                    if (parentIdx >= 0) {
-                        val childrenIndices =
-                            visibleItems.mapIndexedNotNull { idx, item ->
-                                if (item.parentLocalId == targetParentId) idx else null
-                            }
-                        if (childrenIndices.isNotEmpty()) {
-                            resolvedToIndex =
-                                if (toIndex < fromIndex) {
-                                    parentIdx
-                                } else {
-                                    childrenIndices.last()
-                                }
-                        }
-                    }
-                }
-            }
+            val resolvedToIndex =
+                resolveParentGroupTargetIndex(
+                    itemsByLocalId = itemsByLocalId,
+                    visibleIds = visibleIds,
+                    fromIndex = fromIndex,
+                    toIndex = toIndex,
+                    targetItem = targetItem,
+                    isDragging = isDragging,
+                )
 
             return reorderVisibleGroup(
                 items = items,
@@ -193,6 +179,7 @@ object ChecklistEditor {
                 movingVisibleGroupIds = movingGroupIds.filter { id -> id in itemsByLocalId && id in visibleIds },
                 fromIndex = fromIndex,
                 toIndex = resolvedToIndex,
+                keepParentGroupsTogether = !isDragging,
             )
         } else {
             // Moving a child item
@@ -222,30 +209,15 @@ object ChecklistEditor {
                     else -> movingItem.sortOrder
                 }
 
-            // 2. Resolve new parentLocalId and depth based on the preceding item in rearrangedIds
-            var newParentLocalId: Long? = movingItem.parentLocalId
-            var newDepth = movingItem.depth
-
-            if (!isDragging) {
-                newParentLocalId = null
-                newDepth = 0
-                // Search backwards from the item's new position to find the nearest parent (depth 0)
-                for (idx in toIndex - 1 downTo 0) {
-                    val prevId = rearrangedIds[idx]
-                    val prevItem = itemsByLocalId[prevId]
-                    if (prevItem != null) {
-                        if (prevItem.depth == 0) {
-                            newParentLocalId = prevItem.localId
-                            newDepth = 1
-                            break
-                        } else if (prevItem.depth == 1 && prevItem.parentLocalId != null) {
-                            newParentLocalId = prevItem.parentLocalId
-                            newDepth = 1
-                            break
-                        }
-                    }
-                }
-            }
+            // 2. Resolve new parentLocalId and depth based on the preceding item in rearrangedIds.
+            val (newParentLocalId, newDepth) =
+                resolveChildParentAfterMove(
+                    movingItem = movingItem,
+                    rearrangedIds = rearrangedIds,
+                    toIndex = toIndex,
+                    itemsByLocalId = itemsByLocalId,
+                    isDragging = isDragging,
+                )
 
             return ChecklistEditResult(
                 items =
@@ -265,6 +237,52 @@ object ChecklistEditor {
         }
     }
 
+    private fun resolveParentGroupTargetIndex(
+        itemsByLocalId: Map<Long, EditableItem>,
+        visibleIds: List<Long>,
+        fromIndex: Int,
+        toIndex: Int,
+        targetItem: EditableItem,
+        isDragging: Boolean,
+    ): Int {
+        if (isDragging) return toIndex
+
+        val targetParentId = if (targetItem.depth == 0) targetItem.localId else targetItem.parentLocalId
+        val visibleItems = visibleIds.mapNotNull { id -> itemsByLocalId[id] }
+        val parentIdx = visibleItems.indexOfFirst { item -> item.localId == targetParentId }
+        if (targetParentId == null || parentIdx < 0) return toIndex
+
+        val lastChildIndex =
+            visibleItems
+                .mapIndexedNotNull { index, item ->
+                    if (item.parentLocalId == targetParentId) index else null
+                }.lastOrNull() ?: return toIndex
+
+        return if (toIndex < fromIndex) parentIdx else lastChildIndex
+    }
+
+    private fun resolveChildParentAfterMove(
+        movingItem: EditableItem,
+        rearrangedIds: List<Long>,
+        toIndex: Int,
+        itemsByLocalId: Map<Long, EditableItem>,
+        isDragging: Boolean,
+    ): Pair<Long?, Int> {
+        if (isDragging) return movingItem.parentLocalId to movingItem.depth
+
+        for (idx in toIndex - 1 downTo 0) {
+            val prevItem = itemsByLocalId[rearrangedIds[idx]] ?: continue
+            if (prevItem.depth == 0) {
+                return prevItem.localId to 1
+            }
+            if (prevItem.depth == 1 && prevItem.parentLocalId != null) {
+                return prevItem.parentLocalId to 1
+            }
+        }
+
+        return null to 0
+    }
+
     private fun reorderVisibleGroup(
         items: List<EditableItem>,
         visibleIds: List<Long>,
@@ -272,6 +290,7 @@ object ChecklistEditor {
         movingVisibleGroupIds: List<Long>,
         fromIndex: Int,
         toIndex: Int,
+        keepParentGroupsTogether: Boolean,
     ): ChecklistEditResult {
         val targetId = visibleIds[toIndex]
         if (targetId in movingVisibleGroupIds) {
@@ -296,32 +315,18 @@ object ChecklistEditor {
                 addAll(insertionIndex, movingGroupIds)
             }
         val itemsByLocalId = items.associateBy { item -> item.localId }
-        val fullReorderedIds = mutableListOf<Long>()
-        val seenIds = mutableSetOf<Long>()
-        for (id in reorderedIds) {
-            if (id in seenIds) continue
-            fullReorderedIds.add(id)
-            seenIds.add(id)
-
-            val item = itemsByLocalId[id]
-            if (item != null && item.depth == 0) {
-                val children = items
-                    .filter { childItem -> childItem.parentLocalId == id }
-                    .sortedBy { childItem -> childItem.sortOrder }
-                    .map { childItem -> childItem.localId }
-                for (childId in children) {
-                    if (childId !in seenIds) {
-                        fullReorderedIds.add(childId)
-                        seenIds.add(childId)
-                    }
-                }
+        val fullReorderedIds =
+            if (keepParentGroupsTogether) {
+                expandParentGroups(reorderedIds, items, itemsByLocalId)
+            } else {
+                reorderedIds.distinct()
             }
-        }
         val sortOrdersById =
-            fullReorderedIds
-                .mapIndexed { index, id ->
-                    id to (index + 1).toDouble()
-                }.toMap()
+            calculateMovedGroupSortOrders(
+                fullReorderedIds = fullReorderedIds,
+                movingGroupIds = movingGroupIds,
+                itemsByLocalId = itemsByLocalId,
+            )
         return ChecklistEditResult(
             items =
                 items.map { item ->
@@ -331,6 +336,76 @@ object ChecklistEditor {
                 },
             changed = true,
         )
+    }
+
+    private fun expandParentGroups(
+        reorderedIds: List<Long>,
+        items: List<EditableItem>,
+        itemsByLocalId: Map<Long, EditableItem>,
+    ): List<Long> {
+        val fullReorderedIds = mutableListOf<Long>()
+        val seenIds = mutableSetOf<Long>()
+        for (id in reorderedIds) {
+            if (id in seenIds) continue
+            fullReorderedIds.add(id)
+            seenIds.add(id)
+
+            val item = itemsByLocalId[id]
+            if (item != null && item.depth == 0) {
+                val children =
+                    items
+                        .filter { childItem -> childItem.parentLocalId == id }
+                        .sortedBy { childItem -> childItem.sortOrder }
+                        .map { childItem -> childItem.localId }
+                for (childId in children) {
+                    if (childId !in seenIds) {
+                        fullReorderedIds.add(childId)
+                        seenIds.add(childId)
+                    }
+                }
+            }
+        }
+        return fullReorderedIds
+    }
+
+    private fun calculateMovedGroupSortOrders(
+        fullReorderedIds: List<Long>,
+        movingGroupIds: List<Long>,
+        itemsByLocalId: Map<Long, EditableItem>,
+    ): Map<Long, Double> {
+        val movedIndices =
+            fullReorderedIds.mapIndexedNotNull { index, id ->
+                if (id in movingGroupIds) index else null
+            }
+        if (movedIndices.isEmpty()) return emptyMap()
+
+        val firstMovedIndex = movedIndices.first()
+        val lastMovedIndex = movedIndices.last()
+        val previousOrder =
+            fullReorderedIds
+                .take(firstMovedIndex)
+                .lastOrNull { id -> id !in movingGroupIds }
+                ?.let { id -> itemsByLocalId[id]?.sortOrder }
+        val nextOrder =
+            fullReorderedIds
+                .drop(lastMovedIndex + 1)
+                .firstOrNull { id -> id !in movingGroupIds }
+                ?.let { id -> itemsByLocalId[id]?.sortOrder }
+
+        return when {
+            previousOrder != null && nextOrder != null -> {
+                val step = (nextOrder - previousOrder) / (movingGroupIds.size + 1)
+                movingGroupIds.mapIndexed { index, id -> id to previousOrder + step * (index + 1) }.toMap()
+            }
+            previousOrder != null ->
+                movingGroupIds.mapIndexed { index, id -> id to previousOrder + index + 1 }.toMap()
+            nextOrder != null -> {
+                val firstOrder = nextOrder - movingGroupIds.size
+                movingGroupIds.mapIndexed { index, id -> id to firstOrder + index }.toMap()
+            }
+            else ->
+                movingGroupIds.mapNotNull { id -> itemsByLocalId[id]?.sortOrder?.let { sortOrder -> id to sortOrder } }.toMap()
+        }
     }
 
     /**

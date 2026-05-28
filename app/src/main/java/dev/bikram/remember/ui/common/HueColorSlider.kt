@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -44,10 +45,18 @@ internal fun HueColorSlider(
 ) {
     val fallbackHex = colorHexFromHue(fallbackHue)
     val normalizedHex = normalizeHex(selectedHex.orEmpty()) ?: fallbackHex
-    var hue by rememberSaveable(normalizedHex) {
+    var hue by rememberSaveable {
         mutableFloatStateOf(hueFromHexColor(normalizedHex) ?: fallbackHue)
     }
-    var currentHex by rememberSaveable(normalizedHex) { mutableStateOf(normalizedHex) }
+    var currentHex by rememberSaveable { mutableStateOf(normalizedHex) }
+
+    LaunchedEffect(normalizedHex) {
+        if (normalizedHex != currentHex) {
+            currentHex = normalizedHex
+            hue = hueFromHexColor(normalizedHex) ?: fallbackHue
+        }
+    }
+
     val currentColor = colorFromHexOrDefault(currentHex, fallbackHue)
     val thumbColor = colorFromHue(hue, saturation = HUE_SLIDER_THUMB_SATURATION, value = HUE_SLIDER_THUMB_VALUE)
     val lightPanel = sliderPanelColor.luminance() > 0.5f

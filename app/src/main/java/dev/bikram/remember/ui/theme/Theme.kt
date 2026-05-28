@@ -92,6 +92,9 @@ fun RememberTheme(
         }
     }
 
+    val targetColorScheme = colorResolution.colorScheme
+    val targetBackgroundScheme = colorResolution.backgroundScheme
+
     CompositionLocalProvider(
         LocalDensity provides responsiveDensity,
         LocalIsDark provides darkTheme,
@@ -103,20 +106,22 @@ fun RememberTheme(
         LocalReducedMotion provides reducedMotion,
     ) {
         MaterialExpressiveTheme(
-            colorScheme = colorResolution.colorScheme,
+            colorScheme = targetColorScheme,
             motionScheme = MotionScheme.expressive(),
             shapes = AppShapes,
             typography = AppTypography,
         ) {
-            Box(Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+            ) {
                 // Page background uses the base scheme so card/panel surface adjustments
                 // never change the page backdrop.
                 if (paintBackground) {
                     GradientBackground(
                         useGradient = effectiveUseGradient,
-                        pageBackground = colorResolution.backgroundScheme.background,
-                        gradientBase = colorResolution.backgroundScheme.surface,
-                        gradientTop = colorResolution.backgroundScheme.primaryContainer,
+                        pageBackground = targetBackgroundScheme.background,
+                        gradientBase = targetBackgroundScheme.surface,
+                        gradientTop = targetBackgroundScheme.primaryContainer,
                         wallpaperTint = wallpaperTint,
                     )
                 }

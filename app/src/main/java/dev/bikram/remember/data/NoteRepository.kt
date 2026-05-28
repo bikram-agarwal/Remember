@@ -54,6 +54,7 @@ data class NoteCompletionSnapshot(
     val recurrence: RecurrenceRule?,
 )
 
+@Suppress("LargeClass")
 class NoteRepository(
     private val noteDao: NoteDao,
     private val itemDao: ChecklistItemDao,
@@ -812,20 +813,12 @@ class NoteRepository(
     ) {
         val existingItems = itemDao.itemsFor(noteId)
         val existingById = existingItems.associateBy { it.id }
-        val retainedExistingIds =
-            items
-                .mapNotNull { draft -> existingById[draft.localKey]?.id }
-                .toSet()
 
-        // 1. Delete items that are no longer present
-        val toDelete = existingItems.filter { it.id !in retainedExistingIds }
-        toDelete.forEach { itemDao.deleteById(it.id) }
-
-        // 2. Partition incoming items into parents and children
+        // 1. Partition incoming items into parents and children
         val (parents, children) = items.partition { it.parentLocalKey == null }
         val keyToRealId = mutableMapOf<Long, Long>()
 
-        // 3. Process parents (depth 0)
+        // 2. Process parents (depth 0)
         parents.forEach { draft ->
             val existing = existingById[draft.localKey]
             if (existing != null) {
@@ -858,7 +851,7 @@ class NoteRepository(
             }
         }
 
-        // 4. Process children (depth 1)
+        // 3. Process children (depth 1)
         children.forEach { draft ->
             val realParentId = draft.parentLocalKey?.let { keyToRealId[it] }
             val resolvedDepth = if (realParentId != null) draft.depth.coerceIn(0, 1) else 0
@@ -891,6 +884,14 @@ class NoteRepository(
                         ),
                     )
                 keyToRealId[draft.localKey] = newId
+            }
+        }
+
+        // 4. Delete items that were in the database but are no longer in our saved set
+        val savedRealIds = keyToRealId.values.toSet()
+        existingItems.forEach { existing ->
+            if (existing.id !in savedRealIds) {
+                itemDao.deleteById(existing.id)
             }
         }
     }

@@ -570,16 +570,20 @@ fun EditListScreen(
                                             placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                         ),
                                 ) { isDragging ->
-                                    LaunchedEffect(isDragging, item.localId, item.depth) {
-                                        if (isDragging) {
+                                    DisposableEffect(isDragging, item.localId) {
+                                        val wasDragging = isDragging
+                                        if (wasDragging) {
                                             vm.startDragging(item.localId)
                                             if (item.depth == 0) {
                                                 draggingParentLocalId = item.localId
                                             }
-                                        } else {
-                                            vm.stopDragging(item.localId)
-                                            if (draggingParentLocalId == item.localId) {
-                                                draggingParentLocalId = null
+                                        }
+                                        onDispose {
+                                            if (wasDragging) {
+                                                vm.stopDragging(item.localId)
+                                                if (draggingParentLocalId == item.localId) {
+                                                    draggingParentLocalId = null
+                                                }
                                             }
                                         }
                                     }
