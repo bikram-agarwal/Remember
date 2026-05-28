@@ -388,6 +388,222 @@ class ChecklistEditorTest {
         assertEquals(items, result.items)
     }
 
+    @Test
+    fun reordering_parent_coerces_target_index_to_avoid_splitting_other_parent_when_dragged_up() {
+        val itemsList =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 4L, sortOrder = 40.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 5L, sortOrder = 50.0),
+                editableItem(localId = 6L, sortOrder = 60.0, parentLocalId = 5L, depth = 1),
+            )
+        // visibleIds simulates dragging parent 5L up. Its children (6L) are filtered out of activeIds.
+        val visibleIdsList = listOf(1L, 2L, 3L, 4L, 5L)
+        // Drag parent 5L (index 4) and drop on child 2L (index 1).
+        val editResult =
+            ChecklistEditor.reorderWithin(
+                items = itemsList,
+                visibleIds = visibleIdsList,
+                fromIndex = 4,
+                toIndex = 1,
+            )
+        val sortedIdsList = editResult.items.sortedBy { item -> item.sortOrder }.map { item -> item.localId }
+
+        assertTrue(editResult.changed)
+        // Parent 5L (and child 6L) should be coerced to index 0 (parentIdx of 1L) to prevent splitting the 1L group.
+        assertEquals(listOf(5L, 6L, 1L, 2L, 3L, 4L), sortedIdsList)
+    }
+
+    @Test
+    fun reordering_parent_coerces_target_index_to_avoid_splitting_other_parent_when_dragged_down() {
+        val itemsList =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 4L, sortOrder = 40.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 5L, sortOrder = 50.0),
+                editableItem(localId = 6L, sortOrder = 60.0, parentLocalId = 5L, depth = 1),
+            )
+        // visibleIds simulates dragging parent 1L down. Its children (2L, 3L, 4L) are filtered out.
+        val visibleIdsList = listOf(1L, 5L, 6L)
+        // Drag parent 1L (index 0) and drop on child 6L (index 2).
+        val editResult =
+            ChecklistEditor.reorderWithin(
+                items = itemsList,
+                visibleIds = visibleIdsList,
+                fromIndex = 0,
+                toIndex = 2,
+            )
+        val sortedIdsList = editResult.items.sortedBy { item -> item.sortOrder }.map { item -> item.localId }
+
+        assertTrue(editResult.changed)
+        // Parent 1L (and children 2L, 3L, 4L) should be coerced to index 2 (last child index of 5L) to prevent splitting.
+        assertEquals(listOf(5L, 6L, 1L, 2L, 3L, 4L), sortedIdsList)
+    }
+
+    @Test
+    fun reordering_parent_coerces_target_index_to_avoid_splitting_other_parent_when_dragged_down_to_parent() {
+        val itemsList =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 4L, sortOrder = 40.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 5L, sortOrder = 50.0),
+                editableItem(localId = 6L, sortOrder = 60.0, parentLocalId = 5L, depth = 1),
+            )
+        // visibleIds simulates dragging parent 1L down. Its children (2L, 3L, 4L) are filtered out.
+        val visibleIdsList = listOf(1L, 5L, 6L)
+        // Drag parent 1L (index 0) and drop on parent 5L (index 1).
+        val editResult =
+            ChecklistEditor.reorderWithin(
+                items = itemsList,
+                visibleIds = visibleIdsList,
+                fromIndex = 0,
+                toIndex = 1,
+            )
+        val sortedIdsList = editResult.items.sortedBy { item -> item.sortOrder }.map { item -> item.localId }
+
+        assertTrue(editResult.changed)
+        // Parent 1L (and children 2L, 3L, 4L) should be coerced to index 2 (last child index of 5L) to prevent splitting.
+        assertEquals(listOf(5L, 6L, 1L, 2L, 3L, 4L), sortedIdsList)
+    }
+
+    @Test
+    fun reordering_parent_coerces_target_index_to_avoid_splitting_other_parent_when_dragged_up_to_parent() {
+        val itemsList =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 4L, sortOrder = 40.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 5L, sortOrder = 50.0),
+                editableItem(localId = 6L, sortOrder = 60.0, parentLocalId = 5L, depth = 1),
+            )
+        // visibleIds simulates dragging parent 5L up. Its children (6L) are filtered out of activeIds.
+        val visibleIdsList = listOf(1L, 2L, 3L, 4L, 5L)
+        // Drag parent 5L (index 4) and drop on parent 1L (index 0).
+        val editResult =
+            ChecklistEditor.reorderWithin(
+                items = itemsList,
+                visibleIds = visibleIdsList,
+                fromIndex = 4,
+                toIndex = 0,
+            )
+        val sortedIdsList = editResult.items.sortedBy { item -> item.sortOrder }.map { item -> item.localId }
+
+        assertTrue(editResult.changed)
+        // Parent 5L (and child 6L) should be coerced to index 0 (parentIdx of 1L) to prevent splitting the 1L group.
+        assertEquals(listOf(5L, 6L, 1L, 2L, 3L, 4L), sortedIdsList)
+    }
+
+    @Test
+    fun reordering_child_reparents_to_new_parent_when_dragged_between_sections() {
+        val itemsList =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0),
+                editableItem(localId = 4L, sortOrder = 40.0, parentLocalId = 3L, depth = 1),
+            )
+        val visibleIdsList = listOf(1L, 2L, 3L, 4L)
+        // Drag child 2L (index 1) and drop after parent 3L (to index 3).
+        val editResult =
+            ChecklistEditor.reorderWithin(
+                items = itemsList,
+                visibleIds = visibleIdsList,
+                fromIndex = 1,
+                toIndex = 3,
+            )
+        val movedItem = editResult.items.first { item -> item.localId == 2L }
+
+        assertTrue(editResult.changed)
+        assertEquals(3L, movedItem.parentLocalId)
+        assertEquals(1, movedItem.depth)
+    }
+
+    @Test
+    fun reordering_child_promoted_to_parent_when_dragged_to_top() {
+        val itemsList =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+            )
+        val visibleIdsList = listOf(1L, 2L)
+        // Drag child 2L (index 1) and drop at index 0.
+        val editResult =
+            ChecklistEditor.reorderWithin(
+                items = itemsList,
+                visibleIds = visibleIdsList,
+                fromIndex = 1,
+                toIndex = 0,
+            )
+        val movedItem = editResult.items.first { item -> item.localId == 2L }
+
+        assertTrue(editResult.changed)
+        assertEquals(null, movedItem.parentLocalId)
+        assertEquals(0, movedItem.depth)
+    }
+
+    @Test
+    fun reordering_parent_does_not_coerce_target_index_during_active_drag() {
+        val itemsList =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 4L, sortOrder = 40.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 5L, sortOrder = 50.0),
+                editableItem(localId = 6L, sortOrder = 60.0, parentLocalId = 5L, depth = 1),
+            )
+        val visibleIdsList = listOf(1L, 2L, 3L, 4L, 5L)
+        // Drag parent 5L (index 4) and hover on child 2L (index 1) with isDragging = true.
+        val editResult =
+            ChecklistEditor.reorderWithin(
+                items = itemsList,
+                visibleIds = visibleIdsList,
+                fromIndex = 4,
+                toIndex = 1,
+                isDragging = true,
+            )
+        val sortedIdsList = editResult.items.sortedBy { item -> item.sortOrder }.map { item -> item.localId }
+
+        assertTrue(editResult.changed)
+        // Coercion should not occur during active drag, so parent 5L should swap simply to index 1 (between 1L and 2L).
+        assertEquals(listOf(1L, 5L, 6L, 2L, 3L, 4L), sortedIdsList)
+    }
+
+    @Test
+    fun reordering_child_does_not_reparent_during_active_drag() {
+        val itemsList =
+            listOf(
+                editableItem(localId = 1L, sortOrder = 10.0),
+                editableItem(localId = 2L, sortOrder = 20.0, parentLocalId = 1L, depth = 1),
+                editableItem(localId = 3L, sortOrder = 30.0),
+                editableItem(localId = 4L, sortOrder = 40.0, parentLocalId = 3L, depth = 1),
+            )
+        val visibleIdsList = listOf(1L, 2L, 3L, 4L)
+        // Drag child 2L (index 1) and hover after parent 3L (to index 3) with isDragging = true.
+        val editResult =
+            ChecklistEditor.reorderWithin(
+                items = itemsList,
+                visibleIds = visibleIdsList,
+                fromIndex = 1,
+                toIndex = 3,
+                isDragging = true,
+            )
+        val movedItem = editResult.items.first { item -> item.localId == 2L }
+
+        assertTrue(editResult.changed)
+        // Should NOT reparent to 3L during active drag.
+        assertEquals(1L, movedItem.parentLocalId)
+        assertEquals(1, movedItem.depth)
+    }
+
+
     private fun editableItem(
         localId: Long,
         checked: Boolean = false,

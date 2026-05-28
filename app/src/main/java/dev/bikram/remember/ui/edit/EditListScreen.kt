@@ -419,7 +419,10 @@ fun EditListScreen(
                             activeEntries
                         } else {
                             activeEntries.filterNot { entry ->
-                                entry is ActiveEntry.Row && entry.item.parentLocalId == parentLocalId
+                                when (entry) {
+                                    is ActiveEntry.Ghost -> true
+                                    is ActiveEntry.Row -> entry.item.depth == 1
+                                }
                             }
                         }
                     }
@@ -440,9 +443,13 @@ fun EditListScreen(
                 val activeIds =
                     remember(activeList, draggingParentLocalId) {
                         val parentLocalId = draggingParentLocalId
-                        activeList
-                            .filterNot { item -> parentLocalId != null && item.parentLocalId == parentLocalId }
-                            .map { item -> item.localId }
+                        if (parentLocalId == null) {
+                            activeList.map { item -> item.localId }
+                        } else {
+                            activeList
+                                .filter { item -> item.depth == 0 }
+                                .map { item -> item.localId }
+                        }
                     }
                 val completedRowIds = remember(completedItems) { completedItems.map { it.localId } }
 
@@ -564,10 +571,16 @@ fun EditListScreen(
                                         ),
                                 ) { isDragging ->
                                     LaunchedEffect(isDragging, item.localId, item.depth) {
-                                        if (isDragging && item.depth == 0) {
-                                            draggingParentLocalId = item.localId
-                                        } else if (!isDragging && draggingParentLocalId == item.localId) {
-                                            draggingParentLocalId = null
+                                        if (isDragging) {
+                                            vm.startDragging(item.localId)
+                                            if (item.depth == 0) {
+                                                draggingParentLocalId = item.localId
+                                            }
+                                        } else {
+                                            vm.stopDragging(item.localId)
+                                            if (draggingParentLocalId == item.localId) {
+                                                draggingParentLocalId = null
+                                            }
                                         }
                                     }
                                     val focusRequester = remember(item.localId) { FocusRequester() }

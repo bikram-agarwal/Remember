@@ -39,6 +39,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -214,6 +215,7 @@ fun FullScreenHeroImageOverlay(
     var retainedSharedKey by remember { mutableStateOf(sharedElementKey) }
     var reframeMode by remember { mutableStateOf(startInReframeMode) }
     var zoom by remember(retainedImageUri) { mutableFloatStateOf(initialFraming?.zoom?.coerceIn(1f, 8f) ?: 1f) }
+    val currentZoom = rememberUpdatedState(zoom)
     var panXPx by remember(retainedImageUri) { mutableFloatStateOf(0f) }
     var panYPx by remember(retainedImageUri) { mutableFloatStateOf(0f) }
     var lastFrameSizePx by remember { mutableStateOf<Pair<Float, Float>?>(null) }
@@ -271,6 +273,16 @@ fun FullScreenHeroImageOverlay(
         val closeSemantics =
             remember(closeLabel) {
                 Modifier.semantics { contentDescription = closeLabel }
+            }
+        val zoomInLabel = stringResource(R.string.cover_zoom_in_cd)
+        val zoomInSemantics =
+            remember(zoomInLabel) {
+                Modifier.semantics { contentDescription = zoomInLabel }
+            }
+        val zoomOutLabel = stringResource(R.string.cover_zoom_out_cd)
+        val zoomOutSemantics =
+            remember(zoomOutLabel) {
+                Modifier.semantics { contentDescription = zoomOutLabel }
             }
         val imageRequest = rememberHeroImageRequest(visibleImageUri, retainedCacheRevision, maxSidePx = 2048)
         val overlayInteractionSource = remember { MutableInteractionSource() }
@@ -337,7 +349,6 @@ fun FullScreenHeroImageOverlay(
                 val baseImageOffsetXDp = with(density) { baseImageLeft.toDp() }
                 val baseImageOffsetYDp = with(density) { baseImageTop.toDp() }
                 if (reframeMode && imageReady) {
-                    val baseFitScale = min(baseImageW / intrinsic.width, baseImageH / intrinsic.height)
                     val maskW = min(baseImageW, baseImageH * HERO_MASK_ASPECT_RATIO)
                     val maskH = maskW / HERO_MASK_ASPECT_RATIO
                     val baseMaskLeft = baseImageLeft + (baseImageW - maskW) / 2f
@@ -345,48 +356,48 @@ fun FullScreenHeroImageOverlay(
                     val cornerPx = with(density) { 8.dp.toPx() }
                     lastFrameSizePx = maskW to maskH
 
+                    val intrinsicWidth = intrinsic.width
+                    val intrinsicHeight = intrinsic.height
+                    val coverScale = max(maskW / intrinsicWidth, maskH / intrinsicHeight)
+
                     LaunchedEffect(
                         retainedImageUri,
                         imageReady,
                         initialFraming,
                         maskW,
                         maskH,
-                        intrinsic.width,
-                        intrinsic.height,
+                        intrinsicWidth,
+                        intrinsicHeight,
                     ) {
-                        val iw = intrinsic.width
-                        val ih = intrinsic.height
+                        if (!imageReady) return@LaunchedEffect
                         val framing = (initialFraming ?: HeroFraming()).clamped()
-                        val cover = max(maskW / iw, maskH / ih)
-                        val displayScale = baseFitScale
-                        zoom = (displayScale / cover).coerceIn(1f, 8f)
-                        val desiredMaskLeft = baseImageLeft + framing.focalX * baseImageW - maskW / 2f
-                        val desiredMaskTop = baseImageTop + framing.focalY * baseImageH - maskH / 2f
-                        val rangeX = max(0f, (baseImageW - maskW) / 2f)
-                        val rangeY = max(0f, (baseImageH - maskH) / 2f)
-                        panXPx = (desiredMaskLeft - baseMaskLeft).coerceIn(-rangeX, rangeX)
-                        panYPx = (desiredMaskTop - baseMaskTop).coerceIn(-rangeY, rangeY)
+                        zoom = framing.zoom
+                        val initialDisplayScale = coverScale * zoom
+                        val initialScaledWidth = intrinsicWidth * initialDisplayScale
+                        val initialScaledHeight = intrinsicHeight * initialDisplayScale
+                        val initialRangeX = max(0f, (initialScaledWidth - maskW) / 2f)
+                        val initialRangeY = max(0f, (initialScaledHeight - maskH) / 2f)
+                        panXPx = ((0.5f - framing.focalX) * initialScaledWidth).coerceIn(-initialRangeX, initialRangeX)
+                        panYPx = ((0.5f - framing.focalY) * initialScaledHeight).coerceIn(-initialRangeY, initialRangeY)
                     }
 
-                    val iw = intrinsic.width
-                    val ih = intrinsic.height
-                    val cover = max(maskW / iw, maskH / ih)
-                    val displayScale = baseFitScale
-                    val rangeX = max(0f, (baseImageW - maskW) / 2f)
-                    val rangeY = max(0f, (baseImageH - maskH) / 2f)
+                    val baseFitScale = min(baseImageW / intrinsicWidth, baseImageH / intrinsicHeight)
+                    val displayScale = coverScale * zoom.coerceIn(1f, 8f)
+                    val scaledWidth = intrinsicWidth * displayScale
+                    val scaledHeight = intrinsicHeight * displayScale
+                    val rangeX = max(0f, (scaledWidth - maskW) / 2f)
+                    val rangeY = max(0f, (scaledHeight - maskH) / 2f)
                     val frameOffsetX = panXPx.coerceIn(-rangeX, rangeX)
                     val frameOffsetY = panYPx.coerceIn(-rangeY, rangeY)
-                    val maskLeft = baseMaskLeft + frameOffsetX
-                    val maskTop = baseMaskTop + frameOffsetY
+                    val maskLeft = baseMaskLeft
+                    val maskTop = baseMaskTop
+
                     lastReframeGeometry =
                         ReframeGeometry(
                             maskWidthPx = maskW,
                             maskHeightPx = maskH,
-                            baseMaskLeftPx = baseMaskLeft,
-                            baseMaskTopPx = baseMaskTop,
-                            imageLeftPx = baseImageLeft,
-                            imageTopPx = baseImageTop,
-                            displayScale = displayScale,
+                            scaledWidthPx = scaledWidth,
+                            scaledHeightPx = scaledHeight,
                         )
                     Surface(
                         color = Color.Transparent,
@@ -399,25 +410,40 @@ fun FullScreenHeroImageOverlay(
                                         baseImageOffsetXDp.roundToPx(),
                                         baseImageOffsetYDp.roundToPx(),
                                     )
-                                }.pointerInput(maskW, maskH, iw, ih) {
-                                    detectTransformGestures { _, pan, _, _ ->
+                                }
+                                .pointerInput(maskW, maskH, intrinsicWidth, intrinsicHeight) {
+                                    detectTransformGestures { _, pan, zoomChange, _ ->
+                                        val nextZoom = (currentZoom.value * zoomChange).coerceIn(1f, 8f)
+                                        zoom = nextZoom
                                         panXPx += pan.x
                                         panYPx += pan.y
-                                        panXPx = panXPx.coerceIn(-rangeX, rangeX)
-                                        panYPx = panYPx.coerceIn(-rangeY, rangeY)
+                                        val currentDisplayScale = coverScale * nextZoom
+                                        val currentScaledWidth = intrinsicWidth * currentDisplayScale
+                                        val currentScaledHeight = intrinsicHeight * currentDisplayScale
+                                        val currentRangeX = max(0f, (currentScaledWidth - maskW) / 2f)
+                                        val currentRangeY = max(0f, (currentScaledHeight - maskH) / 2f)
+                                        panXPx = panXPx.coerceIn(-currentRangeX, currentRangeX)
+                                        panYPx = panYPx.coerceIn(-currentRangeY, currentRangeY)
                                     }
                                 },
                     ) {
+                        val scale = displayScale / baseFitScale
                         Image(
                             painter = imagePainter,
                             contentDescription = imageContentDescription,
                             contentScale = ContentScale.FillBounds,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .graphicsLayer {
+                                        scaleX = scale
+                                        scaleY = scale
+                                        translationX = frameOffsetX
+                                        translationY = frameOffsetY
+                                    },
                         )
                     }
                     if (showCropMorphLayer && sharedScope != null && effectiveSharedKey != null) {
-                        val previewImageOffsetXDp = with(density) { (baseImageLeft - maskLeft).toDp() }
-                        val previewImageOffsetYDp = with(density) { (baseImageTop - maskTop).toDp() }
                         Surface(
                             color = Color.Transparent,
                             shape = RoundedCornerShape(8.dp),
@@ -429,6 +455,7 @@ fun FullScreenHeroImageOverlay(
                                         with(density) { maskH.toDp() },
                                     ).then(imageModifier),
                         ) {
+                            val scale = displayScale / baseFitScale
                             Image(
                                 painter = imagePainter,
                                 contentDescription = null,
@@ -436,11 +463,12 @@ fun FullScreenHeroImageOverlay(
                                 modifier =
                                     Modifier
                                         .requiredSize(baseImageWidthDp, baseImageHeightDp)
-                                        .offset {
-                                            IntOffset(
-                                                previewImageOffsetXDp.roundToPx(),
-                                                previewImageOffsetYDp.roundToPx(),
-                                            )
+                                        .graphicsLayer {
+                                            scaleX = scale
+                                            scaleY = scale
+                                            translationX = frameOffsetX
+                                            translationY = frameOffsetY
+                                            clip = true
                                         },
                             )
                         }
@@ -495,7 +523,7 @@ fun FullScreenHeroImageOverlay(
                 }
             }
             PhotoOverlayCircleButton(
-                icon = "close",
+                iconName = "close",
                 contentDescriptionModifier = closeSemantics,
                 onClick = onDismiss,
                 buttonSize = 40.dp,
@@ -514,10 +542,11 @@ fun FullScreenHeroImageOverlay(
                             .navigationBarsPadding()
                             .padding(horizontal = 16.dp, vertical = 18.dp),
                     horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     PhotoOverlayActionPill(
                         label = stringResource(R.string.common_cancel),
-                        icon = "close",
+                        iconName = "close",
                         onClick = {
                             showCropMorphLayer = false
                             if (dismissOnCancelReframe) {
@@ -527,39 +556,66 @@ fun FullScreenHeroImageOverlay(
                             }
                         },
                     )
+                    Spacer(Modifier.width(16.dp))
+                    PhotoOverlayCircleButton(
+                        iconName = "zoom_out",
+                        contentDescriptionModifier = zoomOutSemantics,
+                        onClick = {
+                            val geometry = lastReframeGeometry
+                            if (imageReady && geometry != null) {
+                                val maskWidthPx = geometry.maskWidthPx
+                                val maskHeightPx = geometry.maskHeightPx
+                                val coverScale = max(maskWidthPx / intrinsic.width, maskHeightPx / intrinsic.height)
+                                zoom = (zoom - 0.25f).coerceIn(1f, 8f)
+                                val currentDisplayScale = coverScale * zoom
+                                val currentScaledWidth = intrinsic.width * currentDisplayScale
+                                val currentScaledHeight = intrinsic.height * currentDisplayScale
+                                val currentRangeX = max(0f, (currentScaledWidth - maskWidthPx) / 2f)
+                                val currentRangeY = max(0f, (currentScaledHeight - maskHeightPx) / 2f)
+                                panXPx = panXPx.coerceIn(-currentRangeX, currentRangeX)
+                                panYPx = panYPx.coerceIn(-currentRangeY, currentRangeY)
+                            }
+                        },
+                        buttonSize = 40.dp,
+                        iconSize = 22.dp,
+                    )
                     Spacer(Modifier.width(8.dp))
+                    PhotoOverlayCircleButton(
+                        iconName = "zoom_in",
+                        contentDescriptionModifier = zoomInSemantics,
+                        onClick = {
+                            val geometry = lastReframeGeometry
+                            if (imageReady && geometry != null) {
+                                val maskWidthPx = geometry.maskWidthPx
+                                val maskHeightPx = geometry.maskHeightPx
+                                val coverScale = max(maskWidthPx / intrinsic.width, maskHeightPx / intrinsic.height)
+                                zoom = (zoom + 0.25f).coerceIn(1f, 8f)
+                                val currentDisplayScale = coverScale * zoom
+                                val currentScaledWidth = intrinsic.width * currentDisplayScale
+                                val currentScaledHeight = intrinsic.height * currentDisplayScale
+                                val currentRangeX = max(0f, (currentScaledWidth - maskWidthPx) / 2f)
+                                val currentRangeY = max(0f, (currentScaledHeight - maskHeightPx) / 2f)
+                                panXPx = panXPx.coerceIn(-currentRangeX, currentRangeX)
+                                panYPx = panYPx.coerceIn(-currentRangeY, currentRangeY)
+                            }
+                        },
+                        buttonSize = 40.dp,
+                        iconSize = 22.dp,
+                    )
+                    Spacer(Modifier.width(16.dp))
                     PhotoOverlayActionPill(
                         label = stringResource(R.string.common_save),
-                        icon = "check",
+                        iconName = "check",
                         onClick = {
                             val geometry = lastReframeGeometry
                             if (!imageReady || geometry == null) {
                                 return@PhotoOverlayActionPill
                             }
-                            val frameWidthPx = geometry.maskWidthPx
-                            val frameHeightPx = geometry.maskHeightPx
-                            val iw = intrinsic.width
-                            val ih = intrinsic.height
-                            val cover = max(frameWidthPx / iw, frameHeightPx / ih)
-                            val scaledW = iw * geometry.displayScale
-                            val scaledH = ih * geometry.displayScale
-                            val rangeX = max(0f, (scaledW - frameWidthPx) / 2f)
-                            val rangeY = max(0f, (scaledH - frameHeightPx) / 2f)
-                            val frameOffsetX = panXPx.coerceIn(-rangeX, rangeX)
-                            val frameOffsetY = panYPx.coerceIn(-rangeY, rangeY)
-                            val frameLeft = geometry.baseMaskLeftPx + frameOffsetX
-                            val frameTop = geometry.baseMaskTopPx + frameOffsetY
-                            val focalX =
-                                (
-                                    (frameLeft + frameWidthPx / 2f - geometry.imageLeftPx) /
-                                        (iw * geometry.displayScale)
-                                ).coerceIn(0f, 1f)
-                            val focalY =
-                                (
-                                    (frameTop + frameHeightPx / 2f - geometry.imageTopPx) /
-                                        (ih * geometry.displayScale)
-                                ).coerceIn(0f, 1f)
-                            val savedZoom = (geometry.displayScale / cover).coerceIn(1f, 8f)
+                            val scaledW = geometry.scaledWidthPx
+                            val scaledH = geometry.scaledHeightPx
+                            val focalX = (0.5f - panXPx / scaledW).coerceIn(0f, 1f)
+                            val focalY = (0.5f - panYPx / scaledH).coerceIn(0f, 1f)
+                            val savedZoom = zoom.coerceIn(1f, 8f)
                             onCommitFraming?.invoke(HeroFraming(focalX = focalX, focalY = focalY, zoom = savedZoom))
                             if (dismissAfterCommit) {
                                 showCropMorphLayer = true
@@ -591,7 +647,7 @@ fun FullScreenHeroImageOverlay(
                     ) {
                         PhotoOverlayActionPill(
                             label = stringResource(R.string.edit_picture_reframe),
-                            icon = "crop",
+                            iconName = "crop",
                             contentDescriptionModifier = editSemantics,
                             onClick = {
                                 onEdit?.invoke()
@@ -602,7 +658,7 @@ fun FullScreenHeroImageOverlay(
                         if (onReplace != null) {
                             PhotoOverlayActionPill(
                                 label = stringResource(R.string.edit_picture_replace),
-                                icon = "undo",
+                                iconName = "undo",
                                 contentDescriptionModifier = replaceSemantics,
                                 onClick = onReplace,
                                 onLongClick = onReplaceLongClick,
@@ -611,7 +667,7 @@ fun FullScreenHeroImageOverlay(
                         }
                         if (onDelete != null) {
                             PhotoOverlayCircleButton(
-                                icon = "delete",
+                                iconName = "delete",
                                 destructive = true,
                                 contentDescriptionModifier = deleteSemantics,
                                 buttonSize = 40.dp,
@@ -632,7 +688,7 @@ fun FullScreenHeroImageOverlay(
 @Composable
 private fun PhotoOverlayActionPill(
     label: String,
-    icon: String,
+    iconName: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     contentDescriptionModifier: Modifier = Modifier,
@@ -668,7 +724,7 @@ private fun PhotoOverlayActionPill(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             RememberMaterialRoundedSymbol(
-                name = icon,
+                name = iconName,
                 size = 20.dp,
                 tint = content,
                 weight = FontWeight.Medium,
@@ -686,16 +742,13 @@ private fun PhotoOverlayActionPill(
 private data class ReframeGeometry(
     val maskWidthPx: Float,
     val maskHeightPx: Float,
-    val baseMaskLeftPx: Float,
-    val baseMaskTopPx: Float,
-    val imageLeftPx: Float,
-    val imageTopPx: Float,
-    val displayScale: Float,
+    val scaledWidthPx: Float,
+    val scaledHeightPx: Float,
 )
 
 @Composable
 private fun PhotoOverlayCircleButton(
-    icon: String,
+    iconName: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     destructive: Boolean = false,
@@ -732,7 +785,7 @@ private fun PhotoOverlayCircleButton(
     ) {
         Box(contentAlignment = Alignment.Center) {
             RememberMaterialRoundedSymbol(
-                name = icon,
+                name = iconName,
                 size = iconSize,
                 tint = content,
                 weight = FontWeight.Medium,

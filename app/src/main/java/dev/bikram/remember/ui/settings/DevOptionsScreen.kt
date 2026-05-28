@@ -72,15 +72,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.FileProvider
-import androidx.core.graphics.createBitmap
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.backup.RememberBackupWork
+import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.BackupPreferencesState
 import dev.bikram.remember.data.Importance
+import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.PersistableChecklistItem
@@ -131,6 +132,49 @@ private class DeveloperTriggeredCrashException(
 
 private const val REMEMBER_DATABASE_NAME = "remember.db"
 private const val REMEMBER_DATABASE_VERSION = 1
+private const val DEMO_MARKDOWN_HERO_ASSET = "demo_markdown_hero.webp"
+private const val DEMO_TASKS_ATTACHMENT_ASSET = "demo_attachment.txt"
+private const val DEMO_MARKDOWN_HERO_FRAMING = """{"v":1,"fx":0.5,"fy":0.4262000024318695,"z":1}"""
+
+private val demoMarkdownBody =
+    """
+    # Heading 1
+    ## Heading 2
+    ### Heading 3
+    **Bold**, *italic*, <u>underline</u>, ~~strikethrough~~
+
+    > A blockquote line
+
+    - Bullet item 1
+      - Child item 1
+
+    1. Ordered item 1
+      1. Child item 1
+
+    - [ ] Checklist in note
+      - [ ] Child item 1
+
+    `inline code` and [a link](https://example.com)
+
+    ```
+    # Compose FTW
+    echo "Multiline code"
+    ```
+    """.trimIndent()
+
+private fun demoGroceriesChecklistItems(): List<PersistableChecklistItem> =
+    listOf(
+        PersistableChecklistItem(-1, "Drinkables", false, 1.0),
+        PersistableChecklistItem(-2, "Coffee ☕", false, 2.0, -1, 1),
+        PersistableChecklistItem(-3, "Milk 🥛", false, 3.0, -1, 1),
+        PersistableChecklistItem(-4, "Cola 🥤", true, 4.0, -1, 1),
+        PersistableChecklistItem(-5, "Grooming", false, 5.0),
+        PersistableChecklistItem(-6, "Shaving kit 🪒", false, 6.0, -5, 1),
+        PersistableChecklistItem(-7, "Toothpaste / Brush 🪥 ", false, 7.0, -5, 1),
+        PersistableChecklistItem(-8, "Snacks", false, 8.0),
+        PersistableChecklistItem(-9, "Cookies 🍪", false, 9.0, -8, 1),
+        PersistableChecklistItem(-10, "Banana 🍌 ", false, 10.0, -8, 1),
+    )
 
 private object DevOptionsScreenSessionState {
     var firstVisibleItemIndex = 0
@@ -1101,15 +1145,8 @@ private fun fireNotifBigText(
                 title = context.getString(R.string.dev_options_test_notif_big_text_title),
                 colorIndex = 1,
                 items =
-                    listOf(
-                        context.getString(R.string.dev_options_mock_checklist_item_milk),
-                        context.getString(R.string.dev_options_mock_checklist_item_eggs),
-                        context.getString(R.string.dev_options_mock_checklist_item_bread),
-                        context.getString(R.string.dev_options_mock_checklist_item_report),
-                        context.getString(R.string.dev_options_mock_checklist_item_pr),
-                        context.getString(R.string.dev_options_mock_checklist_item_dentist),
-                        context.getString(R.string.dev_options_mock_checklist_item_work),
-                    ),
+                    demoGroceriesChecklistItems()
+                        .map { item -> item.text.trimEnd() },
                 options = NoteOptions(tags = listOf(RememberReservedTags.MOCK)),
             )
         val noteWithItems = noteRepository.get(noteId) ?: return@launch
@@ -1123,7 +1160,7 @@ private fun fireNotifBigPicture(
     scope: CoroutineScope,
 ) {
     scope.launch(Dispatchers.IO) {
-        val heroUri = createMockHeroImageUri(context)
+        val heroUri = copyDemoMarkdownHeroUri(context)
         val noteId =
             noteRepository.createNote(
                 title = context.getString(R.string.dev_options_test_notif_big_picture_title),
@@ -1199,40 +1236,68 @@ private suspend fun createMockNotes(
     val now = System.currentTimeMillis()
     val mockTag = RememberReservedTags.MOCK
 
-    val checklistTags = listOf(mockTag, context.getString(R.string.dev_options_mock_checklist_tag1))
-    val listId =
-        noteRepository.createList(
-            title = context.getString(R.string.dev_options_mock_checklist_title),
-            colorIndex = 2,
-            items = emptyList(),
-            options = NoteOptions(tags = checklistTags, reminderAt = now + 3 * 3_600_000L),
-        )
-    noteRepository.setStarred(listId, true)
-    noteRepository.updateList(
-        id = listId,
-        title = context.getString(R.string.dev_options_mock_checklist_title),
-        colorIndex = 2,
-        items =
-            listOf(
-                PersistableChecklistItem(-1, context.getString(R.string.dev_options_mock_checklist_item_groceries), false, 1.0),
-                PersistableChecklistItem(-2, context.getString(R.string.dev_options_mock_checklist_item_milk), true, 1.1, -1, 1),
-                PersistableChecklistItem(-3, context.getString(R.string.dev_options_mock_checklist_item_eggs), false, 1.2, -1, 1),
-                PersistableChecklistItem(-4, context.getString(R.string.dev_options_mock_checklist_item_bread), true, 1.3, -1, 1),
-                PersistableChecklistItem(-5, context.getString(R.string.dev_options_mock_checklist_item_work), false, 2.0),
-                PersistableChecklistItem(-6, context.getString(R.string.dev_options_mock_checklist_item_report), true, 2.1, -5, 1),
-                PersistableChecklistItem(-7, context.getString(R.string.dev_options_mock_checklist_item_pr), false, 2.2, -5, 1),
-                PersistableChecklistItem(-8, context.getString(R.string.dev_options_mock_checklist_item_dentist), false, 3.0),
+    val markdownHeroUri = copyDemoMarkdownHeroUri(context)
+    noteRepository.createNote(
+        title = "Demo: Markdown",
+        body = demoMarkdownBody,
+        colorIndex = 0,
+        options =
+            NoteOptions(
+                tags = listOf(mockTag),
+                pictureUri = markdownHeroUri,
+                pictureHeroFraming = markdownHeroUri?.let { DEMO_MARKDOWN_HERO_FRAMING },
+                iconKey = "symbol_filled:data_object",
             ),
-        options = NoteOptions(tags = checklistTags, reminderAt = now + 3 * 3_600_000L),
     )
 
-    val heroUri = createMockHeroImageUri(context)
-    noteRepository.createNote(
-        title = context.getString(R.string.dev_options_mock_note_title),
-        body = context.getString(R.string.dev_options_mock_note_body),
-        colorIndex = 4,
-        options = NoteOptions(tags = listOf(mockTag), pictureUri = heroUri),
+    val listId =
+        noteRepository.createList(
+            title = "Demo: Groceries",
+            colorIndex = 0,
+            items = emptyList(),
+            options =
+                NoteOptions(
+                    tags = listOf(mockTag),
+                    reminderAt = now + 5 * 24 * 3_600_000L,
+                    iconKey = "symbol_filled:grocery",
+                    actions =
+                        listOf(
+                            NoteAction(
+                                type = ActionType.GET_DIRECTIONS,
+                                title = "QFC Direction",
+                                details = "1234",
+                            ),
+                        ),
+                ),
+        )
+    noteRepository.updateList(
+        id = listId,
+        title = "Demo: Groceries",
+        colorIndex = 0,
+        items = demoGroceriesChecklistItems(),
+        options =
+            NoteOptions(
+                tags = listOf(mockTag),
+                reminderAt = now + 5 * 24 * 3_600_000L,
+                iconKey = "symbol_filled:grocery",
+                actions =
+                    listOf(
+                        NoteAction(
+                            type = ActionType.GET_DIRECTIONS,
+                            title = "QFC Direction",
+                            details = "1234",
+                        ),
+                    ),
+            ),
     )
+    copyDemoTasksAttachmentUri(context, listId)?.let { attachmentUri ->
+        noteRepository.addAttachment(
+            noteId = listId,
+            uri = attachmentUri,
+            displayName = "Tasks.txt",
+            mimeType = "text/plain",
+        )
+    }
 
     return 2
 }
@@ -1252,32 +1317,34 @@ private suspend fun deleteMockNotes(noteRepository: NoteRepository) {
     }
 }
 
-private fun createMockHeroImageUri(context: Context): String? =
+private fun copyDemoMarkdownHeroUri(context: Context): String? =
+    copyMockAssetToFileProviderUri(
+        context = context,
+        assetName = DEMO_MARKDOWN_HERO_ASSET,
+        destination = java.io.File(context.filesDir, "note_heroes/demo_markdown_hero.webp"),
+    )
+
+private fun copyDemoTasksAttachmentUri(
+    context: Context,
+    noteId: Long,
+): String? =
+    copyMockAssetToFileProviderUri(
+        context = context,
+        assetName = DEMO_TASKS_ATTACHMENT_ASSET,
+        destination = java.io.File(context.filesDir, "note_attachments/$noteId/demo_attachment.txt"),
+    )
+
+private fun copyMockAssetToFileProviderUri(
+    context: Context,
+    assetName: String,
+    destination: java.io.File,
+): String? =
     runCatching {
-        val w = 800
-        val h = 450
-        val bitmap = createBitmap(w, h)
-        val canvas = android.graphics.Canvas(bitmap)
-        val gradient =
-            android.graphics.LinearGradient(
-                0f,
-                0f,
-                w.toFloat(),
-                h.toFloat(),
-                intArrayOf(
-                    android.graphics.Color.rgb(99, 102, 241),
-                    android.graphics.Color.rgb(168, 85, 247),
-                    android.graphics.Color.rgb(236, 72, 153),
-                ),
-                floatArrayOf(0f, 0.5f, 1f),
-                android.graphics.Shader.TileMode.CLAMP,
-            )
-        val paint = android.graphics.Paint().apply { shader = gradient }
-        canvas.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
-        val file = java.io.File(context.cacheDir, "dev_mock/hero.jpg")
-        file.parentFile?.mkdirs()
-        file.outputStream().use { out -> bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out) }
-        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file).toString()
+        destination.parentFile?.mkdirs()
+        context.assets.open(assetName).use { input ->
+            destination.outputStream().use { output -> input.copyTo(output) }
+        }
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", destination).toString()
     }.getOrNull()
 
 // ---------------------------------------------------------------------------

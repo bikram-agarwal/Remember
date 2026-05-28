@@ -363,14 +363,126 @@ class EditListViewModel
             )
         }
 
+        private var draggingItemId: Long? = null
+        private var originalSortOrder: Double? = null
+
+        fun startDragging(localId: Long) {
+            draggingItemId = localId
+            originalSortOrder = _items.value.firstOrNull { item -> item.localId == localId }?.sortOrder
+        }
+
+        fun stopDragging(localId: Long) {
+            if (draggingItemId == localId) {
+                draggingItemId = null
+                finalizeReorder(localId)
+                originalSortOrder = null
+            }
+        }
+
         fun reorderWithin(
             visibleIds: List<Long>,
             fromIndex: Int,
             toIndex: Int,
         ) {
             applyChecklistEdit(
-                ChecklistEditor.reorderWithin(_items.value, visibleIds, fromIndex, toIndex),
+                ChecklistEditor.reorderWithin(_items.value, visibleIds, fromIndex, toIndex, isDragging = true),
             )
+        }
+
+        private fun finalizeReorder(localId: Long) {
+            val currentItems = _items.value
+            val targetItem = currentItems.firstOrNull { item -> item.localId == localId } ?: return
+            val itemsByLocalId = currentItems.associateBy { item -> item.localId }
+
+            if (targetItem.depth == 0) {
+                // Parent coercion logic
+                val sortedItems = currentItems.sortedBy { item -> item.sortOrder }
+                val targetIndex = sortedItems.indexOfFirst { item -> item.localId == localId }
+                if (targetIndex < 0) {
+                    return
+                }
+
+                // Find nearest preceding parent item
+                var precedingParent: EditableItem? = null
+                for (idx in targetIndex - 1 downTo 0) {
+                    val candidateItem = sortedItems[idx]
+                    if (candidateItem.depth == 0) {
+                        precedingParent = candidateItem
+                        break
+                    }
+                }
+
+                if (precedingParent != null) {
+                    // Check if there are any children of precedingParent that are currently placed after localId
+                    val parentId = precedingParent.localId
+                    val hasChildrenAfter = sortedItems.subList(targetIndex + 1, sortedItems.size).any { item ->
+                        item.parentLocalId == parentId
+                    }
+                    if (hasChildrenAfter) {
+                        val targetParentId = precedingParent.localId
+                        val parentIdx = sortedItems.indexOfFirst { item -> item.localId == targetParentId }
+                        val childrenIndices = sortedItems.mapIndexedNotNull { index, item ->
+                            if (item.parentLocalId == targetParentId) index else null
+                        }
+                        val originalOrder = originalSortOrder
+                        if (parentIdx >= 0 && originalOrder != null) {
+                            val resolvedToIndex = if (originalOrder > precedingParent.sortOrder) {
+                                // Dragged up: coerce to before precedingParent
+                                parentIdx
+                            } else {
+                                // Dragged down: coerce to after its last child
+                                if (childrenIndices.isNotEmpty()) childrenIndices.last() else parentIdx
+                            }
+                            val visibleIds = sortedItems.map { item -> item.localId }
+                            val fromIdx = sortedItems.indexOfFirst { item -> item.localId == localId }
+                            if (fromIdx >= 0 && resolvedToIndex >= 0) {
+                                applyChecklistEdit(
+                                    ChecklistEditor.reorderWithin(
+                                        items = currentItems,
+                                        visibleIds = visibleIds,
+                                        fromIndex = fromIdx,
+                                        toIndex = resolvedToIndex,
+                                        isDragging = false
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Child reparenting logic
+                val sortedItems = currentItems.sortedBy { item -> item.sortOrder }
+                val targetIndex = sortedItems.indexOfFirst { item -> item.localId == localId }
+                if (targetIndex < 0) {
+                    return
+                }
+
+                var newParentLocalId: Long? = null
+                var newDepth = 0
+
+                // Search backwards from the item's new position to find the nearest parent
+                for (idx in targetIndex - 1 downTo 0) {
+                    val prevItem = sortedItems[idx]
+                    if (prevItem.depth == 0) {
+                        newParentLocalId = prevItem.localId
+                        newDepth = 1
+                        break
+                    } else if (prevItem.depth == 1 && prevItem.parentLocalId != null) {
+                        newParentLocalId = prevItem.parentLocalId
+                        newDepth = 1
+                        break
+                    }
+                }
+
+                _items.value = currentItems.map { item ->
+                    if (item.localId == localId) {
+                        item.copy(parentLocalId = newParentLocalId, depth = newDepth)
+                    } else {
+                        item
+                    }
+                }
+                markDirty()
+            }
         }
 
         fun setParent(

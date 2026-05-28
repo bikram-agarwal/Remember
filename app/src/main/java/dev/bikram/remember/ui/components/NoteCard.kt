@@ -495,6 +495,7 @@ fun NoteCard(
                         visibleTags = visibleTags,
                         reminderNotificationsAllowed = reminderNotificationsAllowed,
                         contentColor = cardContentColor,
+                        showPictureIndicator = !showHero,
                     )
                 }
             }
@@ -587,12 +588,13 @@ private fun MetadataRow(
     visibleTags: List<String>,
     reminderNotificationsAllowed: Boolean,
     contentColor: Color,
+    showPictureIndicator: Boolean,
 ) {
     val tags = visibleTags.take(3)
     val extraTags = (visibleTags.size - tags.size).coerceAtLeast(0)
     val reminderAt = model.reminderAt
     val isRecurring = model.recurring
-    val hasPicture = model.pictureUri != null
+    val hasPicture = showPictureIndicator && model.pictureUri != null
     val hasAttachment = model.hasAttachment
     val anyMetadata = tags.isNotEmpty() || reminderAt != null || hasPicture || hasAttachment
     if (!anyMetadata) return

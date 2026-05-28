@@ -254,6 +254,7 @@ class NoteRepository(
         options: NoteOptions,
     ) {
         val existing = noteDao.get(id)?.note ?: return
+        val oldPictureUri = existing.pictureUri
         noteDao.update(
             existing.copy(
                 title = title,
@@ -282,6 +283,9 @@ class NoteRepository(
         tagRepository?.replaceTagsForNote(id, options.tags)
         rescheduleReminder(id, options.reminderAt, options.importance)
         refreshNotificationIfActive(id)
+        if (oldPictureUri != null && oldPictureUri != options.pictureUri) {
+            cleanupUnreferencedMedia(listOf(oldPictureUri))
+        }
         postWriteBookkeeping()
     }
 
@@ -327,11 +331,13 @@ class NoteRepository(
                             },
                     ),
                 )
-                itemDao.deleteForNote(id)
-                persistHierarchy(noteId = id, items = items)
+                updateListChecklistItems(noteId = id, items = items)
                 true
             }
         }
+        val existingNote = noteDao.get(id)?.note
+        val oldPictureUri = existingNote?.pictureUri
+
         val didUpdate =
             if (database != null) {
                 database.withTransaction { applyUpdates() }
@@ -341,7 +347,12 @@ class NoteRepository(
         if (didUpdate) tagRepository?.replaceTagsForNote(id, options.tags)
         if (didUpdate) rescheduleReminder(id, options.reminderAt, options.importance)
         if (didUpdate) refreshNotificationIfActive(id)
-        if (didUpdate) postWriteBookkeeping()
+        if (didUpdate) {
+            if (oldPictureUri != null && oldPictureUri != options.pictureUri) {
+                cleanupUnreferencedMedia(listOf(oldPictureUri))
+            }
+            postWriteBookkeeping()
+        }
     }
 
     suspend fun setStarred(
@@ -755,10 +766,11 @@ class NoteRepository(
         items: List<PersistableChecklistItem>,
     ) {
         if (items.isEmpty()) return
+        val (parents, children) = items.partition { it.parentLocalKey == null }
         val keyToRealId = mutableMapOf<Long, Long>()
-        val insertedIds = mutableListOf<Long>()
-        // First pass: insert every row flat.
-        items.forEach { draft ->
+
+        // 1. Insert parents (depth 0)
+        parents.forEach { draft ->
             val newId =
                 itemDao.insert(
                     ChecklistItemEntity(
@@ -771,26 +783,115 @@ class NoteRepository(
                         depth = 0,
                     ),
                 )
-            // localKey 0 means "no stable key"; skip so it does not collide with other drafts.
             if (draft.localKey != 0L) keyToRealId[draft.localKey] = newId
-            insertedIds += newId
         }
-        // Second pass: patch parentId / depth on children.
-        items.forEachIndexed { index, draft ->
-            val parentKey = draft.parentLocalKey ?: return@forEachIndexed
-            val realParentId = keyToRealId[parentKey] ?: return@forEachIndexed
-            val realId = insertedIds[index]
-            itemDao.update(
-                ChecklistItemEntity(
-                    id = realId,
-                    noteId = noteId,
-                    text = draft.text,
-                    checked = draft.checked,
-                    sortOrder = draft.sortOrder,
-                    parentId = realParentId,
-                    depth = draft.depth.coerceIn(0, 1),
-                ),
-            )
+
+        // 2. Insert children (depth 1)
+        children.forEach { draft ->
+            val realParentId = draft.parentLocalKey?.let { keyToRealId[it] }
+            val resolvedDepth = if (realParentId != null) draft.depth.coerceIn(0, 1) else 0
+            val newId =
+                itemDao.insert(
+                    ChecklistItemEntity(
+                        id = 0,
+                        noteId = noteId,
+                        text = draft.text,
+                        checked = draft.checked,
+                        sortOrder = draft.sortOrder,
+                        parentId = realParentId,
+                        depth = resolvedDepth,
+                    ),
+                )
+            if (draft.localKey != 0L) keyToRealId[draft.localKey] = newId
+        }
+    }
+
+    private suspend fun updateListChecklistItems(
+        noteId: Long,
+        items: List<PersistableChecklistItem>,
+    ) {
+        val existingItems = itemDao.itemsFor(noteId)
+        val existingById = existingItems.associateBy { it.id }
+        val retainedExistingIds =
+            items
+                .mapNotNull { draft -> existingById[draft.localKey]?.id }
+                .toSet()
+
+        // 1. Delete items that are no longer present
+        val toDelete = existingItems.filter { it.id !in retainedExistingIds }
+        toDelete.forEach { itemDao.deleteById(it.id) }
+
+        // 2. Partition incoming items into parents and children
+        val (parents, children) = items.partition { it.parentLocalKey == null }
+        val keyToRealId = mutableMapOf<Long, Long>()
+
+        // 3. Process parents (depth 0)
+        parents.forEach { draft ->
+            val existing = existingById[draft.localKey]
+            if (existing != null) {
+                itemDao.update(
+                    ChecklistItemEntity(
+                        id = existing.id,
+                        noteId = noteId,
+                        text = draft.text,
+                        checked = draft.checked,
+                        sortOrder = draft.sortOrder,
+                        parentId = null,
+                        depth = 0,
+                    ),
+                )
+                keyToRealId[draft.localKey] = existing.id
+            } else {
+                val newId =
+                    itemDao.insert(
+                        ChecklistItemEntity(
+                            id = 0,
+                            noteId = noteId,
+                            text = draft.text,
+                            checked = draft.checked,
+                            sortOrder = draft.sortOrder,
+                            parentId = null,
+                            depth = 0,
+                        ),
+                    )
+                keyToRealId[draft.localKey] = newId
+            }
+        }
+
+        // 4. Process children (depth 1)
+        children.forEach { draft ->
+            val realParentId = draft.parentLocalKey?.let { keyToRealId[it] }
+            val resolvedDepth = if (realParentId != null) draft.depth.coerceIn(0, 1) else 0
+
+            val existing = existingById[draft.localKey]
+            if (existing != null) {
+                itemDao.update(
+                    ChecklistItemEntity(
+                        id = existing.id,
+                        noteId = noteId,
+                        text = draft.text,
+                        checked = draft.checked,
+                        sortOrder = draft.sortOrder,
+                        parentId = realParentId,
+                        depth = resolvedDepth,
+                    ),
+                )
+                keyToRealId[draft.localKey] = existing.id
+            } else {
+                val newId =
+                    itemDao.insert(
+                        ChecklistItemEntity(
+                            id = 0,
+                            noteId = noteId,
+                            text = draft.text,
+                            checked = draft.checked,
+                            sortOrder = draft.sortOrder,
+                            parentId = realParentId,
+                            depth = resolvedDepth,
+                        ),
+                    )
+                keyToRealId[draft.localKey] = newId
+            }
         }
     }
 
@@ -799,6 +900,7 @@ class NoteRepository(
         pictureUri: String?,
     ) {
         val existing = noteDao.get(noteId)?.note ?: return
+        val oldPictureUri = existing.pictureUri
         noteDao.update(
             existing.copy(
                 pictureUri = pictureUri,
@@ -806,6 +908,9 @@ class NoteRepository(
                 updatedAt = clock(),
             ),
         )
+        if (oldPictureUri != null && oldPictureUri != pictureUri) {
+            cleanupUnreferencedMedia(listOf(oldPictureUri))
+        }
         postWriteBookkeeping(includeSummary = false)
     }
 
