@@ -17,6 +17,8 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.get
 import androidx.core.net.toUri
 import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
@@ -926,7 +928,7 @@ private fun materialSymbolBitmap(
     name: String,
     typeface: Typeface,
 ): Bitmap {
-    val source = Bitmap.createBitmap(WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX, WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX, Bitmap.Config.ARGB_8888)
+    val source = createBitmap(WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX, WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(source)
     val paint =
         Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -941,7 +943,7 @@ private fun materialSymbolBitmap(
             ((paint.fontMetrics.ascent + paint.fontMetrics.descent) / 2f)
     canvas.drawText(name, WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX / 2f, baseline, paint)
     val bounds = source.nonTransparentBounds() ?: return source
-    val output = Bitmap.createBitmap(WIDGET_SYMBOL_BITMAP_SIZE_PX, WIDGET_SYMBOL_BITMAP_SIZE_PX, Bitmap.Config.ARGB_8888)
+    val output = createBitmap(WIDGET_SYMBOL_BITMAP_SIZE_PX, WIDGET_SYMBOL_BITMAP_SIZE_PX, Bitmap.Config.ARGB_8888)
     Canvas(output).drawBitmap(
         source,
         bounds,
@@ -964,7 +966,7 @@ private fun Bitmap.nonTransparentBounds(): Rect? {
     var bottom = -1
     for (y in 0 until height) {
         for (x in 0 until width) {
-            if ((getPixel(x, y) ushr 24) != 0) {
+            if ((this[x, y] ushr 24) != 0) {
                 if (x < left) left = x
                 if (x > right) right = x
                 if (y < top) top = y

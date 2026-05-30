@@ -10,20 +10,20 @@ import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-internal fun rememberEditorSharedBoundsModifier(noteId: Long?): Modifier {
+internal fun Modifier.rememberEditorSharedBoundsModifier(noteId: Long?): Modifier {
     val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
     val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
     val sharedBoundsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Rect>())
     val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
     return if (sharedScope != null && navScope != null && noteId != null) {
         with(sharedScope) {
-            Modifier.sharedBounds(
+            this@rememberEditorSharedBoundsModifier.sharedBounds(
                 sharedContentState = rememberSharedContentState(key = "note-card-$noteId"),
                 animatedVisibilityScope = navScope,
                 boundsTransform = sharedBoundsTransform,
             )
         }
     } else {
-        Modifier
+        this
     }
 }

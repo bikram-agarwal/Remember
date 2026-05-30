@@ -1,4 +1,4 @@
-## v1.0.0: Launch of **Remember**
+## v1.0.1: Launch of **Remember**
 
 ### ✨ Features
 

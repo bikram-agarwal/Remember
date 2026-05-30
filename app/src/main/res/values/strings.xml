@@ -163,7 +163,6 @@
     <string name="view_options_group_type">Type</string>
 
     <!-- Note cards -->
-    <string name="cd_note_hero_image">Note hero image</string>
     <string name="notecard_starred_cd">Starred</string>
     <string name="notecard_reminder_cd">Has reminder</string>
     <string name="notecard_recurring_cd">Repeats</string>
@@ -670,7 +669,6 @@
     <string name="appearance_theme_light">Light</string>
     <string name="appearance_theme_dark">Dark</string>
     <string name="appearance_theme_black">Black</string>
-    <string name="appearance_palette_style">Palette style</string>
     <string name="appearance_palette">Palette</string>
     <string name="appearance_preview_title_named">Preview · %1$s</string>
     <string name="appearance_preview_customize">Customize</string>
@@ -684,8 +682,6 @@
     <string name="color_source_dusk">Dusk</string>
     <string name="color_source_berry">Berry</string>
     <string name="color_source_custom">Custom</string>
-    <string name="appearance_preview_surface_ladder">Surface ladder</string>
-    <string name="appearance_preview_accent_containers">Accent containers</string>
     <string name="appearance_preview_label_lowest">lowest</string>
     <string name="appearance_preview_label_low">low</string>
     <string name="appearance_preview_label_surface">surface</string>
@@ -705,8 +701,6 @@
     <string name="appearance_cover_subtitle">Use the note picture as a faded background of the card</string>
     <string name="appearance_adaptive_note_themes_title">Adaptive note themes</string>
     <string name="appearance_adaptive_note_themes_subtitle">Use color from cover image to tint the note page</string>
-    <string name="appearance_shading_title">Enhanced shading</string>
-    <string name="appearance_shading_subtitle">Makes cards darker in dark mode and lighter in light mode</string>
     <string name="appearance_shading_intensity_title">Surface shading</string>
     <string name="appearance_shading_intensity_subtitle">Adjust how strongly theme colors tint surfaces</string>
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>
@@ -951,9 +945,9 @@
     <string name="settings_about_website">Website</string>
     <string name="settings_about_privacy_policy">Privacy policy</string>
     <string name="settings_about_terms">Terms</string>
-    <string name="settings_about_remember_website_url" translatable="false">https://bikram101.qzz.io/remember/</string>
-    <string name="settings_about_remember_privacy_url" translatable="false">https://bikram101.qzz.io/remember/privacy/</string>
-    <string name="settings_about_remember_terms_url" translatable="false">https://bikram101.qzz.io/remember/terms/</string>
+    <string name="settings_about_remember_website_url" translatable="false">https://bikram-agarwal.github.io/remember/</string>
+    <string name="settings_about_remember_privacy_url" translatable="false">https://bikram-agarwal.github.io/remember/privacy/</string>
+    <string name="settings_about_remember_terms_url" translatable="false">https://bikram-agarwal.github.io/remember/terms/</string>
     <string name="settings_about_filepipe_play_store_url" translatable="false">https://play.google.com/store/apps/details?id=dev.bikram.filepipe</string>
     <string name="settings_about_filepipe_github_url" translatable="false">https://github.com/bikram-agarwal/filepipe/releases/latest</string>
     <string name="settings_about_obtainx_github_url" translatable="false">https://github.com/bikram-agarwal/ObtainX/releases/latest</string>

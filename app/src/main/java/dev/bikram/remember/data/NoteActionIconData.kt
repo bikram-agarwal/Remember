@@ -7,13 +7,14 @@ import android.graphics.Rect
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.util.Base64
+import androidx.core.graphics.createBitmap
 import java.io.ByteArrayOutputStream
 
 private const val NOTE_ACTION_ICON_SIZE_PX = 96
 
 fun Drawable.toNoteActionIconData(): String? =
     runCatching {
-        val bitmap = Bitmap.createBitmap(NOTE_ACTION_ICON_SIZE_PX, NOTE_ACTION_ICON_SIZE_PX, Bitmap.Config.ARGB_8888)
+        val bitmap = createBitmap(NOTE_ACTION_ICON_SIZE_PX, NOTE_ACTION_ICON_SIZE_PX, Bitmap.Config.ARGB_8888)
         try {
             val canvas = Canvas(bitmap)
             val oldBounds = Rect(bounds)

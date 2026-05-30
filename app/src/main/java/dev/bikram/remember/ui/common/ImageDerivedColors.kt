@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.graphics.get
 import androidx.core.net.toUri
 import com.materialkolor.rememberDynamicColorScheme
 import dev.bikram.remember.data.ThemeMode
@@ -201,7 +202,7 @@ private fun Bitmap.averageColor(): Int? {
     while (y < height) {
         var x = stride / 2
         while (x < width) {
-            val pixel = getPixel(x, y)
+            val pixel = this[x, y]
             if (AndroidColor.alpha(pixel) >= 160) {
                 val r = AndroidColor.red(pixel).toDouble()
                 val g = AndroidColor.green(pixel).toDouble()

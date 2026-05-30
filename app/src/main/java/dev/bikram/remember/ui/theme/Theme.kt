@@ -27,10 +27,10 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
 import dev.bikram.remember.data.ThemeMode
@@ -133,7 +133,12 @@ fun RememberTheme(
 
 @Composable
 private fun responsiveTextScaleForScreenWidth(): Float {
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val screenWidthDp =
+        with(LocalDensity.current) {
+            LocalWindowInfo.current.containerSize.width
+                .toDp()
+                .value
+        }
     return when {
         screenWidthDp < 320 -> 0.84f
         screenWidthDp < 360 -> 0.88f

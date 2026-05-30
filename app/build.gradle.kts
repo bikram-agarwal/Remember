@@ -72,8 +72,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = 101
+        versionName = "1.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -191,9 +191,9 @@ ktlint {
 configurations.named("detekt") {
     resolutionStrategy {
         force(
-            "io.github.detekt.sarif4k:sarif4k:0.7.0",
-            "io.github.detekt.sarif4k:sarif4k-jvm:0.7.0",
-            "io.github.oshai:kotlin-logging:8.0.03",
+            "io.github.detekt.sarif4k:sarif4k:${libs.versions.sarif4k.get()}",
+            "io.github.detekt.sarif4k:sarif4k-jvm:${libs.versions.sarif4k.get()}",
+            "io.github.oshai:kotlin-logging:${libs.versions.kotlinLogging.get()}",
         )
     }
 }

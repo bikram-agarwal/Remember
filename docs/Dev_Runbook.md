@@ -10,23 +10,10 @@ What to run at each stage of the development loop.
 
 | Checkpoint | Commands |
 | --- | --- |
-| Tiny code change | `.\gradlew.bat :app:compileGithubDebugKotlin` |
-| Logic change with unit tests | `.\gradlew.bat :app:compileGithubDebugKotlin`<br>`.\gradlew.bat :app:testGithubDebugUnitTest` |
+| Tiny code change with unit tests | `.\gradlew.bat :app:compileGithubDebugKotlin`<br>`.\gradlew.bat :app:testGithubDebugUnitTest` |
 | Shared code, DB, Hilt, or flavor-sensitive change | `.\gradlew.bat :app:compileGithubDebugKotlin :app:compilePlaystoreDebugKotlin`<br>`.\gradlew.bat :app:testGithubDebugUnitTest :app:testPlaystoreDebugUnitTest` |
 | Before commit | `.\gradlew.bat :app:ktlintMainSourceSetCheck :app:compileGithubDebugKotlin :app:testGithubDebugUnitTest` |
-| Before PR | `.\gradlew.bat :app:ktlintCheck :app:detekt`<br>`.\gradlew.bat :app:testGithubDebugUnitTest :app:testPlaystoreDebugUnitTest`<br>`.\gradlew.bat :app:lintGithubDebug`<br>`.\gradlew.bat :app:assembleGithubDevRelease` |
 | Before release candidate | `.\gradlew.bat :app:ktlintCheck :app:detekt`<br>`.\gradlew.bat :app:testGithubDebugUnitTest :app:testPlaystoreDebugUnitTest`<br>`.\gradlew.bat :app:lintGithubDebug :app:lintVitalGithubDevRelease`<br>`.\gradlew.bat :app:assembleGithubDevRelease` |
-
-**Specific situations:**
-
-| Changed | Add to checkpoint |
-| --- | --- |
-| Play Store-only source or build config | `.\gradlew.bat :app:compilePlaystoreDebugKotlin` |
-| Android API, manifest, permissions, resources, or Gradle config | `.\gradlew.bat :app:lintGithubDebug` |
-| R8 / resource shrinking | `.\gradlew.bat :app:assembleGithubDevRelease` |
-| Dependency upgrade sweep | `.\gradlew.bat checkDependencyUpdates` |
-| Formatting cleanup before rechecking | `.\gradlew.bat :app:ktlintFormat` |
-| Lint issue intentionally fixed or suppressed | `.\gradlew.bat :app:updateLintBaseline` — run once, after the code is already correct |
 
 ---
 
@@ -37,23 +24,14 @@ Use these when the task is maintenance-focused rather than part of every edit lo
 | Task | Commands |
 | --- | --- |
 | Check dependency upgrades | `.\gradlew.bat checkDependencyUpdates` |
-| See raw dependency-updates output | `.\gradlew.bat --no-parallel --no-configuration-cache dependencyUpdates` |
+| Apply dependency upgrades | `.\gradlew.bat --no-parallel --no-configuration-cache versionCatalogUpdate` |
+| Update Gradle version | `.\gradlew.bat wrapper --gradle-version <version>` |
+| Recheck formatting | `.\gradlew.bat :app:ktlintCheck` |
 | Format app Kotlin sources | `.\gradlew.bat :app:ktlintFormat` |
 | Format only main app sources | `.\gradlew.bat :app:ktlintMainSourceSetFormat` |
-| Recheck formatting | `.\gradlew.bat :app:ktlintCheck` |
+| Lint issue intentionally fixed or suppressed | `.\gradlew.bat :app:updateLintBaseline` — run once, after the code is already correct |
 
 After running a formatter, inspect the diff before keeping the result. Ktlint can touch nearby files that already had style drift, so only keep formatting changes that belong with the current task.
-
----
-
-## What Not To Run Routinely
-
-| Avoid | Use instead | Why |
-| --- | --- | --- |
-| All checks in one invocation (tests + detekt + ktlint + assemble) | The staged PR commands above | Loads KSP, Hilt, Room, minified build, and analysis together — more likely to hit Metaspace pressure |
-| `.\gradlew.bat :app:updateLintBaseline` speculatively | Fix or suppress first, then run once | Baseline updates should record intentional decisions, not hide new warnings |
-| `.\gradlew.bat tasks --all` | `.\gradlew.bat tasks` | Android projects generate noisy variant-specific task lists |
-| `.\gradlew.bat --stop` after every build | Run only after Gradle/JVM/tooling changes | Stopping daemons needlessly slows the normal loop |
 
 ---
 
@@ -97,16 +75,22 @@ After running a formatter, inspect the diff before keeping the result. Ktlint ca
 
 ---
 
-## Appendix: FilePipe
+## Appendix: ObtainX
 
-Run from `D:\git\FilePipe`. Same Gradle structure as Remember.
+### Quality Check Mapping
 
-FilePipe has no unit tests and no lint baseline. The before-PR suite is lighter as a result:
+| Command | What it does |
+| --- | --- |
+| `flutter analyze` <br> `dart format --output=none --set-exit-if-changed .` | Runs static analysis checks (via analysis_options.yaml) and verifies files match standard Dart formatting guidelines.|
+| `flutter test` | Executes all unit and widget tests located in the test/ directory. |
+| `dart format .` | Formats all .dart files in the workspace. |
+| `flutter build apk --split-per-abi` | Compiles a release APK, performing full tree-shaking and build verification.
 
-```
-.\gradlew.bat :app:ktlintCheck :app:detekt
-.\gradlew.bat :app:compileGithubDebugKotlin :app:compilePlaystoreDebugKotlin
-.\gradlew.bat :app:assembleGithubDevRelease
-```
+### Development Loop Checkpoints
 
-All other checkpoints (compile, install, dependency updates) use the same commands as Remember. Add `test...UnitTest` tasks if unit tests are introduced.
+| Checkpoint | Commands |
+| --- | --- |
+| Tiny code change | `flutter analyze` |
+| Logic change with unit tests | `flutter test` |
+| Before commit | `dart format .` <br> `flutter analyze` <br> `flutter test` |
+| Before PR / Release Candidate | `flutter analyze` <br> `flutter test` <br> `flutter build apk --split-per-abi`|

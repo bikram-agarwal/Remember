@@ -29,26 +29,28 @@ ICON_SYMBOL_IDENTIFIER = r'(?=[A-Za-z_][A-Za-z0-9_]*)(?=[A-Za-z0-9_]*(?:[Ii]con|
 ICON_SYMBOL_ASSIGNMENT = rf'\b{ICON_SYMBOL_IDENTIFIER}\s*=\s*{LIGATURE}'
 ICON_SYMBOL_DEFAULT_PARAM = rf'\b{ICON_SYMBOL_IDENTIFIER}\s*:\s*String\??\s*=\s*{LIGATURE}'
 ICON_SYMBOL_IF_ELSE_IDENTIFIER = rf'(?:name|{ICON_SYMBOL_IDENTIFIER})'
+KOTLIN_OPEN_BRACE = r'\{'
+KOTLIN_CLOSE_BRACE = r'\}'
 ICON_SYMBOL_WHEN_BRANCH = re.compile(r'->\s*"([a-z][a-z0-9_]+)"')
 ICON_SYMBOL_WHEN_BLOCKS: list[tuple[str, re.Pattern[str]]] = [
     (
         "icon_symbol_when_assignment",
         re.compile(
-            rf'\b{ICON_SYMBOL_IDENTIFIER}\s*=\s*when\b[^\{{]*\{{(?P<body>.*?)^\s*\}}',
+            rf'\b{ICON_SYMBOL_IDENTIFIER}\s*=\s*when\b[^{KOTLIN_OPEN_BRACE}]*{KOTLIN_OPEN_BRACE}(?P<body>.*?)^\s*{KOTLIN_CLOSE_BRACE}',
             re.DOTALL | re.MULTILINE,
         ),
     ),
     (
         "icon_symbol_when_function",
         re.compile(
-            rf'\bfun\s+[A-Za-z0-9_.]*{ICON_SYMBOL_IDENTIFIER}\s*\([^)]*\)\s*:\s*String\s*=\s*when\b[^\{{]*\{{(?P<body>.*?)^\s*\}}',
+            rf'\bfun\s+[A-Za-z0-9_.]*{ICON_SYMBOL_IDENTIFIER}\s*\([^)]*\)\s*:\s*String\s*=\s*when\b[^{KOTLIN_OPEN_BRACE}]*{KOTLIN_OPEN_BRACE}(?P<body>.*?)^\s*{KOTLIN_CLOSE_BRACE}',
             re.DOTALL | re.MULTILINE,
         ),
     ),
     (
         "icon_symbol_return_when_function",
         re.compile(
-            rf'\bfun\s+[A-Za-z0-9_.]*{ICON_SYMBOL_IDENTIFIER}\s*\([^)]*\)\s*:\s*String\s*\{{.*?\breturn\s+when\b[^\{{]*\{{(?P<body>.*?)^\s*\}}',
+            rf'\bfun\s+[A-Za-z0-9_.]*{ICON_SYMBOL_IDENTIFIER}\s*\([^)]*\)\s*:\s*String\s*{KOTLIN_OPEN_BRACE}.*?\breturn\s+when\b[^{KOTLIN_OPEN_BRACE}]*{KOTLIN_OPEN_BRACE}(?P<body>.*?)^\s*{KOTLIN_CLOSE_BRACE}',
             re.DOTALL | re.MULTILINE,
         ),
     ),
@@ -67,7 +69,7 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # `iconName = if (...) "restore_from_trash" else "delete_forever"`.
     # The simpler `name = "x"` patterns stop at the first `)` inside the condition.
     ("symbol_name_if_else", re.compile(
-        rf'\b{ICON_SYMBOL_IF_ELSE_IDENTIFIER}\s*=\s*if\s*\([^)]*\)\s*(?:\{{\s*)?"([a-z][a-z0-9_]+)"\s*(?:\}}\s*)?else\s*(?:\{{\s*)?"([a-z][a-z0-9_]+)"',
+        rf'\b{ICON_SYMBOL_IF_ELSE_IDENTIFIER}\s*=\s*if\s*\([^)]*\)\s*(?:{KOTLIN_OPEN_BRACE}\s*)?"([a-z][a-z0-9_]+)"\s*(?:{KOTLIN_CLOSE_BRACE}\s*)?else\s*(?:{KOTLIN_OPEN_BRACE}\s*)?"([a-z][a-z0-9_]+)"',
         re.DOTALL,
     )),
     # Enum constructor entries like `ARCHIVE("archive")`.

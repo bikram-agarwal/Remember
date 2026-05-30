@@ -476,10 +476,10 @@ private fun BehaviorOptionSummary(
 @Composable
 private fun OptionCell(
     symbolName: String,
-    icon: Drawable? = null,
     title: String,
     summary: String,
     modifier: Modifier = Modifier,
+    icon: Drawable? = null,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,

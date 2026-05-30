@@ -51,7 +51,7 @@ fun EditNoteRoute(
     val vm: EditNoteViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
     val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
-    val sharedModifier = rememberEditorSharedBoundsModifier(noteId)
+    val sharedModifier = Modifier.rememberEditorSharedBoundsModifier(noteId)
 
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
         EditNoteScreen(

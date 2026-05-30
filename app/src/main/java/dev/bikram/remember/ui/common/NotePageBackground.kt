@@ -13,8 +13,8 @@ import dev.bikram.remember.ui.theme.LocalUseGradient
 
 @Composable
 fun NotePageBackground(
-    colorScheme: ColorScheme = MaterialTheme.colorScheme,
     modifier: Modifier = Modifier,
+    colorScheme: ColorScheme = MaterialTheme.colorScheme,
 ) {
     if (LocalUseGradient.current) {
         val gradientBrush =

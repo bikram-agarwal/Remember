@@ -116,8 +116,8 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 
 ## 📥 Download / links
 
-- [**Play Store**](https://play.google.com/store/apps/details?id=dev.bikram.remember) (Not live yet. Coming soon.)
+- [**Play Store**](https://play.google.com/store/apps/details?id=dev.bikram.remember)
 - [**GitHub**](https://github.com/bikram-agarwal/Remember/releases/latest) 
 
-- [Project site](https://bikram101.qzz.io/remember/)
-- [Privacy policy](https://bikram101.qzz.io/remember/privacy)
+- [Project site](https://bikram-agarwal.github.io/remember/)
+- [Privacy policy](https://bikram-agarwal.github.io/remember/privacy)

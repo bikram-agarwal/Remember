@@ -50,7 +50,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.coroutineScope
@@ -66,7 +67,11 @@ fun rememberResponsiveActionButtonSize(
     compactSize: Dp = 34.dp,
     ultraCompactSize: Dp = 30.dp,
 ): Dp {
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val screenWidth =
+        with(LocalDensity.current) {
+            LocalWindowInfo.current.containerSize.width
+                .toDp()
+        }
     val targetSize =
         when {
             screenWidth < 360.dp -> ultraCompactSize
@@ -82,7 +87,11 @@ fun rememberResponsiveActionIconSize(
     compactSize: Dp = 17.dp,
     ultraCompactSize: Dp = 15.dp,
 ): Dp {
-    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
+    val screenWidth =
+        with(LocalDensity.current) {
+            LocalWindowInfo.current.containerSize.width
+                .toDp()
+        }
     val targetSize =
         when {
             screenWidth < 360.dp -> ultraCompactSize

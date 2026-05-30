@@ -86,6 +86,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -135,6 +136,7 @@ fun IconPicker(
     val resources = LocalResources.current
     val configuration = LocalConfiguration.current
     val density = LocalDensity.current
+    val windowInfo = LocalWindowInfo.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -161,9 +163,10 @@ fun IconPicker(
     var pendingStarredIconKeys by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var pendingStarredEmojis by rememberSaveable { mutableStateOf(emptyList<String>()) }
     val imeBottom = with(density) { WindowInsets.ime.getBottom(density).toDp() }
+    val windowHeight = with(density) { windowInfo.containerSize.height.toDp() }
     val iconSheetContentHeight =
         if (imeBottom > 0.dp) {
-            (configuration.screenHeightDp.dp - imeBottom - 116.dp).coerceIn(360.dp, 644.dp)
+            (windowHeight - imeBottom - 116.dp).coerceIn(360.dp, 644.dp)
         } else {
             644.dp
         }

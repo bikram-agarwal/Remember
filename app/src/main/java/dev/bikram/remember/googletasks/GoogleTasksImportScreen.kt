@@ -139,6 +139,12 @@ fun GoogleTasksImportRoute(
     val vm: GoogleTasksImportViewModel = hiltViewModel()
 
     val state by vm.state.collectAsStateWithLifecycle()
+    val visible = remember(state.tasks, state.listFilterId, state.searchQuery) { state.visibleTasks() }
+    val totalSelected =
+        remember(state.selectedTaskIds, visible) {
+            state.selectedTaskIds.count { id -> visible.any { it.task.id == id } }
+        }
+    val allSelected = visible.isNotEmpty() && totalSelected >= visible.size
     val effect by vm.effects.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val uriHandler = LocalUriHandler.current
@@ -285,6 +291,34 @@ fun GoogleTasksImportRoute(
                         stringResource(R.string.google_tasks_import_tasks_title),
                     )
                 },
+                actions = {
+                    if (state.isLoaded) {
+                        val actionButtonSize = rememberResponsiveActionButtonSize()
+                        RememberFilledTonalIconButton(
+                            onClick = vm::toggleSelectAll,
+                            enabled = visible.isNotEmpty() && !allSelected,
+                            modifier = Modifier.size(actionButtonSize),
+                            tooltipLabel = stringResource(R.string.home_select_all),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "select_all",
+                                weight = FontWeight.Medium,
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        RememberFilledTonalIconButton(
+                            onClick = vm::clearSelection,
+                            enabled = totalSelected > 0,
+                            modifier = Modifier.size(actionButtonSize),
+                            tooltipLabel = stringResource(R.string.home_unselect_all),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "deselect",
+                                weight = FontWeight.Medium,
+                            )
+                        }
+                    }
+                },
                 scrollBehavior = scrollBehavior,
             )
         },
@@ -327,8 +361,6 @@ fun GoogleTasksImportRoute(
                             onSearchQueryChange = vm::setSearchQuery,
                             onImportModeChange = vm::setImportMode,
                             onOverwriteChange = vm::setOverwriteAlreadyImported,
-                            onSelectAllToggle = vm::toggleSelectAll,
-                            onClearSelection = vm::clearSelection,
                             onTaskToggle = vm::toggleSelection,
                             onGroupToggleSelectAll = vm::toggleSelectAllInList,
                             onGroupToggleCollapse = vm::toggleListCollapse,
@@ -723,8 +755,6 @@ private fun LoadedPanel(
     onSearchQueryChange: (String) -> Unit,
     onImportModeChange: (ImportMode) -> Unit,
     onOverwriteChange: (Boolean) -> Unit,
-    onSelectAllToggle: () -> Unit,
-    onClearSelection: () -> Unit,
     onTaskToggle: (String) -> Unit,
     onGroupToggleSelectAll: (String) -> Unit,
     onGroupToggleCollapse: (String) -> Unit,
@@ -807,12 +837,8 @@ private fun LoadedPanel(
                 ControlPillRow(
                     importMode = state.importMode,
                     overwrite = state.overwriteAlreadyImported,
-                    selectedVisibleCount = totalSelected,
-                    visibleCount = visible.size,
                     onImportModeChange = onImportModeChange,
                     onOverwriteChange = onOverwriteChange,
-                    onSelectAllToggle = onSelectAllToggle,
-                    onClearSelection = onClearSelection,
                 )
             }
             if (groups.isEmpty()) {
@@ -1112,17 +1138,9 @@ private fun SearchPill(
 private fun ControlPillRow(
     importMode: ImportMode,
     overwrite: Boolean,
-    selectedVisibleCount: Int,
-    visibleCount: Int,
     onImportModeChange: (ImportMode) -> Unit,
     onOverwriteChange: (Boolean) -> Unit,
-    onSelectAllToggle: () -> Unit,
-    onClearSelection: () -> Unit,
 ) {
-    // Pack the four controls left-to-right with a consistent 8dp gap. The previous design
-    // pushed the icon buttons to the right edge with a Spacer(weight=1f), which on narrow
-    // phones squeezed the last icon into an oval. Letting them sit flush after the
-    // dropdowns gives every control its natural size and keeps tap targets uniform.
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -1136,30 +1154,6 @@ private fun ControlPillRow(
             overwrite = overwrite,
             onChange = onOverwriteChange,
         )
-        val allSelected = visibleCount > 0 && selectedVisibleCount >= visibleCount
-        val actionButtonSize = rememberResponsiveActionButtonSize()
-        RememberFilledTonalIconButton(
-            onClick = onSelectAllToggle,
-            enabled = visibleCount > 0 && !allSelected,
-            modifier = Modifier.size(actionButtonSize),
-            tooltipLabel = stringResource(R.string.home_select_all),
-        ) {
-            RememberMaterialRoundedSymbol(
-                name = "select_all",
-                weight = FontWeight.Medium,
-            )
-        }
-        RememberFilledTonalIconButton(
-            onClick = onClearSelection,
-            enabled = selectedVisibleCount > 0,
-            modifier = Modifier.size(actionButtonSize),
-            tooltipLabel = stringResource(R.string.home_unselect_all),
-        ) {
-            RememberMaterialRoundedSymbol(
-                name = "deselect",
-                weight = FontWeight.Medium,
-            )
-        }
     }
 }
 
