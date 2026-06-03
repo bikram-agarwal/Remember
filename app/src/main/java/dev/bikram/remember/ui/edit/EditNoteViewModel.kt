@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dev.bikram.remember.data.Visibility as NoteVisibility
+import dagger.hilt.android.EntryPointAccessors
+import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 
 /**
  * Owns every persisted field for the Edit Note screen and serializes save/load through
@@ -600,8 +602,13 @@ class EditNoteViewModel
             saveIfNeeded(untitledName)
             val id = loadedId ?: return
             val note = repository.get(id)?.note ?: return
+            val reminderPrefs = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                SettingsDependenciesEntryPoint::class.java,
+            ).reminderPrefs()
+            val keepUntilDone = reminderPrefs.snapshot().keepReminderNotificationsUntilDone
             dev.bikram.remember.reminders.ReminderReceiver
-                .showNotification(context, note)
+                .showNotification(context, note, keepUntilDone = keepUntilDone)
             android.widget.Toast
                 .makeText(
                     context,

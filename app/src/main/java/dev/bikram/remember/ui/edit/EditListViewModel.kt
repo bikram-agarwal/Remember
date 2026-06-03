@@ -27,6 +27,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dev.bikram.remember.data.Visibility as NoteVisibility
+import dagger.hilt.android.EntryPointAccessors
+import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 
 @HiltViewModel
 class EditListViewModel
@@ -838,10 +840,16 @@ class EditListViewModel
             saveIfNeeded(untitledName)
             val id = loadedId ?: return
             val noteWithItems = repository.get(id) ?: return
+            val reminderPrefs = EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                SettingsDependenciesEntryPoint::class.java,
+            ).reminderPrefs()
+            val keepUntilDone = reminderPrefs.snapshot().keepReminderNotificationsUntilDone
             dev.bikram.remember.reminders.ReminderReceiver.showNotification(
-                context,
-                noteWithItems.note,
-                noteWithItems.items,
+                context = context,
+                note = noteWithItems.note,
+                items = noteWithItems.items,
+                keepUntilDone = keepUntilDone,
             )
             android.widget.Toast
                 .makeText(

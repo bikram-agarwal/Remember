@@ -57,6 +57,25 @@ class ReminderScheduler(
         }
     }
 
+    suspend fun scheduleOrShow(
+        note: NoteEntity,
+        items: List<ChecklistItemEntity> = emptyList(),
+    ) {
+        val reminderAtTime = note.reminderAt ?: return
+        if (reminderAtTime > System.currentTimeMillis()) {
+            schedule(note.id, reminderAtTime, note.importance)
+        } else if (note.completedAt == null && !note.trashed && !note.archived) {
+            ReminderReceiver.showNotification(
+                context = context,
+                note = note,
+                items = items,
+                keepUntilDone = keepReminderNotificationsUntilDone(),
+            )
+        }
+    }
+
+
+
     fun cancel(noteId: Long) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         am.cancel(pendingIntent(noteId))

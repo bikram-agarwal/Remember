@@ -189,7 +189,12 @@ class NoteRepository(
                 ),
             )
         tagRepository?.replaceTagsForNote(noteId, options.tags)
-        options.reminderAt?.let { scheduler?.schedule(noteId, it, options.importance) }
+        if (options.reminderAt != null) {
+            val createdNote = noteDao.get(noteId)?.note
+            if (createdNote != null) {
+                scheduler?.scheduleOrShow(createdNote, emptyList())
+            }
+        }
         postWriteBookkeeping()
         return noteId
     }
@@ -242,7 +247,12 @@ class NoteRepository(
                 },
             )
         }
-        options.reminderAt?.let { scheduler?.schedule(id, it, options.importance) }
+        if (options.reminderAt != null) {
+            val createdNoteWithItems = noteDao.get(id)
+            if (createdNoteWithItems != null) {
+                scheduler?.scheduleOrShow(createdNoteWithItems.note, createdNoteWithItems.items)
+            }
+        }
         postWriteBookkeeping()
         return id
     }
@@ -389,8 +399,13 @@ class NoteRepository(
 
     suspend fun restoreFromTrash(id: Long) {
         noteDao.setTrashed(id, false, clock())
-        val n = noteDao.get(id)?.note
-        n?.reminderAt?.let { at -> scheduler?.schedule(id, at, n.importance) }
+        val noteWithItems = noteDao.get(id)
+        if (noteWithItems != null) {
+            val restoredNote = noteWithItems.note
+            if (restoredNote.reminderAt != null) {
+                scheduler?.scheduleOrShow(restoredNote, noteWithItems.items)
+            }
+        }
         postWriteBookkeeping()
     }
 
@@ -407,8 +422,13 @@ class NoteRepository(
 
     suspend fun unarchiveNote(id: Long) {
         noteDao.setArchived(id, false, clock())
-        val n = noteDao.get(id)?.note
-        n?.reminderAt?.let { at -> scheduler?.schedule(id, at, n.importance) }
+        val noteWithItems = noteDao.get(id)
+        if (noteWithItems != null) {
+            val unarchivedNote = noteWithItems.note
+            if (unarchivedNote.reminderAt != null) {
+                scheduler?.scheduleOrShow(unarchivedNote, noteWithItems.items)
+            }
+        }
         postWriteBookkeeping()
     }
 
@@ -471,8 +491,11 @@ class NoteRepository(
         // for notes that still have a reminderAt set; restored rows without one stay
         // alarm-free.
         ids.forEach { id ->
-            val note = noteDao.get(id)?.note ?: return@forEach
-            note.reminderAt?.let { at -> scheduler?.schedule(id, at, note.importance) }
+            val noteWithItems = noteDao.get(id) ?: return@forEach
+            val note = noteWithItems.note
+            if (note.reminderAt != null) {
+                scheduler?.scheduleOrShow(note, noteWithItems.items)
+            }
         }
         postWriteBookkeeping()
     }
@@ -497,8 +520,11 @@ class NoteRepository(
             ids.forEach { id -> noteDao.setTrashed(id, false, now) }
         }
         ids.forEach { id ->
-            val note = noteDao.get(id)?.note ?: return@forEach
-            note.reminderAt?.let { at -> scheduler?.schedule(id, at, note.importance) }
+            val noteWithItems = noteDao.get(id) ?: return@forEach
+            val note = noteWithItems.note
+            if (note.reminderAt != null) {
+                scheduler?.scheduleOrShow(note, noteWithItems.items)
+            }
         }
         postWriteBookkeeping()
     }
@@ -613,9 +639,10 @@ class NoteRepository(
         val newIds = noteDao.allNoteIds().toSet()
         (oldIds + newIds).forEach { noteId -> schedulerNonNull.cancel(noteId) }
         newIds.forEach { noteId ->
-            val note = noteDao.get(noteId)?.note ?: return@forEach
+            val noteWithItems = noteDao.get(noteId) ?: return@forEach
+            val note = noteWithItems.note
             if (!note.trashed && note.reminderAt != null) {
-                schedulerNonNull.schedule(noteId, note.reminderAt, note.importance)
+                schedulerNonNull.scheduleOrShow(note, noteWithItems.items)
             }
         }
     }
@@ -747,7 +774,9 @@ class NoteRepository(
             )
         }
         if (!suppressReminderSchedule && !note.trashed) {
-            note.reminderAt?.let { scheduler?.schedule(noteId, it, note.importance) }
+            if (note.reminderAt != null) {
+                scheduler?.scheduleOrShow(note.copy(id = noteId), items)
+            }
         }
         return noteId
     }
@@ -953,13 +982,18 @@ class NoteRepository(
             attachments.mapNotNullTo(this) { attachment -> attachment.uri.takeIf { uri -> uri.isNotBlank() } }
         }
 
-    private fun rescheduleReminder(
+    private suspend fun rescheduleReminder(
         id: Long,
         at: Long?,
         importance: Importance,
     ) {
         scheduler?.cancel(id)
-        if (at != null) scheduler?.schedule(id, at, importance)
+        if (at != null) {
+            val noteWithItems = noteDao.get(id)
+            if (noteWithItems != null) {
+                scheduler?.scheduleOrShow(noteWithItems.note, noteWithItems.items)
+            }
+        }
     }
 
     private suspend fun refreshNotificationIfActive(id: Long) {
@@ -1017,7 +1051,12 @@ class NoteRepository(
                 updatedAt = clock(),
             ),
         )
-        if (nextTime != null) scheduler?.schedule(id, nextTime, note.importance)
+        if (nextTime != null) {
+            val noteWithItems = noteDao.get(id)
+            if (noteWithItems != null) {
+                scheduler?.scheduleOrShow(noteWithItems.note, noteWithItems.items)
+            }
+        }
     }
 
     suspend fun toggleItemChecked(item: ChecklistItemEntity) {
