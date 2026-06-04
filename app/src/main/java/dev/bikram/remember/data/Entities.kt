@@ -234,6 +234,7 @@ data class ChecklistItemEntity(
     val parentId: Long? = null,
     /** 0 for top-level rows, 1 for children. Kept in sync with [parentId] presence. */
     val depth: Int = 0,
+    val details: String = "",
 )
 
 @Entity(

@@ -195,6 +195,7 @@
     </plurals>
     <string name="edit_list_add_item">Add item</string>
     <string name="edit_list_new_item_placeholder">New item</string>
+    <string name="edit_list_item_details_placeholder">Add details</string>
     <string name="rt_text_to_display">Text to display</string>
     <string name="rt_url_hint" tools:ignore="TypographyEllipsis">URL (e.g. https://...)</string>
     <string name="rt_h1">H1</string>

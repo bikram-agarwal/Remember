@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
+private val MarkdownChecklistContinuationLineRegex = Regex("""^\s{4,}(.+)$""")
 
 internal data class MarkdownTextTap(
     val markdownOffset: Int,
@@ -142,10 +143,33 @@ internal fun MarkdownText(
                     onTextLongPress = onTextLongPress,
                 )
             } else {
+                val checklistContinuationLines =
+                    if (MarkdownChecklistLineRegex.matchEntire(lines[lineIndex]) != null) {
+                        val continuationLines = mutableListOf<MarkdownContinuationLine>()
+                        var continuationIndex = lineIndex + 1
+                        while (continuationIndex < lines.size) {
+                            val continuationLine = lines[continuationIndex]
+                            val continuationMatch =
+                                MarkdownChecklistContinuationLineRegex.matchEntire(continuationLine) ?: break
+                            if (isMarkdownBlockLine(continuationLine)) break
+                            val contentRange = continuationMatch.groups[1]?.range ?: break
+                            continuationLines +=
+                                MarkdownContinuationLine(
+                                    text = continuationMatch.groupValues[1],
+                                    lineStartOffset = lineStartOffsets.getOrElse(continuationIndex) { markdown.length },
+                                    contentStartOffset = contentRange.first,
+                                )
+                            continuationIndex++
+                        }
+                        continuationLines
+                    } else {
+                        emptyList()
+                    }
                 MarkdownLine(
                     line = lines[lineIndex],
                     lineIndex = lineIndex,
                     lineStartOffset = lineStartOffsets.getOrElse(lineIndex) { markdown.length },
+                    checklistContinuationLines = checklistContinuationLines,
                     style = style,
                     styler = styler,
                     includeLinkAnnotations = includeLinkAnnotations,
@@ -155,17 +179,32 @@ internal fun MarkdownText(
                     onLinkClick = onLinkClick,
                     onLinkLongPress = onLinkLongPress,
                 )
-                lineIndex++
+                lineIndex += 1 + checklistContinuationLines.size
             }
         }
     }
 }
+
+private data class MarkdownContinuationLine(
+    val text: String,
+    val lineStartOffset: Int,
+    val contentStartOffset: Int,
+)
+
+private fun isMarkdownBlockLine(line: String): Boolean =
+    MarkdownHeadingLineRegex.matchEntire(line) != null ||
+        MarkdownChecklistLineRegex.matchEntire(line) != null ||
+        MarkdownBulletLineRegex.matchEntire(line) != null ||
+        MarkdownNumberedLineRegex.matchEntire(line) != null ||
+        MarkdownQuoteLineRegex.matchEntire(line) != null ||
+        MarkdownCodeFenceLineRegex.matches(line)
 
 @Composable
 private fun MarkdownLine(
     line: String,
     lineIndex: Int,
     lineStartOffset: Int,
+    checklistContinuationLines: List<MarkdownContinuationLine>,
     style: TextStyle,
     styler: MarkdownStyler,
     includeLinkAnnotations: Boolean,
@@ -202,7 +241,7 @@ private fun MarkdownLine(
         val checked = checklistMatch.groupValues[2].equals("x", ignoreCase = true)
         Row(
             modifier = Modifier.padding(start = styler.listStartPadding(checklistMatch.groupValues[1], baseIndent = 0.dp)),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             RememberMaterialRoundedSymbol(
                 name = if (checked) "check_box" else "check_box_outline_blank",
@@ -219,21 +258,43 @@ private fun MarkdownLine(
             )
             Spacer(Modifier.width(8.dp))
             val contentRange = checklistMatch.groups[3]?.range
-            MarkdownInlineText(
-                text =
-                    styler.markdownInlineAnnotatedString(
-                        source = checklistMatch.groupValues[3],
-                        includeLinkAnnotations = includeLinkAnnotations,
-                    ),
-                style = if (checked) style.copy(textDecoration = TextDecoration.LineThrough) else style,
+            Column(
                 modifier = Modifier.weight(1f),
-                source = checklistMatch.groupValues[3],
-                sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
-                onTextTap = onTextTap,
-                onTextLongPress = onTextLongPress,
-                onLinkClick = onLinkClick,
-                onLinkLongPress = onLinkLongPress,
-            )
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                MarkdownInlineText(
+                    text =
+                        styler.markdownInlineAnnotatedString(
+                            source = checklistMatch.groupValues[3],
+                            includeLinkAnnotations = includeLinkAnnotations,
+                        ),
+                    style = if (checked) style.copy(textDecoration = TextDecoration.LineThrough) else style,
+                    modifier = Modifier.fillMaxWidth(),
+                    source = checklistMatch.groupValues[3],
+                    sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
+                    onTextTap = onTextTap,
+                    onTextLongPress = onTextLongPress,
+                    onLinkClick = onLinkClick,
+                    onLinkLongPress = onLinkLongPress,
+                )
+                checklistContinuationLines.forEach { continuationLine ->
+                    MarkdownInlineText(
+                        text =
+                            styler.markdownInlineAnnotatedString(
+                                source = continuationLine.text,
+                                includeLinkAnnotations = includeLinkAnnotations,
+                            ),
+                        style = style,
+                        modifier = Modifier.fillMaxWidth(),
+                        source = continuationLine.text,
+                        sourceOffset = continuationLine.lineStartOffset + continuationLine.contentStartOffset,
+                        onTextTap = onTextTap,
+                        onTextLongPress = onTextLongPress,
+                        onLinkClick = onLinkClick,
+                        onLinkLongPress = onLinkLongPress,
+                    )
+                }
+            }
         }
         return
     }

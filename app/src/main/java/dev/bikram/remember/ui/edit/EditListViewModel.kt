@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.ChecklistItemEntity
@@ -14,6 +15,7 @@ import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RememberReservedTags
+import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.domain.checklist.ChecklistEditResult
 import dev.bikram.remember.domain.checklist.ChecklistEditor
 import dev.bikram.remember.domain.checklist.EditableItem
@@ -27,8 +29,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dev.bikram.remember.data.Visibility as NoteVisibility
-import dagger.hilt.android.EntryPointAccessors
-import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 
 @HiltViewModel
 class EditListViewModel
@@ -159,6 +159,7 @@ class EditListViewModel
                                 EditableItem(
                                     localId = it.id,
                                     text = it.text,
+                                    details = it.details,
                                     checked = it.checked,
                                     sortOrder = it.sortOrder,
                                     parentLocalId = it.parentId,
@@ -328,6 +329,7 @@ class EditListViewModel
                 EditableItem(
                     localId = localId,
                     text = "",
+                    details = "",
                     checked = false,
                     sortOrder = max + 1.0,
                     parentLocalId = null,
@@ -355,6 +357,17 @@ class EditListViewModel
             _items.value =
                 _items.value.map {
                     if (it.localId == localId) it.copy(text = text) else it
+                }
+            markDirty()
+        }
+
+        fun updateItemDetails(
+            localId: Long,
+            details: String,
+        ) {
+            _items.value =
+                _items.value.map {
+                    if (it.localId == localId) it.copy(details = details) else it
                 }
             markDirty()
         }
@@ -625,6 +638,7 @@ class EditListViewModel
                     id = 0,
                     noteId = id,
                     text = item.text,
+                    details = item.details,
                     checked = item.checked,
                     sortOrder = item.sortOrder,
                     parentId = null,
@@ -645,6 +659,7 @@ class EditListViewModel
                     dev.bikram.remember.data.PersistableChecklistItem(
                         localKey = item.localId,
                         text = item.text,
+                        details = item.details,
                         checked = item.checked,
                         sortOrder = item.sortOrder,
                         parentLocalKey = item.parentLocalId,
@@ -685,6 +700,7 @@ class EditListViewModel
                     val c = nowSorted[i]
                     val o = oldSorted[i]
                     if (c.text != o.text) return true
+                    if (c.details != o.details) return true
                     if (c.checked != o.checked) return true
                     if (c.sortOrder != o.sortOrder) return true
                     if (c.depth != o.depth) return true
@@ -716,13 +732,10 @@ class EditListViewModel
                     // Creation still goes through createList which assigns sortOrder itself. If the
                     // user pre-composed hierarchy/checked state in the draft, we re-run updateList
                     // immediately afterwards with the real persistable payload.
-                    val newId = repository.createList(finalTitle, 0, nonEmpty.map { it.text }, currentOptions())
+                    val newId = repository.createListWithItems(finalTitle, 0, persistable, currentOptions())
                     loadedId = newId
                     syncHasPersistedRow()
                     if (t.isBlank()) _title.value = finalTitle
-                    if (persistable.any { it.checked || it.parentLocalKey != null || it.depth > 0 }) {
-                        repository.updateList(newId, finalTitle, 0, persistable, currentOptions())
-                    }
                     if (_starred.value) repository.setStarred(newId, true)
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
@@ -762,6 +775,7 @@ class EditListViewModel
                                         dev.bikram.remember.data.PersistableChecklistItem(
                                             localKey = it.id,
                                             text = it.text,
+                                            details = it.details,
                                             checked = it.checked,
                                             sortOrder = it.sortOrder,
                                             parentLocalKey = it.parentId,
@@ -840,10 +854,12 @@ class EditListViewModel
             saveIfNeeded(untitledName)
             val id = loadedId ?: return
             val noteWithItems = repository.get(id) ?: return
-            val reminderPrefs = EntryPointAccessors.fromApplication(
-                context.applicationContext,
-                SettingsDependenciesEntryPoint::class.java,
-            ).reminderPrefs()
+            val settingsDependencies =
+                EntryPointAccessors.fromApplication(
+                    context.applicationContext,
+                    SettingsDependenciesEntryPoint::class.java,
+                )
+            val reminderPrefs = settingsDependencies.reminderPrefs()
             val keepUntilDone = reminderPrefs.snapshot().keepReminderNotificationsUntilDone
             dev.bikram.remember.reminders.ReminderReceiver.showNotification(
                 context = context,
