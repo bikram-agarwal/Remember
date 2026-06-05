@@ -2,7 +2,9 @@ package dev.bikram.remember.ui.edit
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +17,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -28,7 +34,10 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
@@ -95,6 +104,11 @@ internal fun ChecklistRow(
     item: EditableItem,
     isEditMode: Boolean,
     focusRequester: androidx.compose.ui.focus.FocusRequester? = null,
+    detailsFocusRequester: androidx.compose.ui.focus.FocusRequester? = null,
+    initialTitleSelection: Int? = null,
+    initialDetailsSelection: Int? = null,
+    onTitleFocusOffsetConsumed: () -> Unit = {},
+    onDetailsFocusOffsetConsumed: () -> Unit = {},
     isDragging: Boolean = false,
     dragHandleModifier: Modifier = Modifier,
     /**
@@ -104,10 +118,12 @@ internal fun ChecklistRow(
      */
     showDragHandle: Boolean = true,
     onTextChange: (String) -> Unit,
+    onDetailsChange: (String) -> Unit = {},
     onToggle: () -> Unit,
     onRemove: () -> Unit,
     onNext: () -> Unit = {},
-    onTextTap: (() -> Unit)? = null,
+    onTextTap: ((Int) -> Unit)? = null,
+    onDetailsTap: ((Int) -> Unit)? = null,
     /**
      * Horizontal drag callback. `+1` means the user dragged right past the indent threshold
      * (request to nest under the previous top-level sibling). `-1` means the user dragged left
@@ -129,6 +145,41 @@ internal fun ChecklistRow(
         .animateDpAsState(depthIndent, label = "checklistDepthIndent")
 
     val haptic = LocalHapticFeedback.current
+    var detailsExpanded by rememberSaveable(item.localId) { mutableStateOf(false) }
+
+    var titleFieldValue by remember(item.text) {
+        mutableStateOf(TextFieldValue(text = item.text, selection = TextRange(item.text.length)))
+    }
+    var detailsFieldValue by remember(item.details) {
+        mutableStateOf(TextFieldValue(text = item.details, selection = TextRange(item.details.length)))
+    }
+
+    LaunchedEffect(isEditMode, initialTitleSelection) {
+        if (isEditMode && initialTitleSelection != null) {
+            val clamped = initialTitleSelection.coerceIn(0, item.text.length)
+            titleFieldValue = titleFieldValue.copy(selection = TextRange(clamped))
+            onTitleFocusOffsetConsumed()
+        }
+    }
+
+    LaunchedEffect(isEditMode, initialDetailsSelection) {
+        if (isEditMode && initialDetailsSelection != null) {
+            val clamped = initialDetailsSelection.coerceIn(0, item.details.length)
+            detailsFieldValue = detailsFieldValue.copy(selection = TextRange(clamped))
+            onDetailsFocusOffsetConsumed()
+        }
+    }
+
+    val detailLineCount = item.details.lineSequence().count { it.isNotBlank() }
+    val detailsCanExpand = detailLineCount > 1
+    val showDetailsAffordance = isEditMode || detailsCanExpand
+    val detailPreview =
+        item.details
+            .lineSequence()
+            .firstOrNull { it.isNotBlank() }
+            ?.trim()
+            .orEmpty()
+    val detailsToggleLabel = stringResource(R.string.edit_list_item_details_placeholder)
 
     LaunchedEffect(isDragging) {
         if (isDragging) {
@@ -192,8 +243,7 @@ internal fun ChecklistRow(
             Modifier
         }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
         modifier =
             modifier
                 .fillMaxWidth()
@@ -202,115 +252,248 @@ internal fun ChecklistRow(
                 .scale(scale)
                 .alpha(alpha),
     ) {
-        if (isEditMode && showDragHandle) {
-            // The drag handle is a vertical-only gesture surface: only `dragHandleModifier`
-            // (the library's `draggableHandle()`) is applied here. We deliberately do NOT also
-            // attach the horizontal indentModifier to this Box because detectHorizontalDragGestures
-            // and draggableHandle() live on independent pointer-input blocks and both observe
-            // the same pointer stream. During a long vertical reorder drag the user's finger
-            // tends to drift horizontally by small amounts; that drift can accumulate past the
-            // indent threshold and silently reparent the item, which then breaks the parent
-            // cascade in `toggleChecked` (a child's parentLocalId no longer matches the tapped
-            // parent, or the parent itself ends up at depth 1 and the `target.depth == 0`
-            // cascade branch is skipped). The row body retains the horizontal indent gesture,
-            // so users can still swipe the text area left or right to change depth.
-            val cdReorder = stringResource(R.string.cd_reorder_drag_handle)
-            Box(
-                modifier =
-                    dragHandleModifier
-                        .padding(start = 4.dp, end = 4.dp)
-                        .size(32.dp)
-                        .semantics { contentDescription = cdReorder },
-                contentAlignment = Alignment.Center,
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = "drag_indicator",
-                    size = 20.dp,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    weight = FontWeight.Medium,
-                )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            if (isEditMode && showDragHandle) {
+                // The drag handle is a vertical-only gesture surface: only `dragHandleModifier`
+                // (the library's `draggableHandle()`) is applied here. We deliberately do NOT also
+                // attach the horizontal indentModifier to this Box because detectHorizontalDragGestures
+                // and draggableHandle() live on independent pointer-input blocks and both observe
+                // the same pointer stream. During a long vertical reorder drag the user's finger
+                // tends to drift horizontally by small amounts; that drift can accumulate past the
+                // indent threshold and silently reparent the item, which then breaks the parent
+                // cascade in `toggleChecked` (a child's parentLocalId no longer matches the tapped
+                // parent, or the parent itself ends up at depth 1 and the `target.depth == 0`
+                // cascade branch is skipped). The row body retains the horizontal indent gesture,
+                // so users can still swipe the text area left or right to change depth.
+                val cdReorder = stringResource(R.string.cd_reorder_drag_handle)
+                Box(
+                    modifier =
+                        dragHandleModifier
+                            .padding(start = 4.dp, end = 4.dp)
+                            .size(32.dp)
+                            .semantics { contentDescription = cdReorder },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "drag_indicator",
+                        size = 20.dp,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        weight = FontWeight.Medium,
+                    )
+                }
             }
-        }
-        RememberIconButton(onClick = onToggle) {
-            RememberMaterialRoundedSymbol(
-                name = if (item.checked) "check_box" else "check_box_outline_blank",
-                size = 24.dp,
-                tint = if (item.checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
-            )
-        }
-        if (isEditMode) {
-            BasicTextField(
-                value = item.text,
-                onValueChange = onTextChange,
-                textStyle =
-                    MaterialTheme.typography.bodyLarge.copy(
-                        color =
-                            if (item.checked) {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
-                    ),
-                singleLine = true,
-                keyboardOptions =
-                    androidx.compose.foundation.text.KeyboardOptions(
-                        capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
-                        imeAction = androidx.compose.ui.text.input.ImeAction.Next,
-                    ),
-                keyboardActions =
-                    androidx.compose.foundation.text.KeyboardActions(
-                        onNext = { onNext() },
-                    ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
-                decorationBox = { inner ->
-                    if (item.text.isEmpty()) {
-                        Text(
-                            stringResource(R.string.edit_list_new_item_placeholder),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-                        )
-                    }
-                    inner()
-                },
-            )
-            RememberIconButton(onClick = onRemove) {
+            RememberIconButton(onClick = onToggle) {
                 RememberMaterialRoundedSymbol(
-                    name = "close",
+                    name = if (item.checked) "check_box" else "check_box_outline_blank",
                     size = 24.dp,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (item.checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                     weight = FontWeight.Medium,
                 )
             }
-        } else {
-            Text(
-                text = item.text.ifEmpty { stringResource(R.string.edit_list_new_item_placeholder) },
-                style =
-                    MaterialTheme.typography.bodyLarge.copy(
-                        color =
-                            if (item.checked) {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                            } else if (item.text.isEmpty()) {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
-                            } else {
-                                MaterialTheme.colorScheme.onSurface
-                            },
-                        textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
-                    ),
-                modifier =
-                    if (onTextTap != null) {
+            if (isEditMode) {
+                BasicTextField(
+                    value = titleFieldValue,
+                    onValueChange = { newValue ->
+                        val oldText = titleFieldValue.text
+                        titleFieldValue = newValue
+                        if (newValue.text != oldText) {
+                            onTextChange(newValue.text)
+                        }
+                    },
+                    textStyle =
+                        MaterialTheme.typography.bodyLarge.copy(
+                            color =
+                                if (item.checked) {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
+                        ),
+                    singleLine = true,
+                    keyboardOptions =
+                        androidx.compose.foundation.text.KeyboardOptions(
+                            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Next,
+                        ),
+                    keyboardActions =
+                        androidx.compose.foundation.text.KeyboardActions(
+                            onNext = { onNext() },
+                        ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier =
                         Modifier
                             .weight(1f)
-                            .tapSoundClickable(onClick = onTextTap)
-                    } else {
-                        Modifier.weight(1f)
+                            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
+                    decorationBox = { inner ->
+                        if (item.text.isEmpty()) {
+                            Text(
+                                stringResource(R.string.edit_list_new_item_placeholder),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                            )
+                        }
+                        inner()
                     },
-            )
+                )
+                if (showDetailsAffordance) {
+                    RememberIconButton(
+                        onClick = { detailsExpanded = !detailsExpanded },
+                        tooltipLabel = detailsToggleLabel,
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = if (detailsExpanded) "expand_less" else "notes",
+                            size = 22.dp,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            weight = FontWeight.Medium,
+                        )
+                    }
+                }
+                RememberIconButton(onClick = onRemove) {
+                    RememberMaterialRoundedSymbol(
+                        name = "close",
+                        size = 24.dp,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        weight = FontWeight.Medium,
+                    )
+                }
+            } else {
+                var titleLayout by remember(item.text) { mutableStateOf<TextLayoutResult?>(null) }
+                Text(
+                    text = item.text.ifEmpty { stringResource(R.string.edit_list_new_item_placeholder) },
+                    style =
+                        MaterialTheme.typography.bodyLarge.copy(
+                            color =
+                                if (item.checked) {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                } else if (item.text.isEmpty()) {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
+                        ),
+                    onTextLayout = { titleLayout = it },
+                    modifier =
+                        if (onTextTap != null) {
+                            Modifier
+                                .weight(1f)
+                                .pointerInput(onTextTap, titleLayout) {
+                                    detectTapGestures { tapOffset ->
+                                        val offset =
+                                            if (item.text.isEmpty()) {
+                                                0
+                                            } else {
+                                                titleLayout?.getOffsetForPosition(tapOffset) ?: item.text.length
+                                            }
+                                        onTextTap(offset)
+                                    }
+                                }
+                        } else {
+                            Modifier.weight(1f)
+                        },
+                )
+                if (showDetailsAffordance) {
+                    RememberIconButton(
+                        onClick = { detailsExpanded = !detailsExpanded },
+                        tooltipLabel = detailsToggleLabel,
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = if (detailsExpanded) "expand_less" else "expand_more",
+                            size = 22.dp,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            weight = FontWeight.Medium,
+                        )
+                    }
+                }
+            }
+        }
+
+        if (detailsExpanded || (!isEditMode && detailPreview.isNotBlank())) {
+            val detailsStartPadding = (if (isEditMode && showDragHandle) 40.dp else 0.dp) + 40.dp
+            if (isEditMode) {
+                BasicTextField(
+                    value = detailsFieldValue,
+                    onValueChange = { newValue ->
+                        val oldText = detailsFieldValue.text
+                        detailsFieldValue = newValue
+                        if (newValue.text != oldText) {
+                            onDetailsChange(newValue.text)
+                        }
+                    },
+                    textStyle =
+                        MaterialTheme.typography.bodyMedium.copy(
+                            color =
+                                if (item.checked) {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                        ),
+                    keyboardOptions =
+                        androidx.compose.foundation.text.KeyboardOptions(
+                            capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
+                            imeAction = androidx.compose.ui.text.input.ImeAction.Default,
+                        ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = detailsStartPadding, end = 48.dp, bottom = 8.dp)
+                            .then(if (detailsFocusRequester != null) Modifier.focusRequester(detailsFocusRequester) else Modifier),
+                    decorationBox = { inner ->
+                        if (item.details.isEmpty()) {
+                            Text(
+                                stringResource(R.string.edit_list_item_details_placeholder),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                            )
+                        }
+                        inner()
+                    },
+                )
+            } else {
+                var detailsLayout by remember(item.details) { mutableStateOf<TextLayoutResult?>(null) }
+                val detailsModifier =
+                    if (onDetailsTap != null) {
+                        Modifier.pointerInput(onDetailsTap, detailsLayout) {
+                            detectTapGestures { tapOffset ->
+                                val offset =
+                                    if (item.details.isEmpty()) {
+                                        0
+                                    } else {
+                                        detailsLayout?.getOffsetForPosition(tapOffset) ?: item.details.length
+                                    }
+                                detailsExpanded = true
+                                onDetailsTap(offset)
+                            }
+                        }
+                    } else if (detailsCanExpand) {
+                        Modifier.tapSoundClickable { detailsExpanded = !detailsExpanded }
+                    } else {
+                        Modifier
+                    }
+                Text(
+                    text = if (detailsExpanded) item.details else detailPreview,
+                    style =
+                        MaterialTheme.typography.bodyMedium.copy(
+                            color =
+                                if (item.checked) {
+                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.42f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                        ),
+                    maxLines = if (detailsExpanded) Int.MAX_VALUE else 1,
+                    overflow = if (detailsExpanded) TextOverflow.Clip else TextOverflow.Ellipsis,
+                    onTextLayout = { detailsLayout = it },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(start = detailsStartPadding, end = 48.dp, bottom = 8.dp)
+                            .then(detailsModifier),
+                )
+            }
         }
     }
 }

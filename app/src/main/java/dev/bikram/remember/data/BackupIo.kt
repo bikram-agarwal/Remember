@@ -146,6 +146,7 @@ class BackupIo(
                             JSONObject().apply {
                                 put("id", it2.id)
                                 put("text", it2.text)
+                                put("details", it2.details)
                                 put("checked", it2.checked)
                                 put("sortOrder", it2.sortOrder)
                                 it2.parentId?.let { parent -> put("parentId", parent) }
@@ -737,6 +738,7 @@ class BackupIo(
                 id = jo.optLong("id", 0L),
                 noteId = 0L,
                 text = jo.optString("text", ""),
+                details = jo.optString("details", ""),
                 checked = jo.optBoolean("checked", false),
                 sortOrder = sortOrder,
                 parentId = parentId,
@@ -813,7 +815,7 @@ class BackupIo(
     private fun JSONObject.optStringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
 
     companion object {
-        const val SCHEMA_VERSION = 2
+        const val SCHEMA_VERSION = 3
         const val LEGACY_SCHEMA_VERSION = 1
         const val ENTRY_MANIFEST = "backup_manifest.json"
         const val ENTRY_NOTES = "notes.json"

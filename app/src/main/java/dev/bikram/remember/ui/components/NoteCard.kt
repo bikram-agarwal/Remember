@@ -738,25 +738,46 @@ private fun ChecklistPreview(
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         items.forEach { item ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                // Indent children one gutter's width to mirror the editor hierarchy.
-                if (item.depth > 0) Spacer(Modifier.width(16.dp))
-                RememberMaterialRoundedSymbol(
-                    name = if (item.checked) "check_circle" else "radio_button_unchecked",
-                    size = 16.dp,
-                    tint = contentColor,
-                    weight = FontWeight.Medium,
-                    modifier = Modifier.alpha(if (item.checked) 0.6f else 0.85f),
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text = item.text,
-                    style = MaterialTheme.typography.bodyMedium.copy(color = contentColor),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
-                    modifier = Modifier.alpha(if (item.checked) 0.55f else 0.92f),
-                )
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Indent children one gutter's width to mirror the editor hierarchy.
+                    if (item.depth > 0) Spacer(Modifier.width(16.dp))
+                    RememberMaterialRoundedSymbol(
+                        name = if (item.checked) "check_circle" else "radio_button_unchecked",
+                        size = 16.dp,
+                        tint = contentColor,
+                        weight = FontWeight.Medium,
+                        modifier = Modifier.alpha(if (item.checked) 0.6f else 0.85f),
+                    )
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        text = item.text,
+                        style = MaterialTheme.typography.bodyMedium.copy(color = contentColor),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
+                        modifier = Modifier.alpha(if (item.checked) 0.55f else 0.92f),
+                    )
+                }
+                val detailPreview =
+                    item.details
+                        .lineSequence()
+                        .firstOrNull { line -> line.isNotBlank() }
+                        ?.trim()
+                        .orEmpty()
+                if (detailPreview.isNotBlank()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (item.depth > 0) Spacer(Modifier.width(16.dp))
+                        Spacer(Modifier.width(26.dp))
+                        Text(
+                            text = detailPreview,
+                            style = MaterialTheme.typography.bodySmall.copy(color = contentColor),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.alpha(if (item.checked) 0.42f else 0.62f),
+                        )
+                    }
+                }
             }
         }
         if (hiddenCount > 0) {

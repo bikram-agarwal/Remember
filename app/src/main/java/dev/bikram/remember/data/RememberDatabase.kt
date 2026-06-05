@@ -65,7 +65,7 @@ class Converters {
         TagEntity::class,
         NoteTagCrossRef::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -82,7 +82,7 @@ abstract class RememberDatabase : RoomDatabase() {
         fun build(context: Context): RememberDatabase =
             Room
                 .databaseBuilder(context, RememberDatabase::class.java, "remember.db")
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .fallbackToDestructiveMigration(false)
                 .build()
 
@@ -148,6 +148,13 @@ abstract class RememberDatabase : RoomDatabase() {
                         SELECT rowid, title, body, tags, checklistText, attachmentText, actionsText FROM notes
                         """.trimIndent(),
                     )
+                }
+            }
+
+        private val MIGRATION_2_3 =
+            object : Migration(2, 3) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE checklist_items ADD COLUMN details TEXT NOT NULL DEFAULT ''")
                 }
             }
 

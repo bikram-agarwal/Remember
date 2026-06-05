@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.ChecklistItemEntity
@@ -14,6 +15,7 @@ import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RememberReservedTags
+import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.domain.checklist.ChecklistEditResult
 import dev.bikram.remember.domain.checklist.ChecklistEditor
 import dev.bikram.remember.domain.checklist.EditableItem
@@ -27,8 +29,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dev.bikram.remember.data.Visibility as NoteVisibility
-import dagger.hilt.android.EntryPointAccessors
-import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 
 @HiltViewModel
 class EditListViewModel
@@ -96,6 +96,12 @@ class EditListViewModel
         private val _attachments = MutableStateFlow<List<NoteAttachmentEntity>>(emptyList())
         val attachments: StateFlow<List<NoteAttachmentEntity>> = _attachments.asStateFlow()
 
+        private val _createdAt = MutableStateFlow<Long?>(null)
+        val createdAt: StateFlow<Long?> = _createdAt.asStateFlow()
+
+        private val _updatedAt = MutableStateFlow<Long?>(null)
+        val updatedAt: StateFlow<Long?> = _updatedAt.asStateFlow()
+
         /**
          * Mirrors the underlying note's archived / trashed shelf. The edit screen uses these to
          * flip into read-only mode and swap the bottom-bar action set. New lists always start on
@@ -153,12 +159,15 @@ class EditListViewModel
                     _archived.value = n.archived
                     _trashed.value = n.trashed
                     _completed.value = n.completedAt != null
+                    _createdAt.value = n.createdAt
+                    _updatedAt.value = n.updatedAt
                     _items.value =
                         existing.items
                             .map {
                                 EditableItem(
                                     localId = it.id,
                                     text = it.text,
+                                    details = it.details,
                                     checked = it.checked,
                                     sortOrder = it.sortOrder,
                                     parentLocalId = it.parentId,
@@ -178,6 +187,8 @@ class EditListViewModel
                         if (_trashed.value != n.trashed) _trashed.value = n.trashed
                         val isCompleted = n.completedAt != null
                         if (_completed.value != isCompleted) _completed.value = isCompleted
+                        if (_createdAt.value != n.createdAt) _createdAt.value = n.createdAt
+                        if (_updatedAt.value != n.updatedAt) _updatedAt.value = n.updatedAt
                     }
                 }
             }
@@ -196,6 +207,7 @@ class EditListViewModel
             } else {
                 repository.markCompleted(id)
             }
+            syncTimestamps()
         }
 
         fun setTitle(v: String) {
@@ -328,6 +340,7 @@ class EditListViewModel
                 EditableItem(
                     localId = localId,
                     text = "",
+                    details = "",
                     checked = false,
                     sortOrder = max + 1.0,
                     parentLocalId = null,
@@ -355,6 +368,17 @@ class EditListViewModel
             _items.value =
                 _items.value.map {
                     if (it.localId == localId) it.copy(text = text) else it
+                }
+            markDirty()
+        }
+
+        fun updateItemDetails(
+            localId: Long,
+            details: String,
+        ) {
+            _items.value =
+                _items.value.map {
+                    if (it.localId == localId) it.copy(details = details) else it
                 }
             markDirty()
         }
@@ -625,6 +649,7 @@ class EditListViewModel
                     id = 0,
                     noteId = id,
                     text = item.text,
+                    details = item.details,
                     checked = item.checked,
                     sortOrder = item.sortOrder,
                     parentId = null,
@@ -645,6 +670,7 @@ class EditListViewModel
                     dev.bikram.remember.data.PersistableChecklistItem(
                         localKey = item.localId,
                         text = item.text,
+                        details = item.details,
                         checked = item.checked,
                         sortOrder = item.sortOrder,
                         parentLocalKey = item.parentLocalId,
@@ -685,6 +711,7 @@ class EditListViewModel
                     val c = nowSorted[i]
                     val o = oldSorted[i]
                     if (c.text != o.text) return true
+                    if (c.details != o.details) return true
                     if (c.checked != o.checked) return true
                     if (c.sortOrder != o.sortOrder) return true
                     if (c.depth != o.depth) return true
@@ -716,19 +743,20 @@ class EditListViewModel
                     // Creation still goes through createList which assigns sortOrder itself. If the
                     // user pre-composed hierarchy/checked state in the draft, we re-run updateList
                     // immediately afterwards with the real persistable payload.
-                    val newId = repository.createList(finalTitle, 0, nonEmpty.map { it.text }, currentOptions())
+                    val newId = repository.createListWithItems(finalTitle, 0, persistable, currentOptions())
                     loadedId = newId
                     syncHasPersistedRow()
                     if (t.isBlank()) _title.value = finalTitle
-                    if (persistable.any { it.checked || it.parentLocalKey != null || it.depth > 0 }) {
-                        repository.updateList(newId, finalTitle, 0, persistable, currentOptions())
-                    }
                     if (_starred.value) repository.setStarred(newId, true)
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val savedList = repository.get(newId)
                     originalNote = savedList?.note
                     originalItems = savedList?.items ?: emptyList()
+                    savedList?.note?.let { note ->
+                        _createdAt.value = note.createdAt
+                        _updatedAt.value = note.updatedAt
+                    }
 
                     return@withLock {
                         repository.moveToTrash(newId)
@@ -750,6 +778,10 @@ class EditListViewModel
                     val savedList = repository.get(id)
                     originalNote = savedList?.note
                     originalItems = savedList?.items ?: emptyList()
+                    savedList?.note?.let { note ->
+                        _createdAt.value = note.createdAt
+                        _updatedAt.value = note.updatedAt
+                    }
 
                     if (old != null) {
                         return@withLock {
@@ -762,6 +794,7 @@ class EditListViewModel
                                         dev.bikram.remember.data.PersistableChecklistItem(
                                             localKey = it.id,
                                             text = it.text,
+                                            details = it.details,
                                             checked = it.checked,
                                             sortOrder = it.sortOrder,
                                             parentLocalKey = it.parentId,
@@ -791,6 +824,17 @@ class EditListViewModel
             }
         }
 
+        private fun syncTimestamps() {
+            val id = loadedId ?: return
+            viewModelScope.launch {
+                val cur = repository.get(id)?.note
+                if (cur != null) {
+                    _createdAt.value = cur.createdAt
+                    _updatedAt.value = cur.updatedAt
+                }
+            }
+        }
+
         suspend fun trashCurrent() {
             persistence.withLock {
                 val id = loadedId ?: return@withLock
@@ -799,6 +843,7 @@ class EditListViewModel
                 _trashed.value = true
                 _archived.value = false
             }
+            syncTimestamps()
         }
 
         /** Flip the list onto the archive shelf. Saves any in-flight edits first. */
@@ -811,6 +856,7 @@ class EditListViewModel
                 _trashed.value = false
                 persistence.clearDirty()
             }
+            syncTimestamps()
         }
 
         suspend fun unarchiveCurrent() {
@@ -821,6 +867,7 @@ class EditListViewModel
                 _trashed.value = false
                 persistence.clearDirty()
             }
+            syncTimestamps()
         }
 
         suspend fun restoreFromTrashCurrent() {
@@ -831,6 +878,7 @@ class EditListViewModel
                 _archived.value = false
                 persistence.clearDirty()
             }
+            syncTimestamps()
         }
 
         suspend fun fireNotification(
@@ -840,10 +888,12 @@ class EditListViewModel
             saveIfNeeded(untitledName)
             val id = loadedId ?: return
             val noteWithItems = repository.get(id) ?: return
-            val reminderPrefs = EntryPointAccessors.fromApplication(
-                context.applicationContext,
-                SettingsDependenciesEntryPoint::class.java,
-            ).reminderPrefs()
+            val settingsDependencies =
+                EntryPointAccessors.fromApplication(
+                    context.applicationContext,
+                    SettingsDependenciesEntryPoint::class.java,
+                )
+            val reminderPrefs = settingsDependencies.reminderPrefs()
             val keepUntilDone = reminderPrefs.snapshot().keepReminderNotificationsUntilDone
             dev.bikram.remember.reminders.ReminderReceiver.showNotification(
                 context = context,

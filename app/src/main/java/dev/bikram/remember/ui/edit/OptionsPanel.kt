@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -53,6 +54,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ActionType
@@ -109,6 +111,8 @@ fun OptionsPanel(
     // wash on the panel surface plus a tilted watermark star at the top-end. Keeps the
     // starred cue consistent when the user opens a starred note or list into the editor.
     starred: Boolean = false,
+    createdAt: Long? = null,
+    updatedAt: Long? = null,
 ) {
     var behaviorOpen by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
@@ -271,6 +275,44 @@ fun OptionsPanel(
                             onClick = onOpenAttachments,
                             modifier = Modifier.weight(1f),
                         )
+                    }
+                }
+                if (createdAt != null && createdAt > 0L) {
+                    Spacer(Modifier.height(6.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 2.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val createdFormatted = remember(createdAt) {
+                            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(createdAt))
+                        }
+                        Text(
+                            text = stringResource(R.string.options_created, createdFormatted),
+                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                        )
+                        if (updatedAt != null && updatedAt > 0L) {
+                            Text(
+                                text = "·",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                                modifier = Modifier.padding(horizontal = 6.dp),
+                            )
+                            val updatedFormatted = remember(updatedAt) {
+                                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(updatedAt))
+                            }
+                            Text(
+                                text = stringResource(R.string.options_updated, updatedFormatted),
+                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                            )
+                        }
                     }
                 }
             }

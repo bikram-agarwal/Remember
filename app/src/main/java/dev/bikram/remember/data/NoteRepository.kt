@@ -41,6 +41,7 @@ data class PersistableChecklistItem(
     val sortOrder: Double,
     val parentLocalKey: Long? = null,
     val depth: Int = 0,
+    val details: String = "",
 )
 
 /**
@@ -239,6 +240,7 @@ class NoteRepository(
                     ChecklistItemEntity(
                         noteId = id,
                         text = text,
+                        details = "",
                         checked = false,
                         sortOrder = (index + 1).toDouble(),
                         parentId = null,
@@ -247,6 +249,56 @@ class NoteRepository(
                 },
             )
         }
+        if (options.reminderAt != null) {
+            val createdNoteWithItems = noteDao.get(id)
+            if (createdNoteWithItems != null) {
+                scheduler?.scheduleOrShow(createdNoteWithItems.note, createdNoteWithItems.items)
+            }
+        }
+        postWriteBookkeeping()
+        return id
+    }
+
+    suspend fun createListWithItems(
+        title: String,
+        colorIndex: Int,
+        items: List<PersistableChecklistItem>,
+        options: NoteOptions = NoteOptions(),
+    ): Long {
+        val now = clock()
+        val validItems = items.filter { item -> item.text.isNotBlank() || item.details.isNotBlank() }
+        val id =
+            noteDao.insert(
+                NoteEntity(
+                    kind = NoteKind.LIST,
+                    title = title,
+                    body = "",
+                    checklistText =
+                        checklistSearchText(
+                            validItems
+                                .sortedBy { item -> item.sortOrder }
+                                .flatMap { item -> listOf(item.text, item.details) },
+                        ),
+                    colorIndex = colorIndex,
+                    starred = false,
+                    trashed = false,
+                    createdAt = now,
+                    updatedAt = now,
+                    reminderAt = options.reminderAt,
+                    importance = options.importance,
+                    visibility = options.visibility,
+                    pictureUri = options.pictureUri,
+                    pictureHeroFraming = options.pictureHeroFraming,
+                    locked = options.locked,
+                    iconKey = options.iconKey,
+                    actions = options.actions,
+                    actionsText = actionsSearchText(options.actions),
+                    tags = options.tags,
+                    recurrence = options.recurrence?.sanitized(),
+                ),
+            )
+        tagRepository?.replaceTagsForNote(id, options.tags)
+        persistHierarchy(noteId = id, items = validItems)
         if (options.reminderAt != null) {
             val createdNoteWithItems = noteDao.get(id)
             if (createdNoteWithItems != null) {
@@ -320,7 +372,7 @@ class NoteRepository(
                             checklistSearchText(
                                 items
                                     .sortedBy { item -> item.sortOrder }
-                                    .map { item -> item.text },
+                                    .flatMap { item -> listOf(item.text, item.details) },
                             ),
                         updatedAt = clock(),
                         reminderAt = options.reminderAt,
@@ -741,7 +793,7 @@ class NoteRepository(
                         checklistSearchText(
                             items
                                 .sortedBy { item -> item.sortOrder }
-                                .map { item -> item.text },
+                                .flatMap { item -> listOf(item.text, item.details) },
                         ),
                     attachmentText = attachmentSearchText(attachments),
                     actionsText = actionsSearchText(note.actions),
@@ -760,6 +812,7 @@ class NoteRepository(
                         PersistableChecklistItem(
                             localKey = item.id,
                             text = item.text,
+                            details = item.details,
                             checked = item.checked,
                             sortOrder = item.sortOrder,
                             parentLocalKey = item.parentId,
@@ -807,6 +860,7 @@ class NoteRepository(
                         id = 0,
                         noteId = noteId,
                         text = draft.text,
+                        details = draft.details,
                         checked = draft.checked,
                         sortOrder = draft.sortOrder,
                         parentId = null,
@@ -826,6 +880,7 @@ class NoteRepository(
                         id = 0,
                         noteId = noteId,
                         text = draft.text,
+                        details = draft.details,
                         checked = draft.checked,
                         sortOrder = draft.sortOrder,
                         parentId = realParentId,
@@ -856,6 +911,7 @@ class NoteRepository(
                         id = existing.id,
                         noteId = noteId,
                         text = draft.text,
+                        details = draft.details,
                         checked = draft.checked,
                         sortOrder = draft.sortOrder,
                         parentId = null,
@@ -870,6 +926,7 @@ class NoteRepository(
                             id = 0,
                             noteId = noteId,
                             text = draft.text,
+                            details = draft.details,
                             checked = draft.checked,
                             sortOrder = draft.sortOrder,
                             parentId = null,
@@ -892,6 +949,7 @@ class NoteRepository(
                         id = existing.id,
                         noteId = noteId,
                         text = draft.text,
+                        details = draft.details,
                         checked = draft.checked,
                         sortOrder = draft.sortOrder,
                         parentId = realParentId,
@@ -906,6 +964,7 @@ class NoteRepository(
                             id = 0,
                             noteId = noteId,
                             text = draft.text,
+                            details = draft.details,
                             checked = draft.checked,
                             sortOrder = draft.sortOrder,
                             parentId = realParentId,

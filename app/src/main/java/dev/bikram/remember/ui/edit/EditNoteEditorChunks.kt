@@ -751,6 +751,8 @@ private fun OptionsPanelSection(
     val tags by vm.tags.collectAsStateWithLifecycle()
     val attachments by vm.attachments.collectAsStateWithLifecycle()
     val starred by vm.starred.collectAsStateWithLifecycle()
+    val createdAt by vm.createdAt.collectAsStateWithLifecycle()
+    val updatedAt by vm.updatedAt.collectAsStateWithLifecycle()
 
     EditorOptionsPanel(
         reminderAt = reminderAt,
@@ -764,6 +766,8 @@ private fun OptionsPanelSection(
         notificationsAllowed = notificationsAllowed,
         readOnly = readOnly,
         starred = starred,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
         onOpenReminder = onOpenReminder,
         onImportanceChange = vm::setImportance,
         onVisibilityChange = vm::setVisibility,

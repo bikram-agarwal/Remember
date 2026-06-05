@@ -32,6 +32,7 @@ data class NoteCardUiModel(
 @Immutable
 data class NoteCardChecklistItemUiModel(
     val text: String,
+    val details: String,
     val checked: Boolean,
     val depth: Int,
 )
@@ -63,6 +64,7 @@ fun NoteWithItems.toNoteCardUiModel(
                 .map { item ->
                     NoteCardChecklistItemUiModel(
                         text = item.text,
+                        details = item.details,
                         checked = item.checked,
                         depth = item.depth,
                     )

@@ -2,6 +2,7 @@ package dev.bikram.remember.googletasks
 
 import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.PersistableChecklistItem
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -15,7 +16,7 @@ import java.time.format.DateTimeFormatter
  * Mapping rules (one note per task is the default; group-by-list and list-as-checklist are
  * driven by [ImportMode]):
  *  - title  -> NoteEntity.title (falls back to the first line of `notes` when title is blank)
- *  - notes  -> NoteEntity.body
+ *  - notes  -> NoteEntity.body, or checklist item details in list-as-checklist mode
  *  - status == "completed" -> NoteEntity.completedAt (uses the API-provided completion timestamp
  *    when present, otherwise [now])
  *  - due (date-only per Google's docs) -> reminderAt at 09:00 in [zone]
@@ -87,30 +88,48 @@ class GoogleTasksImporter(
                         group
                             .filter { it.task.parent.isNullOrBlank() }
                             .sortedBy { it.task.position.orEmpty() }
-                    val itemTexts = mutableListOf<String>()
+                    val checklistItems = mutableListOf<PersistableChecklistItem>()
+                    var nextLocalKey = -1L
+                    var sortOrder = 1.0
                     parents.forEach { parent ->
-                        itemTexts.add(
-                            parent.task.title
-                                .orEmpty()
-                                .ifBlank { firstLineOfNotes(parent.task) },
-                        )
+                        val parentTitle = checklistItemTitle(parent.task)
+                        val parentLocalKey = nextLocalKey--
+                        if (parentTitle.isNotBlank()) {
+                            checklistItems.add(
+                                PersistableChecklistItem(
+                                    localKey = parentLocalKey,
+                                    text = parentTitle,
+                                    details = checklistItemDetails(parent.task),
+                                    checked = isCompleted(parent.task),
+                                    sortOrder = sortOrder++,
+                                ),
+                            )
+                        }
                         group
                             .filter { it.task.parent == parent.task.id }
                             .sortedBy { it.task.position.orEmpty() }
                             .forEach { child ->
-                                itemTexts.add(
-                                    "- " +
-                                        child.task.title
-                                            .orEmpty()
-                                            .ifBlank { firstLineOfNotes(child.task) },
-                                )
+                                val childTitle = checklistItemTitle(child.task)
+                                if (childTitle.isNotBlank()) {
+                                    checklistItems.add(
+                                        PersistableChecklistItem(
+                                            localKey = nextLocalKey--,
+                                            text = childTitle,
+                                            details = checklistItemDetails(child.task),
+                                            checked = isCompleted(child.task),
+                                            sortOrder = sortOrder++,
+                                            parentLocalKey = parentLocalKey.takeIf { parentTitle.isNotBlank() },
+                                            depth = if (parentTitle.isNotBlank()) 1 else 0,
+                                        ),
+                                    )
+                                }
                             }
                     }
                     val newId =
-                        repository.createList(
+                        repository.createListWithItems(
                             title = taskListTitle,
                             colorIndex = 0,
-                            items = itemTexts.filter { it.isNotBlank() },
+                            items = checklistItems,
                             options = NoteOptions(tags = listOf(taskListTitle)),
                         )
                     group.forEach {
@@ -139,6 +158,7 @@ class GoogleTasksImporter(
                                             .ifBlank { firstLineOfNotes(wrapper.task) }
                                     if (displayTitle.isNotBlank()) {
                                         append(indent)
+                                            .append("- ")
                                             .append(mark)
                                             .append(' ')
                                             .append(displayTitle)
@@ -149,7 +169,10 @@ class GoogleTasksImporter(
                                             .orEmpty()
                                             .isNotBlank()
                                     ) {
-                                        append(indent).append("    ").append(wrapper.task.notes.replace("\n", "\n    ")).append('\n')
+                                        append(indent)
+                                            .append("    ")
+                                            .append(wrapper.task.notes.replace("\n", "\n$indent    "))
+                                            .append('\n')
                                     }
                                 }
                         }.trimEnd()
@@ -258,6 +281,24 @@ class GoogleTasksImporter(
             .firstOrNull { it.isNotBlank() }
             ?.trim()
             .orEmpty()
+
+    private fun checklistItemTitle(task: GoogleTask): String =
+        task.title
+            .orEmpty()
+            .trim()
+            .ifBlank { firstLineOfNotes(task) }
+
+    private fun checklistItemDetails(task: GoogleTask): String {
+        val notes = task.notes.orEmpty().trim()
+        if (notes.isBlank()) return ""
+        if (task.title.orEmpty().isNotBlank()) return notes
+        return notes
+            .lineSequence()
+            .dropWhile { line -> line.isBlank() }
+            .drop(1)
+            .joinToString("\n")
+            .trim()
+    }
 
     private fun isCompleted(task: GoogleTask): Boolean = task.status.equals(GoogleTaskStatus.COMPLETED, ignoreCase = true)
 

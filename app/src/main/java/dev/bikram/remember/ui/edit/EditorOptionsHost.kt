@@ -36,6 +36,8 @@ fun EditorOptionsPanel(
     notificationsAllowed: Boolean,
     readOnly: Boolean,
     starred: Boolean,
+    createdAt: Long?,
+    updatedAt: Long?,
     onOpenReminder: () -> Unit,
     onImportanceChange: (Importance) -> Unit,
     onVisibilityChange: (NoteVisibility) -> Unit,
@@ -77,6 +79,8 @@ fun EditorOptionsPanel(
             },
         readOnly = readOnly,
         starred = starred,
+        createdAt = createdAt,
+        updatedAt = updatedAt,
     )
 }
 

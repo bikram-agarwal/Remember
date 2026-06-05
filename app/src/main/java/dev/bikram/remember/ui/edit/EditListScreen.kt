@@ -26,6 +26,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -74,7 +75,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import sh.calvin.reorderable.ReorderableItem
+import sh.calvin.reorderable.rememberReorderableLazyListState
 import java.io.File
+
+private enum class FocusField { TITLE, DETAILS }
 
 @Composable
 fun EditListRoute(
@@ -134,6 +138,8 @@ fun EditListScreen(
     val archived by vm.archived.collectAsStateWithLifecycle()
     val trashed by vm.trashed.collectAsStateWithLifecycle()
     val hasUnsavedChanges by vm.hasUnsavedChanges.collectAsStateWithLifecycle()
+    val createdAt by vm.createdAt.collectAsStateWithLifecycle()
+    val updatedAt by vm.updatedAt.collectAsStateWithLifecycle()
 
     var reminderPickerOpen by rememberSaveable { mutableStateOf(false) }
     var iconPickerOpen by rememberSaveable { mutableStateOf(false) }
@@ -170,29 +176,32 @@ fun EditListScreen(
 
     var isEditMode by remember(existing, forceEdit) { mutableStateOf(!existing || forceEdit) }
     var pendingFocusItemId by remember { mutableStateOf<Long?>(null) }
+    var pendingFocusField by remember { mutableStateOf(FocusField.TITLE) }
     var pendingTitleFocusOffset by remember { mutableStateOf<Int?>(null) }
+    var pendingItemTitleFocusOffset by remember { mutableStateOf<Int?>(null) }
+    var pendingItemDetailsFocusOffset by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(readOnly) {
         if (readOnly && isEditMode) isEditMode = false
     }
     LaunchedEffect(isEditMode) {
         if (!isEditMode) {
             pendingTitleFocusOffset = null
+            pendingItemTitleFocusOffset = null
+            pendingItemDetailsFocusOffset = null
         }
     }
 
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val lazyListStateForVisibility =
-        androidx.compose.foundation.lazy
-            .rememberLazyListState()
+    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
     var bottomBarVisible by remember { mutableStateOf(true) }
 
     // Force-show the bar whenever the list is scrolled to the very top. derivedStateOf is
     // cheaper than an observer because it only recomputes when the boolean transitions.
     val atTopOfContent by remember {
         derivedStateOf {
-            lazyListStateForVisibility.firstVisibleItemIndex == 0 &&
-                lazyListStateForVisibility.firstVisibleItemScrollOffset == 0
+            lazyListState.firstVisibleItemIndex == 0 &&
+                lazyListState.firstVisibleItemScrollOffset == 0
         }
     }
     LaunchedEffect(atTopOfContent) {
@@ -242,32 +251,90 @@ fun EditListScreen(
             deleteForeverCurrent = vm::deleteForeverCurrent,
             fireNotification = vm::fireNotification,
         )
-    val titleCollapseProgress by remember(lazyListStateForVisibility) {
+
+    val topAlphaMultiplier by remember(lazyListState) {
         derivedStateOf {
-            if (lazyListStateForVisibility.firstVisibleItemIndex > 0) {
+            if (lazyListState.firstVisibleItemIndex > 0) {
                 1f
             } else {
-                val offsetPx = lazyListStateForVisibility.firstVisibleItemScrollOffset.toFloat()
+                val offsetPx = lazyListState.firstVisibleItemScrollOffset.toFloat()
+                val thresholdPx = with(density) { 24.dp.toPx() }
+                (offsetPx / thresholdPx).coerceIn(0f, 1f)
+            }
+        }
+    }
+
+    val titleCollapseProgress by remember(lazyListState) {
+        derivedStateOf {
+            if (lazyListState.firstVisibleItemIndex > 0) {
+                1f
+            } else {
+                val offsetPx = lazyListState.firstVisibleItemScrollOffset.toFloat()
                 val thresholdPx = with(density) { 72.dp.toPx() }
                 (offsetPx / thresholdPx).coerceIn(0f, 1f)
             }
         }
     }
 
-    // Edit mode replaces the action bar: the list's inline "Add item" and the top-bar Save
-    // action take over, and the keyboard toolbar stays on the bottom unobstructed. Stacking
-    // the shelf action bar under the keyboard would look like a layout bug. IME visibility
-    // still gates it so the bar slides out when the keyboard appears.
-    val actionBarVisible = bottomBarVisible && !isEditMode && !imeVisible
+    val blurMod =
+        blurStyle?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier)
+            ?: Modifier
 
-    // Save path for the top-bar Save icon (only visible while in edit mode): flips edit
-    // mode off AND asks the route-level callback to flush the VM and flash the toast so
-    // users get feedback that their Save tap did something beyond dismissing the toolbar.
+    // Save on back press.
+    androidx.activity.compose.BackHandler(onBack = editorActions.saveAndBack)
+
+    val (completedItems, activeItems) = items.partition { it.checked }
+    val activeParents = activeItems.associateBy { it.localId }
+    val checkedParents = completedItems.associateBy { it.localId }
+    val activeEntries = remember(items) { buildActiveEntries(activeItems, activeParents, checkedParents) }
+    val completedEntries = remember(items) { buildCompletedEntries(completedItems, activeParents, checkedParents) }
+
+    var draggingParentLocalId by remember { mutableStateOf<Long?>(null) }
+    val visibleActiveEntries = remember(activeEntries, draggingParentLocalId) {
+        if (draggingParentLocalId == null) {
+            activeEntries
+        } else {
+            activeEntries.filter { entry ->
+                when (entry) {
+                    is ActiveEntry.Ghost -> entry.header.realParentLocalId != draggingParentLocalId
+                    is ActiveEntry.Row -> entry.item.localId == draggingParentLocalId || entry.item.parentLocalId != draggingParentLocalId
+                }
+            }
+        }
+    }
+    val visibleCompletedEntries = remember(completedEntries, draggingParentLocalId) {
+        if (draggingParentLocalId == null) {
+            completedEntries
+        } else {
+            completedEntries.filter { entry ->
+                when (entry) {
+                    is CompletedEntry.Ghost -> entry.header.realParentLocalId != draggingParentLocalId
+                    is CompletedEntry.Row -> entry.item.parentLocalId != draggingParentLocalId
+                }
+            }
+        }
+    }
+
+    val titleFocusRequesters = remember { androidx.compose.runtime.mutableStateMapOf<Long, FocusRequester>() }
+    val detailsFocusRequesters = remember { androidx.compose.runtime.mutableStateMapOf<Long, FocusRequester>() }
+
+    LaunchedEffect(pendingFocusItemId, isEditMode) {
+        if (isEditMode && pendingFocusItemId != null) {
+            delay(80)
+            val requester = if (pendingFocusField == FocusField.DETAILS) {
+                detailsFocusRequesters[pendingFocusItemId]
+            } else {
+                titleFocusRequesters[pendingFocusItemId]
+            }
+            requester?.requestFocus()
+            pendingFocusItemId = null
+        }
+    }
+
     val saveAndExitEditMode: () -> Unit = {
         isEditMode = false
         editorActions.saveAndShowToast()
     }
-    androidx.activity.compose.BackHandler(onBack = editorActions.saveAndBack)
 
     val adaptiveNoteThemes = LocalThemeState.current.adaptiveNoteThemes
     val imageDerivedColors =
@@ -276,6 +343,8 @@ fun EditListScreen(
             cacheRevision = pictureRevision,
         )
     val imageResolution = rememberImageDerivedColorScheme(imageDerivedColors)
+    var showChecked by rememberSaveable { mutableStateOf(true) }
+
     NoteAdaptiveTheme(imageResolution) {
         Box(Modifier.fillMaxSize()) {
             if (imageResolution != null) NotePageBackground(colorScheme = imageResolution.backgroundScheme)
@@ -290,7 +359,7 @@ fun EditListScreen(
                         title = title,
                         titlePlaceholder = titlePlaceholder,
                         iconKey = iconKey,
-                        existing = existing,
+                        existing = existing || persistedForToolbar,
                         isEditMode = isEditMode,
                         readOnly = readOnly,
                         hasUnsavedChanges = hasUnsavedChanges,
@@ -304,15 +373,16 @@ fun EditListScreen(
                         onTitleFocusOffsetConsumed = {
                             pendingTitleFocusOffset = null
                         },
-                        onOpenIcon = { iconPickerOpen = true },
-                        onSave = saveAndExitEditMode,
-                        showEditableWhenTitleEmpty = true,
+                        onTitleFocusChanged = { /* unused */ },
                         titleCollapseProgress = titleCollapseProgress,
+                        onSave = saveAndExitEditMode,
+                        onOpenIcon = { iconPickerOpen = true },
                     )
                 },
                 bottomBar = {
+                    val actionBarVisible = bottomBarVisible && !isEditMode && !imeVisible
                     EditorBottomBarSlot(
-                        isEditMode = isEditMode,
+                        isEditMode = false,
                         actionBarVisible = actionBarVisible,
                         actionContent = {
                             NoteActionBottomBarContent(
@@ -321,9 +391,9 @@ fun EditListScreen(
                                 isEditMode = isEditMode,
                                 starred = starred,
                                 completed = completed,
-                                // Action bar is hidden while isEditMode, so this callback only fires from
-                                // view mode - always turning edit mode ON. Save is owned by the top bar.
-                                onToggleEdit = { if (!isEditMode) isEditMode = true else saveAndExitEditMode() },
+                                onToggleEdit = {
+                                    if (!isEditMode) isEditMode = true else saveAndExitEditMode()
+                                },
                                 onToggleStar = { vm.toggleStar() },
                                 onToggleCompleted = {
                                     appScope.launch { vm.toggleCompleted() }
@@ -334,132 +404,16 @@ fun EditListScreen(
                                 onTrash = editorActions.trashAndBack,
                                 onRestore = editorActions.restore,
                                 onDeleteForever = { deleteForeverConfirmOpen = true },
-                                showEditAction = false,
+                                showEditAction = true,
                             )
                         },
                     )
                 },
             ) { padding ->
-                val topAlphaMultiplier by remember(lazyListStateForVisibility) {
-                    derivedStateOf {
-                        if (lazyListStateForVisibility.firstVisibleItemIndex > 0) {
-                            1f
-                        } else {
-                            val offsetPx = lazyListStateForVisibility.firstVisibleItemScrollOffset.toFloat()
-                            val thresholdPx = with(density) { 24.dp.toPx() }
-                            (offsetPx / thresholdPx).coerceIn(0f, 1f)
-                        }
-                    }
-                }
-                val blurMod =
-                    blurStyle?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier)
-                        ?: Modifier
-                val focusRequesters = remember { mutableMapOf<Long, FocusRequester>() }
-                var draggingParentLocalId by remember { mutableStateOf<Long?>(null) }
-                LaunchedEffect(isEditMode, pendingFocusItemId, readOnly) {
-                    val itemId = pendingFocusItemId
-                    if (isEditMode && itemId != null && !readOnly) {
-                        delay(80)
-                        focusRequesters[itemId]?.requestFocus()
-                        keyboardController?.show()
-                        pendingFocusItemId = null
-                    }
-                }
-
-                // ---------------------------------------------------------------------------------
-                // Compose the two weighted sublists per the spec:
-                //   activeList    = items.filter { !it.isChecked }.sortedBy { it.sortOrder }
-                //   completedList = items.filter {  it.isChecked }.sortedBy { it.sortOrder }
-                //
-                // The completed list is additionally augmented with "ghost parent" headers: when a
-                // checked child's real parent is still in the active section we synthesise a read-only
-                // header row above that child's group so the context isn't lost.
-                // ---------------------------------------------------------------------------------
-                val activeList =
-                    remember(items) {
-                        items.filter { !it.checked }.sortedBy { it.sortOrder }
-                    }
-                val completedItems =
-                    remember(items) {
-                        items.filter { it.checked }.sortedBy { it.sortOrder }
-                    }
-                val activeParentLookup =
-                    remember(activeList) {
-                        activeList.filter { it.depth == 0 }.associateBy { it.localId }
-                    }
-                val checkedParentLookup =
-                    remember(completedItems) {
-                        completedItems.filter { it.depth == 0 }.associateBy { it.localId }
-                    }
-                val completedEntries: List<CompletedEntry> =
-                    remember(completedItems, activeParentLookup, checkedParentLookup) {
-                        buildCompletedEntries(
-                            completedItems = completedItems,
-                            activeParents = activeParentLookup,
-                            checkedParents = checkedParentLookup,
-                        )
-                    }
-                // Mirror of completedEntries for the active half: synthesises a ghost parent header when a
-                // child is unchecked but its real parent is still in the completed section. This keeps the
-                // parent context visible when the user unchecks a single child out of a cascade-checked
-                // group (the user's bug report: "tap B2 to uncheck it, only B2 moves back to unchecked
-                // section, without a parent above it").
-                val activeEntries: List<ActiveEntry> =
-                    remember(activeList, activeParentLookup, checkedParentLookup) {
-                        buildActiveEntries(
-                            activeItems = activeList,
-                            activeParents = activeParentLookup,
-                            checkedParents = checkedParentLookup,
-                        )
-                    }
-                val visibleActiveEntries =
-                    remember(activeEntries, draggingParentLocalId) {
-                        val parentLocalId = draggingParentLocalId
-                        if (parentLocalId == null) {
-                            activeEntries
-                        } else {
-                            activeEntries.filterNot { entry ->
-                                when (entry) {
-                                    is ActiveEntry.Ghost -> true
-                                    is ActiveEntry.Row -> entry.item.depth == 1
-                                }
-                            }
-                        }
-                    }
-                val visibleCompletedEntries =
-                    remember(completedEntries, draggingParentLocalId) {
-                        val parentLocalId = draggingParentLocalId
-                        if (parentLocalId == null) {
-                            completedEntries
-                        } else {
-                            completedEntries.filterNot { entry ->
-                                when (entry) {
-                                    is CompletedEntry.Ghost -> entry.header.realParentLocalId == parentLocalId
-                                    is CompletedEntry.Row -> entry.item.parentLocalId == parentLocalId
-                                }
-                            }
-                        }
-                    }
-                val activeIds =
-                    remember(activeList, draggingParentLocalId) {
-                        val parentLocalId = draggingParentLocalId
-                        if (parentLocalId == null) {
-                            activeList.map { item -> item.localId }
-                        } else {
-                            activeList
-                                .filter { item -> item.depth == 0 }
-                                .map { item -> item.localId }
-                        }
-                    }
-                val completedRowIds = remember(completedItems) { completedItems.map { it.localId } }
-
-                var showChecked by rememberSaveable { mutableStateOf(true) }
-
-                val lazyListState = lazyListStateForVisibility
+                val activeIds = activeEntries.filterIsInstance<ActiveEntry.Row>().map { it.item.localId }
+                val completedRowIds = completedEntries.filterIsInstance<CompletedEntry.Row>().map { it.item.localId }
                 val reorderState =
-                    sh.calvin.reorderable.rememberReorderableLazyListState(lazyListState) { from, to ->
-                        // Keys are the EditableItem.localId for both active rows and completed rows. Ghost
-                        // headers are keyed with a synthetic "ghost-<parentId>" string so their drags are
+                    rememberReorderableLazyListState(lazyListState) { from, to ->
                         // ignored here. We only reorder within the matching sublist (no cross-section drags).
                         val fromId = from.key as? Long ?: return@rememberReorderableLazyListState
                         val toId = to.key as? Long ?: return@rememberReorderableLazyListState
@@ -587,22 +541,33 @@ fun EditListScreen(
                                             }
                                         }
                                     }
-                                    val focusRequester = remember(item.localId) { FocusRequester() }
-                                    DisposableEffect(item.localId, focusRequester) {
-                                        focusRequesters[item.localId] = focusRequester
+                                    val titleFocusRequester = remember(item.localId) { FocusRequester() }
+                                    val detailsFocusRequester = remember(item.localId) { FocusRequester() }
+                                    DisposableEffect(item.localId, titleFocusRequester, detailsFocusRequester) {
+                                        titleFocusRequesters[item.localId] = titleFocusRequester
+                                        detailsFocusRequesters[item.localId] = detailsFocusRequester
                                         onDispose {
-                                            if (focusRequesters[item.localId] === focusRequester) {
-                                                focusRequesters.remove(item.localId)
+                                            if (titleFocusRequesters[item.localId] === titleFocusRequester) {
+                                                titleFocusRequesters.remove(item.localId)
+                                            }
+                                            if (detailsFocusRequesters[item.localId] === detailsFocusRequester) {
+                                                detailsFocusRequesters.remove(item.localId)
                                             }
                                         }
                                     }
                                     ChecklistRow(
                                         item = item,
                                         isEditMode = isEditMode && !readOnly,
-                                        focusRequester = focusRequester,
+                                        focusRequester = titleFocusRequester,
+                                        detailsFocusRequester = detailsFocusRequester,
+                                        initialTitleSelection = if (pendingFocusItemId == item.localId) pendingItemTitleFocusOffset else null,
+                                        initialDetailsSelection = if (pendingFocusItemId == item.localId) pendingItemDetailsFocusOffset else null,
+                                        onTitleFocusOffsetConsumed = { pendingItemTitleFocusOffset = null },
+                                        onDetailsFocusOffsetConsumed = { pendingItemDetailsFocusOffset = null },
                                         isDragging = isDragging,
                                         dragHandleModifier = if (readOnly) Modifier else Modifier.draggableHandle(),
                                         onTextChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemText(item.localId, it) }),
+                                        onDetailsChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemDetails(item.localId, it) }),
                                         onToggle = if (readOnly) ({}) else ({ vm.toggleChecked(item.localId) }),
                                         onRemove = if (readOnly) ({}) else ({ vm.removeItem(item.localId) }),
                                         onNext =
@@ -612,6 +577,7 @@ fun EditListScreen(
                                                 (
                                                     {
                                                         pendingFocusItemId = vm.addItemAfter(item.localId)
+                                                        pendingFocusField = FocusField.TITLE
                                                         isEditMode = true
                                                     }
                                                 )
@@ -620,8 +586,21 @@ fun EditListScreen(
                                             if (readOnly) {
                                                 null
                                             } else {
-                                                {
+                                                { offset ->
                                                     pendingFocusItemId = item.localId
+                                                    pendingFocusField = FocusField.TITLE
+                                                    pendingItemTitleFocusOffset = offset
+                                                    isEditMode = true
+                                                }
+                                            },
+                                        onDetailsTap =
+                                            if (readOnly) {
+                                                null
+                                            } else {
+                                                { offset ->
+                                                    pendingFocusItemId = item.localId
+                                                    pendingFocusField = FocusField.DETAILS
+                                                    pendingItemDetailsFocusOffset = offset
                                                     isEditMode = true
                                                 }
                                             },
@@ -631,14 +610,6 @@ fun EditListScreen(
                                             } else {
                                                 (
                                                     { deltaDepth ->
-                                                        // deltaDepth = +1 means user dragged right (indent); -1 means
-                                                        // user dragged left (outdent). We delegate both to the
-                                                        // ViewModel so the anchor lookup runs on the freshest
-                                                        // in-memory list. Doing the lookup here was buggy: the
-                                                        // gesture lives inside a pointerInput(item.localId, depth)
-                                                        // block whose captured `activeList` does NOT refresh when
-                                                        // siblings are reordered, so swiping right after a drag
-                                                        // picked the wrong prior top-level row as the anchor.
                                                         if (deltaDepth > 0) {
                                                             vm.indent(item.localId)
                                                         } else if (deltaDepth < 0) {
@@ -664,6 +635,7 @@ fun EditListScreen(
                                             placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
                                         ).tapSoundClickable {
                                             pendingFocusItemId = vm.addItem()
+                                            pendingFocusField = FocusField.TITLE
                                             isEditMode = true
                                         }.padding(vertical = 14.dp),
                             ) {
@@ -735,28 +707,35 @@ fun EditListScreen(
                                                 ),
                                         )
                                     is CompletedEntry.Row -> {
-                                        // Checked rows are NOT wrapped in ReorderableItem: Google Keep
-                                        // freezes the order of checked items and we mirror that. The
-                                        // item sort order in completed is implicit (most-recently
-                                        // checked last, siblings grouped under their ghost parent).
                                         val item = entry.item
-                                        val focusRequester = remember(item.localId) { FocusRequester() }
-                                        DisposableEffect(item.localId, focusRequester) {
-                                            focusRequesters[item.localId] = focusRequester
+                                        val titleFocusRequester = remember(item.localId) { FocusRequester() }
+                                        val detailsFocusRequester = remember(item.localId) { FocusRequester() }
+                                        DisposableEffect(item.localId, titleFocusRequester, detailsFocusRequester) {
+                                            titleFocusRequesters[item.localId] = titleFocusRequester
+                                            detailsFocusRequesters[item.localId] = detailsFocusRequester
                                             onDispose {
-                                                if (focusRequesters[item.localId] === focusRequester) {
-                                                    focusRequesters.remove(item.localId)
+                                                if (titleFocusRequesters[item.localId] === titleFocusRequester) {
+                                                    titleFocusRequesters.remove(item.localId)
+                                                }
+                                                if (detailsFocusRequesters[item.localId] === detailsFocusRequester) {
+                                                    detailsFocusRequesters.remove(item.localId)
                                                 }
                                             }
                                         }
                                         ChecklistRow(
                                             item = item,
                                             isEditMode = isEditMode && !readOnly,
-                                            focusRequester = focusRequester,
+                                            focusRequester = titleFocusRequester,
+                                            detailsFocusRequester = detailsFocusRequester,
+                                            initialTitleSelection = if (pendingFocusItemId == item.localId) pendingItemTitleFocusOffset else null,
+                                            initialDetailsSelection = if (pendingFocusItemId == item.localId) pendingItemDetailsFocusOffset else null,
+                                            onTitleFocusOffsetConsumed = { pendingItemTitleFocusOffset = null },
+                                            onDetailsFocusOffsetConsumed = { pendingItemDetailsFocusOffset = null },
                                             isDragging = false,
                                             dragHandleModifier = Modifier,
                                             showDragHandle = false,
                                             onTextChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemText(item.localId, it) }),
+                                            onDetailsChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemDetails(item.localId, it) }),
                                             onToggle = if (readOnly) ({}) else ({ vm.toggleChecked(item.localId) }),
                                             onRemove = if (readOnly) ({}) else ({ vm.removeItem(item.localId) }),
                                             onNext =
@@ -766,6 +745,7 @@ fun EditListScreen(
                                                     (
                                                         {
                                                             pendingFocusItemId = vm.addItemAfter(item.localId)
+                                                            pendingFocusField = FocusField.TITLE
                                                             isEditMode = true
                                                         }
                                                     )
@@ -774,8 +754,21 @@ fun EditListScreen(
                                                 if (readOnly) {
                                                     null
                                                 } else {
-                                                    {
+                                                    { offset ->
                                                         pendingFocusItemId = item.localId
+                                                        pendingFocusField = FocusField.TITLE
+                                                        pendingItemTitleFocusOffset = offset
+                                                        isEditMode = true
+                                                    }
+                                                },
+                                            onDetailsTap =
+                                                if (readOnly) {
+                                                    null
+                                                } else {
+                                                    { offset ->
+                                                        pendingFocusItemId = item.localId
+                                                        pendingFocusField = FocusField.DETAILS
+                                                        pendingItemDetailsFocusOffset = offset
                                                         isEditMode = true
                                                     }
                                                 },
@@ -805,6 +798,8 @@ fun EditListScreen(
                             notificationsAllowed = notificationsAllowed,
                             readOnly = readOnly,
                             starred = starred,
+                            createdAt = createdAt,
+                            updatedAt = updatedAt,
                             onOpenReminder = { reminderPickerOpen = true },
                             onImportanceChange = vm::setImportance,
                             onVisibilityChange = vm::setVisibility,

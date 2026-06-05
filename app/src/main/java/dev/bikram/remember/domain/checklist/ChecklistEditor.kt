@@ -13,6 +13,7 @@ data class EditableItem(
     val sortOrder: Double,
     val parentLocalId: Long? = null,
     val depth: Int = 0,
+    val details: String = "",
 )
 
 data class ChecklistEditResult(
