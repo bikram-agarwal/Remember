@@ -398,6 +398,8 @@
     <string name="options_picture_none">No picture</string>
     <string name="options_picture_attached">Attached</string>
     <string name="options_attachments">Attachments</string>
+    <string name="options_created">Created: %1$s</string>
+    <string name="options_updated">Updated: %1$s</string>
     <plurals name="options_tags_more_count">
         <item quantity="one">+%1$d more</item>
         <item quantity="other">+%1$d more</item>

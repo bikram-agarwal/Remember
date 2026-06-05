@@ -96,6 +96,12 @@ class EditListViewModel
         private val _attachments = MutableStateFlow<List<NoteAttachmentEntity>>(emptyList())
         val attachments: StateFlow<List<NoteAttachmentEntity>> = _attachments.asStateFlow()
 
+        private val _createdAt = MutableStateFlow<Long?>(null)
+        val createdAt: StateFlow<Long?> = _createdAt.asStateFlow()
+
+        private val _updatedAt = MutableStateFlow<Long?>(null)
+        val updatedAt: StateFlow<Long?> = _updatedAt.asStateFlow()
+
         /**
          * Mirrors the underlying note's archived / trashed shelf. The edit screen uses these to
          * flip into read-only mode and swap the bottom-bar action set. New lists always start on
@@ -153,6 +159,8 @@ class EditListViewModel
                     _archived.value = n.archived
                     _trashed.value = n.trashed
                     _completed.value = n.completedAt != null
+                    _createdAt.value = n.createdAt
+                    _updatedAt.value = n.updatedAt
                     _items.value =
                         existing.items
                             .map {
@@ -179,6 +187,8 @@ class EditListViewModel
                         if (_trashed.value != n.trashed) _trashed.value = n.trashed
                         val isCompleted = n.completedAt != null
                         if (_completed.value != isCompleted) _completed.value = isCompleted
+                        if (_createdAt.value != n.createdAt) _createdAt.value = n.createdAt
+                        if (_updatedAt.value != n.updatedAt) _updatedAt.value = n.updatedAt
                     }
                 }
             }
@@ -197,6 +207,7 @@ class EditListViewModel
             } else {
                 repository.markCompleted(id)
             }
+            syncTimestamps()
         }
 
         fun setTitle(v: String) {
@@ -742,6 +753,10 @@ class EditListViewModel
                     val savedList = repository.get(newId)
                     originalNote = savedList?.note
                     originalItems = savedList?.items ?: emptyList()
+                    savedList?.note?.let { note ->
+                        _createdAt.value = note.createdAt
+                        _updatedAt.value = note.updatedAt
+                    }
 
                     return@withLock {
                         repository.moveToTrash(newId)
@@ -763,6 +778,10 @@ class EditListViewModel
                     val savedList = repository.get(id)
                     originalNote = savedList?.note
                     originalItems = savedList?.items ?: emptyList()
+                    savedList?.note?.let { note ->
+                        _createdAt.value = note.createdAt
+                        _updatedAt.value = note.updatedAt
+                    }
 
                     if (old != null) {
                         return@withLock {
@@ -805,6 +824,17 @@ class EditListViewModel
             }
         }
 
+        private fun syncTimestamps() {
+            val id = loadedId ?: return
+            viewModelScope.launch {
+                val cur = repository.get(id)?.note
+                if (cur != null) {
+                    _createdAt.value = cur.createdAt
+                    _updatedAt.value = cur.updatedAt
+                }
+            }
+        }
+
         suspend fun trashCurrent() {
             persistence.withLock {
                 val id = loadedId ?: return@withLock
@@ -813,6 +843,7 @@ class EditListViewModel
                 _trashed.value = true
                 _archived.value = false
             }
+            syncTimestamps()
         }
 
         /** Flip the list onto the archive shelf. Saves any in-flight edits first. */
@@ -825,6 +856,7 @@ class EditListViewModel
                 _trashed.value = false
                 persistence.clearDirty()
             }
+            syncTimestamps()
         }
 
         suspend fun unarchiveCurrent() {
@@ -835,6 +867,7 @@ class EditListViewModel
                 _trashed.value = false
                 persistence.clearDirty()
             }
+            syncTimestamps()
         }
 
         suspend fun restoreFromTrashCurrent() {
@@ -845,6 +878,7 @@ class EditListViewModel
                 _archived.value = false
                 persistence.clearDirty()
             }
+            syncTimestamps()
         }
 
         suspend fun fireNotification(

@@ -107,6 +107,12 @@ class EditNoteViewModel
         private val _attachments = MutableStateFlow<List<NoteAttachmentEntity>>(emptyList())
         val attachments: StateFlow<List<NoteAttachmentEntity>> = _attachments.asStateFlow()
 
+        private val _createdAt = MutableStateFlow<Long?>(null)
+        val createdAt: StateFlow<Long?> = _createdAt.asStateFlow()
+
+        private val _updatedAt = MutableStateFlow<Long?>(null)
+        val updatedAt: StateFlow<Long?> = _updatedAt.asStateFlow()
+
         /**
          * Mirrors the underlying note's archived / trashed shelf. Used by the edit screen to flip
          * into read-only mode and swap the bottom-bar action set. New notes always start on the
@@ -171,6 +177,8 @@ class EditNoteViewModel
                             _archived.value = n.archived
                             _trashed.value = n.trashed
                             _completed.value = n.completedAt != null
+                            _createdAt.value = n.createdAt
+                            _updatedAt.value = n.updatedAt
                         }
                     } finally {
                         // Leave loading when the load finishes: missing row, success, or thrown from get().
@@ -194,6 +202,8 @@ class EditNoteViewModel
                         if (_trashed.value != n.trashed) _trashed.value = n.trashed
                         val isCompleted = n.completedAt != null
                         if (_completed.value != isCompleted) _completed.value = isCompleted
+                        if (_createdAt.value != n.createdAt) _createdAt.value = n.createdAt
+                        if (_updatedAt.value != n.updatedAt) _updatedAt.value = n.updatedAt
                     }
                 }
             }
@@ -473,7 +483,12 @@ class EditNoteViewModel
                     if (_starred.value) repository.setStarred(newId, true)
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
-                    originalNote = repository.get(newId)?.note
+                    val savedNote = repository.get(newId)?.note
+                    originalNote = savedNote
+                    if (savedNote != null) {
+                        _createdAt.value = savedNote.createdAt
+                        _updatedAt.value = savedNote.updatedAt
+                    }
 
                     return@withLock {
                         repository.moveToTrash(newId)
@@ -490,7 +505,12 @@ class EditNoteViewModel
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val old = originalNote
-                    originalNote = repository.get(id)?.note
+                    val savedNote = repository.get(id)?.note
+                    originalNote = savedNote
+                    if (savedNote != null) {
+                        _createdAt.value = savedNote.createdAt
+                        _updatedAt.value = savedNote.updatedAt
+                    }
 
                     if (old != null) {
                         return@withLock {
@@ -522,6 +542,17 @@ class EditNoteViewModel
             }
         }
 
+        private fun syncTimestamps() {
+            val id = loadedId ?: return
+            viewModelScope.launch {
+                val cur = repository.get(id)?.note
+                if (cur != null) {
+                    _createdAt.value = cur.createdAt
+                    _updatedAt.value = cur.updatedAt
+                }
+            }
+        }
+
         suspend fun trashCurrent() {
             persistence.withLock {
                 val id = loadedId ?: return@withLock
@@ -530,6 +561,7 @@ class EditNoteViewModel
                 _trashed.value = true
                 _archived.value = false
             }
+            syncTimestamps()
         }
 
         /**
@@ -546,6 +578,7 @@ class EditNoteViewModel
             } else {
                 repository.markCompleted(id)
             }
+            syncTimestamps()
         }
 
         /** Flip the note to the archive shelf after saving any in-flight edits. */
@@ -559,6 +592,7 @@ class EditNoteViewModel
                 _trashed.value = false
                 persistence.clearDirty()
             }
+            syncTimestamps()
         }
 
         suspend fun unarchiveCurrent() {
@@ -569,6 +603,7 @@ class EditNoteViewModel
                 _trashed.value = false
                 persistence.clearDirty()
             }
+            syncTimestamps()
         }
 
         suspend fun restoreFromTrashCurrent() {
@@ -579,6 +614,7 @@ class EditNoteViewModel
                 _archived.value = false
                 persistence.clearDirty()
             }
+            syncTimestamps()
         }
 
         /**

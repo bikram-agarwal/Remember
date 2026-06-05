@@ -138,6 +138,8 @@ fun EditListScreen(
     val archived by vm.archived.collectAsStateWithLifecycle()
     val trashed by vm.trashed.collectAsStateWithLifecycle()
     val hasUnsavedChanges by vm.hasUnsavedChanges.collectAsStateWithLifecycle()
+    val createdAt by vm.createdAt.collectAsStateWithLifecycle()
+    val updatedAt by vm.updatedAt.collectAsStateWithLifecycle()
 
     var reminderPickerOpen by rememberSaveable { mutableStateOf(false) }
     var iconPickerOpen by rememberSaveable { mutableStateOf(false) }
@@ -796,6 +798,8 @@ fun EditListScreen(
                             notificationsAllowed = notificationsAllowed,
                             readOnly = readOnly,
                             starred = starred,
+                            createdAt = createdAt,
+                            updatedAt = updatedAt,
                             onOpenReminder = { reminderPickerOpen = true },
                             onImportanceChange = vm::setImportance,
                             onVisibilityChange = vm::setVisibility,

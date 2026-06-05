@@ -1,3 +1,18 @@
+## v1.0.3: Checklist item notes
+
+### ✨ New features
+
+- Add notes to individual checklist items.
+- Imported Google Tasks lists now keep task notes with their matching checklist items.
+- `Created` and `Updated` timestamps are now shown at the bottom of every note / checklist.
+
+### 🧾 Misc
+
+- Backups and restores now preserve checklist item notes.
+- Existing checklist data upgrades cleanly with support for item notes.
+
+---
+
 ## v1.0.2: Launch of **Remember**
 
 ### ✨ Features
