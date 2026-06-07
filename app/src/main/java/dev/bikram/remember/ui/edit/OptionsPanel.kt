@@ -286,8 +286,10 @@ fun OptionsPanel(
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val createdFormatted = remember(createdAt) {
-                            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(createdAt))
+                        val createdFormatted = remember(createdAt, context) {
+                            val createdDate = Date(createdAt)
+                            android.text.format.DateFormat.getMediumDateFormat(context).format(createdDate) + " " +
+                                    android.text.format.DateFormat.getTimeFormat(context).format(createdDate)
                         }
                         Text(
                             text = stringResource(R.string.options_created, createdFormatted),
@@ -304,8 +306,10 @@ fun OptionsPanel(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                                 modifier = Modifier.padding(horizontal = 6.dp),
                             )
-                            val updatedFormatted = remember(updatedAt) {
-                                DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(updatedAt))
+                            val updatedFormatted = remember(updatedAt, context) {
+                                val updatedDate = Date(updatedAt)
+                                android.text.format.DateFormat.getMediumDateFormat(context).format(updatedDate) + " " +
+                                        android.text.format.DateFormat.getTimeFormat(context).format(updatedDate)
                             }
                             Text(
                                 text = stringResource(R.string.options_updated, updatedFormatted),
@@ -486,7 +490,12 @@ private fun ReminderOptionSummary(
         )
         return
     }
-    val datePart = DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT).format(Date(reminderAt))
+    val summaryContext = LocalContext.current
+    val datePart = remember(reminderAt, summaryContext) {
+        val reminderDate = Date(reminderAt)
+        android.text.format.DateFormat.getMediumDateFormat(summaryContext).format(reminderDate) + " " +
+                android.text.format.DateFormat.getTimeFormat(summaryContext).format(reminderDate)
+    }
     val rule = recurrence?.sanitized()
     val recurrenceLabel = rule?.let { compactRecurrenceLabel(it) }.orEmpty()
     if (recurrenceLabel.isEmpty()) {
