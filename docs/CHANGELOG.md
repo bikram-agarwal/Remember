@@ -1,4 +1,4 @@
-## v1.0.3: Checklist item notes
+## v1.0.4: Checklist item notes, time format
 
 ### ✨ New features
 
@@ -10,6 +10,7 @@
 
 - Backups and restores now preserve checklist item notes.
 - Existing checklist data upgrades cleanly with support for item notes.
+- App now follows system time format (12 hours / 24 hours)
 
 ---
 

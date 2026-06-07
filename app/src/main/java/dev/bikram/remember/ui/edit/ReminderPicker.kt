@@ -808,11 +808,12 @@ internal fun ReminderTimePickerDialog(
         properties = DialogProperties(usePlatformDefaultWidth = false),
     ) {
         key(initialHour, initialMinute) {
+            val pickerContext = LocalContext.current
             val timePickerState =
                 rememberTimePickerState(
                     initialHour = initialHour,
                     initialMinute = initialMinute,
-                    is24Hour = false,
+                    is24Hour = DateFormat.is24HourFormat(pickerContext),
                 )
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
