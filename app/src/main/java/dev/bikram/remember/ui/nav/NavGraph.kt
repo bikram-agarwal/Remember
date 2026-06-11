@@ -523,6 +523,7 @@ fun RememberNavGraph(
                                                 interactionPrefs = interactionPrefs,
                                                 appScope = appScope,
                                                 closeRevealRequest = closeRevealRequest,
+                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
                                                 onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
                                                 onOpenNoteInSinglePane = { note, forceEdit ->
                                                     navController.openEditRouteFor(note, forceEdit)
@@ -547,6 +548,7 @@ fun RememberNavGraph(
                                             HistoryTwoPaneRoute(
                                                 interactionPrefs = interactionPrefs,
                                                 appScope = appScope,
+                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
                                                 section = historySection,
                                                 onSectionChange = { selectedSection -> historySection = selectedSection },
                                                 onVisibleItemCountChange = { visibleItemCount ->

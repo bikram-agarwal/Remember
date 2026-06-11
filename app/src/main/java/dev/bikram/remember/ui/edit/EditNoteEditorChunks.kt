@@ -663,7 +663,7 @@ internal fun EditNoteScrollableContent(
         scrollState = scrollState,
         scrollEnabled = scrollEnabled,
         shelfState = shelfState,
-        bottomPadding = padding.calculateBottomPadding() + if (isEditMode && !readOnly) imeBottomPadding else 0.dp,
+        bottomPadding = editorBottomPaddingWithFloor(padding) + if (isEditMode && !readOnly) imeBottomPadding else 0.dp,
         heroContent = {
             PictureHeroSection(
                 vm = vm,

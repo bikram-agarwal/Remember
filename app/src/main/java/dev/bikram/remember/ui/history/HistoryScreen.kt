@@ -451,8 +451,13 @@ fun HistoryRoute(
             }
         }
     }
+    // Pane mode (showSelectionActionBar = false) has no floating pill over this list,
+    // so the pill-sized bottom blur band is dropped.
     val listBlurMod =
-        blurStyle?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
+        blurStyle?.applyToScrollableList(
+            topAlphaMultiplier = topAlphaMultiplier,
+            bottomAlphaMultiplier = if (showSelectionActionBar) 1f else 0f,
+        ) ?: Modifier
     val listScrollEnabled =
         rememberContentOverflowScrollEnabled(
             listState = listState,

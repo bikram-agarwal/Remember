@@ -600,6 +600,8 @@ private fun IconPickerSearchTitleRow(
             }
         }
 
+        // Breathing room so the open search pill doesn't touch the toggle button.
+        Spacer(Modifier.width(8.dp))
         val cdCloseSearch = stringResource(R.string.cd_close_search)
         val cdSearch = stringResource(R.string.cd_search)
         RememberFilledTonalIconButton(onClick = onToggleSearch) {

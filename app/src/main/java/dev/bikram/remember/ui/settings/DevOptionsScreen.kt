@@ -323,8 +323,12 @@ fun DevOptionsRoute(
             }
         }
     }
+    // Pane mode (no back arrow) drops the bottom blur band to match the settings pane.
     val blurMod =
-        blurStyle?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
+        blurStyle?.applyToScrollableList(
+            topAlphaMultiplier = topAlphaMultiplier,
+            bottomAlphaMultiplier = if (showNavigateBack) 1f else 0f,
+        ) ?: Modifier
     val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp
     val sharedScope = LocalSharedTransitionScope.current
     val navScope = LocalNavAnimatedVisibilityScope.current

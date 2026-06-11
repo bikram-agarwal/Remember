@@ -123,6 +123,8 @@ internal fun SearchableTopBarTitle(
                 // Empty title placeholder to remove the big title
             }
         }
+        // Breathing room so the open search pill doesn't touch the toggle button.
+        Spacer(Modifier.width(8.dp))
         // Toggle button stays in place at the End. The icon morphs between search and
         // close, scoped inside its own AnimatedContent so the rest of the row's
         // expansion animation isn't gated on the icon swap.

@@ -76,37 +76,42 @@ internal fun AboutSection(
     modifier: Modifier = Modifier,
     onDevModeActivated: () -> Unit = {},
     devModeEnabled: Boolean = false,
+    // The empty-detail-pane filler shows just the card, without the section header
+    // (and its diagnostics button).
+    showHeader: Boolean = true,
 ) {
     val context = LocalContext.current
     val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
     val shareDiagnostics = rememberDiagnosticsShareAction(context, diagnosticsChooserTitle)
     Column(modifier = modifier) {
-        SettingsStaticSectionHeader(
-            materialSymbolName = "info",
-            title = stringResource(R.string.settings_section_about),
-            trailingContent = {
-                RememberIconButton(
-                    onClick = shareDiagnostics,
-                    tooltipLabel = stringResource(R.string.settings_share_diagnostics),
-                    modifier =
-                        Modifier.size(
-                            rememberResponsiveActionButtonSize(
-                                defaultSize = 40.dp,
-                                compactSize = 38.dp,
-                                ultraCompactSize = 36.dp,
+        if (showHeader) {
+            SettingsStaticSectionHeader(
+                materialSymbolName = "info",
+                title = stringResource(R.string.settings_section_about),
+                trailingContent = {
+                    RememberIconButton(
+                        onClick = shareDiagnostics,
+                        tooltipLabel = stringResource(R.string.settings_share_diagnostics),
+                        modifier =
+                            Modifier.size(
+                                rememberResponsiveActionButtonSize(
+                                    defaultSize = 40.dp,
+                                    compactSize = 38.dp,
+                                    ultraCompactSize = 36.dp,
+                                ),
                             ),
-                        ),
-                ) {
-                    RememberMaterialRoundedSymbol(
-                        name = "bug_report",
-                        size = 20.dp,
-                        tint = MaterialTheme.colorScheme.primary,
-                        weight = FontWeight.Medium,
-                    )
-                }
-            },
-        )
-        Spacer(Modifier.height(8.dp))
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "bug_report",
+                            size = 20.dp,
+                            tint = MaterialTheme.colorScheme.primary,
+                            weight = FontWeight.Medium,
+                        )
+                    }
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+        }
         AboutSettingsBlock(
             onOpenIntro = onOpenIntro,
             onLaunchPlayReview = onLaunchPlayReview,

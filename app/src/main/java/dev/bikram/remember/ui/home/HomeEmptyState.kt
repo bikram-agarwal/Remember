@@ -31,6 +31,9 @@ internal fun NotesEmptyState(
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
     modifier: Modifier = Modifier,
+    // Pane mode hosts its own create FAB, so the inline buttons are redundant there —
+    // and dropping them frees the height the subtitle needs on short landscape panes.
+    showCreateActions: Boolean = true,
 ) {
     val pristineVault =
         totalUnfilteredNotes == 0 && filter.text.isBlank() && !filter.facetActive
@@ -59,33 +62,35 @@ internal fun NotesEmptyState(
                     modifier = Modifier.padding(horizontal = 24.dp),
                 )
             }
-            Spacer(Modifier.height(24.dp))
-            RememberButton(
-                onClick = onCreateNote,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.fillMaxWidth(0.78f),
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = "add",
-                    size = 20.dp,
-                    weight = FontWeight.Medium,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_create_note))
-            }
-            Spacer(Modifier.height(12.dp))
-            RememberOutlinedButton(
-                onClick = onCreateList,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.fillMaxWidth(0.78f),
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = "add",
-                    size = 20.dp,
-                    weight = FontWeight.Medium,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_create_list))
+            if (showCreateActions) {
+                Spacer(Modifier.height(24.dp))
+                RememberButton(
+                    onClick = onCreateNote,
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.fillMaxWidth(0.78f),
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "add",
+                        size = 20.dp,
+                        weight = FontWeight.Medium,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.home_create_note))
+                }
+                Spacer(Modifier.height(12.dp))
+                RememberOutlinedButton(
+                    onClick = onCreateList,
+                    shape = MaterialTheme.shapes.large,
+                    modifier = Modifier.fillMaxWidth(0.78f),
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "add",
+                        size = 20.dp,
+                        weight = FontWeight.Medium,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.home_create_list))
+                }
             }
         } else {
             val titleText =

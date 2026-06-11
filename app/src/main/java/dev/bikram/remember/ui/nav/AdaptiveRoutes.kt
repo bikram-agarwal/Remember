@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.nav
 
+import androidx.activity.ComponentActivity
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -12,12 +13,19 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -72,8 +80,10 @@ import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
 import dev.bikram.remember.ui.components.RememberFloatingActionButton
+import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.edit.EditListRoute
 import dev.bikram.remember.ui.edit.EditNoteRoute
@@ -87,6 +97,7 @@ import dev.bikram.remember.ui.home.HomeRoute
 import dev.bikram.remember.ui.home.HomeViewModel
 import dev.bikram.remember.ui.home.buildBulkTagCoverage
 import dev.bikram.remember.ui.main.NotesCreateFabMenu
+import dev.bikram.remember.ui.settings.AboutSection
 import dev.bikram.remember.ui.settings.DevOptionsRoute
 import dev.bikram.remember.ui.settings.SettingsRoute
 import dev.bikram.remember.ui.settings.SettingsSectionKey
@@ -105,6 +116,7 @@ fun NotesTwoPaneRoute(
     interactionPrefs: InteractionPrefs,
     appScope: CoroutineScope,
     closeRevealRequest: Int,
+    onOpenIntro: () -> Unit,
     onImportGoogleTasks: () -> Unit,
     onOpenNoteInSinglePane: (NoteWithItems, Boolean) -> Unit,
     onCreateNoteInSinglePane: () -> Unit,
@@ -140,6 +152,15 @@ fun NotesTwoPaneRoute(
         remember(state.items) {
             state.items.mapNotNull { item ->
                 (item as? HomeListItem.NoteRow)?.note
+            }
+        }
+    // Archived/trashed search hits live outside state.items but are tappable in the
+    // list pane, so the detail pane must be allowed to keep hosting them.
+    val searchShelfIds =
+        remember(state.archivedMatches, state.trashedMatches) {
+            buildSet {
+                state.archivedMatches.forEach { match -> add(match.note.id) }
+                state.trashedMatches.forEach { match -> add(match.note.id) }
             }
         }
 
@@ -205,7 +226,7 @@ fun NotesTwoPaneRoute(
     // ViewModel and already handles OpenNote (via onOpenNote) and bulk-action
     // snackbars. A second collector would double-handle every event.
 
-    LaunchedEffect(visibleNotes, activeDetailId) {
+    LaunchedEffect(visibleNotes, activeDetailId, searchShelfIds) {
         val visibleIds = visibleNotes.map { note -> note.note.id }
         val currentDetailId = activeDetailId
         if (pendingSavedNoteId != null && pendingSavedNoteId in visibleIds) {
@@ -228,7 +249,9 @@ fun NotesTwoPaneRoute(
             // A just-saved note may not have landed in the Room flow yet; don't treat
             // it as deleted and steal its selection.
             currentDetailId != pendingSavedNoteId &&
-            currentDetailId !in visibleIds
+            currentDetailId !in visibleIds &&
+            // Archived/trashed search hits stay hosted while their list rows exist.
+            currentDetailId !in searchShelfIds
         ) {
             val fallbackNote = visibleNotes.firstOrNull()
             activeDetailId = fallbackNote?.note?.id
@@ -313,8 +336,21 @@ fun NotesTwoPaneRoute(
                             onArchiveSelected = viewModel::archiveSelected,
                             onTrashSelected = viewModel::trashSelected,
                         )
-                    } else if (selectedDetailId == null) {
-                        NotesEmptyDetail()
+                    } else if (selectedDetailId == null ||
+                        // Never trust activeDetailId alone: the pane may only host notes
+                        // still reachable from the list pane (active rows, search shelf
+                        // hits), placeholders, or a just-saved note awaiting the Room
+                        // emission. Anything else (e.g. a note that was bulk-archived
+                        // while open) immediately falls back to the empty state instead
+                        // of lingering on screen.
+                        !(
+                            selectedDetailId < 0L ||
+                                selectedDetailId == pendingSavedNoteId ||
+                                selectedDetailId in searchShelfIds ||
+                                visibleNotes.any { note -> note.note.id == selectedDetailId }
+                        )
+                    ) {
+                        AboutEmptyDetailPane(onOpenIntro = onOpenIntro)
                     } else {
                         NoteDetailPaneHost(
                             detailId = selectedDetailId,
@@ -515,6 +551,7 @@ fun SettingsTwoPaneRoute(
 fun HistoryTwoPaneRoute(
     interactionPrefs: InteractionPrefs,
     appScope: CoroutineScope,
+    onOpenIntro: () -> Unit,
     section: HistorySection,
     onSectionChange: (HistorySection) -> Unit,
     onVisibleItemCountChange: (Int) -> Unit,
@@ -650,8 +687,12 @@ fun HistoryTwoPaneRoute(
                         // the single-pane action bar.
                         onDeleteForeverSelected = { bulkDeleteForeverOpen = true },
                     )
-                } else if (selectedDetailId == null) {
-                    NotesEmptyDetail()
+                } else if (selectedDetailId == null ||
+                    // Same guard as the Notes route: only host notes still present in the
+                    // current section so bulk restore/delete can't leave a stale editor.
+                    visibleNotes.none { note -> note.note.id == selectedDetailId }
+                ) {
+                    AboutEmptyDetailPane(onOpenIntro = onOpenIntro)
                 } else {
                     NoteDetailPaneHost(
                         detailId = selectedDetailId,
@@ -837,38 +878,56 @@ private fun NoteDetailPaneHost(
     }
 }
 
+/**
+ * Detail-pane filler when nothing is selected: the Settings About card, mirroring
+ * FilePipe's two-pane filler. No explicit background so the shared app background
+ * (gradient or black) shows through and both panes match.
+ */
 @Composable
-private fun NotesEmptyDetail() {
-    // No explicit background: the shared app background (gradient or black) shows
-    // through so both panes match.
+private fun AboutEmptyDetailPane(onOpenIntro: () -> Unit) {
+    val context = LocalContext.current
+    val settingsDependencies =
+        remember(context) {
+            EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                SettingsDependenciesEntryPoint::class.java,
+            )
+        }
+    val devModePrefs = settingsDependencies.devModePrefs()
+    val appReviewLauncher = remember(settingsDependencies) { settingsDependencies.appReviewLauncher() }
+    val devModeEnabled by devModePrefs.isEnabled.collectAsStateWithLifecycle(initialValue = false)
+    val scope = rememberCoroutineScope()
     Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(32.dp),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            // Full-bleed scroll with the insets/margins inside, like the selection panes:
+            // short windows scroll edge-to-edge instead of clipping the card.
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .verticalScroll(rememberScrollState())
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(24.dp),
         ) {
-            RememberMaterialRoundedSymbol(
-                name = "notes",
-                size = 44.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
-            )
-            Text(
-                text = stringResource(R.string.two_pane_notes_empty_detail_title),
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = stringResource(R.string.two_pane_notes_empty_detail_body),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
+            AboutSection(
+                onOpenIntro = onOpenIntro,
+                showHeader = false,
+                devModeEnabled = devModeEnabled,
+                onDevModeActivated = {
+                    scope.launch { devModePrefs.setEnabled(true) }
+                },
+                onLaunchPlayReview = { onFlowFinished ->
+                    val hostActivity = context as? ComponentActivity
+                    if (hostActivity != null) {
+                        appReviewLauncher.tryLaunchInAppReview(hostActivity, onFlowFinished)
+                    } else {
+                        onFlowFinished()
+                    }
+                },
             )
         }
     }
@@ -996,7 +1055,9 @@ private fun SettingsSectionListPane(
                 start = 16.dp,
                 end = 16.dp,
                 top = 72.dp,
-                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp,
+                // 56dp FAB + its 20dp bottom margin + 24dp clearance: the last row must
+                // scroll above the share FAB instead of sitting underneath it.
+                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 100.dp,
             ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -1018,7 +1079,6 @@ private fun SettingsSectionListPane(
                     title = stringResource(SettingsSectionKey.DevOptions.titleRes),
                     selected = selectedSectionKey == SettingsSectionKey.DevOptions,
                     onClick = { onSectionSelected(SettingsSectionKey.DevOptions) },
-                    trailingIconName = "arrow_outward",
                 )
             }
         }
@@ -1113,7 +1173,35 @@ private fun SettingsPaneSectionRow(
     }
 }
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+// Mirrors FilePipe's RulesSelectionActionPane: a centered stack of full-width pill
+// buttons (icon + label), tonal for regular actions, outlined for cancel, filled
+// error for the destructive one. Keep the two apps' selection panes in sync.
+private val SelectionPaneButtonShape = RoundedCornerShape(percent = 50)
+private val SelectionPaneButtonPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+
+@Composable
+private fun SelectionPaneButtonContent(
+    iconName: String,
+    label: String,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = iconName,
+            size = 20.dp,
+            weight = FontWeight.Medium,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+        )
+    }
+}
+
 @Composable
 private fun NotesSelectionActionPane(
     selectedCount: Int,
@@ -1126,61 +1214,102 @@ private fun NotesSelectionActionPane(
     onTrashSelected: () -> Unit,
 ) {
     Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(32.dp),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            shape = MaterialTheme.shapes.large,
+        Column(
+            // The scroll container spans the whole pane and the insets/margins live
+            // INSIDE it: on low-height windows the stack scrolls edge-to-edge instead
+            // of being clipped at an invisible padded boundary (which reads as a solid
+            // bar covering the bottom button).
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState())
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
+            Text(
+                text = stringResource(R.string.two_pane_notes_selection_title, selectedCount),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            RememberFilledTonalButton(
+                onClick = onSelectAll,
+                enabled = totalVisibleCount > 0 && selectedCount < totalVisibleCount,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                        .height(56.dp),
+                shape = SelectionPaneButtonShape,
+                contentPadding = SelectionPaneButtonPadding,
             ) {
-                Text(
-                    text = stringResource(R.string.two_pane_notes_selection_title, selectedCount),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    RememberFilledTonalButton(
-                        onClick = onSelectAll,
-                        enabled = totalVisibleCount > 0 && selectedCount < totalVisibleCount,
-                        colors = ButtonDefaults.filledTonalButtonColors(),
-                    ) {
-                        Text(stringResource(R.string.home_select_all))
-                    }
-                    RememberFilledTonalButton(onClick = onClearSelection) {
-                        Text(stringResource(R.string.home_unselect_all))
-                    }
-                }
-                Spacer(Modifier.size(4.dp))
-                RememberFilledTonalButton(onClick = onTagSelected) {
-                    Text(stringResource(R.string.home_bulk_tag))
-                }
-                RememberFilledTonalButton(onClick = onMarkDoneSelected) {
-                    Text(stringResource(R.string.edit_bottom_bar_mark_done))
-                }
-                RememberFilledTonalButton(onClick = onArchiveSelected) {
-                    Text(stringResource(R.string.edit_bottom_bar_archive))
-                }
-                RememberFilledTonalButton(
-                    onClick = onTrashSelected,
-                    colors =
-                        ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        ),
-                ) {
-                    Text(stringResource(R.string.home_bulk_trash))
-                }
+                SelectionPaneButtonContent("select_all", stringResource(R.string.home_select_all))
+            }
+            RememberOutlinedButton(
+                onClick = onClearSelection,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                shape = SelectionPaneButtonShape,
+                contentPadding = SelectionPaneButtonPadding,
+            ) {
+                SelectionPaneButtonContent("close", stringResource(R.string.home_unselect_all))
+            }
+            RememberFilledTonalButton(
+                onClick = onTagSelected,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                shape = SelectionPaneButtonShape,
+                contentPadding = SelectionPaneButtonPadding,
+            ) {
+                SelectionPaneButtonContent("label", stringResource(R.string.home_bulk_tag))
+            }
+            RememberFilledTonalButton(
+                onClick = onMarkDoneSelected,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                shape = SelectionPaneButtonShape,
+                contentPadding = SelectionPaneButtonPadding,
+            ) {
+                SelectionPaneButtonContent("check_circle", stringResource(R.string.edit_bottom_bar_mark_done))
+            }
+            RememberFilledTonalButton(
+                onClick = onArchiveSelected,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                shape = SelectionPaneButtonShape,
+                contentPadding = SelectionPaneButtonPadding,
+            ) {
+                SelectionPaneButtonContent("archive", stringResource(R.string.edit_bottom_bar_archive))
+            }
+            RememberButton(
+                onClick = onTrashSelected,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                shape = SelectionPaneButtonShape,
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    ),
+                contentPadding = SelectionPaneButtonPadding,
+            ) {
+                SelectionPaneButtonContent("delete", stringResource(R.string.home_bulk_trash))
             }
         }
     }
@@ -1200,66 +1329,114 @@ private fun HistorySelectionActionPane(
     onDeleteForeverSelected: () -> Unit,
 ) {
     Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(32.dp),
+        modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.surfaceContainer,
-            shape = MaterialTheme.shapes.large,
+        Column(
+            // Same full-bleed scroll structure as the Notes pane: insets/margins live
+            // inside the scroll container so nothing gets clipped at a padded boundary.
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 360.dp)
+                    .verticalScroll(rememberScrollState())
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Column(
+            Text(
+                text = stringResource(R.string.two_pane_notes_selection_title, selectedCount),
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            RememberFilledTonalButton(
+                onClick = onSelectAll,
+                enabled = totalVisibleCount > 0 && selectedCount < totalVisibleCount,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+                        .height(56.dp),
+                shape = SelectionPaneButtonShape,
+                contentPadding = SelectionPaneButtonPadding,
             ) {
-                Text(
-                    text = stringResource(R.string.two_pane_notes_selection_title, selectedCount),
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    RememberFilledTonalButton(
-                        onClick = onSelectAll,
-                        enabled = totalVisibleCount > 0 && selectedCount < totalVisibleCount,
-                    ) {
-                        Text(stringResource(R.string.home_select_all))
-                    }
-                    RememberFilledTonalButton(onClick = onClearSelection) {
-                        Text(stringResource(R.string.home_unselect_all))
-                    }
-                }
-                Spacer(Modifier.size(4.dp))
-                if (section == HistorySection.TRASH) {
-                    RememberFilledTonalButton(onClick = onRestoreSelected) {
-                        Text(stringResource(R.string.edit_bottom_bar_restore))
-                    }
-                    RememberFilledTonalButton(onClick = onArchiveSelected) {
-                        Text(stringResource(R.string.edit_bottom_bar_archive))
-                    }
-                } else {
-                    RememberFilledTonalButton(onClick = onUnarchiveSelected) {
-                        Text(stringResource(R.string.edit_bottom_bar_unarchive))
-                    }
-                    RememberFilledTonalButton(onClick = onTrashSelected) {
-                        Text(stringResource(R.string.common_move_to_trash))
-                    }
+                SelectionPaneButtonContent("select_all", stringResource(R.string.home_select_all))
+            }
+            RememberOutlinedButton(
+                onClick = onClearSelection,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                shape = SelectionPaneButtonShape,
+                contentPadding = SelectionPaneButtonPadding,
+            ) {
+                SelectionPaneButtonContent("close", stringResource(R.string.home_unselect_all))
+            }
+            if (section == HistorySection.TRASH) {
+                RememberFilledTonalButton(
+                    onClick = onRestoreSelected,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                    shape = SelectionPaneButtonShape,
+                    contentPadding = SelectionPaneButtonPadding,
+                ) {
+                    SelectionPaneButtonContent("restore_from_trash", stringResource(R.string.edit_bottom_bar_restore))
                 }
                 RememberFilledTonalButton(
-                    onClick = onDeleteForeverSelected,
-                    colors =
-                        ButtonDefaults.filledTonalButtonColors(
-                            containerColor = MaterialTheme.colorScheme.errorContainer,
-                            contentColor = MaterialTheme.colorScheme.onErrorContainer,
-                        ),
+                    onClick = onArchiveSelected,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                    shape = SelectionPaneButtonShape,
+                    contentPadding = SelectionPaneButtonPadding,
                 ) {
-                    Text(stringResource(R.string.edit_bottom_bar_delete_forever))
+                    SelectionPaneButtonContent("archive", stringResource(R.string.edit_bottom_bar_archive))
                 }
+            } else {
+                RememberFilledTonalButton(
+                    onClick = onUnarchiveSelected,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                    shape = SelectionPaneButtonShape,
+                    contentPadding = SelectionPaneButtonPadding,
+                ) {
+                    SelectionPaneButtonContent("unarchive", stringResource(R.string.edit_bottom_bar_unarchive))
+                }
+                RememberFilledTonalButton(
+                    onClick = onTrashSelected,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(56.dp),
+                    shape = SelectionPaneButtonShape,
+                    contentPadding = SelectionPaneButtonPadding,
+                ) {
+                    SelectionPaneButtonContent("delete_sweep", stringResource(R.string.common_move_to_trash))
+                }
+            }
+            RememberButton(
+                onClick = onDeleteForeverSelected,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                shape = SelectionPaneButtonShape,
+                colors =
+                    ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer,
+                    ),
+                contentPadding = SelectionPaneButtonPadding,
+            ) {
+                SelectionPaneButtonContent("delete_forever", stringResource(R.string.edit_bottom_bar_delete_forever))
             }
         }
     }

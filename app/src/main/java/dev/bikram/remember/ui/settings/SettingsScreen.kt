@@ -895,7 +895,15 @@ fun SettingsRoute(
             )
         },
     ) { _ ->
-        val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
+        // Pane mode (selectedSectionKey set) has no floating pill over this list, so the
+        // bottom blur band that exists to sit under the pill is dropped.
+        val paneHosted = selectedSectionKey != null
+        val blurMod =
+            remember(blurStyle, paneHosted) {
+                blurStyle
+                    ?.applyToScrollableList(bottomAlphaMultiplier = if (paneHosted) 0f else 1f)
+                    ?: Modifier
+            }
         val topInset = statusBarInset + if (showTopActions) 68.dp else 24.dp
         val bottomPadding = pillInset + 24.dp
         val listContentPadding =

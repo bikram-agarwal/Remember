@@ -5,6 +5,7 @@ import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
@@ -452,7 +454,14 @@ fun HomeScreen(
             }
         },
     ) { _ ->
-        val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
+        // Pane mode (showSelectionActionBar = false) has no floating pill over this list,
+        // so the pill-sized bottom blur band is dropped.
+        val blurMod =
+            remember(blurStyle, showSelectionActionBar) {
+                blurStyle
+                    ?.applyToScrollableList(bottomAlphaMultiplier = if (showSelectionActionBar) 1f else 0f)
+                    ?: Modifier
+            }
         val topInset = statusBarInset + 68.dp
         val bottomPadding = bottomInset + 24.dp
         val listContentPadding =
@@ -480,7 +489,13 @@ fun HomeScreen(
         val itemFadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
         val itemFadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
         val itemPlacementSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntOffset>()
-        Box(Modifier.fillMaxSize()) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            // Height of the area actually visible between the list's top inset and the
+            // bottom chrome padding. The empty state centers within THIS, not the raw
+            // viewport — otherwise its bottom (subtitle) starts below the fold on short
+            // landscape panes. If the content is taller it simply grows and the list
+            // scrolls; nothing is ever clipped.
+            val emptyStateMinHeight = (maxHeight - topInset - bottomPadding).coerceAtLeast(0.dp)
             LazyColumn(
                 state = listState,
                 modifier =
@@ -491,21 +506,6 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 userScrollEnabled = listScrollEnabled,
             ) {
-                if (pendingNewNoteKind != null) {
-                    item(key = "__pending_new_note__", contentType = "pendingNewNote") {
-                        PendingNewNoteCard(
-                            kind = pendingNewNoteKind,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .animateItem(
-                                        fadeInSpec = itemFadeInSpec,
-                                        placementSpec = itemPlacementSpec,
-                                        fadeOutSpec = itemFadeOutSpec,
-                                    ),
-                        )
-                    }
-                }
                 if (showFilterControls) {
                     item(key = "__chips__", contentType = "chips") {
                         ActiveFilterChips(
@@ -528,12 +528,29 @@ fun HomeScreen(
                         )
                     }
                 }
+                // After the chips: the placeholder for a pane-mode new note belongs under
+                // the filter row, like any other list entry.
+                if (pendingNewNoteKind != null) {
+                    item(key = "__pending_new_note__", contentType = "pendingNewNote") {
+                        PendingNewNoteCard(
+                            kind = pendingNewNoteKind,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .animateItem(
+                                        fadeInSpec = itemFadeInSpec,
+                                        placementSpec = itemPlacementSpec,
+                                        fadeOutSpec = itemFadeOutSpec,
+                                    ),
+                        )
+                    }
+                }
                 if (showEmptyState) {
                     item(key = "__empty_state__", contentType = "emptyState") {
                         Box(
                             modifier =
                                 Modifier
-                                    .fillParentMaxHeight()
+                                    .heightIn(min = emptyStateMinHeight)
                                     .fillMaxWidth(),
                             contentAlignment = Alignment.Center,
                         ) {
@@ -542,6 +559,7 @@ fun HomeScreen(
                                 totalUnfilteredNotes = state.totalActive,
                                 onCreateNote = onCreateNote,
                                 onCreateList = onCreateList,
+                                showCreateActions = showSelectionActionBar,
                                 modifier =
                                     Modifier
                                         .fillMaxWidth()
@@ -755,6 +773,8 @@ fun HomeScreen(
                         .then(topBarOverlayModifier),
                 contentAlignment = Alignment.TopEnd,
             ) {
+                // In pane mode (showSelectionActionBar = false) the detail pane owns
+                // Select all / Cancel selection, so the top-bar swap stays out entirely.
                 if (!state.inSelectionMode) {
                     SearchableTopBarTitle(
                         searchOpen = searchOpen,
@@ -773,7 +793,7 @@ fun HomeScreen(
                             }
                         },
                     )
-                } else {
+                } else if (showSelectionActionBar) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         val actionButtonSize = rememberResponsiveActionButtonSize()
                         val cdSelectAll = stringResource(R.string.home_select_all)
