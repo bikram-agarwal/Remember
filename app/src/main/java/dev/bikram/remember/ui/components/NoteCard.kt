@@ -87,6 +87,7 @@ fun NoteCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
+    activeInDetailPane: Boolean = false,
     reminderNotificationsAllowed: Boolean = true,
 ) {
     NoteCard(
@@ -95,6 +96,7 @@ fun NoteCard(
         modifier = modifier,
         onLongClick = onLongClick,
         selected = selected,
+        activeInDetailPane = activeInDetailPane,
         reminderNotificationsAllowed = reminderNotificationsAllowed,
     )
 }
@@ -107,6 +109,7 @@ fun NoteCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
+    activeInDetailPane: Boolean = false,
     reminderNotificationsAllowed: Boolean = true,
 ) {
     val cardColors = elevatedCardColors()
@@ -260,8 +263,14 @@ fun NoteCard(
         } else {
             Modifier
         }
+    val activePaneBorder =
+        if (activeInDetailPane && !selected) {
+            Modifier.border(BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary), cardShape)
+        } else {
+            Modifier
+        }
     val starredBorder =
-        if (model.starred && !selected) {
+        if (model.starred && !selected && !activeInDetailPane) {
             Modifier.border(BorderStroke(1.dp, Color(0xFFF9A825).copy(alpha = 0.70f)), cardShape)
         } else {
             Modifier
@@ -289,6 +298,7 @@ fun NoteCard(
                 }.then(sharedModifier)
                 .clip(cardShape)
                 .then(starredBorder)
+                .then(activePaneBorder)
                 .then(selectionBorder)
                 .then(clickableModifier)
                 .semantics(mergeDescendants = true) {

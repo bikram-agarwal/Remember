@@ -1,7 +1,6 @@
 package dev.bikram.remember.ui.main
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -18,6 +17,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,10 +43,8 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
-import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,13 +70,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.graphics.shapes.Morph
-import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.notifications.appNotificationSettingsIntent
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
+import dev.bikram.remember.ui.common.rememberShareAppAction
 import dev.bikram.remember.ui.components.AlertChromeSummary
 import dev.bikram.remember.ui.components.AlertFloatingActionButtonMenu
 import dev.bikram.remember.ui.components.RememberFloatingActionButton
@@ -121,6 +119,7 @@ fun MainTabScaffold(
     repository: NoteRepository,
     currentTab: MainTab,
     chromeVisible: Boolean = true,
+    useDualPaneMode: Boolean = false,
     onTabSelected: (MainTab) -> Unit,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
@@ -142,16 +141,7 @@ fun MainTabScaffold(
     var moveArchiveToTrashOpen by rememberSaveable { mutableStateOf(false) }
     var closeNotesRevealRequest by rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
-    val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
-    val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
-    val shareUrl =
-        when {
-            BuildConfig.FLAVOR == "playstore" -> playStoreListingUrl
-            githubRepoForSourceLink.isNotEmpty() -> "https://github.com/$githubRepoForSourceLink/releases/latest"
-            else -> playStoreListingUrl
-        }
-    val shareText = stringResource(R.string.about_share_text, shareUrl)
-    val shareChooserTitle = stringResource(R.string.main_share_chooser_title)
+    val shareApp = rememberShareAppAction()
     val navAnimatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
     val chromeTargetVisible =
         navAnimatedVisibilityScope?.transition?.targetState == EnterExitState.Visible
@@ -193,9 +183,7 @@ fun MainTabScaffold(
         // briefly point at a stale location while the new tab's FAB rebinds.
         if (!effectiveChromeVisible || currentTab != MainTab.Notes) fabExpanded = false
     }
-    val navigationSuiteType =
-        NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfoV2())
-    val useAdaptiveNavigationRail = navigationSuiteType != NavigationSuiteType.NavigationBar
+    val useAdaptiveNavigationRail = useDualPaneMode
     val mainContent: @Composable () -> Unit = {
         Box(modifier = Modifier.fillMaxSize()) {
             content(closeNotesRevealRequest)
@@ -229,76 +217,42 @@ fun MainTabScaffold(
                 // wrapper grows upward beyond the strip's reported bounds without pushing the
                 // pill. Rail mode is unaffected - the FAB sits in its own BottomEnd box.
                 if (useAdaptiveNavigationRail) {
+                    // Rail mode has no main FAB here — each two-pane route hosts its own
+                    // FAB in the list pane. The alert chrome anchors at the start edge,
+                    // beside the rail, mirroring its left-of-the-pill spot on phones.
                     if (alertSummary.count > 0) {
-                        Box(
-                            modifier =
-                                Modifier
-                                    .align(Alignment.BottomEnd)
-                                    .then(chromeOverlayModifier)
-                                    .windowInsetsPadding(WindowInsets.navigationBars)
-                                    .padding(end = 96.dp, bottom = 24.dp),
-                        ) {
-                            AlertFloatingActionButtonMenu(
-                                expanded = alertBarsExpanded,
-                                onExpandedChange = { expanded ->
-                                    fabExpanded = false
-                                    onAlertBarsExpandedChange(expanded)
-                                },
-                                summary = alertSummary,
-                                updateState = updateBarState,
-                                blockedReminderCount = blockedReminderCount,
-                                onEnableReminderNotifications = enableReminderNotifications,
-                                onUpdateClick = onUpdateClick,
-                                onDismissUpdateAvailable = onDismissUpdateAvailable,
-                                onInstallUpdate = onInstallUpdate,
-                                horizontalAlignment = Alignment.End,
-                            )
+                        BoxWithConstraints(modifier = Modifier.matchParentSize()) {
+                            // Keep the unfurled bars inside the list pane (0.4 of the
+                            // content width, same proportion as the pane split) so they
+                            // never shove into the detail pane.
+                            val railBarsMaxWidth = maxWidth * 0.4f - 30.dp
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.BottomStart)
+                                        .then(chromeOverlayModifier)
+                                        .windowInsetsPadding(WindowInsets.navigationBars)
+                                        // Same 20dp baseline as the list-pane FABs. The count
+                                        // badge hangs below via offset without affecting layout.
+                                        .padding(start = 20.dp, bottom = 20.dp),
+                            ) {
+                                AlertFloatingActionButtonMenu(
+                                    expanded = alertBarsExpanded,
+                                    onExpandedChange = { expanded ->
+                                        fabExpanded = false
+                                        onAlertBarsExpandedChange(expanded)
+                                    },
+                                    summary = alertSummary,
+                                    updateState = updateBarState,
+                                    blockedReminderCount = blockedReminderCount,
+                                    onEnableReminderNotifications = enableReminderNotifications,
+                                    onUpdateClick = onUpdateClick,
+                                    onDismissUpdateAvailable = onDismissUpdateAvailable,
+                                    onInstallUpdate = onInstallUpdate,
+                                    barsMaxWidth = railBarsMaxWidth,
+                                )
+                            }
                         }
-                    }
-                    Box(
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomEnd)
-                                .then(chromeOverlayModifier)
-                                .windowInsetsPadding(WindowInsets.navigationBars)
-                                .padding(end = 24.dp, bottom = 24.dp),
-                    ) {
-                        MainFabSlot(
-                            tab = currentTab,
-                            fabExpanded = fabExpanded,
-                            onToggleNotesFab = {
-                                closeNotesRevealRequest++
-                                onAlertBarsExpandedChange(false)
-                                fabExpanded = !fabExpanded
-                            },
-                            historySection = historySection,
-                            historyVisibleItemCount = historyVisibleItemCount,
-                            onClearTrashRequest = { clearTrashOpen = true },
-                            onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
-                            onShareApp = {
-                                val send =
-                                    Intent(Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(Intent.EXTRA_TEXT, shareText)
-                                    }
-                                context.startActivity(Intent.createChooser(send, shareChooserTitle))
-                            },
-                            onPickImport = {
-                                closeNotesRevealRequest++
-                                fabExpanded = false
-                                onImportGoogleTasks()
-                            },
-                            onPickList = {
-                                closeNotesRevealRequest++
-                                fabExpanded = false
-                                onCreateList()
-                            },
-                            onPickNote = {
-                                closeNotesRevealRequest++
-                                fabExpanded = false
-                                onCreateNote()
-                            },
-                        )
                     }
                 } else {
                     CenteredPillWithSideFab(
@@ -338,6 +292,7 @@ fun MainTabScaffold(
                                         onUpdateClick = onUpdateClick,
                                         onDismissUpdateAvailable = onDismissUpdateAvailable,
                                         onInstallUpdate = onInstallUpdate,
+                                        centerBarsInWindow = true,
                                     )
                                 }
                             },
@@ -354,14 +309,7 @@ fun MainTabScaffold(
                                 historyVisibleItemCount = historyVisibleItemCount,
                                 onClearTrashRequest = { clearTrashOpen = true },
                                 onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
-                                onShareApp = {
-                                    val send =
-                                        Intent(Intent.ACTION_SEND).apply {
-                                            type = "text/plain"
-                                            putExtra(Intent.EXTRA_TEXT, shareText)
-                                        }
-                                    context.startActivity(Intent.createChooser(send, shareChooserTitle))
-                                },
+                                onShareApp = shareApp,
                                 onPickImport = {
                                     closeNotesRevealRequest++
                                     fabExpanded = false
@@ -382,8 +330,6 @@ fun MainTabScaffold(
                         fabRightInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
                         fabBottomInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
                         leadingFabGap = 18.dp,
-                        leadingFabLeftInset = 16.dp,
-                        leadingFabBottomInset = 16.dp,
                     )
                 }
             }
@@ -401,7 +347,7 @@ fun MainTabScaffold(
 
     if (effectiveChromeVisible && useAdaptiveNavigationRail) {
         NavigationSuiteScaffold(
-            layoutType = navigationSuiteType,
+            layoutType = NavigationSuiteType.NavigationRail,
             containerColor = Color.Transparent,
             navigationSuiteItems = {
                 MainTab.entries.forEach { tabItem ->
@@ -748,125 +694,14 @@ private fun MainFabSlot(
     onPickNote: () -> Unit,
 ) {
     when (tab) {
-        MainTab.Notes -> {
-            val createDescription = stringResource(R.string.main_fab_create)
-            val closeDescription = stringResource(R.string.main_fab_close)
-            val description = if (fabExpanded) closeDescription else createDescription
-            val motionScheme = MaterialTheme.motionScheme
-            val iconColor by animateColorAsState(
-                targetValue =
-                    if (fabExpanded) {
-                        MaterialTheme.colorScheme.onPrimary
-                    } else {
-                        MaterialTheme.colorScheme.onPrimaryContainer
-                    },
-                animationSpec = reducedMotionAwareSpec(motionScheme.defaultEffectsSpec()),
-                label = "notes_fab_icon_color",
-            )
-            val fabMorph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Sunny) }
-            val shapeProgress by animateFloatAsState(
-                targetValue = if (fabExpanded) 1f else 0f,
-                animationSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec()),
-                label = "notes_fab_shape_morph",
-            )
-            val iconRotation by animateFloatAsState(
-                targetValue = if (fabExpanded) 45f else 0f,
-                animationSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec()),
-                label = "notes_fab_icon_rotation",
-            )
-            val fabShape = MorphPolygonShape(fabMorph, shapeProgress)
-            // FloatingActionButtonMenu hosts BOTH the toggle FAB and the menu items. The
-            // FAB element stays anchored (right + bottom of the wrapper); the menu items
-            // expand upward and leftward when [expanded] flips on. The pill-mode caller
-            // ([CenteredPillWithSideFab]) deliberately measures this child with infinite
-            // max height and reports a strip height clamped to the FAB's core size, so
-            // the menu's expansion overflows up into screen space without re-flowing the
-            // pill - what the hand-rolled SpeedDialOverlay used to enforce, now folded
-            // into the surrounding Layout instead.
-            FloatingActionButtonMenu(
+        MainTab.Notes ->
+            NotesCreateFabMenu(
                 expanded = fabExpanded,
-                button = {
-                    ToggleFloatingActionButton(
-                        checked = fabExpanded,
-                        onCheckedChange = {
-                            onToggleNotesFab()
-                        },
-                        modifier =
-                            Modifier
-                                .shadow(
-                                    elevation = 2.dp,
-                                    shape = fabShape,
-                                    clip = false,
-                                ).clip(fabShape)
-                                .semantics { contentDescription = description },
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "add",
-                            size = 26.dp,
-                            tint = iconColor,
-                            weight = FontWeight.Medium,
-                            modifier = Modifier.graphicsLayer { rotationZ = iconRotation },
-                        )
-                    }
-                },
-                horizontalAlignment = Alignment.End,
-            ) {
-                FloatingActionButtonMenuItem(
-                    onClick = onPickImport,
-                    icon = {
-                        RememberMaterialRoundedSymbol(
-                            name = "download",
-                            size = 22.dp,
-                            weight = FontWeight.Medium,
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = stringResource(R.string.main_speed_dial_import),
-                            style = MaterialTheme.typography.labelLargeEmphasized,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                        )
-                    },
-                )
-                FloatingActionButtonMenuItem(
-                    onClick = onPickList,
-                    icon = {
-                        RememberMaterialRoundedSymbol(
-                            name = DEFAULT_LIST_HEADER_SYMBOL,
-                            size = 22.dp,
-                            weight = FontWeight.Medium,
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = stringResource(R.string.main_speed_dial_checklist),
-                            style = MaterialTheme.typography.labelLargeEmphasized,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                        )
-                    },
-                )
-                FloatingActionButtonMenuItem(
-                    onClick = onPickNote,
-                    icon = {
-                        RememberMaterialRoundedSymbol(
-                            name = DEFAULT_NOTE_HEADER_SYMBOL,
-                            size = 22.dp,
-                            weight = FontWeight.Medium,
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = stringResource(R.string.main_speed_dial_note),
-                            style = MaterialTheme.typography.labelLargeEmphasized,
-                            fontWeight = FontWeight.SemiBold,
-                            maxLines = 1,
-                        )
-                    },
-                )
-            }
-        }
+                onToggle = onToggleNotesFab,
+                onPickImport = onPickImport,
+                onPickList = onPickList,
+                onPickNote = onPickNote,
+            )
         MainTab.History -> {
             val isArchive = historySection == HistorySection.ARCHIVE
             val symbolName = if (isArchive) "delete_sweep" else "delete_forever"
@@ -900,6 +735,141 @@ private fun MainFabSlot(
                 iconSize = 26.dp,
                 onClick = onShareApp,
             )
+    }
+}
+
+/**
+ * The Notes create speed dial — the same FAB (Cookie9Sided/Sunny morph, icon rotation,
+ * animated colors) whether it is hosted by the phone pill strip or by a two-pane list
+ * pane, so the FAB never changes shape between single- and dual-pane modes.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+internal fun NotesCreateFabMenu(
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onPickImport: () -> Unit,
+    onPickList: () -> Unit,
+    onPickNote: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val createDescription = stringResource(R.string.main_fab_create)
+    val closeDescription = stringResource(R.string.main_fab_close)
+    val description = if (expanded) closeDescription else createDescription
+    val motionScheme = MaterialTheme.motionScheme
+    val iconColor by animateColorAsState(
+        targetValue =
+            if (expanded) {
+                MaterialTheme.colorScheme.onPrimary
+            } else {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            },
+        animationSpec = reducedMotionAwareSpec(motionScheme.defaultEffectsSpec()),
+        label = "notes_fab_icon_color",
+    )
+    val fabMorph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Sunny) }
+    val shapeProgress by animateFloatAsState(
+        targetValue = if (expanded) 1f else 0f,
+        animationSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec()),
+        label = "notes_fab_shape_morph",
+    )
+    val iconRotation by animateFloatAsState(
+        targetValue = if (expanded) 45f else 0f,
+        animationSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec()),
+        label = "notes_fab_icon_rotation",
+    )
+    val fabShape = MorphPolygonShape(fabMorph, shapeProgress)
+    // FloatingActionButtonMenu hosts BOTH the toggle FAB and the menu items. The
+    // FAB element stays anchored (right + bottom of the wrapper); the menu items
+    // expand upward and leftward when [expanded] flips on. The pill-mode caller
+    // ([CenteredPillWithSideFab]) deliberately measures this child with infinite
+    // max height and reports a strip height clamped to the FAB's core size, so
+    // the menu's expansion overflows up into screen space without re-flowing the
+    // pill - what the hand-rolled SpeedDialOverlay used to enforce, now folded
+    // into the surrounding Layout instead.
+    FloatingActionButtonMenu(
+        expanded = expanded,
+        modifier = modifier,
+        button = {
+            ToggleFloatingActionButton(
+                checked = expanded,
+                onCheckedChange = {
+                    onToggle()
+                },
+                modifier =
+                    Modifier
+                        .shadow(
+                            elevation = 2.dp,
+                            shape = fabShape,
+                            clip = false,
+                        ).clip(fabShape)
+                        .semantics { contentDescription = description },
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name = "add",
+                    size = 26.dp,
+                    tint = iconColor,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.graphicsLayer { rotationZ = iconRotation },
+                )
+            }
+        },
+        horizontalAlignment = Alignment.End,
+    ) {
+        FloatingActionButtonMenuItem(
+            onClick = onPickImport,
+            icon = {
+                RememberMaterialRoundedSymbol(
+                    name = "download",
+                    size = 22.dp,
+                    weight = FontWeight.Medium,
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.main_speed_dial_import),
+                    style = MaterialTheme.typography.labelLargeEmphasized,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+            },
+        )
+        FloatingActionButtonMenuItem(
+            onClick = onPickList,
+            icon = {
+                RememberMaterialRoundedSymbol(
+                    name = DEFAULT_LIST_HEADER_SYMBOL,
+                    size = 22.dp,
+                    weight = FontWeight.Medium,
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.main_speed_dial_checklist),
+                    style = MaterialTheme.typography.labelLargeEmphasized,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+            },
+        )
+        FloatingActionButtonMenuItem(
+            onClick = onPickNote,
+            icon = {
+                RememberMaterialRoundedSymbol(
+                    name = DEFAULT_NOTE_HEADER_SYMBOL,
+                    size = 22.dp,
+                    weight = FontWeight.Medium,
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(R.string.main_speed_dial_note),
+                    style = MaterialTheme.typography.labelLargeEmphasized,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                )
+            },
+        )
     }
 }
 

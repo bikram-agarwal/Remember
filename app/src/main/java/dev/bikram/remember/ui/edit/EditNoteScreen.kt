@@ -45,13 +45,31 @@ fun EditNoteRoute(
     appScope: CoroutineScope,
     noteId: Long?,
     forceEdit: Boolean = false,
+    showNavigateBack: Boolean = true,
+    allowInitialTitleFocus: Boolean = true,
+    interceptBack: Boolean = true,
+    onPersistedNoteIdChanged: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
     val vm: EditNoteViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
+    val currentNoteId by vm.currentNoteId.collectAsStateWithLifecycle()
     val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
     val sharedModifier = Modifier.rememberEditorSharedBoundsModifier(noteId)
+    LaunchedEffect(currentNoteId) {
+        currentNoteId?.let(onPersistedNoteIdChanged)
+    }
+    // Report the persisted id before leaving: a save-and-back disposes pane hosts before
+    // the currentNoteId LaunchedEffect gets a chance to run, so deliver it synchronously.
+    val handleBack = {
+        vm.currentNoteId.value?.let(onPersistedNoteIdChanged)
+        onBack()
+    }
+    val handleNavigateUp = {
+        vm.currentNoteId.value?.let(onPersistedNoteIdChanged)
+        onNavigateUp()
+    }
 
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
         EditNoteScreen(
@@ -62,8 +80,11 @@ fun EditNoteRoute(
             persistedForToolbar = hasPersistedRow,
             activeTagSuggestions = activeTagSuggestions,
             forceEdit = forceEdit,
-            onBack = onBack,
-            onNavigateUp = onNavigateUp,
+            showNavigateBack = showNavigateBack,
+            allowInitialTitleFocus = allowInitialTitleFocus,
+            interceptBack = interceptBack,
+            onBack = handleBack,
+            onNavigateUp = handleNavigateUp,
         )
     }
 }
@@ -78,6 +99,9 @@ fun EditNoteScreen(
     persistedForToolbar: Boolean,
     activeTagSuggestions: List<String>,
     forceEdit: Boolean = false,
+    showNavigateBack: Boolean = true,
+    allowInitialTitleFocus: Boolean = true,
+    interceptBack: Boolean = true,
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -216,7 +240,10 @@ fun EditNoteScreen(
     // already finished animating - that gap reads as a "moment of nothing" before
     // the back transition starts. BackHandler fires immediately on commit, letting
     // the navigation reverse animation pick up where the predictive preview ends.
-    androidx.activity.compose.BackHandler(onBack = editorActions.saveAndBack)
+    // Pane hosts disable interception (except for pending new notes) so system back is
+    // not swallowed while the editor lives permanently in the detail pane; autosave on
+    // ON_STOP/dispose covers persistence there.
+    androidx.activity.compose.BackHandler(enabled = interceptBack, onBack = editorActions.saveAndBack)
 
     // Hoisted scroll state so the bottom action bar can hide on scroll-down and re-show on
     // scroll-up. Also keyed off IME visibility so the rich-text toolbar has the stage alone
@@ -329,6 +356,8 @@ fun EditNoteScreen(
                             titleFocused = focused
                             if (focused) bodyFocused = false
                         },
+                        showNavigateBack = showNavigateBack,
+                        allowInitialTitleFocus = allowInitialTitleFocus,
                         titleCollapseProgress = titleCollapseProgress,
                         onSave = saveAndExitEditMode,
                         onOpenIcon = { iconPickerOpen = true },

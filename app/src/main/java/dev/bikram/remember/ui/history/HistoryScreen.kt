@@ -274,6 +274,10 @@ class HistoryViewModel
             viewModelScope.launch { repository.emptyTrash() }
         }
 
+        fun moveAllArchivedToTrash() {
+            viewModelScope.launch { repository.moveAllArchivedToTrash() }
+        }
+
         fun restoreSelected() {
             val ids = _selectedIds.value
             if (ids.isEmpty()) return
@@ -392,6 +396,8 @@ fun HistoryRoute(
     onSectionChange: (HistorySection) -> Unit,
     onVisibleItemCountChange: (Int) -> Unit,
     onOpenNote: (NoteWithItems, Boolean) -> Unit,
+    activeNoteId: Long? = null,
+    showSelectionActionBar: Boolean = true,
 ) {
     val vm: HistoryViewModel = hiltViewModel()
     val trashed by vm.trashedItems.collectAsStateWithLifecycle()
@@ -601,6 +607,7 @@ fun HistoryRoute(
                         ) { row ->
                             val noteId = row.card.id
                             val isSelected = noteId in selectedIds
+                            val isActiveInDetailPane = !inSelectionMode && activeNoteId == noteId
                             HistorySwipeCard(
                                 model = row.card,
                                 section = targetSection,
@@ -621,6 +628,7 @@ fun HistoryRoute(
                                 onUnarchive = { vm.unarchive(row.note) },
                                 onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
                                 selected = isSelected,
+                                activeInDetailPane = isActiveInDetailPane,
                                 onLongClick = { vm.toggleSelection(noteId) },
                                 swipeEnabled = !inSelectionMode,
                                 reminderNotificationsAllowed = notificationsAllowed,
@@ -651,24 +659,26 @@ fun HistoryRoute(
                         .zIndex(2f),
             )
         }
-        HistorySelectionActionBar(
-            visible = inSelectionMode,
-            section = section,
-            selectedCount = selectedIds.size,
-            selectableVisibleIds = selectableVisibleIds,
-            onClearSelection = vm::clearSelection,
-            onSelectAll = { vm.selectNotes(selectableVisibleIds) },
-            onUnselectAll = vm::clearSelection,
-            onRestoreSelected = vm::restoreSelected,
-            onArchiveSelected = vm::archiveSelectedFromTrash,
-            // Permanent delete is gated by a confirmation sheet; the actual VM
-            // call only fires after the user taps Delete in that sheet.
-            onDeleteForeverSelected = { bulkDeleteForeverOpen = true },
-            onUnarchiveSelected = vm::unarchiveSelected,
-            onTrashSelected = vm::moveSelectedArchivedToTrash,
-            bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
-            modifier = Modifier.align(Alignment.BottomCenter),
-        )
+        if (showSelectionActionBar) {
+            HistorySelectionActionBar(
+                visible = inSelectionMode,
+                section = section,
+                selectedCount = selectedIds.size,
+                selectableVisibleIds = selectableVisibleIds,
+                onClearSelection = vm::clearSelection,
+                onSelectAll = { vm.selectNotes(selectableVisibleIds) },
+                onUnselectAll = vm::clearSelection,
+                onRestoreSelected = vm::restoreSelected,
+                onArchiveSelected = vm::archiveSelectedFromTrash,
+                // Permanent delete is gated by a confirmation sheet; the actual VM
+                // call only fires after the user taps Delete in that sheet.
+                onDeleteForeverSelected = { bulkDeleteForeverOpen = true },
+                onUnarchiveSelected = vm::unarchiveSelected,
+                onTrashSelected = vm::moveSelectedArchivedToTrash,
+                bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
     }
 
     pendingDeleteForeverNote?.let { noteToDelete ->
@@ -1078,6 +1088,7 @@ private fun HistorySwipeCard(
     onMoveToTrash: () -> Unit,
     selected: Boolean = false,
     onLongClick: (() -> Unit)? = null,
+    activeInDetailPane: Boolean = false,
     swipeEnabled: Boolean = true,
     reminderNotificationsAllowed: Boolean = true,
 ) {
@@ -1087,6 +1098,7 @@ private fun HistorySwipeCard(
                 model = model,
                 onClick = onOpenNote,
                 selected = selected,
+                activeInDetailPane = activeInDetailPane,
                 onLongClick = onLongClick,
                 reminderNotificationsAllowed = reminderNotificationsAllowed,
             )
@@ -1175,6 +1187,7 @@ private fun HistorySwipeCard(
                 model = model,
                 onClick = onOpenNote,
                 selected = selected,
+                activeInDetailPane = activeInDetailPane,
                 onLongClick = onLongClick,
                 reminderNotificationsAllowed = reminderNotificationsAllowed,
             )

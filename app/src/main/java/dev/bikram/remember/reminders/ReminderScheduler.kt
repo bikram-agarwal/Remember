@@ -74,8 +74,6 @@ class ReminderScheduler(
         }
     }
 
-
-
     fun cancel(noteId: Long) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         am.cancel(pendingIntent(noteId))

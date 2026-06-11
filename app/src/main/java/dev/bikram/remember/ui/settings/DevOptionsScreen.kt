@@ -189,7 +189,10 @@ private object DevOptionsScreenSessionState {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun DevOptionsRoute(onBack: () -> Unit) {
+fun DevOptionsRoute(
+    onBack: () -> Unit,
+    showNavigateBack: Boolean = true,
+) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val resources = LocalResources.current
@@ -813,6 +816,7 @@ fun DevOptionsRoute(onBack: () -> Unit) {
                 developerOptionsEnabled = isEnabled,
                 topPadding = padding.calculateTopPadding(),
                 allSectionsCollapsed = allDevOptionsSectionsCollapsed,
+                showNavigateBack = showNavigateBack,
                 onNavigateBack = onBack,
                 onToggleAllSections = {
                     val collapsed = !allDevOptionsSectionsCollapsed
@@ -856,6 +860,7 @@ private fun DevDeveloperModeHeader(
     developerOptionsEnabled: Boolean,
     topPadding: androidx.compose.ui.unit.Dp,
     allSectionsCollapsed: Boolean,
+    showNavigateBack: Boolean,
     onNavigateBack: () -> Unit,
     onToggleAllSections: () -> Unit,
     onDeveloperOptionsEnabledChange: (Boolean) -> Unit,
@@ -878,15 +883,17 @@ private fun DevDeveloperModeHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RememberFilledTonalIconButton(
-                onClick = onNavigateBack,
-                shape = CircleShape,
-                tooltipLabel = stringResource(R.string.dev_options_back_cd),
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = "arrow_back",
-                    size = 22.dp,
-                )
+            if (showNavigateBack) {
+                RememberFilledTonalIconButton(
+                    onClick = onNavigateBack,
+                    shape = CircleShape,
+                    tooltipLabel = stringResource(R.string.dev_options_back_cd),
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "arrow_back",
+                        size = 22.dp,
+                    )
+                }
             }
             DevDeveloperModeCard(
                 developerOptionsEnabled = developerOptionsEnabled,

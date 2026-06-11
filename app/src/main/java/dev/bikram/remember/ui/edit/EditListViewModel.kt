@@ -120,6 +120,9 @@ class EditListViewModel
         private val _hasPersistedRow = MutableStateFlow(noteId != null)
         val hasPersistedRow: StateFlow<Boolean> = _hasPersistedRow.asStateFlow()
 
+        private val _currentNoteId = MutableStateFlow(noteId)
+        val currentNoteId: StateFlow<Long?> = _currentNoteId.asStateFlow()
+
         private val persistence = EditorPersistenceSession()
         val hasUnsavedChanges: StateFlow<Boolean> = persistence.hasUnsavedChanges
 
@@ -134,6 +137,7 @@ class EditListViewModel
 
         private fun syncHasPersistedRow() {
             _hasPersistedRow.value = loadedId != null
+            _currentNoteId.value = loadedId
         }
 
         init {

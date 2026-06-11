@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.Importance
@@ -13,6 +14,7 @@ import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RememberReservedTags
+import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.nav.Routes
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,8 +25,6 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import dev.bikram.remember.data.Visibility as NoteVisibility
-import dagger.hilt.android.EntryPointAccessors
-import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 
 /**
  * Owns every persisted field for the Edit Note screen and serializes save/load through
@@ -132,6 +132,9 @@ class EditNoteViewModel
         private val _hasPersistedRow = MutableStateFlow(noteId != null)
         val hasPersistedRow: StateFlow<Boolean> = _hasPersistedRow.asStateFlow()
 
+        private val _currentNoteId = MutableStateFlow(noteId)
+        val currentNoteId: StateFlow<Long?> = _currentNoteId.asStateFlow()
+
         /** True after the initial DB load has populated the state flows (or immediately for a new note). */
         private val _loaded = MutableStateFlow(noteId == null)
         val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
@@ -149,6 +152,7 @@ class EditNoteViewModel
 
         private fun syncHasPersistedRow() {
             _hasPersistedRow.value = loadedId != null
+            _currentNoteId.value = loadedId
         }
 
         init {
@@ -638,10 +642,12 @@ class EditNoteViewModel
             saveIfNeeded(untitledName)
             val id = loadedId ?: return
             val note = repository.get(id)?.note ?: return
-            val reminderPrefs = EntryPointAccessors.fromApplication(
-                context.applicationContext,
-                SettingsDependenciesEntryPoint::class.java,
-            ).reminderPrefs()
+            val reminderPrefs =
+                EntryPointAccessors
+                    .fromApplication(
+                        context.applicationContext,
+                        SettingsDependenciesEntryPoint::class.java,
+                    ).reminderPrefs()
             val keepUntilDone = reminderPrefs.snapshot().keepReminderNotificationsUntilDone
             dev.bikram.remember.reminders.ReminderReceiver
                 .showNotification(context, note, keepUntilDone = keepUntilDone)

@@ -16,4 +16,5 @@ data class ViewOptions(
     val sortKey: SortKey = SortKey.REMINDER,
     val sortDir: SortDir = SortDir.ASC,
     val groupBy: GroupBy = GroupBy.DATE,
+    val settingsCollapsedSectionKeys: List<String> = emptyList(),
 )

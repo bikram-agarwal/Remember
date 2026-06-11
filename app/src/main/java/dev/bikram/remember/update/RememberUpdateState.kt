@@ -22,6 +22,12 @@ class RememberUpdateState
         private val _updateInfo = MutableStateFlow<RememberUpdateInfo?>(null)
         val updateInfo: StateFlow<RememberUpdateInfo?> = _updateInfo.asStateFlow()
 
+        // Bumped every time an update is delivered, even when the value is identical to
+        // the current one (StateFlow would swallow that emission). Lets the alert chrome
+        // re-present on every (re-)trigger of the update flow, not just on value changes.
+        private val _updateSignalEpoch = MutableStateFlow(0)
+        val updateSignalEpoch: StateFlow<Int> = _updateSignalEpoch.asStateFlow()
+
         private val _devReleasePlayBannerMockUiState =
             MutableStateFlow<PlayInAppUpdateBannerUiState>(PlayInAppUpdateBannerUiState.Hidden)
         val devReleasePlayBannerMockUiState: StateFlow<PlayInAppUpdateBannerUiState> =
@@ -31,6 +37,9 @@ class RememberUpdateState
 
         fun showUpdate(info: RememberUpdateInfo?) {
             _updateInfo.value = info
+            if (info != null) {
+                _updateSignalEpoch.value += 1
+            }
         }
 
         fun devReleaseMockShowUpdateAvailable() {
@@ -48,6 +57,7 @@ class RememberUpdateState
                         },
                     isDevReleaseMock = true,
                 )
+            _updateSignalEpoch.value += 1
         }
 
         fun devReleaseMockStartPlayUpdateBannerSequence() {

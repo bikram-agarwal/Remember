@@ -85,6 +85,8 @@ internal fun EditorTitleTopBar(
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
     onTitleFocusChanged: (Boolean) -> Unit = {},
+    showNavigateBack: Boolean = true,
+    allowInitialTitleFocus: Boolean = true,
     showEditableWhenTitleEmpty: Boolean = false,
     titleCollapseProgress: Float = 0f,
     markdownDisplayMode: MarkdownEditorDisplayMode? = null,
@@ -112,7 +114,7 @@ internal fun EditorTitleTopBar(
         }
     }
     LaunchedEffect(existing, isEditMode, readOnly) {
-        if (!existing && isEditMode && !readOnly) {
+        if (allowInitialTitleFocus && !existing && isEditMode && !readOnly) {
             delay(80)
             titleFocusRequester.requestFocus()
             keyboardController?.show()
@@ -168,16 +170,18 @@ internal fun EditorTitleTopBar(
                     )
                 },
                 navigationIcon = {
-                    RememberIconButton(
-                        onClick = onBack,
-                        modifier = Modifier.size(rememberResponsiveActionButtonSize()),
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "arrow_back",
-                            size = 24.dp,
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            weight = FontWeight.Medium,
-                        )
+                    if (showNavigateBack) {
+                        RememberIconButton(
+                            onClick = onBack,
+                            modifier = Modifier.size(rememberResponsiveActionButtonSize()),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "arrow_back",
+                                size = 24.dp,
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                weight = FontWeight.Medium,
+                            )
+                        }
                     }
                 },
                 actions = {

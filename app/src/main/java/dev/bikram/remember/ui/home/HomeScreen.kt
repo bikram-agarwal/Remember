@@ -68,6 +68,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
+import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.NotesFilter
@@ -75,10 +76,13 @@ import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
+import dev.bikram.remember.ui.components.NoteCard
+import dev.bikram.remember.ui.components.NoteCardUiModel
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.toNoteCardUiModel
+import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
@@ -87,6 +91,7 @@ import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
 import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
 import dev.bikram.remember.ui.theme.LocalSnackbarHostState
+import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.launch
 
 private object HomeScreenSessionState {
@@ -99,12 +104,53 @@ private object HomeScreenSessionState {
 }
 
 @Composable
+private fun PendingNewNoteCard(
+    kind: NoteKind,
+    modifier: Modifier = Modifier,
+) {
+    val model =
+        remember(kind) {
+            NoteCardUiModel(
+                id = -1L,
+                kind = kind,
+                title = "",
+                body = "",
+                starred = false,
+                completed = false,
+                icon =
+                    when (kind) {
+                        NoteKind.NOTE -> NoteIcon.NotePlaceholder
+                        NoteKind.LIST -> NoteIcon.ListPlaceholder
+                    },
+                pictureUri = null,
+                pictureHeroFraming = null,
+                pictureCacheRevision = 0L,
+                reminderAt = null,
+                recurring = false,
+                hasAttachment = false,
+                visibleTags = persistentListOf(),
+                checklistPreviewItems = persistentListOf(),
+                checklistHiddenItemCount = 0,
+            )
+        }
+    NoteCard(
+        model = model,
+        onClick = {},
+        modifier = modifier,
+        activeInDetailPane = true,
+    )
+}
+
+@Composable
 fun HomeRoute(
     interactionPrefs: InteractionPrefs,
     closeRevealRequest: Int,
     onOpenNote: (NoteWithItems, Boolean) -> Unit,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
+    activeNoteId: Long? = null,
+    pendingNewNoteKind: NoteKind? = null,
+    showSelectionActionBar: Boolean = true,
 ) {
     val vm: HomeViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -157,6 +203,9 @@ fun HomeRoute(
         closeRevealRequest = closeRevealRequest,
         onCreateNote = onCreateNote,
         onCreateList = onCreateList,
+        activeNoteId = activeNoteId,
+        pendingNewNoteKind = pendingNewNoteKind,
+        showSelectionActionBar = showSelectionActionBar,
     )
 }
 
@@ -186,6 +235,9 @@ fun HomeScreen(
     closeRevealRequest: Int,
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
+    activeNoteId: Long? = null,
+    pendingNewNoteKind: NoteKind? = null,
+    showSelectionActionBar: Boolean = true,
 ) {
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var searchShouldRequestFocus by rememberSaveable { mutableStateOf(false) }
@@ -267,6 +319,12 @@ fun HomeScreen(
     LaunchedEffect(closeRevealRequest) {
         if (closeRevealRequest > 0) {
             revealedNoteCardId = null
+        }
+    }
+    LaunchedEffect(pendingNewNoteKind) {
+        if (pendingNewNoteKind != null) {
+            revealedNoteCardId = null
+            listState.animateScrollToItem(0)
         }
     }
     LaunchedEffect(revealedNoteCardId) {
@@ -381,15 +439,17 @@ fun HomeScreen(
                 },
         containerColor = Color.Transparent,
         bottomBar = {
-            HomeSelectionActionBar(
-                visible = state.inSelectionMode,
-                onClearSelection = onClearSelection,
-                onTagSelected = { tagSheetOpen = true },
-                onMarkDoneSelected = onMarkSelectedDone,
-                onArchiveSelected = onArchiveSelected,
-                onTrashSelected = onTrashSelected,
-                bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
-            )
+            if (showSelectionActionBar) {
+                HomeSelectionActionBar(
+                    visible = state.inSelectionMode,
+                    onClearSelection = onClearSelection,
+                    onTagSelected = { tagSheetOpen = true },
+                    onMarkDoneSelected = onMarkSelectedDone,
+                    onArchiveSelected = onArchiveSelected,
+                    onTrashSelected = onTrashSelected,
+                    bottomPadding = navBarInset + PillBottomBarHeight + PillBottomScrimExtra + 24.dp,
+                )
+            }
         },
     ) { _ ->
         val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
@@ -431,6 +491,21 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 userScrollEnabled = listScrollEnabled,
             ) {
+                if (pendingNewNoteKind != null) {
+                    item(key = "__pending_new_note__", contentType = "pendingNewNote") {
+                        PendingNewNoteCard(
+                            kind = pendingNewNoteKind,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .animateItem(
+                                        fadeInSpec = itemFadeInSpec,
+                                        placementSpec = itemPlacementSpec,
+                                        fadeOutSpec = itemFadeOutSpec,
+                                    ),
+                        )
+                    }
+                }
                 if (showFilterControls) {
                     item(key = "__chips__", contentType = "chips") {
                         ActiveFilterChips(
@@ -534,6 +609,7 @@ fun HomeScreen(
                             is HomeListItem.NoteRow -> {
                                 val noteId = item.card.id
                                 val isSelected = noteId in state.selectedIds
+                                val isActiveInDetailPane = !state.inSelectionMode && activeNoteId == noteId
                                 var cardBounds by remember { mutableStateOf<Rect?>(null) }
                                 SwipeableRememberNoteCard(
                                     note = item.note,
@@ -560,6 +636,7 @@ fun HomeScreen(
                                                 fadeOutSpec = itemFadeOutSpec,
                                             ),
                                     selected = isSelected,
+                                    activeInDetailPane = isActiveInDetailPane,
                                     onLongClick = { onToggleSelection(noteId) },
                                     activeRevealKey = revealedNoteCardId,
                                     onRevealStarted = { revealedNoteId ->

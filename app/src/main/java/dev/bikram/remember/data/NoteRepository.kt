@@ -344,7 +344,7 @@ class NoteRepository(
             ),
         )
         tagRepository?.replaceTagsForNote(id, options.tags)
-        rescheduleReminder(id, options.reminderAt, options.importance)
+        rescheduleReminder(id, options.reminderAt)
         refreshNotificationIfActive(id)
         if (oldPictureUri != null && oldPictureUri != options.pictureUri) {
             cleanupUnreferencedMedia(listOf(oldPictureUri))
@@ -408,7 +408,7 @@ class NoteRepository(
                 applyUpdates()
             }
         if (didUpdate) tagRepository?.replaceTagsForNote(id, options.tags)
-        if (didUpdate) rescheduleReminder(id, options.reminderAt, options.importance)
+        if (didUpdate) rescheduleReminder(id, options.reminderAt)
         if (didUpdate) refreshNotificationIfActive(id)
         if (didUpdate) {
             if (oldPictureUri != null && oldPictureUri != options.pictureUri) {
@@ -1044,7 +1044,6 @@ class NoteRepository(
     private suspend fun rescheduleReminder(
         id: Long,
         at: Long?,
-        importance: Importance,
     ) {
         scheduler?.cancel(id)
         if (at != null) {

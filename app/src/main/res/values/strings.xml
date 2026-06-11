@@ -311,6 +311,9 @@
     <string name="home_bulk_trash_cd">Move selected notes to trash</string>
     <string name="home_bulk_mark_done_cd">Mark selected notes done</string>
     <string name="home_bulk_tag_cd">Tag selected notes</string>
+    <string name="two_pane_notes_empty_detail_title">Select a note</string>
+    <string name="two_pane_notes_empty_detail_body">Choose a note from the list or create a new one.</string>
+    <string name="two_pane_notes_selection_title">%1$d selected</string>
 
     <!-- Snackbar messages shown after a bulk action completes. The single Undo button
          on the snackbar reverses the action by calling the inverse repository method. -->

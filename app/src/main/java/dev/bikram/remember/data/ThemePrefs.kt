@@ -347,6 +347,7 @@ class ThemePrefs(
             fun booleanOrNull(key: String): Boolean? {
                 if (!json.has(key) || json.isNull(key)) return null
                 return when (val rawValue = json.opt(key)) {
+                    null -> null
                     is Boolean -> rawValue
                     is String ->
                         when (rawValue.trim().lowercase()) {

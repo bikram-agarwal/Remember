@@ -280,17 +280,23 @@ fun OptionsPanel(
                 if (createdAt != null && createdAt > 0L) {
                     Spacer(Modifier.height(6.dp))
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 2.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 2.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val createdFormatted = remember(createdAt, context) {
-                            val createdDate = Date(createdAt)
-                            android.text.format.DateFormat.getMediumDateFormat(context).format(createdDate) + " " +
-                                    android.text.format.DateFormat.getTimeFormat(context).format(createdDate)
-                        }
+                        val createdFormatted =
+                            remember(createdAt, context) {
+                                val createdDate = Date(createdAt)
+                                android.text.format.DateFormat
+                                    .getMediumDateFormat(context)
+                                    .format(createdDate) + " " +
+                                    android.text.format.DateFormat
+                                        .getTimeFormat(context)
+                                        .format(createdDate)
+                            }
                         Text(
                             text = stringResource(R.string.options_created, createdFormatted),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
@@ -299,18 +305,24 @@ fun OptionsPanel(
                         if (updatedAt != null && updatedAt > 0L) {
                             Text(
                                 text = "·",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
+                                style =
+                                    MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                                 modifier = Modifier.padding(horizontal = 6.dp),
                             )
-                            val updatedFormatted = remember(updatedAt, context) {
-                                val updatedDate = Date(updatedAt)
-                                android.text.format.DateFormat.getMediumDateFormat(context).format(updatedDate) + " " +
-                                        android.text.format.DateFormat.getTimeFormat(context).format(updatedDate)
-                            }
+                            val updatedFormatted =
+                                remember(updatedAt, context) {
+                                    val updatedDate = Date(updatedAt)
+                                    android.text.format.DateFormat
+                                        .getMediumDateFormat(context)
+                                        .format(updatedDate) + " " +
+                                        android.text.format.DateFormat
+                                            .getTimeFormat(context)
+                                            .format(updatedDate)
+                                }
                             Text(
                                 text = stringResource(R.string.options_updated, updatedFormatted),
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
@@ -491,11 +503,16 @@ private fun ReminderOptionSummary(
         return
     }
     val summaryContext = LocalContext.current
-    val datePart = remember(reminderAt, summaryContext) {
-        val reminderDate = Date(reminderAt)
-        android.text.format.DateFormat.getMediumDateFormat(summaryContext).format(reminderDate) + " " +
-                android.text.format.DateFormat.getTimeFormat(summaryContext).format(reminderDate)
-    }
+    val datePart =
+        remember(reminderAt, summaryContext) {
+            val reminderDate = Date(reminderAt)
+            android.text.format.DateFormat
+                .getMediumDateFormat(summaryContext)
+                .format(reminderDate) + " " +
+                android.text.format.DateFormat
+                    .getTimeFormat(summaryContext)
+                    .format(reminderDate)
+        }
     val rule = recurrence?.sanitized()
     val recurrenceLabel = rule?.let { compactRecurrenceLabel(it) }.orEmpty()
     if (recurrenceLabel.isEmpty()) {

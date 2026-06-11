@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -227,6 +228,16 @@ private fun AppRoot(
     var openUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
     var startPlayInAppUpdateRequest by rememberSaveable { mutableIntStateOf(0) }
     var dismissedUpdateBarKey by rememberSaveable { mutableStateOf<String?>(null) }
+    // Every update-flow (re-)trigger resurrects a dismissed update bar. The handled
+    // epoch is saveable so rotation does not count as a new trigger.
+    val updateSignalEpoch by rememberUpdateState.updateSignalEpoch.collectAsStateWithLifecycle()
+    var lastHandledUpdateSignalEpoch by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(updateSignalEpoch) {
+        if (updateSignalEpoch != lastHandledUpdateSignalEpoch) {
+            lastHandledUpdateSignalEpoch = updateSignalEpoch
+            dismissedUpdateBarKey = null
+        }
+    }
     val currentLockState = lockState
 
     if (currentLockState == null) {
@@ -287,16 +298,15 @@ private fun AppRoot(
                 onStartPlayInAppUpdateRequestHandled = { startPlayInAppUpdateRequest = 0 },
                 onUpdateCheckStarted = { dismissedUpdateBarKey = null },
                 updateBarState = updateBarState,
+                updateSignalEpoch = updateSignalEpoch,
                 onUpdateClick = {
                     if (updateBarState == UpdateChromeState.Available) {
                         dismissedUpdateBarKey = updateKey
                     }
+                    // Check only surfaces the update sheet; starting the actual
+                    // download is the sheet's job.
                     openSettingsRequest += 1
-                    if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
-                        startPlayInAppUpdateRequest += 1
-                    } else {
-                        openUpdateSheetRequest += 1
-                    }
+                    openUpdateSheetRequest += 1
                 },
                 onDismissUpdateAvailable = { dismissedUpdateBarKey = updateKey },
                 onInstallUpdate = {

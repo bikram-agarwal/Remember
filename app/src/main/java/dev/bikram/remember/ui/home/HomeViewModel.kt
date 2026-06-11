@@ -198,9 +198,9 @@ class HomeViewModel
         fun toggleSelection(noteId: Long) {
             selectedIds.value =
                 if (noteId in selectedIds.value) {
-                    selectedIds.value.remove(noteId)
+                    selectedIds.value.removing(noteId)
                 } else {
-                    selectedIds.value.add(noteId)
+                    selectedIds.value.adding(noteId)
                 }
         }
 
