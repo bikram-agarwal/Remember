@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -47,6 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -66,6 +68,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.key
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
@@ -269,7 +273,7 @@ fun SettingsRoute(
     val updateState by updatePrefs.state.collectAsStateWithLifecycle(
         initialValue = UpdatePreferencesState(),
     )
-    val viewOptionsState by viewOptionsPrefs.state.collectAsStateWithLifecycle(initialValue = ViewOptions())
+    val viewOptionsState by viewOptionsPrefs.state.collectAsStateWithLifecycle(initialValue = null)
     val globalUpdateInfo by rememberUpdateState.updateInfo.collectAsStateWithLifecycle(initialValue = null)
     val realPlayBannerState by playInAppUpdateProgressController.bannerUiState.collectAsStateWithLifecycle()
     val devReleaseMockPlayBannerState by rememberUpdateState.devReleasePlayBannerMockUiState.collectAsStateWithLifecycle()
@@ -279,7 +283,10 @@ fun SettingsRoute(
         } else {
             realPlayBannerState
         }
-    val maxUpdateSheetHeight = with(density) { (windowInfo.containerSize.height * 0.85f).toDp() }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val heightFraction = if (isLandscape) 0.95f else 0.85f
+    val maxUpdateSheetHeight = (configuration.screenHeightDp * heightFraction).dp
 
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
     var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
@@ -288,11 +295,8 @@ fun SettingsRoute(
     var downloadProgress by rememberSaveable { mutableStateOf<Float?>(null) }
     var updateInfo by remember { mutableStateOf<RememberUpdateInfo?>(null) }
     var updateSheetChangelog by remember { mutableStateOf<ChangelogUiState>(ChangelogUiState.Hidden) }
-    val updateSheetState =
-        rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-        )
+
+
     val playInAppUpdateLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartIntentSenderForResult(),
@@ -435,12 +439,17 @@ fun SettingsRoute(
                 .toSet()
         }
     var collapsedSettingsSectionKeys by rememberSaveable {
-        mutableStateOf(SettingsScreenSessionState.collapsedSectionKeys)
+        mutableStateOf<Set<String>?>(null)
     }
-    LaunchedEffect(viewOptionsState.settingsCollapsedSectionKeys, settingsExpandableSectionKeys) {
+    val currentCollapsedSectionKeys = collapsedSettingsSectionKeys
+        ?: viewOptionsState?.settingsCollapsedSectionKeys
+            ?.filter { it in settingsExpandableSectionKeys }
+            ?.toSet()
+        ?: SettingsScreenSessionState.collapsedSectionKeys
+    LaunchedEffect(viewOptionsState?.settingsCollapsedSectionKeys, settingsExpandableSectionKeys) {
+        val keys = viewOptionsState?.settingsCollapsedSectionKeys ?: return@LaunchedEffect
         collapsedSettingsSectionKeys =
-            viewOptionsState.settingsCollapsedSectionKeys
-                .filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }
+            keys.filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }
                 .toSet()
     }
 
@@ -453,15 +462,15 @@ fun SettingsRoute(
     }
     val selectedSectionRouteKey = selectedSectionKey?.routeKey
     val visibleCollapsedSectionKeys =
-        selectedSectionRouteKey?.let { sectionKey -> collapsedSettingsSectionKeys - sectionKey }
-            ?: collapsedSettingsSectionKeys
+        selectedSectionRouteKey?.let { sectionKey -> currentCollapsedSectionKeys - sectionKey }
+            ?: currentCollapsedSectionKeys
     val includeSettingsSection: (SettingsSectionKey) -> Boolean =
         remember(selectedSectionKey) {
             { sectionKey -> selectedSectionKey == null || selectedSectionKey == sectionKey }
         }
     val allSettingsSectionsCollapsed =
         settingsExpandableSectionKeys.all { sectionKey ->
-            sectionKey in collapsedSettingsSectionKeys
+            sectionKey in currentCollapsedSectionKeys
         }
     val settingsListState =
         rememberLazyListState(
@@ -498,7 +507,7 @@ fun SettingsRoute(
 
     androidx.compose.runtime.DisposableEffect(settingsListState) {
         onDispose {
-            SettingsScreenSessionState.collapsedSectionKeys = collapsedSettingsSectionKeys
+            SettingsScreenSessionState.collapsedSectionKeys = currentCollapsedSectionKeys
             SettingsScreenSessionState.listFirstVisibleItemIndex = settingsListState.firstVisibleItemIndex
             SettingsScreenSessionState.listFirstVisibleItemScrollOffset = settingsListState.firstVisibleItemScrollOffset
         }
@@ -568,6 +577,14 @@ fun SettingsRoute(
         }
         Unit
     }
+
+    LaunchedEffect(showUpdateSheet) {
+        if (showUpdateSheet) {
+            loadUpdateSheetChangelog()
+        }
+    }
+
+
     val beginUpdateCheck: (Boolean) -> Unit = { redisplayAvailableAlert ->
         if (redisplayAvailableAlert) onUpdateCheckStarted()
         showUpdateSheet = true
@@ -780,8 +797,8 @@ fun SettingsRoute(
     LaunchedEffect(highlightSectionKey) {
         val key = highlightSection ?: return@LaunchedEffect
         activeHighlightItem = null
-        val wasCollapsed = key in collapsedSettingsSectionKeys
-        updateCollapsedSettingsSectionKeys(collapsedSettingsSectionKeys - key)
+        val wasCollapsed = key in currentCollapsedSectionKeys
+        updateCollapsedSettingsSectionKeys(currentCollapsedSectionKeys - key)
         // Wait for expandVertically to finish before scrolling or starting item-level highlights.
         if (wasCollapsed) delay(SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS)
         val index =
@@ -843,6 +860,15 @@ fun SettingsRoute(
     val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlightActive)
 
     if (showUpdateSheet) {
+        val updateSheetState = rememberBottomSheetState(
+            initialValue = SheetValue.Expanded,
+            confirmValueChange = { true },
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+        )
+        val currentOrientation = LocalConfiguration.current.orientation
+        LaunchedEffect(currentOrientation) {
+            updateSheetState.expand()
+        }
         ModalBottomSheet(
             onDismissRequest = {
                 showUpdateSheet = false
@@ -915,8 +941,11 @@ fun SettingsRoute(
                     bottom = bottomPadding,
                 )
             }
-        Box(Modifier.fillMaxSize()) {
-            LazyColumn(
+        if (viewOptionsState == null) {
+            Box(Modifier.fillMaxSize())
+        } else {
+            Box(Modifier.fillMaxSize()) {
+                LazyColumn(
                 state = settingsListState,
                 modifier =
                     Modifier
@@ -1317,9 +1346,9 @@ fun SettingsRoute(
                         onClick = {
                             updateCollapsedSettingsSectionKeys(
                                 if (allSettingsSectionsCollapsed) {
-                                    collapsedSettingsSectionKeys - settingsExpandableSectionKeys
+                                    currentCollapsedSectionKeys - settingsExpandableSectionKeys
                                 } else {
-                                    collapsedSettingsSectionKeys + settingsExpandableSectionKeys
+                                    currentCollapsedSectionKeys + settingsExpandableSectionKeys
                                 },
                             )
                         },
@@ -1340,6 +1369,7 @@ fun SettingsRoute(
                 }
             }
         }
+    }
     }
 
     pendingRestore?.let { restore ->
