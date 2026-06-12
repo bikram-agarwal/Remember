@@ -127,6 +127,8 @@ fun NotesTwoPaneRoute(
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
+    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     if (!isMultiPane) {
         HomeRoute(
@@ -314,7 +316,7 @@ fun NotesTwoPaneRoute(
                                 // 20dp baseline as the History/Settings pane FABs.
                                 .padding(
                                     end = 4.dp,
-                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 4.dp,
+                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + (if (isLandscape) 0.dp else 4.dp),
                                 ),
                     )
                 }
@@ -434,6 +436,8 @@ fun SettingsTwoPaneRoute(
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
+    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     if (!isMultiPane) {
         SettingsRoute(
@@ -507,7 +511,7 @@ fun SettingsTwoPaneRoute(
                                 .align(Alignment.BottomEnd)
                                 .padding(
                                     end = 20.dp,
-                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 20.dp,
+                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + (if (isLandscape) 10.dp else 20.dp),
                                 ),
                     )
                 }
@@ -561,6 +565,8 @@ fun HistoryTwoPaneRoute(
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
+    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     if (!isMultiPane) {
         HistoryRoute(
@@ -663,7 +669,7 @@ fun HistoryTwoPaneRoute(
                                 .align(Alignment.BottomEnd)
                                 .padding(
                                     end = 20.dp,
-                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 20.dp,
+                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + (if (isLandscape) 10.dp else 20.dp),
                                 ),
                     )
                 }

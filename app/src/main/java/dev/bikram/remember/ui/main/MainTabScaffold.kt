@@ -95,10 +95,6 @@ import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-/**
- * Bottom tabs. Each [symbolName] must be listed by `font_subset/harvest_ligatures.py`
- * (then run `subset_font.py`) so the subset icon font actually contains that glyph.
- */
 enum class MainTab(
     @param:androidx.annotation.StringRes val labelRes: Int,
     val symbolName: String,
@@ -157,7 +153,6 @@ fun MainTabScaffold(
         }
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            // The global permission state is refreshed by rememberNotificationsAllowed.
         }
     val enableReminderNotifications = {
         if (
@@ -170,17 +165,15 @@ fun MainTabScaffold(
         }
     }
 
-    // Back handling: when the FAB speed dial is open, back closes it first. Tab route
-    // back behavior is owned by Navigation Compose so predictive back can preview it.
     RememberPredictiveBackHandler(enabled = effectiveChromeVisible && fabExpanded) { fabExpanded = false }
     RememberPredictiveBackHandler(enabled = effectiveChromeVisible && alertBarsExpanded && !fabExpanded) {
         onAlertBarsExpandedChange(false)
     }
     val scope = rememberCoroutineScope()
+    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+        android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     LaunchedEffect(effectiveChromeVisible, currentTab) {
-        // Switching tabs collapses the speed dial so the captured FAB bounds do not
-        // briefly point at a stale location while the new tab's FAB rebinds.
         if (!effectiveChromeVisible || currentTab != MainTab.Notes) fabExpanded = false
     }
     val useAdaptiveNavigationRail = useDualPaneMode
@@ -188,8 +181,6 @@ fun MainTabScaffold(
         Box(modifier = Modifier.fillMaxSize()) {
             content(closeNotesRevealRequest)
 
-            // Scrim covers the page (not the toolbar / FAB) when the speed dial is open.
-            // Tapping the scrim collapses the menu, matching standard speed-dial dismiss.
             AnimatedVisibility(
                 visible = effectiveChromeVisible && ((fabExpanded && currentTab == MainTab.Notes) || alertBarsExpanded),
                 enter = fadeIn(reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec())),
@@ -210,21 +201,9 @@ fun MainTabScaffold(
             }
 
             if (effectiveChromeVisible) {
-                // Bottom strip. Pill mode (phones) re-uses the original CenteredPillWithSideFab
-                // layout so the FAB visually attaches to the pill at the same position as
-                // before; the layout's measure logic clamps its reported height to the FAB's
-                // *core* size, so when the FloatingActionButtonMenu's content expands the
-                // wrapper grows upward beyond the strip's reported bounds without pushing the
-                // pill. Rail mode is unaffected - the FAB sits in its own BottomEnd box.
                 if (useAdaptiveNavigationRail) {
-                    // Rail mode has no main FAB here — each two-pane route hosts its own
-                    // FAB in the list pane. The alert chrome anchors at the start edge,
-                    // beside the rail, mirroring its left-of-the-pill spot on phones.
                     if (alertSummary.count > 0) {
                         BoxWithConstraints(modifier = Modifier.matchParentSize()) {
-                            // Keep the unfurled bars inside the list pane (0.4 of the
-                            // content width, same proportion as the pane split) so they
-                            // never shove into the detail pane.
                             val railBarsMaxWidth = maxWidth * 0.4f - 30.dp
                             Box(
                                 modifier =
@@ -232,8 +211,6 @@ fun MainTabScaffold(
                                         .align(Alignment.BottomStart)
                                         .then(chromeOverlayModifier)
                                         .windowInsetsPadding(WindowInsets.navigationBars)
-                                        // Same 20dp baseline as the list-pane FABs. The count
-                                        // badge hangs below via offset without affecting layout.
                                         .padding(start = 20.dp, bottom = 20.dp),
                             ) {
                                 AlertFloatingActionButtonMenu(
@@ -262,7 +239,11 @@ fun MainTabScaffold(
                                 .then(chromeOverlayModifier)
                                 .fillMaxWidth()
                                 .windowInsetsPadding(WindowInsets.navigationBars)
-                                .padding(bottom = 12.dp, start = 24.dp, end = 24.dp),
+                                .padding(
+                                    bottom = if (isLandscape) 6.dp else 12.dp,
+                                    start = 24.dp,
+                                    end = 24.dp
+                                ),
                         fabGap = 12.dp,
                         pill = {
                             RememberFloatingNavPill(
@@ -328,7 +309,11 @@ fun MainTabScaffold(
                             )
                         },
                         fabRightInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
-                        fabBottomInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
+                        fabBottomInset = if (currentTab == MainTab.Notes) {
+                            if (isLandscape) 8.dp else 16.dp
+                        } else {
+                            0.dp
+                        },
                         leadingFabGap = 18.dp,
                     )
                 }
@@ -397,7 +382,6 @@ fun MainTabScaffold(
                 }) { Text(stringResource(R.string.common_empty)) }
             },
         ) {
-            // No body content - subtitle covers the warning.
         }
     }
 
@@ -416,15 +400,10 @@ fun MainTabScaffold(
                 }) { Text(stringResource(R.string.edit_bottom_bar_trash)) }
             },
         ) {
-            // No body content - subtitle covers the retention warning.
         }
     }
 }
 
-/**
- * Pill-only floating nav. The FAB is rendered as a sibling by [CenteredPillWithSideFab]
- * so that the pill alone is centered on screen.
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun RememberFloatingNavPill(
@@ -452,30 +431,6 @@ private fun RememberFloatingNavPill(
     }
 }
 
-/**
- * Bottom-strip layout: pill horizontally centered against the strip's full width, FAB
- * placed just to the right of the pill. On very narrow displays the whole chrome row
- * scales down just enough to preserve the side-by-side relationship without overlap.
- * Children share a vertical centerline so the FAB and the pill optically sit on the
- * same baseline.
- *
- * Designed to host an M3 Expressive [FloatingActionButtonMenu] in the [fab] slot
- * without letting the menu's expansion push the pill. Two tricks:
- *
- *   1. The [fab] child is measured with `Constraints.Infinity` for height, so the menu
- *      can grow as tall as it wants when expanded; the strip doesn't cap it.
- *   2. The strip's reported height is clamped to [fabCoreSize] (not the wrapper's
- *      potentially-much-larger measured height). The expanded menu overflows upward
- *      beyond the strip's reported bounds, but Compose draws and hit-tests it because
- *      no parent in the chain clips. The pill never sees the menu's height.
- *
- * Placement of the FAB child anchors the *FAB element* (assumed to sit at the wrapper's
- * right + bottom minus [fabRightInset] / [fabBottomInset]) at the same screen position
- * regardless of collapsed/expanded state - menu width and height grow inward
- * (left and up). The insets are zero for a regular FAB; the Notes
- * [FloatingActionButtonMenu] uses Material's 16.dp horizontal menu padding and 16.dp
- * bottom button padding.
- */
 @Composable
 private fun CenteredPillWithSideFab(
     pill: @Composable () -> Unit,
@@ -507,8 +462,6 @@ private fun CenteredPillWithSideFab(
                 maxWidth = androidx.compose.ui.unit.Constraints.Infinity,
             )
         val pillPlaceable = measurables[0].measure(loose)
-        // Measure the FAB child unconstrained vertically so the FloatingActionButtonMenu's
-        // expanded items can be as tall as they need without the strip capping them.
         val fabPlaceable =
             measurables[1].measure(
                 loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity),
@@ -566,15 +519,9 @@ private fun CenteredPillWithSideFab(
         val scaledLeadingGap = (leadingGapPx * chromeScale).roundToInt()
         val scaledLeadingFabLeftInset = (leadingFabLeftInsetPx * chromeScale).roundToInt()
         val scaledLeadingFabBottomInset = (leadingFabBottomInsetPx * chromeScale).roundToInt()
-        // Strip height tracks the FAB's *core* size rather than the wrapper's measured
-        // height. When the menu is expanded the wrapper is much taller; we deliberately
-        // ignore that so the parent layout doesn't see the bigger height and re-center
-        // the strip (which would push the pill).
         val stripHeight = maxOf(scaledPillHeight, scaledFabCore)
 
         layout(width, stripHeight) {
-            // Pill: horizontally centered against the strip's full width and vertically
-            // centered within the strip.
             val pillX = (width - scaledPillWidth) / 2
             val pillY = (stripHeight - scaledPillHeight) / 2
             pillPlaceable.placeWithLayer(pillX, pillY) {
@@ -583,18 +530,6 @@ private fun CenteredPillWithSideFab(
                 transformOrigin = TransformOrigin(0f, 0f)
             }
 
-            // FAB child: anchored by the FAB *element* rather than by the wrapper's
-            // outer bounds.
-            //
-            // Horizontally: the FAB element's right edge sits at clamp(pill.right + gap
-            // + fabCore, stripWidth). For a wrapper wider than the FAB (menu expanded)
-            // the wrapper extends LEFT, leaving the FAB element anchored at the same
-            // screen position. FloatingActionButtonMenu adds 16.dp side padding, so
-            // Notes passes that as [fabRightInset].
-            //
-            // Vertically: the FAB element's center sits at the strip's vertical center
-            // (same as pill's). FloatingActionButtonMenu places the button 16.dp above
-            // the wrapper bottom, so Notes passes that as [fabBottomInset].
             val fabX =
                 if (scaledFabRightInset > 0 || scaledFabBottomInset > 0) {
                     val desiredFabElementRight = pillX + scaledPillWidth + scaledGap + scaledFabCore
@@ -685,8 +620,6 @@ private fun FloatingNavTabItem(
                 size = 24.dp,
                 tint = LocalContentColor.current,
                 weight = FontWeight.Medium,
-                // Selected tab renders from the FILL=1 subset; inactive tabs render from
-                // the FILL=0 subset so the pill reads with standard tab semantics.
                 filled = selected,
             )
             if (labelWidth > 4.dp) {
@@ -702,12 +635,6 @@ private fun FloatingNavTabItem(
     }
 }
 
-/**
- * Per-tab FAB. Notes wraps an M3 Expressive [ToggleFloatingActionButton] inside the
- * official [FloatingActionButtonMenu] so the speed dial gets the framework's stagger,
- * predictive-back collapse, and accessibility focus order for free. History and
- * Settings render a regular FAB without a menu.
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun MainFabSlot(
@@ -768,11 +695,6 @@ private fun MainFabSlot(
     }
 }
 
-/**
- * The Notes create speed dial — the same FAB (Cookie9Sided/Sunny morph, icon rotation,
- * animated colors) whether it is hosted by the phone pill strip or by a two-pane list
- * pane, so the FAB never changes shape between single- and dual-pane modes.
- */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun NotesCreateFabMenu(
@@ -797,109 +719,114 @@ internal fun NotesCreateFabMenu(
         animationSpec = reducedMotionAwareSpec(motionScheme.defaultEffectsSpec()),
         label = "notes_fab_icon_color",
     )
-    val fabMorph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Sunny) }
-    val shapeProgress by animateFloatAsState(
+    val spatialSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec<Float>())
+    val fabProgress by animateFloatAsState(
         targetValue = if (expanded) 1f else 0f,
-        animationSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec()),
-        label = "notes_fab_shape_morph",
+        animationSpec = spatialSpec,
+        label = "notes_fab_progress",
     )
+    val fabMorph = remember { Morph(MaterialShapes.Cookie9Sided, MaterialShapes.Sunny) }
+    val fabShape = remember(fabMorph, fabProgress) { MorphPolygonShape(fabMorph, fabProgress) }
     val iconRotation by animateFloatAsState(
-        targetValue = if (expanded) 45f else 0f,
+        targetValue = if (expanded) 135f else 0f,
         animationSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec()),
         label = "notes_fab_icon_rotation",
     )
-    val fabShape = MorphPolygonShape(fabMorph, shapeProgress)
-    // FloatingActionButtonMenu hosts BOTH the toggle FAB and the menu items. The
-    // FAB element stays anchored (right + bottom of the wrapper); the menu items
-    // expand upward and leftward when [expanded] flips on. The pill-mode caller
-    // ([CenteredPillWithSideFab]) deliberately measures this child with infinite
-    // max height and reports a strip height clamped to the FAB's core size, so
-    // the menu's expansion overflows up into screen space without re-flowing the
-    // pill - what the hand-rolled SpeedDialOverlay used to enforce, now folded
-    // into the surrounding Layout instead.
-    FloatingActionButtonMenu(
-        expanded = expanded,
-        modifier = modifier,
-        button = {
-            ToggleFloatingActionButton(
-                checked = expanded,
-                onCheckedChange = {
-                    onToggle()
-                },
-                modifier =
-                    Modifier
-                        .shadow(
-                            elevation = 2.dp,
-                            shape = fabShape,
-                            clip = false,
-                        ).clip(fabShape)
-                        .semantics { contentDescription = description },
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = "add",
-                    size = 26.dp,
-                    tint = iconColor,
-                    weight = FontWeight.Medium,
-                    modifier = Modifier.graphicsLayer { rotationZ = iconRotation },
-                )
-            }
-        },
-        horizontalAlignment = Alignment.End,
+    Box(
+        modifier = modifier.semantics { contentDescription = description },
+        contentAlignment = Alignment.BottomEnd,
     ) {
-        FloatingActionButtonMenuItem(
-            onClick = onPickImport,
-            icon = {
-                RememberMaterialRoundedSymbol(
-                    name = "download",
-                    size = 22.dp,
-                    weight = FontWeight.Medium,
-                )
+        FloatingActionButtonMenu(
+            expanded = expanded,
+            button = {
+                val containerColor =
+                    if (expanded) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.primaryContainer
+                    }
+                RememberFloatingActionButton(
+                    onClick = onToggle,
+                    modifier =
+                        Modifier
+                            .shadow(
+                                elevation =
+                                    animateDpAsState(
+                                        targetValue = if (expanded) 2.dp else 4.dp,
+                                        animationSpec = reducedMotionAwareSpec(motionScheme.defaultSpatialSpec()),
+                                        label = "notes_fab_elevation",
+                                    ).value,
+                                shape = fabShape,
+                                clip = false,
+                            ).clip(fabShape)
+                            .semantics { contentDescription = description },
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "add",
+                        size = 26.dp,
+                        tint = iconColor,
+                        weight = FontWeight.Medium,
+                        modifier = Modifier.graphicsLayer { rotationZ = iconRotation },
+                    )
+                }
             },
-            text = {
-                Text(
-                    text = stringResource(R.string.main_speed_dial_import),
-                    style = MaterialTheme.typography.labelLargeEmphasized,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                )
-            },
-        )
-        FloatingActionButtonMenuItem(
-            onClick = onPickList,
-            icon = {
-                RememberMaterialRoundedSymbol(
-                    name = DEFAULT_LIST_HEADER_SYMBOL,
-                    size = 22.dp,
-                    weight = FontWeight.Medium,
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.main_speed_dial_checklist),
-                    style = MaterialTheme.typography.labelLargeEmphasized,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                )
-            },
-        )
-        FloatingActionButtonMenuItem(
-            onClick = onPickNote,
-            icon = {
-                RememberMaterialRoundedSymbol(
-                    name = DEFAULT_NOTE_HEADER_SYMBOL,
-                    size = 22.dp,
-                    weight = FontWeight.Medium,
-                )
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.main_speed_dial_note),
-                    style = MaterialTheme.typography.labelLargeEmphasized,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                )
-            },
-        )
+            horizontalAlignment = Alignment.End,
+        ) {
+            FloatingActionButtonMenuItem(
+                onClick = onPickImport,
+                icon = {
+                    RememberMaterialRoundedSymbol(
+                        name = "download",
+                        size = 22.dp,
+                        weight = FontWeight.Medium,
+                    )
+                },
+                text = {
+                    Text(
+                        text = stringResource(R.string.main_speed_dial_import),
+                        style = MaterialTheme.typography.labelLargeEmphasized,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                },
+            )
+            FloatingActionButtonMenuItem(
+                onClick = onPickList,
+                icon = {
+                    RememberMaterialRoundedSymbol(
+                        name = DEFAULT_LIST_HEADER_SYMBOL,
+                        size = 22.dp,
+                        weight = FontWeight.Medium,
+                    )
+                },
+                text = {
+                    Text(
+                        text = stringResource(R.string.main_speed_dial_checklist),
+                        style = MaterialTheme.typography.labelLargeEmphasized,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                },
+            )
+            FloatingActionButtonMenuItem(
+                onClick = onPickNote,
+                icon = {
+                    RememberMaterialRoundedSymbol(
+                        name = DEFAULT_NOTE_HEADER_SYMBOL,
+                        size = 22.dp,
+                        weight = FontWeight.Medium,
+                    )
+                },
+                text = {
+                    Text(
+                        text = stringResource(R.string.main_speed_dial_note),
+                        style = MaterialTheme.typography.labelLargeEmphasized,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                    )
+                },
+            )
+        }
     }
 }
 

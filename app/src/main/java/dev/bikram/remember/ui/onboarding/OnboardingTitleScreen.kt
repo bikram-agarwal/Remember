@@ -1,14 +1,18 @@
 package dev.bikram.remember.ui.onboarding
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -85,112 +89,202 @@ fun OnboardingTitleScreen(
                 }
         }
 
-    Box(
+    BoxWithConstraints(
         modifier =
             Modifier
-                .fillMaxSize()
-                .systemBarsPadding(),
+                .fillMaxSize(),
     ) {
-        AnimatedVisibility(
-            visible = iconVisible,
-            modifier = Modifier.align(Alignment.Center),
-            enter = reducedMotionEnterTransition(iconEnter),
-        ) {
-            Column(
-                modifier = Modifier.padding(horizontal = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
+        val useTwoColumns = maxHeight < 480.dp && maxWidth > maxHeight
+
+        if (useTwoColumns) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                AppIconImage(
-                    modifier =
-                        Modifier
-                            .size(120.dp)
-                            .clip(MaterialTheme.shapes.extraLarge),
-                )
-                Spacer(Modifier.height(24.dp))
-                AnimatedVisibility(
-                    visible = titleVisible,
-                    enter = reducedMotionEnterTransition(blockEnter),
+                Column(
+                    modifier = Modifier
+                        .weight(1.1f)
+                        .fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = scheme.onSurface,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(R.string.app_tagline),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = scheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                        )
-                    }
+                    OnboardingHeader(
+                        visible = iconVisible,
+                        titleVisible = titleVisible,
+                        enter = reducedMotionEnterTransition(iconEnter),
+                        blockEnter = reducedMotionEnterTransition(blockEnter),
+                        useTwoColumns = true,
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    OnboardingByline(
+                        visible = bylineVisible,
+                        enter = reducedMotionEnterTransition(blockEnter),
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(0.9f)
+                        .fillMaxHeight()
+                        .padding(horizontal = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    OnboardingLetsBeginButton(
+                        visible = buttonVisible,
+                        enter = reducedMotionEnterTransition(blockEnter),
+                        onClick = onLetsBegin,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
-        }
+        } else {
+            OnboardingHeader(
+                visible = iconVisible,
+                titleVisible = titleVisible,
+                enter = reducedMotionEnterTransition(iconEnter),
+                blockEnter = reducedMotionEnterTransition(blockEnter),
+                useTwoColumns = false,
+                modifier = Modifier.align(Alignment.Center),
+            )
 
-        AnimatedVisibility(
-            visible = bylineVisible,
-            modifier =
-                Modifier
+            OnboardingByline(
+                visible = bylineVisible,
+                enter = reducedMotionEnterTransition(blockEnter),
+                modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 120.dp),
-            enter = reducedMotionEnterTransition(blockEnter),
-        ) {
-            Surface(
-                shape = MaterialTheme.shapes.extraExtraLarge,
-                color = scheme.surfaceContainerHigh,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
-                ) {
-                    Image(
-                        painter = painterResource(R.drawable.me_600),
-                        contentDescription = null,
-                        modifier =
-                            Modifier
-                                .size(28.dp)
-                                .clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.onboarding_byline),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = scheme.onSurfaceVariant,
-                    )
-                }
-            }
-        }
+            )
 
-        AnimatedVisibility(
-            visible = buttonVisible,
-            modifier =
-                Modifier
+            OnboardingLetsBeginButton(
+                visible = buttonVisible,
+                enter = reducedMotionEnterTransition(blockEnter),
+                onClick = onLetsBegin,
+                modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
-            enter = reducedMotionEnterTransition(blockEnter),
+            )
+        }
+    }
+}
+
+@Composable
+private fun OnboardingHeader(
+    visible: Boolean,
+    titleVisible: Boolean,
+    enter: EnterTransition,
+    blockEnter: EnterTransition,
+    useTwoColumns: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = enter,
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = if (useTwoColumns) 16.dp else 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            RememberButton(
-                onClick = onLetsBegin,
-                modifier = Modifier.fillMaxWidth(),
-                shape = MaterialTheme.shapes.extraExtraLarge,
-                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+            AppIconImage(
+                modifier =
+                    Modifier
+                        .size(if (useTwoColumns) 96.dp else 120.dp)
+                        .clip(MaterialTheme.shapes.extraLarge),
+            )
+            Spacer(Modifier.height(if (useTwoColumns) 16.dp else 24.dp))
+            AnimatedVisibility(
+                visible = titleVisible,
+                enter = blockEnter,
             ) {
-                Text(
-                    text = stringResource(R.string.onboarding_lets_begin),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.headlineLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                    Spacer(Modifier.height(if (useTwoColumns) 4.dp else 8.dp))
+                    Text(
+                        text = stringResource(R.string.app_tagline),
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingByline(
+    visible: Boolean,
+    enter: EnterTransition,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = MaterialTheme.colorScheme
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = enter,
+    ) {
+        Surface(
+            shape = MaterialTheme.shapes.extraExtraLarge,
+            color = scheme.surfaceContainerHigh,
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.me_600),
+                    contentDescription = null,
+                    modifier =
+                        Modifier
+                            .size(28.dp)
+                            .clip(CircleShape),
+                    contentScale = ContentScale.Crop,
                 )
-                RememberMaterialRoundedSymbol(
-                    name = "arrow_forward",
-                    tint = MaterialTheme.colorScheme.onPrimary,
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = stringResource(R.string.onboarding_byline),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = scheme.onSurfaceVariant,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun OnboardingLetsBeginButton(
+    visible: Boolean,
+    enter: EnterTransition,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = enter,
+    ) {
+        RememberButton(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth(),
+            shape = MaterialTheme.shapes.extraExtraLarge,
+            contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.onboarding_lets_begin),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            RememberMaterialRoundedSymbol(
+                name = "arrow_forward",
+                tint = MaterialTheme.colorScheme.onPrimary,
+            )
         }
     }
 }

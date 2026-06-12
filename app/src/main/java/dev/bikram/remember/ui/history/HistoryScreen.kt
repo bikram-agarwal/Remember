@@ -1277,6 +1277,13 @@ private fun EmptyState(
         } else {
             R.string.history_trash_empty_subtitle
         }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isSmallHeight = configuration.screenHeightDp < 480
+
+    val titleSpacer = if (isLandscape && isSmallHeight) 10.dp else 18.dp
+    val subtitleSpacer = if (isLandscape && isSmallHeight) 4.dp else 6.dp
+
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier.padding(horizontal = 24.dp),
@@ -1286,13 +1293,13 @@ private fun EmptyState(
         } else {
             EmptyTrashIllustration()
         }
-        Spacer(Modifier.height(18.dp))
+        Spacer(Modifier.height(titleSpacer))
         Text(
             text = stringResource(titleRes),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        Spacer(Modifier.height(6.dp))
+        Spacer(Modifier.height(subtitleSpacer))
         Text(
             text = stringResource(subtitleRes),
             style = MaterialTheme.typography.bodyMedium,

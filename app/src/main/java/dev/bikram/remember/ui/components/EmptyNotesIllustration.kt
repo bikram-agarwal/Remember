@@ -58,13 +58,25 @@ private const val PAD_H = 160f
 @Composable
 fun EmptyNotesIllustration(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    Box(modifier.size(width = 180.dp, height = 180.dp)) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallHeight = configuration.screenHeightDp < 480
+    val sizeDp = if (isLandscape && isSmallHeight) 120.dp else 180.dp
+
+    val backdrop1Size = if (isLandscape && isSmallHeight) 48.dp else 72.dp
+    val backdrop2Size = if (isLandscape && isSmallHeight) 38.dp else 58.dp
+    val backdrop1Start = if (isLandscape && isSmallHeight) 2.dp else 4.dp
+    val backdrop1Top = if (isLandscape && isSmallHeight) 8.dp else 12.dp
+    val backdrop2End = if (isLandscape && isSmallHeight) 4.dp else 6.dp
+    val backdrop2Bottom = if (isLandscape && isSmallHeight) 6.dp else 10.dp
+
+    Box(modifier.size(sizeDp)) {
         ExpressiveEmptyBackdrop(
             modifier =
                 Modifier
                     .align(Alignment.TopStart)
-                    .padding(start = 4.dp, top = 12.dp)
-                    .size(72.dp),
+                    .padding(start = backdrop1Start, top = backdrop1Top)
+                    .size(backdrop1Size),
             polygon = MaterialShapes.Clover4Leaf,
             morphTo = MaterialShapes.Cookie9Sided,
             color = scheme.tertiaryContainer.copy(alpha = 0.42f),
@@ -73,8 +85,8 @@ fun EmptyNotesIllustration(modifier: Modifier = Modifier) {
             modifier =
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 6.dp, bottom = 10.dp)
-                    .size(58.dp),
+                    .padding(end = backdrop2End, bottom = backdrop2Bottom)
+                    .size(backdrop2Size),
             polygon = MaterialShapes.Cookie9Sided,
             morphTo = MaterialShapes.Clover4Leaf,
             color = scheme.primaryContainer.copy(alpha = 0.46f),
@@ -278,12 +290,20 @@ private fun ExpressiveEmptyBackdrop(
 @Composable
 fun EmptyArchiveIllustration(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    Box(modifier.size(width = 132.dp, height = 132.dp)) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallHeight = configuration.screenHeightDp < 480
+    val sizeDp = if (isLandscape && isSmallHeight) 96.dp else 132.dp
+
+    val backdrop1Size = if (isLandscape && isSmallHeight) 42.dp else 58.dp
+    val backdrop2Size = if (isLandscape && isSmallHeight) 35.dp else 48.dp
+
+    Box(modifier.size(sizeDp)) {
         ExpressiveEmptyBackdrop(
             modifier =
                 Modifier
                     .align(Alignment.TopStart)
-                    .size(58.dp),
+                    .size(backdrop1Size),
             polygon = MaterialShapes.Cookie6Sided,
             morphTo = MaterialShapes.Clover4Leaf,
             color = scheme.primaryContainer.copy(alpha = 0.50f),
@@ -292,7 +312,7 @@ fun EmptyArchiveIllustration(modifier: Modifier = Modifier) {
             modifier =
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .size(48.dp),
+                    .size(backdrop2Size),
             polygon = MaterialShapes.Clover4Leaf,
             morphTo = MaterialShapes.Cookie6Sided,
             color = scheme.secondaryContainer.copy(alpha = 0.56f),
@@ -418,12 +438,20 @@ fun EmptyArchiveIllustration(modifier: Modifier = Modifier) {
 @Composable
 fun EmptyTrashIllustration(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    Box(modifier.size(width = 132.dp, height = 132.dp)) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallHeight = configuration.screenHeightDp < 480
+    val sizeDp = if (isLandscape && isSmallHeight) 96.dp else 132.dp
+
+    val backdrop1Size = if (isLandscape && isSmallHeight) 40.dp else 56.dp
+    val backdrop2Size = if (isLandscape && isSmallHeight) 33.dp else 46.dp
+
+    Box(modifier.size(sizeDp)) {
         ExpressiveEmptyBackdrop(
             modifier =
                 Modifier
                     .align(Alignment.TopEnd)
-                    .size(56.dp),
+                    .size(backdrop1Size),
             polygon = MaterialShapes.Sunny,
             morphTo = MaterialShapes.Cookie9Sided,
             color = scheme.errorContainer.copy(alpha = 0.42f),
@@ -432,7 +460,7 @@ fun EmptyTrashIllustration(modifier: Modifier = Modifier) {
             modifier =
                 Modifier
                     .align(Alignment.BottomStart)
-                    .size(46.dp),
+                    .size(backdrop2Size),
             polygon = MaterialShapes.Cookie9Sided,
             morphTo = MaterialShapes.Sunny,
             color = scheme.tertiaryContainer.copy(alpha = 0.52f),
@@ -547,12 +575,20 @@ private fun DrawScope.drawSparkle(
 @Composable
 fun EmptyFilterIllustration(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    Box(modifier.size(width = 132.dp, height = 132.dp)) {
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallHeight = configuration.screenHeightDp < 480
+    val sizeDp = if (isLandscape && isSmallHeight) 96.dp else 132.dp
+
+    val backdrop1Size = if (isLandscape && isSmallHeight) 40.dp else 56.dp
+    val backdrop2Size = if (isLandscape && isSmallHeight) 32.dp else 44.dp
+
+    Box(modifier.size(sizeDp)) {
         ExpressiveEmptyBackdrop(
             modifier =
                 Modifier
                     .align(Alignment.TopStart)
-                    .size(56.dp),
+                    .size(backdrop1Size),
             polygon = MaterialShapes.Clover4Leaf,
             morphTo = MaterialShapes.Cookie9Sided,
             color = scheme.tertiaryContainer.copy(alpha = 0.56f),
@@ -561,7 +597,7 @@ fun EmptyFilterIllustration(modifier: Modifier = Modifier) {
             modifier =
                 Modifier
                     .align(Alignment.BottomEnd)
-                    .size(44.dp),
+                    .size(backdrop2Size),
             polygon = MaterialShapes.Cookie9Sided,
             morphTo = MaterialShapes.Clover4Leaf,
             color = scheme.primaryContainer.copy(alpha = 0.58f),

@@ -1,6 +1,8 @@
 package dev.bikram.remember.ui.home
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -37,6 +39,15 @@ internal fun NotesEmptyState(
 ) {
     val pristineVault =
         totalUnfilteredNotes == 0 && filter.text.isBlank() && !filter.facetActive
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallHeight = configuration.screenHeightDp < 480
+
+    val titleSpacer = if (isLandscape && isSmallHeight) 12.dp else 24.dp
+    val subtitleSpacer = if (isLandscape && isSmallHeight) 4.dp else 8.dp
+    val filterTitleSpacer = if (isLandscape && isSmallHeight) 10.dp else 18.dp
+    val filterSubtitleSpacer = if (isLandscape && isSmallHeight) 4.dp else 6.dp
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -47,13 +58,13 @@ internal fun NotesEmptyState(
                 modifier = Modifier.semantics(mergeDescendants = true) {},
             ) {
                 EmptyNotesIllustration()
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(titleSpacer))
                 Text(
                     text = stringResource(R.string.home_no_notes_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(subtitleSpacer))
                 Text(
                     text = stringResource(R.string.home_no_notes_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
@@ -66,33 +77,67 @@ internal fun NotesEmptyState(
                 )
             }
             if (showCreateActions) {
-                Spacer(Modifier.height(24.dp))
-                RememberButton(
-                    onClick = onCreateNote,
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.fillMaxWidth(0.78f),
-                ) {
-                    RememberMaterialRoundedSymbol(
-                        name = "add",
-                        size = 20.dp,
-                        weight = FontWeight.Medium,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.home_create_note))
-                }
-                Spacer(Modifier.height(12.dp))
-                RememberOutlinedButton(
-                    onClick = onCreateList,
-                    shape = MaterialTheme.shapes.large,
-                    modifier = Modifier.fillMaxWidth(0.78f),
-                ) {
-                    RememberMaterialRoundedSymbol(
-                        name = "add",
-                        size = 20.dp,
-                        weight = FontWeight.Medium,
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.home_create_list))
+                Spacer(Modifier.height(titleSpacer))
+                if (isLandscape && isSmallHeight) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(0.9f),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        RememberButton(
+                            onClick = onCreateNote,
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "add",
+                                size = 20.dp,
+                                weight = FontWeight.Medium,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.home_create_note))
+                        }
+                        RememberOutlinedButton(
+                            onClick = onCreateList,
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "add",
+                                size = 20.dp,
+                                weight = FontWeight.Medium,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.home_create_list))
+                        }
+                    }
+                } else {
+                    RememberButton(
+                        onClick = onCreateNote,
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.fillMaxWidth(0.78f),
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "add",
+                            size = 20.dp,
+                            weight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.home_create_note))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    RememberOutlinedButton(
+                        onClick = onCreateList,
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.fillMaxWidth(0.78f),
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "add",
+                            size = 20.dp,
+                            weight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.home_create_list))
+                    }
                 }
             }
         } else {
@@ -115,14 +160,14 @@ internal fun NotesEmptyState(
                 modifier = Modifier.semantics(mergeDescendants = true) {},
             ) {
                 EmptyFilterIllustration()
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(filterTitleSpacer))
                 Text(
                     text = titleText,
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(filterSubtitleSpacer))
                 Text(
                     text = hintText,
                     style = MaterialTheme.typography.bodyMedium,
