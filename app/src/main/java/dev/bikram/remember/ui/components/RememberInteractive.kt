@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ButtonElevation
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
@@ -441,6 +443,16 @@ fun RememberFloatingActionButton(
     tooltipLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape =
+        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val sizeModifier =
+        if (isSmallLandscape) {
+            Modifier.size(rememberResponsiveActionButtonSize())
+        } else {
+            Modifier
+        }
     RememberLongPressLabelTooltip(
         label = tooltipLabel,
         enabled = true,
@@ -451,7 +463,7 @@ fun RememberFloatingActionButton(
                     onClick()
                 }
             },
-            modifier = modifier,
+            modifier = modifier.then(sizeModifier),
             shape = shape,
             containerColor = containerColor,
             contentColor = contentColor,

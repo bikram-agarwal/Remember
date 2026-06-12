@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -127,8 +128,9 @@ fun NotesTwoPaneRoute(
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
-    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape =
+        androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     if (!isMultiPane) {
         HomeRoute(
@@ -436,8 +438,10 @@ fun SettingsTwoPaneRoute(
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
-    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape =
+        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
 
     if (!isMultiPane) {
         SettingsRoute(
@@ -504,14 +508,15 @@ fun SettingsTwoPaneRoute(
                         symbolName = "share",
                         description = stringResource(R.string.main_menu_share_app),
                         enabled = true,
-                        iconSize = 26.dp,
+                        iconSize = if (isSmallLandscape) 22.dp else 26.dp,
                         onClick = onShareApp,
                         modifier =
                             Modifier
                                 .align(Alignment.BottomEnd)
+                                .navigationBarsPadding()
                                 .padding(
                                     end = 20.dp,
-                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + (if (isLandscape) 10.dp else 20.dp),
+                                    bottom = if (isSmallLandscape) 10.dp else 20.dp,
                                 ),
                     )
                 }
@@ -565,8 +570,9 @@ fun HistoryTwoPaneRoute(
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
-    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape =
+        androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
 
     if (!isMultiPane) {
         HistoryRoute(
@@ -659,19 +665,30 @@ fun HistoryTwoPaneRoute(
                         activeNoteId = activeDetailId,
                         showSelectionActionBar = false,
                     )
-                    HistoryPaneFab(
-                        section = section,
-                        visibleItemCount = visibleNotes.size,
-                        onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
-                        onClearTrashRequest = { clearTrashOpen = true },
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(
-                                    end = 20.dp,
-                                    bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + (if (isLandscape) 10.dp else 20.dp),
-                                ),
-                    )
+                    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+                    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+                    val shouldShowPaneFab =
+                        if (isSmallLandscape) {
+                            visibleNotes.isNotEmpty()
+                        } else {
+                            true
+                        }
+                    if (shouldShowPaneFab) {
+                        HistoryPaneFab(
+                            section = section,
+                            visibleItemCount = visibleNotes.size,
+                            useCompactIcon = isSmallLandscape,
+                            onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
+                            onClearTrashRequest = { clearTrashOpen = true },
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(
+                                        end = 20.dp,
+                                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + (if (isLandscape) 10.dp else 20.dp),
+                                    ),
+                        )
+                    }
                 }
             }
         },
@@ -975,6 +992,7 @@ private fun NotesListPaneFabMenu(
 private fun HistoryPaneFab(
     section: HistorySection,
     visibleItemCount: Int,
+    useCompactIcon: Boolean,
     onMoveArchiveToTrashRequest: () -> Unit,
     onClearTrashRequest: () -> Unit,
     modifier: Modifier = Modifier,
@@ -989,7 +1007,7 @@ private fun HistoryPaneFab(
                 stringResource(R.string.edit_bottom_bar_delete_forever)
             },
         enabled = visibleItemCount > 0,
-        iconSize = if (isArchive) 24.dp else 22.dp,
+        iconSize = if (useCompactIcon || !isArchive) 22.dp else 24.dp,
         onClick =
             if (isArchive) {
                 onMoveArchiveToTrashRequest

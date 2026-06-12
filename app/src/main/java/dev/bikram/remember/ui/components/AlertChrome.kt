@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.pluralStringResource
@@ -98,6 +100,10 @@ fun AlertFloatingFab(
 ) {
     if (summary.count <= 0) return
 
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+
     val label = stringResource(R.string.main_alert_fab_label)
     val scheme = MaterialTheme.colorScheme
     val closedContainerColor =
@@ -124,11 +130,17 @@ fun AlertFloatingFab(
         label = "alert_fab_shape_morph",
     )
     val fabShape = MorphPolygonShape(fabMorph, shapeProgress)
+    val fabSize = if (isSmallLandscape) rememberResponsiveActionButtonSize() else 56.dp
+    val scaleFactor = if (isSmallLandscape) fabSize.value / 56f else 1f
     val density = LocalDensity.current
-    val iconTravelPx = with(density) { 14.dp.toPx() }
+    val iconTravelPx = with(density) { (14.dp * scaleFactor).toPx() }
     val alertIconAlpha = 1f - shapeProgress
     val chevronAlpha = shapeProgress
-    Box(modifier = modifier) {
+
+    Box(
+        modifier = modifier.size(fabSize),
+        contentAlignment = Alignment.Center,
+    ) {
         ToggleFloatingActionButton(
             checked = expanded,
             onCheckedChange = { onClick() },
@@ -139,6 +151,7 @@ fun AlertFloatingFab(
                 ),
             modifier =
                 Modifier
+                    .size(fabSize)
                     .shadow(
                         elevation = 2.dp,
                         shape = fabShape,
@@ -146,10 +159,13 @@ fun AlertFloatingFab(
                     ).clip(fabShape)
                     .semantics { contentDescription = label },
         ) {
-            Box(contentAlignment = Alignment.Center) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
                 RememberMaterialRoundedSymbol(
                     name = summary.iconName,
-                    size = 28.dp,
+                    size = 28.dp * scaleFactor,
                     tint = contentColor,
                     weight = FontWeight.Medium,
                     modifier =
@@ -160,12 +176,12 @@ fun AlertFloatingFab(
                 )
                 RememberMaterialRoundedSymbol(
                     name = "chevron_right",
-                    size = 28.dp,
+                    size = 28.dp * scaleFactor,
                     tint = contentColor,
                     weight = FontWeight.Medium,
                     modifier =
                         Modifier
-                            .offset(y = 1.dp)
+                            .offset(y = 1.dp * scaleFactor)
                             .graphicsLayer {
                                 alpha = chevronAlpha
                                 rotationZ = 90f
@@ -181,7 +197,7 @@ fun AlertFloatingFab(
             modifier =
                 Modifier
                     .align(Alignment.BottomStart)
-                    .offset(x = (-4).dp, y = 4.dp),
+                    .offset(x = (-4).dp * scaleFactor, y = 4.dp * scaleFactor),
         )
     }
 }
@@ -252,6 +268,11 @@ fun AlertFloatingActionButtonMenu(
     // must extend left of the FAB, which is impossible inside that clip. The FAB anchors
     // a plain Box instead, and the bars render as an unclipped sibling placed above it.
     BackHandler(enabled = expanded) { onExpandedChange(false) }
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val barIconSize = if (isSmallLandscape) rememberResponsiveActionButtonSize() else 44.dp
+    val barContentScale = if (isSmallLandscape) barIconSize.value / 44f else 1f
     val density = LocalDensity.current
     val windowWidthPx = LocalWindowInfo.current.containerSize.width
     var anchorLeftInWindow by remember { mutableIntStateOf(0) }
@@ -307,18 +328,30 @@ fun AlertFloatingActionButtonMenu(
                 transition.currentState == EnterExitState.Visible &&
                     transition.targetState == EnterExitState.PostExit
             val barAlpha = if (exiting) progress else 1f
-            val barsMinWidth = if (barsMaxWidth.isSpecified) minOf(332.dp, barsMaxWidth) else 332.dp
-            val barsCapWidth = if (barsMaxWidth.isSpecified) minOf(392.dp, barsMaxWidth) else 392.dp
+            val barsMinWidth =
+                if (barsMaxWidth.isSpecified) {
+                    minOf(332.dp * barContentScale, barsMaxWidth)
+                } else {
+                    332.dp * barContentScale
+                }
+            val barsCapWidth =
+                if (barsMaxWidth.isSpecified) {
+                    minOf(392.dp * barContentScale, barsMaxWidth)
+                } else {
+                    392.dp * barContentScale
+                }
             Column(
                 modifier =
                     Modifier
                         .widthIn(min = barsMinWidth, max = barsCapWidth)
-                        .padding(start = 6.dp, end = 6.dp)
-                        .graphicsLayer {
+                        .padding(
+                            start = 6.dp * barContentScale,
+                            end = 6.dp * barContentScale,
+                        ).graphicsLayer {
                             translationY = with(density) { 18.dp.toPx() } * (1f - progress)
                             alpha = if (centerBarsInWindow && !anchorPlaced) 0f else 1f
                         },
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp * barContentScale),
             ) {
                 if (blockedReminderCount > 0) {
                     ReminderNotificationsBlockedBar(
@@ -326,6 +359,8 @@ fun AlertFloatingActionButtonMenu(
                         contentAlpha = barAlpha,
                         shadowAlpha = barAlpha,
                         onEnableClick = onEnableReminderNotifications,
+                        iconContainerSize = barIconSize,
+                        contentScale = barContentScale,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -337,6 +372,8 @@ fun AlertFloatingActionButtonMenu(
                         onInstallClick = onInstallUpdate,
                         contentAlpha = barAlpha,
                         shadowAlpha = barAlpha,
+                        iconContainerSize = barIconSize,
+                        contentScale = barContentScale,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
@@ -351,6 +388,8 @@ private fun ReminderNotificationsBlockedBar(
     contentAlpha: Float,
     shadowAlpha: Float,
     onEnableClick: () -> Unit,
+    iconContainerSize: Dp = 44.dp,
+    contentScale: Float = 1f,
     modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
@@ -359,17 +398,30 @@ private fun ReminderNotificationsBlockedBar(
         shadowAlpha = shadowAlpha,
         modifier = modifier,
     ) {
+        val rowMinHeight = 64.dp * contentScale
+        val rowStartPadding = 14.dp * contentScale
+        val rowEndPadding = 10.dp * contentScale
+        val rowVerticalPadding = 8.dp * contentScale
+        val rowSpacing = 12.dp * contentScale
+        val symbolSize = 28.dp * contentScale
+        val buttonHorizontalPadding = 18.dp * contentScale
+        val buttonVerticalPadding = 8.dp * contentScale
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 64.dp)
-                    .padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+                    .heightIn(min = rowMinHeight)
+                    .padding(
+                        start = rowStartPadding,
+                        end = rowEndPadding,
+                        top = rowVerticalPadding,
+                        bottom = rowVerticalPadding,
+                    ),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(rowSpacing),
         ) {
             Surface(
-                modifier = Modifier.size(44.dp),
+                modifier = Modifier.size(iconContainerSize),
                 shape = CircleShape,
                 color = scheme.error,
                 contentColor = scheme.onError,
@@ -377,7 +429,7 @@ private fun ReminderNotificationsBlockedBar(
                 Box(contentAlignment = Alignment.Center) {
                     RememberMaterialRoundedSymbol(
                         name = "notifications_off",
-                        size = 28.dp,
+                        size = symbolSize,
                         weight = FontWeight.Medium,
                         tint = scheme.onError,
                     )
@@ -392,10 +444,15 @@ private fun ReminderNotificationsBlockedBar(
                         reminderCount,
                     ),
                 modifier = Modifier.weight(1f),
+                contentScale = contentScale,
             )
             RememberButton(
                 onClick = onEnableClick,
-                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                contentPadding =
+                    PaddingValues(
+                        horizontal = buttonHorizontalPadding,
+                        vertical = buttonVerticalPadding,
+                    ),
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor = scheme.primary,

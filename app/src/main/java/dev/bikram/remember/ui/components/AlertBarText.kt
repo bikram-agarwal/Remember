@@ -13,11 +13,14 @@ internal fun AlertBarText(
     title: String,
     body: String?,
     modifier: Modifier = Modifier,
+    contentScale: Float = 1f,
 ) {
+    val titleStyle = MaterialTheme.typography.titleSmall
+    val bodyStyle = MaterialTheme.typography.bodyMedium
     Column(modifier = modifier) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
+            style = titleStyle.copy(fontSize = titleStyle.fontSize * contentScale),
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -25,7 +28,7 @@ internal fun AlertBarText(
         if (body != null) {
             Text(
                 text = body,
-                style = MaterialTheme.typography.bodyMedium,
+                style = bodyStyle.copy(fontSize = bodyStyle.fontSize * contentScale),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

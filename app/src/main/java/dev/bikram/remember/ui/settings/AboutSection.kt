@@ -13,9 +13,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -39,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
@@ -83,6 +86,9 @@ internal fun AboutSection(
     showHeader: Boolean = true,
     showHeaderTitle: Boolean = true,
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
     val context = LocalContext.current
     val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
     val shareDiagnostics = rememberDiagnosticsShareAction(context, diagnosticsChooserTitle)
@@ -113,9 +119,9 @@ internal fun AboutSection(
                 SettingsStaticSectionHeader(
                     materialSymbolName = "info",
                     title = stringResource(R.string.settings_section_about),
-                    trailingContent = diagnosticsButton,
+                    trailingContent = if (!isLandscape) diagnosticsButton else null,
                 )
-            } else {
+            } else if (!isLandscape) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
@@ -130,6 +136,9 @@ internal fun AboutSection(
             onLaunchPlayReview = onLaunchPlayReview,
             onDevModeActivated = onDevModeActivated,
             devModeEnabled = devModeEnabled,
+            isLandscape = isLandscape,
+            isSmallLandscape = isSmallLandscape,
+            shareDiagnostics = shareDiagnostics,
         )
     }
 }
@@ -173,6 +182,9 @@ private fun AboutSettingsBlock(
     onLaunchPlayReview: (onFlowFinished: () -> Unit) -> Unit,
     onDevModeActivated: () -> Unit = {},
     devModeEnabled: Boolean = false,
+    isLandscape: Boolean = false,
+    isSmallLandscape: Boolean = false,
+    shareDiagnostics: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -210,124 +222,155 @@ private fun AboutSettingsBlock(
     val aboutPillShape = pillShape
     var playStoreAboutUsesListingOnly by remember { mutableStateOf(false) }
 
+    val pillPadding = if (isSmallLandscape) PaddingValues(horizontal = 12.dp, vertical = 6.dp) else ButtonDefaults.ContentPadding
+    val pillTextStyle = if (isSmallLandscape) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge
+    val pillIconSize = if (isSmallLandscape) 18.dp else 20.dp
+    val pillIconSpacer = if (isSmallLandscape) 6.dp else 8.dp
+
     GroupedListColumn {
         GroupedListItem(position = GroupPosition.ONLY) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp)
-                        .padding(top = 24.dp, bottom = 8.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    text =
-                        stringResource(
-                            R.string.app_version_format,
-                            stringResource(R.string.app_name),
-                            BuildConfig.VERSION_NAME,
-                        ),
-                    modifier =
-                        Modifier.combinedClickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = {
-                                if (devModeEnabled) {
-                                    val now = System.currentTimeMillis()
-                                    if (now - lastAlreadyUnlockedToastMs > 2_500L) {
-                                        lastAlreadyUnlockedToastMs = now
-                                        Toast.makeText(context, resources.getString(R.string.dev_options_already_unlocked), Toast.LENGTH_SHORT).show()
-                                    }
-                                } else {
-                                    devModeTapCount++
-                                    if (devModeTapCount >= 7) {
-                                        devModeTapCount = 0
-                                        onDevModeActivated()
-                                    } else if (devModeTapCount >= 3) {
-                                        val tapsLeft = 7 - devModeTapCount
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                resources.getQuantityString(
-                                                    R.plurals.dev_options_taps_remaining,
-                                                    tapsLeft,
-                                                    tapsLeft,
-                                                ),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
-                                    }
-                                }
-                            },
-                            onLongClick = {
-                                devModeTapCount = 0
-                                Toast
-                                    .makeText(context, buildVariantToastText, Toast.LENGTH_SHORT)
-                                    .show()
-                            },
-                        ),
-                    style = MaterialTheme.typography.displaySmall,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    text = stringResource(R.string.app_tagline),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(20.dp))
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    itemVerticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AppIconImage(
+            Box(modifier = Modifier.fillMaxWidth()) {
+                if (isLandscape) {
+                    Box(
                         modifier =
                             Modifier
-                                .size(84.dp)
-                                .clip(iconShape)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = {
-                                        onOpenIntro()
-                                    },
-                                ),
-                    )
-                    Spacer(Modifier.width(20.dp))
-                    AboutAuthorPhoto(
-                        modifier =
-                            Modifier
-                                .size(84.dp)
-                                .clip(authorShape)
-                                .tapSoundCombinedClickable(
-                                    onClick = {
-                                        runCatching {
-                                            context.startActivity(Intent(Intent.ACTION_VIEW, profileUrl.toUri()))
-                                        }
-                                    },
-                                    onLongClick = { copyAboutLink(profileUrl) },
-                                ),
-                    )
+                                .align(Alignment.TopEnd)
+                                .padding(top = if (isSmallLandscape) 4.dp else 8.dp, end = if (isSmallLandscape) 4.dp else 8.dp)
+                    ) {
+                        RememberIconButton(
+                            onClick = shareDiagnostics,
+                            tooltipLabel = stringResource(R.string.settings_share_diagnostics),
+                            modifier = Modifier.size(40.dp),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "bug_report",
+                                size = 20.dp,
+                                tint = MaterialTheme.colorScheme.primary,
+                                weight = FontWeight.Medium,
+                            )
+                        }
+                    }
                 }
-                Spacer(Modifier.height(20.dp))
-                Text(
-                    text = stringResource(R.string.settings_byline),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textAlign = TextAlign.Center,
-                )
-                Spacer(Modifier.height(24.dp))
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                    itemVerticalAlignment = Alignment.CenterVertically,
+
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = if (isSmallLandscape) 16.dp else 20.dp)
+                            .padding(
+                                top = if (isSmallLandscape) 20.dp else 24.dp,
+                                bottom = if (isSmallLandscape) 16.dp else 8.dp
+                            ),
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
+                    Text(
+                        text =
+                            stringResource(
+                                R.string.app_version_format,
+                                stringResource(R.string.app_name),
+                                BuildConfig.VERSION_NAME,
+                            ),
+                        modifier =
+                            Modifier.combinedClickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {
+                                    if (devModeEnabled) {
+                                        val now = System.currentTimeMillis()
+                                        if (now - lastAlreadyUnlockedToastMs > 2_500L) {
+                                            lastAlreadyUnlockedToastMs = now
+                                            Toast.makeText(context, resources.getString(R.string.dev_options_already_unlocked), Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        devModeTapCount++
+                                        if (devModeTapCount >= 7) {
+                                            devModeTapCount = 0
+                                            onDevModeActivated()
+                                        } else if (devModeTapCount >= 3) {
+                                            val tapsLeft = 7 - devModeTapCount
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    resources.getQuantityString(
+                                                        R.plurals.dev_options_taps_remaining,
+                                                        tapsLeft,
+                                                        tapsLeft,
+                                                    ),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
+                                    }
+                                },
+                                onLongClick = {
+                                    devModeTapCount = 0
+                                    Toast
+                                        .makeText(context, buildVariantToastText, Toast.LENGTH_SHORT)
+                                        .show()
+                                },
+                            ),
+                        style = if (isSmallLandscape) MaterialTheme.typography.titleMedium else MaterialTheme.typography.displaySmall,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Spacer(Modifier.height(if (isSmallLandscape) 8.dp else 10.dp))
+                    Text(
+                        text = stringResource(R.string.app_tagline),
+                        style = if (isSmallLandscape) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 20.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalArrangement = Arrangement.spacedBy(if (isSmallLandscape) 8.dp else 12.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        AppIconImage(
+                            modifier =
+                                Modifier
+                                    .size(if (isSmallLandscape) 64.dp else 84.dp)
+                                    .clip(iconShape)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = {
+                                            onOpenIntro()
+                                        },
+                                    ),
+                        )
+                        Spacer(Modifier.width(if (isSmallLandscape) 16.dp else 20.dp))
+                        AboutAuthorPhoto(
+                            modifier =
+                                Modifier
+                                    .size(if (isSmallLandscape) 64.dp else 84.dp)
+                                    .clip(authorShape)
+                                    .tapSoundCombinedClickable(
+                                        onClick = {
+                                            runCatching {
+                                                context.startActivity(Intent(Intent.ACTION_VIEW, profileUrl.toUri()))
+                                            }
+                                        },
+                                        onLongClick = { copyAboutLink(profileUrl) },
+                                    ),
+                        )
+                    }
+                    Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 20.dp))
+                    Text(
+                        text = stringResource(R.string.settings_byline),
+                        style = if (isSmallLandscape) MaterialTheme.typography.bodySmall else MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                    )
+                    Spacer(Modifier.height(if (isSmallLandscape) 14.dp else 24.dp))
+                    FlowRow(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                        verticalArrangement = Arrangement.spacedBy(if (isSmallLandscape) 8.dp else 12.dp),
+                        itemVerticalAlignment = Alignment.CenterVertically,
+                    ) {
                     if (BuildConfig.FLAVOR == "github") {
                         Surface(
                             shape = aboutPillShape,
@@ -348,15 +391,15 @@ private fun AboutSettingsBlock(
                                     ),
                         ) {
                             Row(
-                                modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                modifier = Modifier.padding(pillPadding),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center,
                             ) {
-                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.width(8.dp))
+                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primary, size = pillIconSize)
+                                Spacer(Modifier.width(pillIconSpacer))
                                 Text(
                                     text = stringResource(R.string.settings_rate_on_play_store),
-                                    style = MaterialTheme.typography.labelLarge,
+                                    style = pillTextStyle,
                                     color = MaterialTheme.colorScheme.primary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -383,20 +426,20 @@ private fun AboutSettingsBlock(
                                         ),
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                    modifier = Modifier.padding(pillPadding),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center,
                                 ) {
                                     Icon(
                                         painter = painterResource(R.drawable.ic_github_mark),
                                         contentDescription = null,
-                                        modifier = Modifier.size(20.dp),
+                                        modifier = Modifier.size(pillIconSize),
                                         tint = MaterialTheme.colorScheme.onPrimary,
                                     )
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(pillIconSpacer))
                                     Text(
                                         text = stringResource(R.string.settings_star_on_github),
-                                        style = MaterialTheme.typography.labelLarge,
+                                        style = pillTextStyle,
                                         color = MaterialTheme.colorScheme.onPrimary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -431,15 +474,15 @@ private fun AboutSettingsBlock(
                                     ),
                         ) {
                             Row(
-                                modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                modifier = Modifier.padding(pillPadding),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.Center,
                             ) {
-                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.onPrimary)
-                                Spacer(Modifier.width(8.dp))
+                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.onPrimary, size = pillIconSize)
+                                Spacer(Modifier.width(pillIconSpacer))
                                 Text(
                                     text = stringResource(R.string.settings_rate_on_play_store),
-                                    style = MaterialTheme.typography.labelLarge,
+                                    style = pillTextStyle,
                                     color = MaterialTheme.colorScheme.onPrimary,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
@@ -466,20 +509,20 @@ private fun AboutSettingsBlock(
                                         ),
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(ButtonDefaults.ContentPadding),
+                                    modifier = Modifier.padding(pillPadding),
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center,
                                 ) {
                                     Icon(
                                         painter = painterResource(R.drawable.ic_github_mark),
                                         contentDescription = null,
-                                        modifier = Modifier.size(20.dp),
+                                        modifier = Modifier.size(pillIconSize),
                                         tint = MaterialTheme.colorScheme.primary,
                                     )
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(pillIconSpacer))
                                     Text(
                                         text = stringResource(R.string.settings_star_on_github),
-                                        style = MaterialTheme.typography.labelLarge,
+                                        style = pillTextStyle,
                                         color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis,
@@ -489,23 +532,25 @@ private fun AboutSettingsBlock(
                             }
                         }
                     }
+                    }
+                    Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 24.dp))
+                    AboutOtherAppsAndLinks(
+                        context = context,
+                        copyAboutLink = copyAboutLink,
+                        isSmallLandscape = isSmallLandscape,
+                    )
                 }
-                Spacer(Modifier.height(24.dp))
-                AboutOtherAppsAndLinks(
-                    context = context,
-                    copyAboutLink = copyAboutLink,
-                )
             }
         }
     }
 }
 
 @Composable
-private fun AboutPlayStoreIcon(tint: Color) {
+private fun AboutPlayStoreIcon(tint: Color, size: androidx.compose.ui.unit.Dp = 20.dp) {
     Icon(
         painter = painterResource(R.drawable.ic_google_play_mark),
         contentDescription = null,
-        modifier = Modifier.size(20.dp),
+        modifier = Modifier.size(size),
         tint = tint,
     )
 }
@@ -514,6 +559,7 @@ private fun AboutPlayStoreIcon(tint: Color) {
 private fun AboutOtherAppsAndLinks(
     context: Context,
     copyAboutLink: (String) -> Unit,
+    isSmallLandscape: Boolean,
 ) {
     val filePipeStoreUrl =
         stringResource(
@@ -531,11 +577,11 @@ private fun AboutOtherAppsAndLinks(
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.settings_about_other_apps),
-            style = MaterialTheme.typography.labelMedium,
+            style = if (isSmallLandscape) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
         AboutAppStoreButton(
             iconResId = R.drawable.filepipe_logo,
             name = stringResource(R.string.settings_about_filepipe_name),
@@ -544,9 +590,10 @@ private fun AboutOtherAppsAndLinks(
             accentColor = Color(0xFF5967D8),
             context = context,
             copyAboutLink = copyAboutLink,
+            isSmallLandscape = isSmallLandscape,
         )
         if (BuildConfig.FLAVOR == "github") {
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
             AboutAppStoreButton(
                 iconResId = R.drawable.obtainx_logo,
                 name = stringResource(R.string.settings_about_obtainx_name),
@@ -555,12 +602,13 @@ private fun AboutOtherAppsAndLinks(
                 accentColor = Color(0xFF7C55D9),
                 context = context,
                 copyAboutLink = copyAboutLink,
+                isSmallLandscape = isSmallLandscape,
             )
         }
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(if (isSmallLandscape) 10.dp else 14.dp))
         Row(
             modifier = Modifier.align(Alignment.CenterHorizontally),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            horizontalArrangement = Arrangement.spacedBy(if (isSmallLandscape) 6.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             AboutTextLink(
@@ -568,6 +616,7 @@ private fun AboutOtherAppsAndLinks(
                 url = websiteUrl,
                 context = context,
                 copyAboutLink = copyAboutLink,
+                isSmallLandscape = isSmallLandscape,
             )
             AboutLinkSeparator()
             AboutTextLink(
@@ -575,6 +624,7 @@ private fun AboutOtherAppsAndLinks(
                 url = privacyUrl,
                 context = context,
                 copyAboutLink = copyAboutLink,
+                isSmallLandscape = isSmallLandscape,
             )
             AboutLinkSeparator()
             AboutTextLink(
@@ -582,6 +632,7 @@ private fun AboutOtherAppsAndLinks(
                 url = termsUrl,
                 context = context,
                 copyAboutLink = copyAboutLink,
+                isSmallLandscape = isSmallLandscape,
             )
         }
     }
@@ -596,6 +647,7 @@ private fun AboutAppStoreButton(
     accentColor: Color,
     context: Context,
     copyAboutLink: (String) -> Unit,
+    isSmallLandscape: Boolean,
 ) {
     val shape = MaterialTheme.shapes.large
     Surface(
@@ -616,7 +668,7 @@ private fun AboutAppStoreButton(
                 ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = if (isSmallLandscape) 8.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
@@ -624,14 +676,14 @@ private fun AboutAppStoreButton(
                 contentDescription = null,
                 modifier =
                     Modifier
-                        .size(40.dp)
+                        .size(if (isSmallLandscape) 36.dp else 40.dp)
                         .clip(MaterialTheme.shapes.medium),
             )
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(if (isSmallLandscape) 8.dp else 10.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = name,
-                    style = MaterialTheme.typography.bodyLarge,
+                    style = if (isSmallLandscape) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
@@ -641,14 +693,14 @@ private fun AboutAppStoreButton(
                     text = tagline,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
+                    maxLines = if (isSmallLandscape) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
             Spacer(Modifier.width(8.dp))
             RememberMaterialRoundedSymbol(
                 name = "chevron_right",
-                size = 20.dp,
+                size = if (isSmallLandscape) 18.dp else 20.dp,
                 tint = accentColor.copy(alpha = 0.86f),
                 weight = FontWeight.Medium,
             )
@@ -671,6 +723,7 @@ private fun AboutTextLink(
     url: String,
     context: Context,
     copyAboutLink: (String) -> Unit,
+    isSmallLandscape: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Text(
@@ -686,7 +739,7 @@ private fun AboutTextLink(
                     },
                     onLongClick = { copyAboutLink(url) },
                 ),
-        style = MaterialTheme.typography.labelMedium,
+        style = if (isSmallLandscape) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.primary,
         textAlign = TextAlign.Center,
         maxLines = 1,

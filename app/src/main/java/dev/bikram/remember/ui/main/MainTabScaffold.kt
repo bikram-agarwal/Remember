@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -62,6 +63,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -170,8 +172,10 @@ fun MainTabScaffold(
         onAlertBarsExpandedChange(false)
     }
     val scope = rememberCoroutineScope()
-    val isLandscape = androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val isLandscape =
+        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
 
     LaunchedEffect(effectiveChromeVisible, currentTab) {
         if (!effectiveChromeVisible || currentTab != MainTab.Notes) fabExpanded = false
@@ -210,8 +214,11 @@ fun MainTabScaffold(
                                     Modifier
                                         .align(Alignment.BottomStart)
                                         .then(chromeOverlayModifier)
-                                        .windowInsetsPadding(WindowInsets.navigationBars)
-                                        .padding(start = 20.dp, bottom = 20.dp),
+                                        .navigationBarsPadding()
+                                        .padding(
+                                            start = 20.dp,
+                                            bottom = if (isSmallLandscape) 10.dp else 20.dp,
+                                        ),
                             ) {
                                 AlertFloatingActionButtonMenu(
                                     expanded = alertBarsExpanded,
@@ -232,6 +239,12 @@ fun MainTabScaffold(
                         }
                     }
                 } else {
+                    val notesFabBottomInset =
+                        if (currentTab == MainTab.Notes) {
+                            if (isLandscape) 8.dp else 16.dp
+                        } else {
+                            0.dp
+                        }
                     CenteredPillWithSideFab(
                         modifier =
                             Modifier
@@ -242,7 +255,7 @@ fun MainTabScaffold(
                                 .padding(
                                     bottom = if (isLandscape) 6.dp else 12.dp,
                                     start = 24.dp,
-                                    end = 24.dp
+                                    end = 24.dp,
                                 ),
                         fabGap = 12.dp,
                         pill = {
@@ -309,12 +322,9 @@ fun MainTabScaffold(
                             )
                         },
                         fabRightInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
-                        fabBottomInset = if (currentTab == MainTab.Notes) {
-                            if (isLandscape) 8.dp else 16.dp
-                        } else {
-                            0.dp
-                        },
+                        fabBottomInset = notesFabBottomInset,
                         leadingFabGap = 18.dp,
+                        leadingFabBottomInset = if (isSmallLandscape) notesFabBottomInset else 0.dp,
                     )
                 }
             }
@@ -650,6 +660,10 @@ private fun MainFabSlot(
     onPickList: () -> Unit,
     onPickNote: () -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+
     when (tab) {
         MainTab.Notes ->
             NotesCreateFabMenu(
@@ -668,28 +682,41 @@ private fun MainFabSlot(
                 } else {
                     stringResource(R.string.edit_bottom_bar_delete_forever)
                 }
-            val iconSize = if (isArchive) 24.dp else 22.dp
+            val iconSize =
+                if (isSmallLandscape || !isArchive) {
+                    22.dp
+                } else {
+                    24.dp
+                }
+            val shouldShowFab =
+                if (isSmallLandscape) {
+                    historyVisibleItemCount > 0
+                } else {
+                    true
+                }
 
-            SimpleHistoryOrSettingsFab(
-                symbolName = symbolName,
-                description = description,
-                enabled = historyVisibleItemCount > 0,
-                iconSize = iconSize,
-                onClick = {
-                    if (isArchive) {
-                        onMoveArchiveToTrashRequest()
-                    } else {
-                        onClearTrashRequest()
-                    }
-                },
-            )
+            if (shouldShowFab) {
+                SimpleHistoryOrSettingsFab(
+                    symbolName = symbolName,
+                    description = description,
+                    enabled = historyVisibleItemCount > 0,
+                    iconSize = iconSize,
+                    onClick = {
+                        if (isArchive) {
+                            onMoveArchiveToTrashRequest()
+                        } else {
+                            onClearTrashRequest()
+                        }
+                    },
+                )
+            }
         }
         MainTab.Settings ->
             SimpleHistoryOrSettingsFab(
                 symbolName = "share",
                 description = stringResource(R.string.main_menu_share_app),
                 enabled = true,
-                iconSize = 26.dp,
+                iconSize = if (isSmallLandscape) 22.dp else 26.dp,
                 onClick = onShareApp,
             )
     }
@@ -739,6 +766,9 @@ internal fun NotesCreateFabMenu(
         FloatingActionButtonMenu(
             expanded = expanded,
             button = {
+                val configuration = LocalConfiguration.current
+                val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+                val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
                 val containerColor =
                     if (expanded) {
                         MaterialTheme.colorScheme.primary
@@ -763,7 +793,7 @@ internal fun NotesCreateFabMenu(
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = "add",
-                        size = 26.dp,
+                        size = if (isSmallLandscape) 22.dp else 26.dp,
                         tint = iconColor,
                         weight = FontWeight.Medium,
                         modifier = Modifier.graphicsLayer { rotationZ = iconRotation },

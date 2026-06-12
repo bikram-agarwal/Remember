@@ -33,7 +33,6 @@ class RememberUpdateState
         val devReleasePlayBannerMockUiState: StateFlow<PlayInAppUpdateBannerUiState> =
             _devReleasePlayBannerMockUiState.asStateFlow()
         private var devReleasePlayBannerMockSequenceJob: Job? = null
-        private val updateMocksAvailable = BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease"
 
         fun showUpdate(info: RememberUpdateInfo?) {
             _updateInfo.value = info
@@ -43,7 +42,7 @@ class RememberUpdateState
         }
 
         fun devReleaseMockShowUpdateAvailable() {
-            if (!updateMocksAvailable || !BuildConfig.SHOW_UPDATES) return
+            if (!BuildConfig.SHOW_UPDATES) return
             _updateInfo.value =
                 RememberUpdateInfo(
                     versionName = "9.9.9",
@@ -61,7 +60,6 @@ class RememberUpdateState
         }
 
         fun devReleaseMockStartPlayUpdateBannerSequence() {
-            if (!updateMocksAvailable) return
             devReleasePlayBannerMockSequenceJob?.cancel()
             devReleasePlayBannerMockSequenceJob =
                 applicationScope.launch {
@@ -86,7 +84,6 @@ class RememberUpdateState
         }
 
         fun devReleaseCompletePlayUpdateIfReady(): Boolean {
-            if (!updateMocksAvailable) return false
             if (_devReleasePlayBannerMockUiState.value != PlayInAppUpdateBannerUiState.ReadyToInstall) return false
             devReleasePlayBannerMockSequenceJob?.cancel()
             _devReleasePlayBannerMockUiState.value = PlayInAppUpdateBannerUiState.Hidden
