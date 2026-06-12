@@ -200,6 +200,8 @@ fun SettingsRoute(
     selectedSectionKey: SettingsSectionKey? = null,
     showTopActions: Boolean = true,
     showSectionHeaders: Boolean = true,
+    showAboutHeader: Boolean = true,
+    showAboutHeaderTitle: Boolean = true,
     highlightSectionKey: String? = null,
     onHighlightHandled: () -> Unit = {},
 ) {
@@ -1297,6 +1299,8 @@ fun SettingsRoute(
                                     onFlowFinished()
                                 }
                             },
+                            showHeader = showAboutHeader,
+                            showHeaderTitle = showAboutHeaderTitle,
                         )
                     }
                 }

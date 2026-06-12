@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.history
 
+import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -60,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -69,6 +71,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -474,6 +477,7 @@ fun HistoryRoute(
     val inSelectionMode = selectedIds.isNotEmpty()
     val snackbarHostState = LocalSnackbarHostState.current
     val context = LocalContext.current
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val notificationsAllowed = rememberNotificationsAllowed()
     val undoLabel = stringResource(R.string.bulk_action_undo)
     // Confirmation sheet state for the selection-mode delete-forever path. Permanent
@@ -645,12 +649,17 @@ fun HistoryRoute(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .then(listBlurMod),
+                                .then(
+                                    if (isLandscape) {
+                                        Modifier.padding(top = topBarInset)
+                                    } else {
+                                        Modifier
+                                    },
+                                ),
                         contentAlignment = Alignment.Center,
                     ) {
                         EmptyState(
                             section = targetSection,
-                            modifier = Modifier.padding(top = topBarInset, bottom = pillInset),
                         )
                     }
                 }
@@ -794,6 +803,11 @@ private fun HistorySelectionActionBar(
                 val selectAllInteractionSource = remember { MutableInteractionSource() }
                 val cdUnselectAll = stringResource(R.string.home_unselect_all)
                 val unselectAllInteractionSource = remember { MutableInteractionSource() }
+                val unselectAllColors =
+                    IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 val restoreLabel = stringResource(R.string.edit_bottom_bar_restore)
                 val cdRestore = stringResource(R.string.edit_bottom_bar_restore_cd)
                 val restoreInteractionSource = remember { MutableInteractionSource() }
@@ -900,6 +914,7 @@ private fun HistorySelectionActionBar(
                                 modifier = Modifier.size(actionButtonSize).animateWidth(unselectAllInteractionSource),
                                 interactionSource = unselectAllInteractionSource,
                                 tooltipLabel = cdUnselectAll,
+                                colors = unselectAllColors,
                             ) {
                                 RememberMaterialRoundedSymbol(
                                     name = "deselect",
@@ -1282,6 +1297,8 @@ private fun EmptyState(
             text = stringResource(subtitleRes),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

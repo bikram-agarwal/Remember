@@ -2,6 +2,7 @@ package dev.bikram.remember.ui.nav
 
 import androidx.activity.ComponentActivity
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -535,6 +536,7 @@ fun SettingsTwoPaneRoute(
                             selectedSectionKey = selectedSectionKey,
                             showTopActions = false,
                             showSectionHeaders = false,
+                            showAboutHeaderTitle = false,
                             highlightSectionKey = highlightSectionKey,
                             onHighlightHandled = onHighlightHandled,
                         )
@@ -1258,6 +1260,12 @@ private fun NotesSelectionActionPane(
                         .fillMaxWidth()
                         .height(56.dp),
                 shape = SelectionPaneButtonShape,
+                colors =
+                    ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                    ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 contentPadding = SelectionPaneButtonPadding,
             ) {
                 SelectionPaneButtonContent("close", stringResource(R.string.home_unselect_all))
@@ -1371,6 +1379,12 @@ private fun HistorySelectionActionPane(
                         .fillMaxWidth()
                         .height(56.dp),
                 shape = SelectionPaneButtonShape,
+                colors =
+                    ButtonDefaults.outlinedButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                    ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 contentPadding = SelectionPaneButtonPadding,
             ) {
                 SelectionPaneButtonContent("close", stringResource(R.string.home_unselect_all))

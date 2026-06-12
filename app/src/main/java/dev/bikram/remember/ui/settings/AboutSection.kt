@@ -14,6 +14,8 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -79,37 +81,48 @@ internal fun AboutSection(
     // The empty-detail-pane filler shows just the card, without the section header
     // (and its diagnostics button).
     showHeader: Boolean = true,
+    showHeaderTitle: Boolean = true,
 ) {
     val context = LocalContext.current
     val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
     val shareDiagnostics = rememberDiagnosticsShareAction(context, diagnosticsChooserTitle)
     Column(modifier = modifier) {
         if (showHeader) {
-            SettingsStaticSectionHeader(
-                materialSymbolName = "info",
-                title = stringResource(R.string.settings_section_about),
-                trailingContent = {
-                    RememberIconButton(
-                        onClick = shareDiagnostics,
-                        tooltipLabel = stringResource(R.string.settings_share_diagnostics),
-                        modifier =
-                            Modifier.size(
-                                rememberResponsiveActionButtonSize(
-                                    defaultSize = 40.dp,
-                                    compactSize = 38.dp,
-                                    ultraCompactSize = 36.dp,
-                                ),
+            val diagnosticsButton: @Composable () -> Unit = {
+                RememberIconButton(
+                    onClick = shareDiagnostics,
+                    tooltipLabel = stringResource(R.string.settings_share_diagnostics),
+                    modifier =
+                        Modifier.size(
+                            rememberResponsiveActionButtonSize(
+                                defaultSize = 40.dp,
+                                compactSize = 38.dp,
+                                ultraCompactSize = 36.dp,
                             ),
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "bug_report",
-                            size = 20.dp,
-                            tint = MaterialTheme.colorScheme.primary,
-                            weight = FontWeight.Medium,
-                        )
-                    }
-                },
-            )
+                        ),
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "bug_report",
+                        size = 20.dp,
+                        tint = MaterialTheme.colorScheme.primary,
+                        weight = FontWeight.Medium,
+                    )
+                }
+            }
+            if (showHeaderTitle) {
+                SettingsStaticSectionHeader(
+                    materialSymbolName = "info",
+                    title = stringResource(R.string.settings_section_about),
+                    trailingContent = diagnosticsButton,
+                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    diagnosticsButton()
+                }
+            }
             Spacer(Modifier.height(8.dp))
         }
         AboutSettingsBlock(
@@ -153,7 +166,7 @@ private fun rememberDiagnosticsShareAction(
         }
     }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 private fun AboutSettingsBlock(
     onOpenIntro: () -> Unit,
@@ -266,10 +279,11 @@ private fun AboutSettingsBlock(
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(20.dp))
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
                     AppIconImage(
                         modifier =
@@ -308,10 +322,11 @@ private fun AboutSettingsBlock(
                     textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(24.dp))
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
                     if (BuildConfig.FLAVOR == "github") {
                         Surface(
@@ -343,11 +358,13 @@ private fun AboutSettingsBlock(
                                     text = stringResource(R.string.settings_rate_on_play_store),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    softWrap = false,
                                 )
                             }
                         }
                         if (githubRepoForSourceLink.isNotEmpty()) {
-                            Spacer(Modifier.width(12.dp))
                             val repoUrl = "https://github.com/$githubRepoForSourceLink"
                             Surface(
                                 shape = aboutPillShape,
@@ -381,6 +398,9 @@ private fun AboutSettingsBlock(
                                         text = stringResource(R.string.settings_star_on_github),
                                         style = MaterialTheme.typography.labelLarge,
                                         color = MaterialTheme.colorScheme.onPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        softWrap = false,
                                     )
                                 }
                             }
@@ -421,11 +441,13 @@ private fun AboutSettingsBlock(
                                     text = stringResource(R.string.settings_rate_on_play_store),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onPrimary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    softWrap = false,
                                 )
                             }
                         }
                         if (githubRepoForSourceLink.isNotEmpty()) {
-                            Spacer(Modifier.width(12.dp))
                             val repoUrl = "https://github.com/$githubRepoForSourceLink"
                             Surface(
                                 shape = aboutPillShape,
@@ -459,6 +481,9 @@ private fun AboutSettingsBlock(
                                         text = stringResource(R.string.settings_star_on_github),
                                         style = MaterialTheme.typography.labelLarge,
                                         color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        softWrap = false,
                                     )
                                 }
                             }

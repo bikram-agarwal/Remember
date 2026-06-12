@@ -615,18 +615,33 @@ fun TagEditorSheet(
             title = { Text(stringResource(R.string.tag_editor_unsaved_title)) },
             text = { Text(stringResource(R.string.tag_editor_unsaved_body)) },
             confirmButton = {
-                RememberButton(
-                    onClick = {
-                        showUnsavedChangesDialog = false
-                        onDismiss()
-                    },
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    itemVerticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(stringResource(R.string.tag_editor_unsaved_discard))
-                }
-            },
-            dismissButton = {
-                RememberTextButton(onClick = { showUnsavedChangesDialog = false }) {
-                    Text(stringResource(R.string.tag_editor_unsaved_keep_editing))
+                    RememberTextButton(onClick = { showUnsavedChangesDialog = false }) {
+                        Text(
+                            text = stringResource(R.string.tag_editor_unsaved_keep_editing),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
+                    }
+                    RememberButton(
+                        onClick = {
+                            showUnsavedChangesDialog = false
+                            onDismiss()
+                        },
+                    ) {
+                        Text(
+                            text = stringResource(R.string.tag_editor_unsaved_discard),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
+                        )
+                    }
                 }
             },
         )

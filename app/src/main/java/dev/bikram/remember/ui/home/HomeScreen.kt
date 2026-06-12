@@ -28,6 +28,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -501,7 +502,13 @@ fun HomeScreen(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .then(blurMod),
+                        .then(
+                            if (showEmptyState) {
+                                Modifier
+                            } else {
+                                blurMod
+                            },
+                        ),
                 contentPadding = listContentPadding,
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 userScrollEnabled = listScrollEnabled,
@@ -828,6 +835,11 @@ fun HomeScreen(
                         RememberFilledTonalIconButton(
                             onClick = onClearSelection,
                             modifier = Modifier.size(actionButtonSize),
+                            colors =
+                                IconButtonDefaults.filledTonalIconButtonColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                                    contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                ),
                         ) {
                             RememberMaterialRoundedSymbol(
                                 name = "deselect",

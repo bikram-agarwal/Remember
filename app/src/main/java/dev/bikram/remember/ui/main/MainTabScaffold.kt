@@ -500,7 +500,12 @@ private fun CenteredPillWithSideFab(
             }
         },
     ) { measurables, constraints ->
-        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val loose =
+            constraints.copy(
+                minWidth = 0,
+                minHeight = 0,
+                maxWidth = androidx.compose.ui.unit.Constraints.Infinity,
+            )
         val pillPlaceable = measurables[0].measure(loose)
         // Measure the FAB child unconstrained vertically so the FloatingActionButtonMenu's
         // expanded items can be as tall as they need without the strip capping them.
@@ -526,11 +531,23 @@ private fun CenteredPillWithSideFab(
             } else {
                 pillPlaceable.width + gapPx + fabPlaceable.width
             }
-        val sideRoomPx =
-            maxOf(
-                gapPx + fabCorePx,
-                if (leadingFabPlaceable != null) leadingGapPx + fabCorePx else 0,
-            )
+        val trailingSideFootprintPx =
+            if (fabRightInsetPx > 0 || fabBottomInsetPx > 0) {
+                fabCorePx
+            } else {
+                maxOf(fabCorePx, fabPlaceable.width)
+            }
+        val leadingSideFootprintPx =
+            if (leadingFabPlaceable != null) {
+                if (leadingFabLeftInsetPx > 0 || leadingFabBottomInsetPx > 0) {
+                    fabCorePx
+                } else {
+                    maxOf(fabCorePx, leadingFabPlaceable.width)
+                }
+            } else {
+                0
+            }
+        val sideRoomPx = maxOf(gapPx + trailingSideFootprintPx, leadingGapPx + leadingSideFootprintPx)
         val rowNaturalWidth = pillPlaceable.width + sideRoomPx * 2
         val chromeScale =
             if (rowNaturalWidth > width && rowNaturalWidth > 0) {
@@ -578,9 +595,16 @@ private fun CenteredPillWithSideFab(
             // Vertically: the FAB element's center sits at the strip's vertical center
             // (same as pill's). FloatingActionButtonMenu places the button 16.dp above
             // the wrapper bottom, so Notes passes that as [fabBottomInset].
-            val desiredFabElementRight = pillX + scaledPillWidth + scaledGap + scaledFabCore
-            val fabElementRight = desiredFabElementRight.coerceAtMost(width)
-            val fabX = (fabElementRight - scaledFabWidth + scaledFabRightInset).coerceAtLeast(0)
+            val fabX =
+                if (scaledFabRightInset > 0 || scaledFabBottomInset > 0) {
+                    val desiredFabElementRight = pillX + scaledPillWidth + scaledGap + scaledFabCore
+                    val fabElementRight = desiredFabElementRight.coerceAtMost(width)
+                    (fabElementRight - scaledFabWidth + scaledFabRightInset).coerceAtLeast(0)
+                } else {
+                    (pillX + scaledPillWidth + scaledGap)
+                        .coerceAtMost(width - scaledFabWidth)
+                        .coerceAtLeast(0)
+                }
             val fabBottomY = (stripHeight + scaledFabCore) / 2 + scaledFabBottomInset
             val fabY = fabBottomY - scaledFabHeight
             fabPlaceable.placeWithLayer(fabX, fabY) {
@@ -590,9 +614,15 @@ private fun CenteredPillWithSideFab(
             }
 
             leadingFabPlaceable?.let { leadingPlaceable ->
-                val leadingFabElementLeft =
-                    (pillX - scaledLeadingGap - scaledFabCore).coerceAtLeast(0)
-                val leadingX = (leadingFabElementLeft - scaledLeadingFabLeftInset).coerceAtLeast(0)
+                val scaledLeadingFabWidth = (leadingPlaceable.width * chromeScale).roundToInt()
+                val leadingX =
+                    if (scaledLeadingFabLeftInset > 0 || scaledLeadingFabBottomInset > 0) {
+                        val leadingFabElementLeft =
+                            (pillX - scaledLeadingGap - scaledFabCore).coerceAtLeast(0)
+                        (leadingFabElementLeft - scaledLeadingFabLeftInset).coerceAtLeast(0)
+                    } else {
+                        (pillX - scaledLeadingGap - scaledLeadingFabWidth).coerceAtLeast(0)
+                    }
                 val leadingFabBottomY = (stripHeight + scaledFabCore) / 2 + scaledLeadingFabBottomInset
                 val leadingY =
                     leadingFabBottomY -
