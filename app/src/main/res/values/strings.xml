@@ -161,6 +161,8 @@
     <string name="view_options_group_none">None</string>
     <string name="view_options_group_tags">Tags</string>
     <string name="view_options_group_type">Type</string>
+    <string name="home_group_state_collapsed">Collapsed</string>
+    <string name="home_group_state_expanded">Expanded</string>
 
     <!-- Note cards -->
     <string name="notecard_starred_cd">Starred</string>

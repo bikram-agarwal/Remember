@@ -58,6 +58,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -1204,11 +1205,13 @@ private fun SettingsPaneSectionRow(
 // error for the destructive one. Keep the two apps' selection panes in sync.
 private val SelectionPaneButtonShape = RoundedCornerShape(percent = 50)
 private val SelectionPaneButtonPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+private val CompactSelectionPaneButtonPadding = PaddingValues(horizontal = 14.dp, vertical = 4.dp)
 
 @Composable
 private fun SelectionPaneButtonContent(
     iconName: String,
     label: String,
+    compact: Boolean,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -1217,13 +1220,13 @@ private fun SelectionPaneButtonContent(
     ) {
         RememberMaterialRoundedSymbol(
             name = iconName,
-            size = 20.dp,
+            size = if (compact) 18.dp else 20.dp,
             weight = FontWeight.Medium,
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(if (compact) 6.dp else 8.dp))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelLarge,
+            style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.labelLarge,
         )
     }
 }
@@ -1239,6 +1242,12 @@ private fun NotesSelectionActionPane(
     onArchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    val compact =
+        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
+            configuration.screenHeightDp < 480
+    val buttonHeight = if (compact) 40.dp else 56.dp
+    val buttonPadding = if (compact) CompactSelectionPaneButtonPadding else SelectionPaneButtonPadding
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -1255,13 +1264,13 @@ private fun NotesSelectionActionPane(
                     .verticalScroll(rememberScrollState())
                     .windowInsetsPadding(WindowInsets.statusBars)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(24.dp),
+                    .padding(if (compact) 12.dp else 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
         ) {
             Text(
                 text = stringResource(R.string.two_pane_notes_selection_title, selectedCount),
-                style = MaterialTheme.typography.titleLarge,
+                style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
@@ -1271,18 +1280,18 @@ private fun NotesSelectionActionPane(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(buttonHeight),
                 shape = SelectionPaneButtonShape,
-                contentPadding = SelectionPaneButtonPadding,
+                contentPadding = buttonPadding,
             ) {
-                SelectionPaneButtonContent("select_all", stringResource(R.string.home_select_all))
+                SelectionPaneButtonContent("select_all", stringResource(R.string.home_select_all), compact)
             }
             RememberOutlinedButton(
                 onClick = onClearSelection,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(buttonHeight),
                 shape = SelectionPaneButtonShape,
                 colors =
                     ButtonDefaults.outlinedButtonColors(
@@ -1290,58 +1299,58 @@ private fun NotesSelectionActionPane(
                         disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                     ),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                contentPadding = SelectionPaneButtonPadding,
+                contentPadding = buttonPadding,
             ) {
-                SelectionPaneButtonContent("close", stringResource(R.string.home_unselect_all))
+                SelectionPaneButtonContent("close", stringResource(R.string.home_unselect_all), compact)
             }
             RememberFilledTonalButton(
                 onClick = onTagSelected,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(buttonHeight),
                 shape = SelectionPaneButtonShape,
-                contentPadding = SelectionPaneButtonPadding,
+                contentPadding = buttonPadding,
             ) {
-                SelectionPaneButtonContent("label", stringResource(R.string.home_bulk_tag))
+                SelectionPaneButtonContent("label", stringResource(R.string.home_bulk_tag), compact)
             }
             RememberFilledTonalButton(
                 onClick = onMarkDoneSelected,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(buttonHeight),
                 shape = SelectionPaneButtonShape,
-                contentPadding = SelectionPaneButtonPadding,
+                contentPadding = buttonPadding,
             ) {
-                SelectionPaneButtonContent("check_circle", stringResource(R.string.edit_bottom_bar_mark_done))
+                SelectionPaneButtonContent("check_circle", stringResource(R.string.edit_bottom_bar_mark_done), compact)
             }
             RememberFilledTonalButton(
                 onClick = onArchiveSelected,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(buttonHeight),
                 shape = SelectionPaneButtonShape,
-                contentPadding = SelectionPaneButtonPadding,
+                contentPadding = buttonPadding,
             ) {
-                SelectionPaneButtonContent("archive", stringResource(R.string.edit_bottom_bar_archive))
+                SelectionPaneButtonContent("archive", stringResource(R.string.edit_bottom_bar_archive), compact)
             }
             RememberButton(
                 onClick = onTrashSelected,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(buttonHeight),
                 shape = SelectionPaneButtonShape,
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     ),
-                contentPadding = SelectionPaneButtonPadding,
+                contentPadding = buttonPadding,
             ) {
-                SelectionPaneButtonContent("delete", stringResource(R.string.home_bulk_trash))
+                SelectionPaneButtonContent("delete", stringResource(R.string.home_bulk_trash), compact)
             }
         }
     }
@@ -1360,6 +1369,12 @@ private fun HistorySelectionActionPane(
     onTrashSelected: () -> Unit,
     onDeleteForeverSelected: () -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    val compact =
+        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
+            configuration.screenHeightDp < 480
+    val buttonHeight = if (compact) 40.dp else 56.dp
+    val buttonPadding = if (compact) CompactSelectionPaneButtonPadding else SelectionPaneButtonPadding
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center,
@@ -1374,13 +1389,13 @@ private fun HistorySelectionActionPane(
                     .verticalScroll(rememberScrollState())
                     .windowInsetsPadding(WindowInsets.statusBars)
                     .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(24.dp),
+                    .padding(if (compact) 12.dp else 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp),
         ) {
             Text(
                 text = stringResource(R.string.two_pane_notes_selection_title, selectedCount),
-                style = MaterialTheme.typography.titleLarge,
+                style = if (compact) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
             )
@@ -1390,18 +1405,18 @@ private fun HistorySelectionActionPane(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(buttonHeight),
                 shape = SelectionPaneButtonShape,
-                contentPadding = SelectionPaneButtonPadding,
+                contentPadding = buttonPadding,
             ) {
-                SelectionPaneButtonContent("select_all", stringResource(R.string.home_select_all))
+                SelectionPaneButtonContent("select_all", stringResource(R.string.home_select_all), compact)
             }
             RememberOutlinedButton(
                 onClick = onClearSelection,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(buttonHeight),
                 shape = SelectionPaneButtonShape,
                 colors =
                     ButtonDefaults.outlinedButtonColors(
@@ -1409,9 +1424,9 @@ private fun HistorySelectionActionPane(
                         disabledContentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
                     ),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                contentPadding = SelectionPaneButtonPadding,
+                contentPadding = buttonPadding,
             ) {
-                SelectionPaneButtonContent("close", stringResource(R.string.home_unselect_all))
+                SelectionPaneButtonContent("close", stringResource(R.string.home_unselect_all), compact)
             }
             if (section == HistorySection.TRASH) {
                 RememberFilledTonalButton(
@@ -1419,22 +1434,22 @@ private fun HistorySelectionActionPane(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
+                            .height(buttonHeight),
                     shape = SelectionPaneButtonShape,
-                    contentPadding = SelectionPaneButtonPadding,
+                    contentPadding = buttonPadding,
                 ) {
-                    SelectionPaneButtonContent("restore_from_trash", stringResource(R.string.edit_bottom_bar_restore))
+                    SelectionPaneButtonContent("restore_from_trash", stringResource(R.string.edit_bottom_bar_restore), compact)
                 }
                 RememberFilledTonalButton(
                     onClick = onArchiveSelected,
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
+                            .height(buttonHeight),
                     shape = SelectionPaneButtonShape,
-                    contentPadding = SelectionPaneButtonPadding,
+                    contentPadding = buttonPadding,
                 ) {
-                    SelectionPaneButtonContent("archive", stringResource(R.string.edit_bottom_bar_archive))
+                    SelectionPaneButtonContent("archive", stringResource(R.string.edit_bottom_bar_archive), compact)
                 }
             } else {
                 RememberFilledTonalButton(
@@ -1442,22 +1457,22 @@ private fun HistorySelectionActionPane(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
+                            .height(buttonHeight),
                     shape = SelectionPaneButtonShape,
-                    contentPadding = SelectionPaneButtonPadding,
+                    contentPadding = buttonPadding,
                 ) {
-                    SelectionPaneButtonContent("unarchive", stringResource(R.string.edit_bottom_bar_unarchive))
+                    SelectionPaneButtonContent("unarchive", stringResource(R.string.edit_bottom_bar_unarchive), compact)
                 }
                 RememberFilledTonalButton(
                     onClick = onTrashSelected,
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
+                            .height(buttonHeight),
                     shape = SelectionPaneButtonShape,
-                    contentPadding = SelectionPaneButtonPadding,
+                    contentPadding = buttonPadding,
                 ) {
-                    SelectionPaneButtonContent("delete_sweep", stringResource(R.string.common_move_to_trash))
+                    SelectionPaneButtonContent("delete_sweep", stringResource(R.string.common_move_to_trash), compact)
                 }
             }
             RememberButton(
@@ -1465,16 +1480,16 @@ private fun HistorySelectionActionPane(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(buttonHeight),
                 shape = SelectionPaneButtonShape,
                 colors =
                     ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.errorContainer,
                         contentColor = MaterialTheme.colorScheme.onErrorContainer,
                     ),
-                contentPadding = SelectionPaneButtonPadding,
+                contentPadding = buttonPadding,
             ) {
-                SelectionPaneButtonContent("delete_forever", stringResource(R.string.edit_bottom_bar_delete_forever))
+                SelectionPaneButtonContent("delete_forever", stringResource(R.string.edit_bottom_bar_delete_forever), compact)
             }
         }
     }

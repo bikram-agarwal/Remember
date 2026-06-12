@@ -335,18 +335,19 @@ fun HomeScreen(
             revealedNoteCardBounds = null
         }
     }
-    val displayedItems by
-        remember(state.items, collapsedSectionKeys) {
+    val displayedItems = state.items
+    val visibleDisplayedItems by
+        remember(displayedItems, collapsedSectionKeys) {
             derivedStateOf {
-                state.items.filterNot { item ->
+                displayedItems.filterNot { item ->
                     item is HomeListItem.NoteRow && item.groupKey in collapsedSectionKeys
                 }
             }
         }
     val selectableVisibleIds by
-        remember(displayedItems) {
+        remember(visibleDisplayedItems) {
             derivedStateOf {
-                displayedItems
+                visibleDisplayedItems
                     .mapNotNull { item ->
                         (item as? HomeListItem.NoteRow)?.card?.id
                     }.toSet()
@@ -356,10 +357,10 @@ fun HomeScreen(
         onPruneSelection(selectableVisibleIds)
     }
     val bulkTagCoverage by
-        remember(displayedItems, state.availableTags, state.selectedIds) {
+        remember(visibleDisplayedItems, state.availableTags, state.selectedIds) {
             derivedStateOf {
                 val selectedTagsByNoteId = LinkedHashMap<Long, List<String>>()
-                displayedItems.forEach { item ->
+                visibleDisplayedItems.forEach { item ->
                     if (item is HomeListItem.NoteRow && item.card.id in state.selectedIds) {
                         selectedTagsByNoteId.putIfAbsent(item.card.id, item.note.note.tags)
                     }
@@ -576,7 +577,7 @@ fun HomeScreen(
                     }
                 } else {
                     items(
-                        items = displayedItems,
+                        items = visibleDisplayedItems,
                         key = { item ->
                             when (item) {
                                 is HomeListItem.Header -> item.stableKey.hashCode()

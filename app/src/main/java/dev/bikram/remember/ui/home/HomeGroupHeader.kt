@@ -1,13 +1,19 @@
 package dev.bikram.remember.ui.home
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,12 +23,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
@@ -38,6 +48,70 @@ internal fun GroupHeader(
     pinned: Boolean = false,
 ) {
     val headerInteractionSource = remember { MutableInteractionSource() }
+    val collapsedStateDescription = stringResource(R.string.home_group_state_collapsed)
+    val expandedStateDescription = stringResource(R.string.home_group_state_expanded)
+    val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<androidx.compose.ui.unit.Dp>())
+    val colorSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
+    val headerCorner by animateDpAsState(
+        targetValue = if (collapsed) 28.dp else 4.dp,
+        animationSpec = spatialSpec,
+        label = "home_group_header_corner",
+    )
+    val headerColor by animateColorAsState(
+        targetValue = if (collapsed) MaterialTheme.colorScheme.surfaceContainerHigh else Color.Transparent,
+        animationSpec = colorSpec,
+        label = "home_group_header_color",
+    )
+    val horizontalPadding by animateDpAsState(
+        targetValue = if (collapsed) 12.dp else 4.dp,
+        animationSpec = spatialSpec,
+        label = "home_group_header_horizontal_padding",
+    )
+    val verticalPadding by animateDpAsState(
+        targetValue = if (collapsed) 8.dp else 4.dp,
+        animationSpec = spatialSpec,
+        label = "home_group_header_vertical_padding",
+    )
+    val titleStartPadding by animateDpAsState(
+        targetValue = if (collapsed && !pinned) 8.dp else 0.dp,
+        animationSpec = spatialSpec,
+        label = "home_group_header_title_start_padding",
+    )
+    val pinnedIconContainerSize by animateDpAsState(
+        targetValue = if (collapsed) 30.dp else 18.dp,
+        animationSpec = spatialSpec,
+        label = "home_group_pinned_icon_container_size",
+    )
+    val pinnedIconSize by animateDpAsState(
+        targetValue = if (collapsed) 16.dp else 14.dp,
+        animationSpec = spatialSpec,
+        label = "home_group_pinned_icon_size",
+    )
+    val pinnedIconContainerColor by animateColorAsState(
+        targetValue =
+            if (collapsed) {
+                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.48f)
+            } else {
+                Color.Transparent
+            },
+        animationSpec = colorSpec,
+        label = "home_group_pinned_icon_container_color",
+    )
+    val chevronContainerSize by animateDpAsState(
+        targetValue = if (collapsed) 32.dp else 20.dp,
+        animationSpec = spatialSpec,
+        label = "home_group_chevron_container_size",
+    )
+    val chevronSize by animateDpAsState(
+        targetValue = if (collapsed) 20.dp else 18.dp,
+        animationSpec = spatialSpec,
+        label = "home_group_chevron_size",
+    )
+    val chevronContainerColor by animateColorAsState(
+        targetValue = if (collapsed) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent,
+        animationSpec = colorSpec,
+        label = "home_group_chevron_container_color",
+    )
     val outerSpacing =
         modifier
             .fillMaxWidth()
@@ -46,45 +120,57 @@ internal fun GroupHeader(
         (
             if (collapsible && onToggle != null) {
                 outerSpacing
-                    .clip(MaterialTheme.shapes.small)
+                    .clip(RoundedCornerShape(headerCorner))
+                    .background(headerColor)
                     .clickable(
                         interactionSource = headerInteractionSource,
                         indication = LocalIndication.current,
                     ) {
                         onToggle()
-                    }.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
+                    }.padding(horizontal = horizontalPadding, vertical = verticalPadding)
             } else {
-                outerSpacing.padding(top = 6.dp, bottom = 4.dp, start = 4.dp)
+                outerSpacing.padding(horizontal = horizontalPadding, vertical = verticalPadding)
             }
         ).semantics {
             heading()
-            if (collapsible) stateDescription = if (collapsed) "Collapsed" else "Expanded"
+            if (collapsible) {
+                stateDescription = if (collapsed) collapsedStateDescription else expandedStateDescription
+            }
         }
     Row(
         modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (pinned) {
-            RememberMaterialRoundedSymbol(
-                name = "push_pin",
-                filled = true,
-                size = 14.dp,
-                tint = MaterialTheme.colorScheme.primary,
-                weight = FontWeight.Medium,
+            Box(
                 modifier =
                     Modifier
-                        .padding(end = 6.dp)
-                        .graphicsLayer { rotationZ = 30f },
-            )
+                        .size(pinnedIconContainerSize)
+                        .clip(MaterialTheme.shapes.extraExtraLarge)
+                        .background(pinnedIconContainerColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name = "push_pin",
+                    filled = true,
+                    size = pinnedIconSize,
+                    tint = MaterialTheme.colorScheme.primary,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.graphicsLayer { rotationZ = 30f },
+                )
+            }
         }
         Text(
             text = label,
             style = MaterialTheme.typography.titleMediumEmphasized,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = titleStartPadding),
         )
         if (count != null) {
-            Spacer(Modifier.width(8.dp))
             Text(
                 text = count.toString(),
                 style = MaterialTheme.typography.titleMediumEmphasized,
@@ -99,16 +185,22 @@ internal fun GroupHeader(
                 animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
                 label = "section_chevron_rotation",
             )
-            RememberMaterialRoundedSymbol(
-                name = "chevron_right",
-                size = 18.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
+            Box(
                 modifier =
                     Modifier
-                        .padding(end = 8.dp)
-                        .graphicsLayer { rotationZ = rotation },
-            )
+                        .size(chevronContainerSize)
+                        .clip(MaterialTheme.shapes.extraExtraLarge)
+                        .background(chevronContainerColor),
+                contentAlignment = Alignment.Center,
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name = "chevron_right",
+                    size = chevronSize,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    weight = FontWeight.Medium,
+                    modifier = Modifier.graphicsLayer { rotationZ = rotation },
+                )
+            }
         }
     }
 }
