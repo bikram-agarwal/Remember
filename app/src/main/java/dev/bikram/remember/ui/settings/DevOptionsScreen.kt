@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -94,7 +93,7 @@ import dev.bikram.remember.trash.RememberTrashSweepWork
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
-import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
@@ -350,36 +349,29 @@ fun DevOptionsRoute(
     val installerPackage = remember(context) { installerPackageName(context) }
 
     if (showResetPrefsConfirm) {
-        AlertDialog(
-            onDismissRequest = { showResetPrefsConfirm = false },
-            title = { Text(stringResource(R.string.dev_options_reset_all_title)) },
-            text = { Text(stringResource(R.string.dev_options_reset_all_message)) },
-            confirmButton = {
-                RememberTextButton(
-                    onClick = {
-                        scope.launch {
-                            themePrefs.reset()
-                            viewOptionsPrefs.reset()
-                            interactionPrefs.reset()
-                            reminderPrefs.reset()
-                            quickCapturePrefs.reset()
-                            lockPrefs.reset()
-                            backupPrefs.reset()
-                            updatePrefs.reset()
-                            onboardingPrefs.resetIntroSeen()
-                            devModePrefs.setEnabled(false)
-                        }
-                        showResetPrefsConfirm = false
-                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_reset_done), Toast.LENGTH_SHORT).show()
-                        onBack()
-                    },
-                ) { Text(stringResource(R.string.dev_options_reset_all_confirm), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                RememberTextButton(onClick = { showResetPrefsConfirm = false }) {
-                    Text(stringResource(R.string.common_cancel))
+        RememberConfirmDialog(
+            title = stringResource(R.string.dev_options_reset_all_title),
+            text = stringResource(R.string.dev_options_reset_all_message),
+            confirmLabel = stringResource(R.string.dev_options_reset_all_confirm),
+            onConfirm = {
+                scope.launch {
+                    themePrefs.reset()
+                    viewOptionsPrefs.reset()
+                    interactionPrefs.reset()
+                    reminderPrefs.reset()
+                    quickCapturePrefs.reset()
+                    lockPrefs.reset()
+                    backupPrefs.reset()
+                    updatePrefs.reset()
+                    onboardingPrefs.resetIntroSeen()
+                    devModePrefs.setEnabled(false)
                 }
+                showResetPrefsConfirm = false
+                Toast.makeText(context, resources.getString(R.string.dev_options_toast_reset_done), Toast.LENGTH_SHORT).show()
+                onBack()
             },
+            onDismiss = { showResetPrefsConfirm = false },
+            destructive = true,
         )
     }
 

@@ -1418,12 +1418,19 @@ fun SettingsRoute(
                         }
                     },
                 ) {
-                    Text(stringResource(R.string.settings_restore_go_ahead))
+                    // Restore replaces existing data, so keep this low-emphasis + error-colored.
+                    Text(
+                        text = stringResource(R.string.settings_restore_go_ahead),
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             },
             dismissButton = {
                 RememberTextButton(onClick = { pendingRestore = null }) {
-                    Text(stringResource(R.string.common_cancel))
+                    Text(
+                        text = stringResource(R.string.common_cancel),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             },
         )

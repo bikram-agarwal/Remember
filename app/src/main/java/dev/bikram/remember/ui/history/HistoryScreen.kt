@@ -46,7 +46,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
@@ -96,7 +95,7 @@ import dev.bikram.remember.ui.components.NoteCard
 import dev.bikram.remember.ui.components.NoteCardUiModel
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
-import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.SwipeRevealTile
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
@@ -699,23 +698,16 @@ fun HistoryRoute(
         // Single-card delete-forever confirmation. Mirrors the bulk dialog so users
         // get the same warning regardless of whether they triggered the delete from
         // the swipe action on one card or from selection mode on many.
-        AlertDialog(
-            onDismissRequest = { pendingDeleteForeverNote = null },
-            title = { Text(stringResource(R.string.bulk_delete_forever_confirm_title)) },
-            text = { Text(stringResource(R.string.bulk_delete_forever_confirm_subtitle)) },
-            confirmButton = {
-                RememberTextButton(onClick = {
-                    pendingDeleteForeverNote = null
-                    vm.deleteForever(noteToDelete)
-                }) {
-                    Text(stringResource(R.string.edit_bottom_bar_delete_forever))
-                }
+        RememberConfirmDialog(
+            title = stringResource(R.string.bulk_delete_forever_confirm_title),
+            text = stringResource(R.string.bulk_delete_forever_confirm_subtitle),
+            confirmLabel = stringResource(R.string.edit_bottom_bar_delete_forever),
+            onConfirm = {
+                pendingDeleteForeverNote = null
+                vm.deleteForever(noteToDelete)
             },
-            dismissButton = {
-                RememberTextButton(onClick = { pendingDeleteForeverNote = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+            onDismiss = { pendingDeleteForeverNote = null },
+            destructive = true,
         )
     }
 
@@ -723,23 +715,16 @@ fun HistoryRoute(
         // Mirrors the single-card dialog so the confirmation pattern is consistent. The
         // selected-count snapshot is captured at open time; the selection set itself is
         // unchanged until the user confirms.
-        AlertDialog(
-            onDismissRequest = { bulkDeleteForeverOpen = false },
-            title = { Text(stringResource(R.string.bulk_delete_forever_confirm_title)) },
-            text = { Text(stringResource(R.string.bulk_delete_forever_confirm_subtitle)) },
-            confirmButton = {
-                RememberTextButton(onClick = {
-                    bulkDeleteForeverOpen = false
-                    vm.deleteSelectedForever()
-                }) {
-                    Text(stringResource(R.string.edit_bottom_bar_delete_forever))
-                }
+        RememberConfirmDialog(
+            title = stringResource(R.string.bulk_delete_forever_confirm_title),
+            text = stringResource(R.string.bulk_delete_forever_confirm_subtitle),
+            confirmLabel = stringResource(R.string.edit_bottom_bar_delete_forever),
+            onConfirm = {
+                bulkDeleteForeverOpen = false
+                vm.deleteSelectedForever()
             },
-            dismissButton = {
-                RememberTextButton(onClick = { bulkDeleteForeverOpen = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+            onDismiss = { bulkDeleteForeverOpen = false },
+            destructive = true,
         )
     }
 }

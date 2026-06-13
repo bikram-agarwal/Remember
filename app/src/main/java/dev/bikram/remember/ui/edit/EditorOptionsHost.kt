@@ -1,14 +1,13 @@
 package dev.bikram.remember.ui.edit
 
 import android.net.Uri
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import dev.bikram.remember.R
 import dev.bikram.remember.data.Importance
-import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteKind
@@ -184,25 +183,16 @@ fun EditorOptionSheets(
         )
     }
     if (deleteForeverConfirmOpen) {
-        AlertDialog(
-            onDismissRequest = onDismissDeleteForever,
-            title = { Text(stringResource(R.string.edit_delete_forever_dialog_title)) },
-            text = { Text(stringResource(R.string.edit_delete_forever_dialog_body)) },
-            confirmButton = {
-                RememberTextButton(
-                    onClick = {
-                        onDismissDeleteForever()
-                        onDeleteForever()
-                    },
-                ) {
-                    Text(stringResource(R.string.edit_delete_forever_dialog_confirm))
-                }
+        RememberConfirmDialog(
+            title = stringResource(R.string.edit_delete_forever_dialog_title),
+            text = stringResource(R.string.edit_delete_forever_dialog_body),
+            confirmLabel = stringResource(R.string.edit_delete_forever_dialog_confirm),
+            onConfirm = {
+                onDismissDeleteForever()
+                onDeleteForever()
             },
-            dismissButton = {
-                RememberTextButton(onClick = onDismissDeleteForever) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+            onDismiss = onDismissDeleteForever,
+            destructive = true,
         )
     }
 

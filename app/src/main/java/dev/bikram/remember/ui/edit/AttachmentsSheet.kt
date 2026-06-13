@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -42,6 +41,7 @@ import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import kotlinx.coroutines.launch
@@ -212,24 +212,16 @@ private fun AttachmentRow(
         }
     }
     if (deleteConfirmOpen) {
-        AlertDialog(
-            onDismissRequest = { deleteConfirmOpen = false },
-            title = { Text(stringResource(R.string.attachments_delete_confirm_title)) },
-            confirmButton = {
-                RememberTextButton(
-                    onClick = {
-                        deleteConfirmOpen = false
-                        onRemove()
-                    },
-                ) {
-                    Text(stringResource(R.string.common_yes))
-                }
+        RememberConfirmDialog(
+            title = stringResource(R.string.attachments_delete_confirm_title),
+            confirmLabel = stringResource(R.string.common_yes),
+            onConfirm = {
+                deleteConfirmOpen = false
+                onRemove()
             },
-            dismissButton = {
-                RememberTextButton(onClick = { deleteConfirmOpen = false }) {
-                    Text(stringResource(R.string.common_no))
-                }
-            },
+            onDismiss = { deleteConfirmOpen = false },
+            destructive = true,
+            dismissLabel = stringResource(R.string.common_no),
         )
     }
 }

@@ -30,7 +30,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -85,6 +84,7 @@ import dev.bikram.remember.ui.common.HueColorSlider
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.colorHexFromHue
 import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.TagChipFilled
@@ -610,40 +610,17 @@ fun TagEditorSheet(
     }
 
     if (showUnsavedChangesDialog) {
-        AlertDialog(
-            onDismissRequest = { showUnsavedChangesDialog = false },
-            title = { Text(stringResource(R.string.tag_editor_unsaved_title)) },
-            text = { Text(stringResource(R.string.tag_editor_unsaved_body)) },
-            confirmButton = {
-                FlowRow(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    itemVerticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RememberTextButton(onClick = { showUnsavedChangesDialog = false }) {
-                        Text(
-                            text = stringResource(R.string.tag_editor_unsaved_keep_editing),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            softWrap = false,
-                        )
-                    }
-                    RememberButton(
-                        onClick = {
-                            showUnsavedChangesDialog = false
-                            onDismiss()
-                        },
-                    ) {
-                        Text(
-                            text = stringResource(R.string.tag_editor_unsaved_discard),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            softWrap = false,
-                        )
-                    }
-                }
+        RememberConfirmDialog(
+            title = stringResource(R.string.tag_editor_unsaved_title),
+            text = stringResource(R.string.tag_editor_unsaved_body),
+            confirmLabel = stringResource(R.string.tag_editor_unsaved_discard),
+            onConfirm = {
+                showUnsavedChangesDialog = false
+                onDismiss()
             },
+            onDismiss = { showUnsavedChangesDialog = false },
+            destructive = true,
+            dismissLabel = stringResource(R.string.tag_editor_unsaved_keep_editing),
         )
     }
 }

@@ -41,7 +41,6 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
@@ -83,7 +82,7 @@ import dev.bikram.remember.ui.components.AlertChromeSummary
 import dev.bikram.remember.ui.components.AlertFloatingActionButtonMenu
 import dev.bikram.remember.ui.components.RememberFloatingActionButton
 import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
@@ -376,36 +375,30 @@ fun MainTabScaffold(
     }
 
     if (clearTrashOpen) {
-        AlertDialog(
-            onDismissRequest = { clearTrashOpen = false },
-            title = { Text(stringResource(R.string.main_empty_trash_title)) },
-            text = { Text(stringResource(R.string.main_empty_trash_subtitle)) },
-            confirmButton = {
-                RememberTextButton(onClick = {
-                    clearTrashOpen = false
-                    scope.launch { repository.emptyTrash() }
-                }) { Text(stringResource(R.string.common_empty)) }
+        RememberConfirmDialog(
+            title = stringResource(R.string.main_empty_trash_title),
+            text = stringResource(R.string.main_empty_trash_subtitle),
+            confirmLabel = stringResource(R.string.common_empty),
+            onConfirm = {
+                clearTrashOpen = false
+                scope.launch { repository.emptyTrash() }
             },
-            dismissButton = {
-                RememberTextButton(onClick = { clearTrashOpen = false }) { Text(stringResource(R.string.common_cancel)) }
-            },
+            onDismiss = { clearTrashOpen = false },
+            destructive = true,
         )
     }
 
     if (moveArchiveToTrashOpen) {
-        AlertDialog(
-            onDismissRequest = { moveArchiveToTrashOpen = false },
-            title = { Text(stringResource(R.string.main_move_archive_to_trash_title)) },
-            text = { Text(stringResource(R.string.main_move_archive_to_trash_subtitle)) },
-            confirmButton = {
-                RememberTextButton(onClick = {
-                    moveArchiveToTrashOpen = false
-                    scope.launch { repository.moveAllArchivedToTrash() }
-                }) { Text(stringResource(R.string.edit_bottom_bar_trash)) }
+        RememberConfirmDialog(
+            title = stringResource(R.string.main_move_archive_to_trash_title),
+            text = stringResource(R.string.main_move_archive_to_trash_subtitle),
+            confirmLabel = stringResource(R.string.edit_bottom_bar_trash),
+            onConfirm = {
+                moveArchiveToTrashOpen = false
+                scope.launch { repository.moveAllArchivedToTrash() }
             },
-            dismissButton = {
-                RememberTextButton(onClick = { moveArchiveToTrashOpen = false }) { Text(stringResource(R.string.common_cancel)) }
-            },
+            onDismiss = { moveArchiveToTrashOpen = false },
+            destructive = true,
         )
     }
 }
