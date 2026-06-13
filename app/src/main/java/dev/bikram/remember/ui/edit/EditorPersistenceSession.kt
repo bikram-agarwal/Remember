@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * that was current when the write began. Otherwise a quick edit during an in-flight save can be
  * lost by a stale `dirty = false`.
  */
-internal class EditorPersistenceSession(
+class EditorPersistenceSession(
     initialDirty: Boolean = false,
 ) {
     private val persistMutex = Mutex()

@@ -20,6 +20,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NotesFilter
+import dev.bikram.remember.ui.common.emptyStateSpacing
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.EmptyFilterIllustration
 import dev.bikram.remember.ui.components.EmptyNotesIllustration
@@ -39,14 +41,9 @@ internal fun NotesEmptyState(
 ) {
     val pristineVault =
         totalUnfilteredNotes == 0 && filter.text.isBlank() && !filter.facetActive
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallHeight = configuration.screenHeightDp < 480
-
-    val titleSpacer = if (isLandscape && isSmallHeight) 12.dp else 24.dp
-    val subtitleSpacer = if (isLandscape && isSmallHeight) 4.dp else 8.dp
-    val filterTitleSpacer = if (isLandscape && isSmallHeight) 10.dp else 18.dp
-    val filterSubtitleSpacer = if (isLandscape && isSmallHeight) 4.dp else 6.dp
+    val isSmallLandscape = isSmallLandscape()
+    val heroSpacing = emptyStateSpacing(prominent = true)
+    val filterSpacing = emptyStateSpacing(prominent = false)
 
     Column(
         modifier = modifier,
@@ -58,13 +55,13 @@ internal fun NotesEmptyState(
                 modifier = Modifier.semantics(mergeDescendants = true) {},
             ) {
                 EmptyNotesIllustration()
-                Spacer(Modifier.height(titleSpacer))
+                Spacer(Modifier.height(heroSpacing.titleSpacer))
                 Text(
                     text = stringResource(R.string.home_no_notes_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(subtitleSpacer))
+                Spacer(Modifier.height(heroSpacing.subtitleSpacer))
                 Text(
                     text = stringResource(R.string.home_no_notes_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
@@ -77,8 +74,8 @@ internal fun NotesEmptyState(
                 )
             }
             if (showCreateActions) {
-                Spacer(Modifier.height(titleSpacer))
-                if (isLandscape && isSmallHeight) {
+                Spacer(Modifier.height(heroSpacing.titleSpacer))
+                if (isSmallLandscape) {
                     Row(
                         modifier = Modifier.fillMaxWidth(0.9f),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -160,14 +157,14 @@ internal fun NotesEmptyState(
                 modifier = Modifier.semantics(mergeDescendants = true) {},
             ) {
                 EmptyFilterIllustration()
-                Spacer(Modifier.height(filterTitleSpacer))
+                Spacer(Modifier.height(filterSpacing.titleSpacer))
                 Text(
                     text = titleText,
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.height(filterSubtitleSpacer))
+                Spacer(Modifier.height(filterSpacing.subtitleSpacer))
                 Text(
                     text = hintText,
                     style = MaterialTheme.typography.bodyMedium,

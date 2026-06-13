@@ -18,7 +18,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -42,6 +41,7 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
@@ -63,7 +63,6 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -75,7 +74,8 @@ import androidx.graphics.shapes.Morph
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.notifications.appNotificationSettingsIntent
-import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.isLandscape
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.common.rememberShareAppAction
@@ -172,10 +172,8 @@ fun MainTabScaffold(
         onAlertBarsExpandedChange(false)
     }
     val scope = rememberCoroutineScope()
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isLandscape = isLandscape()
+    val isSmallLandscape = isSmallLandscape()
 
     LaunchedEffect(effectiveChromeVisible, currentTab) {
         if (!effectiveChromeVisible || currentTab != MainTab.Notes) fabExpanded = false
@@ -378,39 +376,37 @@ fun MainTabScaffold(
     }
 
     if (clearTrashOpen) {
-        AppBottomSheet(
-            title = stringResource(R.string.main_empty_trash_title),
-            subtitle = stringResource(R.string.main_empty_trash_subtitle),
-            onDismiss = { clearTrashOpen = false },
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
-            subtitleSpacing = 12.dp,
-            actions = {
-                RememberTextButton(onClick = { clearTrashOpen = false }) { Text(stringResource(R.string.common_cancel)) }
+        AlertDialog(
+            onDismissRequest = { clearTrashOpen = false },
+            title = { Text(stringResource(R.string.main_empty_trash_title)) },
+            text = { Text(stringResource(R.string.main_empty_trash_subtitle)) },
+            confirmButton = {
                 RememberTextButton(onClick = {
                     clearTrashOpen = false
                     scope.launch { repository.emptyTrash() }
                 }) { Text(stringResource(R.string.common_empty)) }
             },
-        ) {
-        }
+            dismissButton = {
+                RememberTextButton(onClick = { clearTrashOpen = false }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
     }
 
     if (moveArchiveToTrashOpen) {
-        AppBottomSheet(
-            title = stringResource(R.string.main_move_archive_to_trash_title),
-            subtitle = stringResource(R.string.main_move_archive_to_trash_subtitle),
-            onDismiss = { moveArchiveToTrashOpen = false },
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
-            subtitleSpacing = 12.dp,
-            actions = {
-                RememberTextButton(onClick = { moveArchiveToTrashOpen = false }) { Text(stringResource(R.string.common_cancel)) }
+        AlertDialog(
+            onDismissRequest = { moveArchiveToTrashOpen = false },
+            title = { Text(stringResource(R.string.main_move_archive_to_trash_title)) },
+            text = { Text(stringResource(R.string.main_move_archive_to_trash_subtitle)) },
+            confirmButton = {
                 RememberTextButton(onClick = {
                     moveArchiveToTrashOpen = false
                     scope.launch { repository.moveAllArchivedToTrash() }
                 }) { Text(stringResource(R.string.edit_bottom_bar_trash)) }
             },
-        ) {
-        }
+            dismissButton = {
+                RememberTextButton(onClick = { moveArchiveToTrashOpen = false }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
     }
 }
 
@@ -660,9 +656,8 @@ private fun MainFabSlot(
     onPickList: () -> Unit,
     onPickNote: () -> Unit,
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isLandscape = isLandscape()
+    val isSmallLandscape = isSmallLandscape()
 
     when (tab) {
         MainTab.Notes ->
@@ -766,9 +761,8 @@ internal fun NotesCreateFabMenu(
         FloatingActionButtonMenu(
             expanded = expanded,
             button = {
-                val configuration = LocalConfiguration.current
-                val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-                val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+                val isLandscape = isLandscape()
+                val isSmallLandscape = isSmallLandscape()
                 val containerColor =
                     if (expanded) {
                         MaterialTheme.colorScheme.primary

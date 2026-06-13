@@ -3,12 +3,12 @@ package dev.bikram.remember.ui.edit
 import android.net.Uri
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import dev.bikram.remember.R
 import dev.bikram.remember.data.Importance
+import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteKind
@@ -189,7 +189,7 @@ fun EditorOptionSheets(
             title = { Text(stringResource(R.string.edit_delete_forever_dialog_title)) },
             text = { Text(stringResource(R.string.edit_delete_forever_dialog_body)) },
             confirmButton = {
-                TextButton(
+                RememberTextButton(
                     onClick = {
                         onDismissDeleteForever()
                         onDeleteForever()
@@ -199,7 +199,7 @@ fun EditorOptionSheets(
                 }
             },
             dismissButton = {
-                TextButton(onClick = onDismissDeleteForever) {
+                RememberTextButton(onClick = onDismissDeleteForever) {
                     Text(stringResource(R.string.common_cancel))
                 }
             },

@@ -82,6 +82,11 @@ PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         r'^\s*[A-Z][A-Za-z0-9_]*\(\s*R\.string\.\w+\s*,\s*"([a-z][a-z0-9_]+)"',
         re.MULTILINE,
     )),
+    # Enum constructor entries like `Swipe("swipe", "swipe_left", R.string.settings_swipe_section)`.
+    ("enum_entry_route_then_icon_arg", re.compile(
+        r'^\s*[A-Z][A-Za-z0-9_]*\(\s*"[a-z][a-z0-9_]+"\s*,\s*"([a-z][a-z0-9_]+)"\s*,\s*R\.string\.\w+',
+        re.MULTILINE,
+    )),
 ]
 
 ENABLED_FILES_HINT = {

@@ -51,7 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
+import dev.bikram.remember.ui.common.isSmallLandscape
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Dp
@@ -443,10 +443,7 @@ fun RememberFloatingActionButton(
     tooltipLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isSmallLandscape = isSmallLandscape()
     val sizeModifier =
         if (isSmallLandscape) {
             Modifier.size(rememberResponsiveActionButtonSize())

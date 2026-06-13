@@ -44,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -54,6 +53,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.data.UpdateCheckSchedule
+import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
@@ -79,7 +79,7 @@ internal fun UpdateCheckBottomSheetContent(
     onDownloadClick: (RememberUpdateInfo) -> Unit,
     onSkipVersionClick: () -> Unit,
 ) {
-    val isLandscape = LocalConfiguration.current.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = isLandscape()
     val isChangelogReady = changelogState is ChangelogUiState.Ready
     val outerScrollState = rememberScrollState()
     val outerScrollable = outerScrollState.maxValue > 0 && outerScrollState.maxValue != Int.MAX_VALUE

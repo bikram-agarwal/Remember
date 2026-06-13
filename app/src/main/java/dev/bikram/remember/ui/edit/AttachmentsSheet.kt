@@ -17,7 +17,6 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -217,7 +216,7 @@ private fun AttachmentRow(
             onDismissRequest = { deleteConfirmOpen = false },
             title = { Text(stringResource(R.string.attachments_delete_confirm_title)) },
             confirmButton = {
-                TextButton(
+                RememberTextButton(
                     onClick = {
                         deleteConfirmOpen = false
                         onRemove()
@@ -227,7 +226,7 @@ private fun AttachmentRow(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { deleteConfirmOpen = false }) {
+                RememberTextButton(onClick = { deleteConfirmOpen = false }) {
                     Text(stringResource(R.string.common_no))
                 }
             },

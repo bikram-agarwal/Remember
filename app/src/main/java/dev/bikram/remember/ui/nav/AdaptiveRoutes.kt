@@ -58,7 +58,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -82,6 +81,8 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.isLandscape
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
@@ -129,9 +130,7 @@ fun NotesTwoPaneRoute(
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
-    val isLandscape =
-        androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = isLandscape()
 
     if (!isMultiPane) {
         HomeRoute(
@@ -439,10 +438,8 @@ fun SettingsTwoPaneRoute(
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<String>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isLandscape = isLandscape()
+    val isSmallLandscape = isSmallLandscape()
 
     if (!isMultiPane) {
         SettingsRoute(
@@ -571,9 +568,7 @@ fun HistoryTwoPaneRoute(
 ) {
     val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
-    val isLandscape =
-        androidx.compose.ui.platform.LocalConfiguration.current.orientation ==
-            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = isLandscape()
 
     if (!isMultiPane) {
         HistoryRoute(
@@ -666,8 +661,7 @@ fun HistoryTwoPaneRoute(
                         activeNoteId = activeDetailId,
                         showSelectionActionBar = false,
                     )
-                    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-                    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+                    val isSmallLandscape = isSmallLandscape()
                     val shouldShowPaneFab =
                         if (isSmallLandscape) {
                             visibleNotes.isNotEmpty()
@@ -1242,10 +1236,7 @@ private fun NotesSelectionActionPane(
     onArchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
 ) {
-    val configuration = LocalConfiguration.current
-    val compact =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
-            configuration.screenHeightDp < 480
+    val compact = isSmallLandscape()
     val buttonHeight = if (compact) 40.dp else 56.dp
     val buttonPadding = if (compact) CompactSelectionPaneButtonPadding else SelectionPaneButtonPadding
     Box(
@@ -1369,10 +1360,7 @@ private fun HistorySelectionActionPane(
     onTrashSelected: () -> Unit,
     onDeleteForeverSelected: () -> Unit,
 ) {
-    val configuration = LocalConfiguration.current
-    val compact =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
-            configuration.screenHeightDp < 480
+    val compact = isSmallLandscape()
     val buttonHeight = if (compact) 40.dp else 56.dp
     val buttonPadding = if (compact) CompactSelectionPaneButtonPadding else SelectionPaneButtonPadding
     Box(

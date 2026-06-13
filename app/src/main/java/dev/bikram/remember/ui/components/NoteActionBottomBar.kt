@@ -37,7 +37,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
@@ -145,10 +145,7 @@ fun NoteActionBottomBarContent(
     modifier: Modifier = Modifier,
     showEditAction: Boolean = true,
 ) {
-    val configuration = LocalConfiguration.current
-    val compact =
-        configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE &&
-            configuration.screenHeightDp < 480
+    val compact = isSmallLandscape()
     val actionRow: @Composable () -> Unit = {
         Row(
             modifier =

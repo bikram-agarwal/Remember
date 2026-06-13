@@ -37,6 +37,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.graphics.shapes.Morph
 import androidx.graphics.shapes.RoundedPolygon
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.RememberTheme
@@ -58,17 +59,15 @@ private const val PAD_H = 160f
 @Composable
 fun EmptyNotesIllustration(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallHeight = configuration.screenHeightDp < 480
-    val sizeDp = if (isLandscape && isSmallHeight) 120.dp else 180.dp
+    val isSmallLandscape = isSmallLandscape()
+    val sizeDp = if (isSmallLandscape) 120.dp else 180.dp
 
-    val backdrop1Size = if (isLandscape && isSmallHeight) 48.dp else 72.dp
-    val backdrop2Size = if (isLandscape && isSmallHeight) 38.dp else 58.dp
-    val backdrop1Start = if (isLandscape && isSmallHeight) 2.dp else 4.dp
-    val backdrop1Top = if (isLandscape && isSmallHeight) 8.dp else 12.dp
-    val backdrop2End = if (isLandscape && isSmallHeight) 4.dp else 6.dp
-    val backdrop2Bottom = if (isLandscape && isSmallHeight) 6.dp else 10.dp
+    val backdrop1Size = if (isSmallLandscape) 48.dp else 72.dp
+    val backdrop2Size = if (isSmallLandscape) 38.dp else 58.dp
+    val backdrop1Start = if (isSmallLandscape) 2.dp else 4.dp
+    val backdrop1Top = if (isSmallLandscape) 8.dp else 12.dp
+    val backdrop2End = if (isSmallLandscape) 4.dp else 6.dp
+    val backdrop2Bottom = if (isSmallLandscape) 6.dp else 10.dp
 
     Box(modifier.size(sizeDp)) {
         ExpressiveEmptyBackdrop(
@@ -290,13 +289,11 @@ private fun ExpressiveEmptyBackdrop(
 @Composable
 fun EmptyArchiveIllustration(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallHeight = configuration.screenHeightDp < 480
-    val sizeDp = if (isLandscape && isSmallHeight) 96.dp else 132.dp
+    val isSmallLandscape = isSmallLandscape()
+    val sizeDp = if (isSmallLandscape) 96.dp else 132.dp
 
-    val backdrop1Size = if (isLandscape && isSmallHeight) 42.dp else 58.dp
-    val backdrop2Size = if (isLandscape && isSmallHeight) 35.dp else 48.dp
+    val backdrop1Size = if (isSmallLandscape) 42.dp else 58.dp
+    val backdrop2Size = if (isSmallLandscape) 35.dp else 48.dp
 
     Box(modifier.size(sizeDp)) {
         ExpressiveEmptyBackdrop(
@@ -438,13 +435,11 @@ fun EmptyArchiveIllustration(modifier: Modifier = Modifier) {
 @Composable
 fun EmptyTrashIllustration(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallHeight = configuration.screenHeightDp < 480
-    val sizeDp = if (isLandscape && isSmallHeight) 96.dp else 132.dp
+    val isSmallLandscape = isSmallLandscape()
+    val sizeDp = if (isSmallLandscape) 96.dp else 132.dp
 
-    val backdrop1Size = if (isLandscape && isSmallHeight) 40.dp else 56.dp
-    val backdrop2Size = if (isLandscape && isSmallHeight) 33.dp else 46.dp
+    val backdrop1Size = if (isSmallLandscape) 40.dp else 56.dp
+    val backdrop2Size = if (isSmallLandscape) 33.dp else 46.dp
 
     Box(modifier.size(sizeDp)) {
         ExpressiveEmptyBackdrop(
@@ -575,13 +570,11 @@ private fun DrawScope.drawSparkle(
 @Composable
 fun EmptyFilterIllustration(modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallHeight = configuration.screenHeightDp < 480
-    val sizeDp = if (isLandscape && isSmallHeight) 96.dp else 132.dp
+    val isSmallLandscape = isSmallLandscape()
+    val sizeDp = if (isSmallLandscape) 96.dp else 132.dp
 
-    val backdrop1Size = if (isLandscape && isSmallHeight) 40.dp else 56.dp
-    val backdrop2Size = if (isLandscape && isSmallHeight) 32.dp else 44.dp
+    val backdrop1Size = if (isSmallLandscape) 40.dp else 56.dp
+    val backdrop2Size = if (isSmallLandscape) 32.dp else 44.dp
 
     Box(modifier.size(sizeDp)) {
         ExpressiveEmptyBackdrop(

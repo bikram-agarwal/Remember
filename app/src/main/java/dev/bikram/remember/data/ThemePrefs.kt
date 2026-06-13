@@ -95,12 +95,23 @@ enum class PaletteStyleOpt {
     CONTENT,
 }
 
-enum class ShadingIntensity {
-    NONE,
-    SUBTLE,
-    MEDIUM,
-    INTENSE,
-}
+/** Surface-shading intensity used when nothing is stored yet. 1.0 == the slider's "medium" notch. */
+const val DEFAULT_SHADING_INTENSITY = 1.0f
+
+/**
+ * Legacy discrete shading levels from versions before the continuous [shading_intensity_factor].
+ * Read-only: kept so installs that stored one of these still migrate to a factor on read. New
+ * writes only persist the factor.
+ */
+private enum class ShadingIntensity { NONE, SUBTLE, MEDIUM, INTENSE }
+
+private fun ShadingIntensity.toFactor(): Float =
+    when (this) {
+        ShadingIntensity.NONE -> 0.0f
+        ShadingIntensity.SUBTLE -> 0.4f
+        ShadingIntensity.MEDIUM -> 1.0f
+        ShadingIntensity.INTENSE -> 1.8f
+    }
 
 data class ThemeState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
@@ -109,7 +120,7 @@ data class ThemeState(
     val customSeeds: List<String> = emptyList(),
     val activeCustomSeed: String = "",
     val useGradient: Boolean = true,
-    val shadingIntensity: Float = 0.0f,
+    val shadingIntensity: Float = DEFAULT_SHADING_INTENSITY,
     val heroOnCards: Boolean = true,
     val adaptiveNoteThemes: Boolean = true,
     val blurBars: Boolean = true,
@@ -128,6 +139,8 @@ class ThemePrefs(
         val CUSTOM_SEEDS = stringPreferencesKey("custom_seeds")
         val ACTIVE_CUSTOM_SEED = stringPreferencesKey("active_custom_seed")
         val USE_GRADIENT = booleanPreferencesKey("use_gradient")
+        // Legacy shading keys, read-only: migrated to SHADING_INTENSITY_FACTOR on read for installs
+        // that predate it. setShadingIntensity / backup import no longer write them.
         val USE_ENHANCED_SHADING = booleanPreferencesKey("use_enhanced_shading")
         val SHADING_INTENSITY = stringPreferencesKey("shading_intensity")
         val SHADING_INTENSITY_FACTOR = floatPreferencesKey("shading_intensity_factor")
@@ -155,19 +168,9 @@ class ThemePrefs(
                 shadingIntensity =
                     p[Keys.SHADING_INTENSITY_FACTOR]
                         ?: runCatching {
-                            val legacyEnum = ShadingIntensity.valueOf(p[Keys.SHADING_INTENSITY] ?: "")
-                            when (legacyEnum) {
-                                ShadingIntensity.NONE -> 0.0f
-                                ShadingIntensity.SUBTLE -> 0.4f
-                                ShadingIntensity.MEDIUM -> 1.0f
-                                ShadingIntensity.INTENSE -> 1.8f
-                            }
+                            ShadingIntensity.valueOf(p[Keys.SHADING_INTENSITY] ?: "").toFactor()
                         }.getOrElse {
-                            if (p[Keys.USE_ENHANCED_SHADING] == true) {
-                                0.0f
-                            } else {
-                                1.0f
-                            }
+                            if (p[Keys.USE_ENHANCED_SHADING] == true) 0.0f else DEFAULT_SHADING_INTENSITY
                         },
                 heroOnCards = p[Keys.HERO_ON_CARDS] ?: true,
                 adaptiveNoteThemes = p[Keys.ADAPTIVE_NOTE_THEMES] ?: true,
@@ -261,17 +264,7 @@ class ThemePrefs(
     }
 
     suspend fun setShadingIntensity(intensity: Float) {
-        context.themePrefsDataStore.edit {
-            it[Keys.SHADING_INTENSITY_FACTOR] = intensity
-            val legacyEnum =
-                when {
-                    intensity <= 0.2f -> ShadingIntensity.NONE
-                    intensity <= 0.7f -> ShadingIntensity.SUBTLE
-                    intensity <= 1.4f -> ShadingIntensity.MEDIUM
-                    else -> ShadingIntensity.INTENSE
-                }
-            it[Keys.SHADING_INTENSITY] = legacyEnum.name
-        }
+        context.themePrefsDataStore.edit { it[Keys.SHADING_INTENSITY_FACTOR] = intensity }
     }
 
     suspend fun setHeroOnCards(value: Boolean) {
@@ -321,16 +314,7 @@ class ThemePrefs(
             put(Keys.CUSTOM_SEEDS.name, prefs[Keys.CUSTOM_SEEDS].orEmpty())
             put(Keys.ACTIVE_CUSTOM_SEED.name, prefs[Keys.ACTIVE_CUSTOM_SEED].orEmpty())
             put(Keys.USE_GRADIENT.name, prefs[Keys.USE_GRADIENT] ?: true)
-            val intensity = prefs[Keys.SHADING_INTENSITY_FACTOR] ?: 0.0f
-            put("shading_intensity_factor", intensity.toDouble())
-            val legacyEnum =
-                when {
-                    intensity <= 0.2f -> ShadingIntensity.NONE
-                    intensity <= 0.7f -> ShadingIntensity.SUBTLE
-                    intensity <= 1.4f -> ShadingIntensity.MEDIUM
-                    else -> ShadingIntensity.INTENSE
-                }
-            put(Keys.SHADING_INTENSITY.name, legacyEnum.name)
+            put(Keys.SHADING_INTENSITY_FACTOR.name, (prefs[Keys.SHADING_INTENSITY_FACTOR] ?: DEFAULT_SHADING_INTENSITY).toDouble())
             put(Keys.HERO_ON_CARDS.name, prefs[Keys.HERO_ON_CARDS] ?: true)
             put(Keys.BLUR_BARS.name, prefs[Keys.BLUR_BARS] ?: true)
         }
@@ -393,32 +377,16 @@ class ThemePrefs(
             booleanOrNull(Keys.USE_GRADIENT.name)?.let { value ->
                 mutable[Keys.USE_GRADIENT] = value
             }
-            val intensityFactor =
-                if (json.has("shading_intensity_factor")) {
-                    runCatching { json.getDouble("shading_intensity_factor").toFloat() }.getOrNull()
+            val importedShadingFactor =
+                if (json.has(Keys.SHADING_INTENSITY_FACTOR.name) && !json.isNull(Keys.SHADING_INTENSITY_FACTOR.name)) {
+                    runCatching { json.getDouble(Keys.SHADING_INTENSITY_FACTOR.name).toFloat() }.getOrNull()
                 } else {
+                    // Older backups carry only the discrete enum; migrate it to a factor.
                     stringOrNull(Keys.SHADING_INTENSITY.name)?.let { raw ->
-                        runCatching { ShadingIntensity.valueOf(raw) }.getOrNull()?.let {
-                            when (it) {
-                                ShadingIntensity.NONE -> 0.0f
-                                ShadingIntensity.SUBTLE -> 0.4f
-                                ShadingIntensity.MEDIUM -> 1.0f
-                                ShadingIntensity.INTENSE -> 1.8f
-                            }
-                        }
+                        runCatching { ShadingIntensity.valueOf(raw).toFactor() }.getOrNull()
                     }
                 }
-            intensityFactor?.let { value ->
-                mutable[Keys.SHADING_INTENSITY_FACTOR] = value
-                val legacyEnum =
-                    when {
-                        value <= 0.2f -> ShadingIntensity.NONE
-                        value <= 0.7f -> ShadingIntensity.SUBTLE
-                        value <= 1.4f -> ShadingIntensity.MEDIUM
-                        else -> ShadingIntensity.INTENSE
-                    }
-                mutable[Keys.SHADING_INTENSITY] = legacyEnum.name
-            }
+            importedShadingFactor?.let { value -> mutable[Keys.SHADING_INTENSITY_FACTOR] = value }
             booleanOrNull(Keys.HERO_ON_CARDS.name)?.let { value ->
                 mutable[Keys.HERO_ON_CARDS] = value
             }

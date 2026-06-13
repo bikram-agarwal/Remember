@@ -166,6 +166,9 @@ object RememberModule {
         lockPrefs: LockPrefs,
         interactionPrefs: InteractionPrefs,
         backupPrefs: BackupPrefs,
+        quickCapturePrefs: QuickCapturePrefs,
+        reminderPrefs: ReminderPrefs,
+        updatePrefs: UpdatePrefs,
     ): BackupIo =
         BackupIo(
             context = context,
@@ -175,6 +178,9 @@ object RememberModule {
             lockPrefs = lockPrefs,
             interactionPrefs = interactionPrefs,
             backupPrefs = backupPrefs,
+            quickCapturePrefs = quickCapturePrefs,
+            reminderPrefs = reminderPrefs,
+            updatePrefs = updatePrefs,
         )
 
     @Provides

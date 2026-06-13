@@ -101,6 +101,7 @@ import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.common.AppBottomSheetDragHandle
+import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
@@ -286,7 +287,7 @@ fun SettingsRoute(
             realPlayBannerState
         }
     val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = isLandscape()
     val heightFraction = if (isLandscape) 0.95f else 0.85f
     val maxUpdateSheetHeight = (configuration.screenHeightDp * heightFraction).dp
 
@@ -873,6 +874,14 @@ fun SettingsRoute(
         LaunchedEffect(currentOrientation) {
             updateSheetState.expand()
         }
+        // Deliberately a raw ModalBottomSheet rather than the shared AppBottomSheet wrapper:
+        // 1. AppBottomSheet always wraps its body in its own verticalScroll. The changelog needs
+        //    orientation-specific scrolling - a single outer scroll in landscape (so a downward
+        //    drag still bubbles up to dismiss the sheet) vs. an inner-scrolled changelog box in
+        //    portrait. A nested inner scroll under AppBottomSheet's outer scroll swallows the
+        //    drag-to-dismiss delta in landscape, which is exactly the "won't drag down" bug.
+        // 2. It needs a height cap (maxUpdateSheetHeight) and to re-expand on rotation below.
+        // The shared AppBottomSheetDragHandle is still reused so the handle stays consistent.
         ModalBottomSheet(
             onDismissRequest = {
                 showUpdateSheet = false

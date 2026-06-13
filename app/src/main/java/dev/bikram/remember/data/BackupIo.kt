@@ -33,6 +33,9 @@ class BackupIo(
     private val lockPrefs: LockPrefs,
     private val interactionPrefs: InteractionPrefs,
     private val backupPrefs: BackupPrefs,
+    private val quickCapturePrefs: QuickCapturePrefs,
+    private val reminderPrefs: ReminderPrefs,
+    private val updatePrefs: UpdatePrefs,
 ) {
     private val fileProviderAuthority: String
         get() = "${context.packageName}.fileprovider"
@@ -56,14 +59,17 @@ class BackupIo(
         var mediaFailedCount: Int = 0,
     )
 
+    // Fixed format + Locale.US on purpose: this is a file name, not a user-facing date. A stable,
+    // sortable, ASCII-only stamp keeps exported file names portable and chronologically ordered
+    // regardless of device locale or 12h/24h setting.
     private fun backupStamp(): String = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
 
     fun suggestedBackupFileName(): String = "remember_backup_${backupStamp()}.zip"
 
-    private suspend fun buildSettingsJson(): JSONObject = SettingsBackup.exportJson(themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs)
+    private suspend fun buildSettingsJson(): JSONObject = SettingsBackup.exportJson(themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
 
     private suspend fun importSettingsFromJson(settingsJson: JSONObject?) {
-        SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs)
+        SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
     }
 
     private data class NotesSnapshot(

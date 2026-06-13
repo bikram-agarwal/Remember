@@ -29,7 +29,10 @@ object RememberTrashSweepWork {
                 ).build()
         workManager.enqueueUniquePeriodicWork(
             UNIQUE_NAME,
-            ExistingPeriodicWorkPolicy.KEEP,
+            // UPDATE (matching the scheduled-backup worker) preserves the existing daily schedule
+            // while still applying any future change to the period/constraints; KEEP would ignore
+            // such changes. Both policies remain idempotent, so the doc note above still holds.
+            ExistingPeriodicWorkPolicy.UPDATE,
             request,
         )
     }

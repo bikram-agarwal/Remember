@@ -41,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.painterResource
@@ -55,6 +54,8 @@ import androidx.core.net.toUri
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.diagnostics.DiagnosticLog
+import dev.bikram.remember.ui.common.isLandscape
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.AboutAuthorPhoto
 import dev.bikram.remember.ui.components.AppIconImage
@@ -86,9 +87,8 @@ internal fun AboutSection(
     showHeader: Boolean = true,
     showHeaderTitle: Boolean = true,
 ) {
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val isSmallLandscape = isLandscape && configuration.screenHeightDp < 480
+    val isLandscape = isLandscape()
+    val isSmallLandscape = isSmallLandscape()
     val context = LocalContext.current
     val diagnosticsChooserTitle = stringResource(R.string.settings_share_diagnostics_chooser)
     val shareDiagnostics = rememberDiagnosticsShareAction(context, diagnosticsChooserTitle)

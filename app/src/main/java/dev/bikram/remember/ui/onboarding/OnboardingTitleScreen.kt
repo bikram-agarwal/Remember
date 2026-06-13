@@ -7,7 +7,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -42,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.AppIconImage
 import dev.bikram.remember.ui.components.RememberButton
@@ -89,13 +89,12 @@ fun OnboardingTitleScreen(
                 }
         }
 
-    BoxWithConstraints(
+    val useTwoColumns = isSmallLandscape()
+    Box(
         modifier =
             Modifier
                 .fillMaxSize(),
     ) {
-        val useTwoColumns = maxHeight < 480.dp && maxWidth > maxHeight
-
         if (useTwoColumns) {
             Row(
                 modifier = Modifier.fillMaxSize(),

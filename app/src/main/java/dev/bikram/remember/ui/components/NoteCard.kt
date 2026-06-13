@@ -69,8 +69,9 @@ import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.elevatedCardColors
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
@@ -724,7 +725,8 @@ private fun formatShortReminderDate(epochMillis: Long): String {
     val now = System.currentTimeMillis()
     val twelveMonthsMs = 365L * 24 * 60 * 60 * 1000
     val pattern = if (kotlin.math.abs(epochMillis - now) > twelveMonthsMs) "MMM yyyy" else "MMM d"
-    return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(epochMillis))
+    val formatter = DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
+    return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(formatter)
 }
 
 @Composable

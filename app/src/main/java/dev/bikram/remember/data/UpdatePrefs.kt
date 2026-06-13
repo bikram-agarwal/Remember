@@ -9,6 +9,7 @@ import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 
 enum class UpdateCheckSchedule {
     AT_APP_START,
@@ -149,6 +150,52 @@ class UpdatePrefs(
         context.updateDataStore.edit { prefs ->
             prefs.remove(Keys.GITHUB_ACK_FINGERPRINT)
             prefs.remove(Keys.GITHUB_ACK_INSTALLED_VERSION)
+        }
+    }
+
+    /**
+     * Backs up only the user-facing update preferences. Install/device-specific bookkeeping
+     * (last-notified dedupe key, APK-copy success flag, GitHub release acknowledgement fingerprint,
+     * Play review-prompt timestamps) is intentionally excluded: restoring it onto a fresh install
+     * would wrongly suppress update notifications or misrepresent state for the new install.
+     */
+    suspend fun exportForBackup(): JSONObject {
+        val prefs = context.updateDataStore.data.first()
+        return JSONObject().apply {
+            put(
+                Keys.UPDATE_CHECK_SCHEDULE.name,
+                prefs[Keys.UPDATE_CHECK_SCHEDULE] ?: UpdateCheckSchedule.AT_APP_START.name,
+            )
+            put(Keys.NOTIFY_ON_NEW_UPDATES.name, prefs[Keys.NOTIFY_ON_NEW_UPDATES] ?: false)
+            put(Keys.SAVE_UPDATE_APK_TO_DOWNLOADS.name, prefs[Keys.SAVE_UPDATE_APK_TO_DOWNLOADS] ?: false)
+            put(
+                Keys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN.name,
+                prefs[Keys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN] ?: false,
+            )
+        }
+    }
+
+    suspend fun importFromBackup(json: JSONObject?) {
+        if (json == null || json.length() == 0) return
+        context.updateDataStore.edit { mutable ->
+            if (json.has(Keys.UPDATE_CHECK_SCHEDULE.name) && !json.isNull(Keys.UPDATE_CHECK_SCHEDULE.name)) {
+                val raw = json.getString(Keys.UPDATE_CHECK_SCHEDULE.name)
+                if (runCatching { UpdateCheckSchedule.valueOf(raw) }.isSuccess) {
+                    mutable[Keys.UPDATE_CHECK_SCHEDULE] = raw
+                }
+            }
+            if (json.has(Keys.NOTIFY_ON_NEW_UPDATES.name) && !json.isNull(Keys.NOTIFY_ON_NEW_UPDATES.name)) {
+                mutable[Keys.NOTIFY_ON_NEW_UPDATES] = json.getBoolean(Keys.NOTIFY_ON_NEW_UPDATES.name)
+            }
+            if (json.has(Keys.SAVE_UPDATE_APK_TO_DOWNLOADS.name) && !json.isNull(Keys.SAVE_UPDATE_APK_TO_DOWNLOADS.name)) {
+                mutable[Keys.SAVE_UPDATE_APK_TO_DOWNLOADS] = json.getBoolean(Keys.SAVE_UPDATE_APK_TO_DOWNLOADS.name)
+            }
+            if (json.has(Keys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN.name) &&
+                !json.isNull(Keys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN.name)
+            ) {
+                mutable[Keys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN] =
+                    json.getBoolean(Keys.IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN.name)
+            }
         }
     }
 

@@ -1,6 +1,5 @@
 package dev.bikram.remember.ui.history
 
-import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -47,6 +46,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
@@ -61,7 +61,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -84,7 +83,8 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
-import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.emptyStateSpacing
+import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.common.BulkUndoableAction
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
@@ -477,7 +477,7 @@ fun HistoryRoute(
     val inSelectionMode = selectedIds.isNotEmpty()
     val snackbarHostState = LocalSnackbarHostState.current
     val context = LocalContext.current
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = isLandscape()
     val notificationsAllowed = rememberNotificationsAllowed()
     val undoLabel = stringResource(R.string.bulk_action_undo)
     // Confirmation sheet state for the selection-mode delete-forever path. Permanent
@@ -696,19 +696,14 @@ fun HistoryRoute(
     }
 
     pendingDeleteForeverNote?.let { noteToDelete ->
-        // Single-card delete-forever confirmation. Mirrors the bulk sheet so users
+        // Single-card delete-forever confirmation. Mirrors the bulk dialog so users
         // get the same warning regardless of whether they triggered the delete from
         // the swipe action on one card or from selection mode on many.
-        AppBottomSheet(
-            title = stringResource(R.string.bulk_delete_forever_confirm_title),
-            subtitle = stringResource(R.string.bulk_delete_forever_confirm_subtitle),
-            onDismiss = { pendingDeleteForeverNote = null },
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
-            subtitleSpacing = 12.dp,
-            actions = {
-                RememberTextButton(onClick = { pendingDeleteForeverNote = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
+        AlertDialog(
+            onDismissRequest = { pendingDeleteForeverNote = null },
+            title = { Text(stringResource(R.string.bulk_delete_forever_confirm_title)) },
+            text = { Text(stringResource(R.string.bulk_delete_forever_confirm_subtitle)) },
+            confirmButton = {
                 RememberTextButton(onClick = {
                     pendingDeleteForeverNote = null
                     vm.deleteForever(noteToDelete)
@@ -716,25 +711,23 @@ fun HistoryRoute(
                     Text(stringResource(R.string.edit_bottom_bar_delete_forever))
                 }
             },
-        ) {
-            // Subtitle covers the warning; no extra body content.
-        }
+            dismissButton = {
+                RememberTextButton(onClick = { pendingDeleteForeverNote = null }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 
     if (bulkDeleteForeverOpen) {
-        // Mirrors the existing main-tab "Empty trash" sheet so the confirmation pattern
-        // is consistent across the app. The selected-count snapshot is captured at open
-        // time; the selection set itself is unchanged until the user confirms.
-        AppBottomSheet(
-            title = stringResource(R.string.bulk_delete_forever_confirm_title),
-            subtitle = stringResource(R.string.bulk_delete_forever_confirm_subtitle),
-            onDismiss = { bulkDeleteForeverOpen = false },
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 0.dp),
-            subtitleSpacing = 12.dp,
-            actions = {
-                RememberTextButton(onClick = { bulkDeleteForeverOpen = false }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
+        // Mirrors the single-card dialog so the confirmation pattern is consistent. The
+        // selected-count snapshot is captured at open time; the selection set itself is
+        // unchanged until the user confirms.
+        AlertDialog(
+            onDismissRequest = { bulkDeleteForeverOpen = false },
+            title = { Text(stringResource(R.string.bulk_delete_forever_confirm_title)) },
+            text = { Text(stringResource(R.string.bulk_delete_forever_confirm_subtitle)) },
+            confirmButton = {
                 RememberTextButton(onClick = {
                     bulkDeleteForeverOpen = false
                     vm.deleteSelectedForever()
@@ -742,9 +735,12 @@ fun HistoryRoute(
                     Text(stringResource(R.string.edit_bottom_bar_delete_forever))
                 }
             },
-        ) {
-            // The subtitle covers the warning fully; no extra body content.
-        }
+            dismissButton = {
+                RememberTextButton(onClick = { bulkDeleteForeverOpen = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 }
 
@@ -1277,12 +1273,7 @@ private fun EmptyState(
         } else {
             R.string.history_trash_empty_subtitle
         }
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val isSmallHeight = configuration.screenHeightDp < 480
-
-    val titleSpacer = if (isLandscape && isSmallHeight) 10.dp else 18.dp
-    val subtitleSpacer = if (isLandscape && isSmallHeight) 4.dp else 6.dp
+    val spacing = emptyStateSpacing(prominent = false)
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -1293,13 +1284,13 @@ private fun EmptyState(
         } else {
             EmptyTrashIllustration()
         }
-        Spacer(Modifier.height(titleSpacer))
+        Spacer(Modifier.height(spacing.titleSpacer))
         Text(
             text = stringResource(titleRes),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface,
         )
-        Spacer(Modifier.height(subtitleSpacer))
+        Spacer(Modifier.height(spacing.subtitleSpacer))
         Text(
             text = stringResource(subtitleRes),
             style = MaterialTheme.typography.bodyMedium,
