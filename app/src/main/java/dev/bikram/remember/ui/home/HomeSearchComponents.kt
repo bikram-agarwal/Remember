@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -42,6 +43,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextRange
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionState
+import dev.bikram.remember.data.NoteLayoutMode
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -66,7 +69,7 @@ import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 /**
  * Top-bar title that doubles as the search entry point. Renders a single Row of:
  *
- *   [animated content area (weight 1)] [search/close icon button]
+ *   [animated content area (weight 1)] [search/close icon button] [layout icon button]
  *
  * The animated content area swaps between the app-name title and [InlineSearchField]
  * with `expandHorizontally(expandFrom = Alignment.End)`, so the search bar emerges
@@ -85,14 +88,18 @@ internal fun SearchableTopBarTitle(
     searchOpen: Boolean,
     requestSearchFocus: Boolean,
     query: String,
+    noteLayoutMode: NoteLayoutMode,
+    showLayoutToggle: Boolean,
     onQueryChange: (String) -> Unit,
     onSearchFocusRequested: () -> Unit,
+    onToggleLayout: () -> Unit,
     onToggleSearch: () -> Unit,
 ) {
     val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
     val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     val scaleIconSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+    val layoutMorphSpec = MaterialTheme.motionScheme.slowSpatialSpec<Float>()
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -100,7 +107,7 @@ internal fun SearchableTopBarTitle(
     ) {
         AnimatedContent(
             targetState = searchOpen,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).height(rememberResponsiveActionButtonSize()),
             transitionSpec = {
                 val enter =
                     fadeIn(fadeInSpec) +
@@ -123,7 +130,7 @@ internal fun SearchableTopBarTitle(
                 // Empty title placeholder to remove the big title
             }
         }
-        // Breathing room so the open search pill doesn't touch the toggle button.
+        // Breathing room so the open search pill doesn't touch the action buttons.
         Spacer(Modifier.width(8.dp))
         // Toggle button stays in place at the End. The icon morphs between search and
         // close, scoped inside its own AnimatedContent so the rest of the row's
@@ -150,6 +157,73 @@ internal fun SearchableTopBarTitle(
                             contentDescription = if (open) cdCloseSearch else cdSearch
                         },
                 )
+            }
+        }
+        if (showLayoutToggle) {
+            Spacer(Modifier.width(8.dp))
+            val switchToMosaic = noteLayoutMode == NoteLayoutMode.LIST
+            val layoutToggleDescription =
+                stringResource(
+                    if (switchToMosaic) {
+                        R.string.home_layout_switch_to_mosaic_cd
+                    } else {
+                        R.string.home_layout_switch_to_list_cd
+                    },
+                )
+            RememberFilledTonalIconButton(
+                onClick = onToggleLayout,
+                modifier = Modifier.size(rememberResponsiveActionButtonSize()),
+                tooltipLabel = layoutToggleDescription,
+            ) {
+                val layoutMorphProgress by animateFloatAsState(
+                    targetValue = if (noteLayoutMode == NoteLayoutMode.MOSAIC) 1f else 0f,
+                    animationSpec = layoutMorphSpec,
+                    label = "layoutIconMorphProgress",
+                )
+                Box(
+                    modifier =
+                        Modifier
+                            .size(rememberResponsiveActionButtonSize())
+                            .clearAndSetSemantics {
+                                contentDescription = layoutToggleDescription
+                            },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    alpha = 1f - layoutMorphProgress
+                                    scaleX = 1f - (0.08f * layoutMorphProgress)
+                                    scaleY = 1f - (0.08f * layoutMorphProgress)
+                                    rotationZ = 90f * layoutMorphProgress
+                                },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "grid_view",
+                            weight = FontWeight.Medium,
+                        )
+                    }
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .graphicsLayer {
+                                    alpha = layoutMorphProgress
+                                    scaleX = 0.92f + (0.08f * layoutMorphProgress)
+                                    scaleY = 0.92f + (0.08f * layoutMorphProgress)
+                                    rotationZ = -90f + (90f * layoutMorphProgress)
+                                },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "view_agenda",
+                            weight = FontWeight.Medium,
+                        )
+                    }
+                }
             }
         }
         Spacer(Modifier.width(4.dp))
@@ -192,7 +266,8 @@ internal fun InlineSearchField(
                 ).background(
                     MaterialTheme.colorScheme.surfaceContainerHigh,
                     MaterialTheme.shapes.extraLargeIncreased,
-                ).padding(horizontal = 16.dp, vertical = 8.dp),
+                ).height(rememberResponsiveActionButtonSize())
+                .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RememberMaterialRoundedSymbol(

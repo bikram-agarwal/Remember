@@ -15,6 +15,7 @@ class ViewOptionsPrefs(
         val SORT_KEY = stringPreferencesKey("sort_key")
         val SORT_DIR = stringPreferencesKey("sort_dir")
         val GROUP_BY = stringPreferencesKey("group_by")
+        val NOTE_LAYOUT_MODE = stringPreferencesKey("note_layout_mode")
         val SETTINGS_COLLAPSED_SECTION_KEYS = stringPreferencesKey("settings_collapsed_section_keys")
     }
 
@@ -31,6 +32,9 @@ class ViewOptionsPrefs(
                 groupBy =
                     runCatching { GroupBy.valueOf(prefs[Keys.GROUP_BY] ?: "") }
                         .getOrDefault(defaultViewOptions.groupBy),
+                noteLayoutMode =
+                    runCatching { NoteLayoutMode.valueOf(prefs[Keys.NOTE_LAYOUT_MODE] ?: "") }
+                        .getOrDefault(defaultViewOptions.noteLayoutMode),
                 settingsCollapsedSectionKeys =
                     prefs[Keys.SETTINGS_COLLAPSED_SECTION_KEYS]
                         ?.split(SETTINGS_SECTION_SEPARATOR)
@@ -44,6 +48,7 @@ class ViewOptionsPrefs(
             it[Keys.SORT_KEY] = value.sortKey.name
             it[Keys.SORT_DIR] = value.sortDir.name
             it[Keys.GROUP_BY] = value.groupBy.name
+            it[Keys.NOTE_LAYOUT_MODE] = value.noteLayoutMode.name
             it[Keys.SETTINGS_COLLAPSED_SECTION_KEYS] =
                 value.settingsCollapsedSectionKeys.joinToString(SETTINGS_SECTION_SEPARATOR)
         }
@@ -66,6 +71,7 @@ class ViewOptionsPrefs(
             put(Keys.SORT_KEY.name, prefs[Keys.SORT_KEY] ?: defaultViewOptions.sortKey.name)
             put(Keys.SORT_DIR.name, prefs[Keys.SORT_DIR] ?: defaultViewOptions.sortDir.name)
             put(Keys.GROUP_BY.name, prefs[Keys.GROUP_BY] ?: defaultViewOptions.groupBy.name)
+            put(Keys.NOTE_LAYOUT_MODE.name, prefs[Keys.NOTE_LAYOUT_MODE] ?: defaultViewOptions.noteLayoutMode.name)
             put(
                 Keys.SETTINGS_COLLAPSED_SECTION_KEYS.name,
                 prefs[Keys.SETTINGS_COLLAPSED_SECTION_KEYS].orEmpty(),
@@ -80,6 +86,7 @@ class ViewOptionsPrefs(
             stringOrNull(Keys.SORT_KEY.name)?.let { mutable[Keys.SORT_KEY] = it }
             stringOrNull(Keys.SORT_DIR.name)?.let { mutable[Keys.SORT_DIR] = it }
             stringOrNull(Keys.GROUP_BY.name)?.let { mutable[Keys.GROUP_BY] = it }
+            stringOrNull(Keys.NOTE_LAYOUT_MODE.name)?.let { mutable[Keys.NOTE_LAYOUT_MODE] = it }
             stringOrNull(Keys.SETTINGS_COLLAPSED_SECTION_KEYS.name)?.let {
                 mutable[Keys.SETTINGS_COLLAPSED_SECTION_KEYS] = it
             }

@@ -161,6 +161,8 @@
     <string name="view_options_group_none">None</string>
     <string name="view_options_group_tags">Tags</string>
     <string name="view_options_group_type">Type</string>
+    <string name="home_layout_switch_to_list_cd">Switch to list layout</string>
+    <string name="home_layout_switch_to_mosaic_cd">Switch to mosaic layout</string>
     <string name="home_group_state_collapsed">Collapsed</string>
     <string name="home_group_state_expanded">Expanded</string>
 

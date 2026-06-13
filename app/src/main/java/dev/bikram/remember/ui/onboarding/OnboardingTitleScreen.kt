@@ -102,9 +102,10 @@ fun OnboardingTitleScreen(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(
-                    modifier = Modifier
-                        .weight(1.1f)
-                        .fillMaxHeight(),
+                    modifier =
+                        Modifier
+                            .weight(1.1f)
+                            .fillMaxHeight(),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -122,10 +123,11 @@ fun OnboardingTitleScreen(
                     )
                 }
                 Column(
-                    modifier = Modifier
-                        .weight(0.9f)
-                        .fillMaxHeight()
-                        .padding(horizontal = 32.dp),
+                    modifier =
+                        Modifier
+                            .weight(0.9f)
+                            .fillMaxHeight()
+                            .padding(horizontal = 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,
                 ) {
@@ -150,19 +152,21 @@ fun OnboardingTitleScreen(
             OnboardingByline(
                 visible = bylineVisible,
                 enter = reducedMotionEnterTransition(blockEnter),
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 120.dp),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 120.dp),
             )
 
             OnboardingLetsBeginButton(
                 visible = buttonVisible,
                 enter = reducedMotionEnterTransition(blockEnter),
                 onClick = onLetsBegin,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+                modifier =
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .fillMaxWidth()
+                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
             )
         }
     }

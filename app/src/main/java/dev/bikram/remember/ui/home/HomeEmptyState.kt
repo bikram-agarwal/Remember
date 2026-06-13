@@ -81,7 +81,7 @@ internal fun NotesEmptyState(
                 if (isLandscape && isSmallHeight) {
                     Row(
                         modifier = Modifier.fillMaxWidth(0.9f),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         RememberButton(
                             onClick = onCreateNote,

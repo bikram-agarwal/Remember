@@ -133,24 +133,27 @@ fun OnboardingPermissionsScreen(
             val useTwoColumns = maxHeight < 480.dp && maxWidth > maxHeight
             if (useTwoColumns) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp)
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 24.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
                     // Left column: graphics, title, subtitle, verified footer
                     Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState()),
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
+                        horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         PermissionsHeroIllustration(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(250.dp),
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(250.dp),
                         )
                         Spacer(Modifier.height(8.dp))
                         Text(
@@ -159,7 +162,7 @@ fun OnboardingPermissionsScreen(
                             fontWeight = FontWeight.Bold,
                             color = scheme.onSurface,
                             modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                         Spacer(Modifier.height(6.dp))
                         Text(
@@ -167,7 +170,7 @@ fun OnboardingPermissionsScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = scheme.onSurfaceVariant,
                             modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
                         )
                         Spacer(Modifier.height(8.dp))
                         Row(
@@ -191,11 +194,12 @@ fun OnboardingPermissionsScreen(
 
                     // Right column: the two permissions cards and the button at the bottom
                     Column(
-                        modifier = Modifier
-                            .weight(1.2f)
-                            .fillMaxHeight()
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically)
+                        modifier =
+                            Modifier
+                                .weight(1.2f)
+                                .fillMaxHeight()
+                                .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
                     ) {
                         Spacer(Modifier.height(12.dp))
                         PermissionStatusCard(
@@ -266,7 +270,7 @@ fun OnboardingPermissionsScreen(
                                     modifier = Modifier.weight(1f),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center
+                                    textAlign = TextAlign.Center,
                                 )
                                 RememberMaterialRoundedSymbol(
                                     name = "arrow_forward",
@@ -284,7 +288,7 @@ fun OnboardingPermissionsScreen(
                                     text = stringResource(R.string.onboarding_permissions_skip_for_now),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center
+                                    textAlign = TextAlign.Center,
                                 )
                             }
                         }
@@ -432,7 +436,7 @@ fun OnboardingPermissionsScreen(
                                 modifier = Modifier.weight(1f),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
                             )
                             RememberMaterialRoundedSymbol(
                                 name = "arrow_forward",
@@ -453,7 +457,7 @@ fun OnboardingPermissionsScreen(
                                 text = stringResource(R.string.onboarding_permissions_skip_for_now),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center
+                                textAlign = TextAlign.Center,
                             )
                         }
                     }

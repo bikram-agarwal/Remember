@@ -19,7 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
@@ -45,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -84,17 +84,18 @@ internal fun UpdateCheckBottomSheetContent(
     val outerScrollState = rememberScrollState()
     val outerScrollable = outerScrollState.maxValue > 0 && outerScrollState.maxValue != Int.MAX_VALUE
     val scheme = MaterialTheme.colorScheme
-    val outerModifier = Modifier
-        .fillMaxWidth()
-        .navigationBarsPadding()
-        .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
-        .let { modifier ->
-            if (isLandscape && isChangelogReady) {
-                modifier.height(maxSheetHeight).verticalScroll(outerScrollState, enabled = outerScrollable)
-            } else {
-                modifier.heightIn(max = maxSheetHeight)
+    val outerModifier =
+        Modifier
+            .fillMaxWidth()
+            .navigationBarsPadding()
+            .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 8.dp)
+            .let { modifier ->
+                if (isLandscape && isChangelogReady) {
+                    modifier.height(maxSheetHeight).verticalScroll(outerScrollState, enabled = outerScrollable)
+                } else {
+                    modifier.heightIn(max = maxSheetHeight)
+                }
             }
-        }
     Column(outerModifier) {
         if (isCheckingUpdate) {
             Box(
@@ -233,15 +234,16 @@ internal fun UpdateCheckBottomSheetContent(
                     if (changelogPages.size <= 1) {
                         val singleScroll = rememberScrollState()
                         val singleScrollable = singleScroll.maxValue > 0 && singleScroll.maxValue != Int.MAX_VALUE
-                        val singleModifier = Modifier
-                            .fillMaxWidth()
-                            .let { modifier ->
-                                if (isLandscape) {
-                                    modifier.wrapContentHeight().padding(8.dp)
-                                } else {
-                                    modifier.heightIn(max = maxSheetHeight * 0.72f).padding(8.dp)
+                        val singleModifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .let { modifier ->
+                                    if (isLandscape) {
+                                        modifier.wrapContentHeight().padding(8.dp)
+                                    } else {
+                                        modifier.heightIn(max = maxSheetHeight * 0.72f).padding(8.dp)
+                                    }
                                 }
-                            }
                         Surface(
                             modifier = singleModifier,
                             shape = compactControlShape,
@@ -249,14 +251,15 @@ internal fun UpdateCheckBottomSheetContent(
                             contentColor = scheme.onSurface,
                         ) {
                             Column(
-                                modifier = Modifier
-                                    .let { modifier ->
-                                        if (isLandscape) {
-                                            modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
-                                        } else {
-                                            modifier.fillMaxSize().verticalScroll(singleScroll, enabled = singleScrollable).padding(16.dp)
-                                        }
-                                    }
+                                modifier =
+                                    Modifier
+                                        .let { modifier ->
+                                            if (isLandscape) {
+                                                modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
+                                            } else {
+                                                modifier.fillMaxSize().verticalScroll(singleScroll, enabled = singleScrollable).padding(16.dp)
+                                            }
+                                        },
                             ) {
                                 MarkdownText(
                                     markdown = readyMarkdown,
@@ -266,15 +269,16 @@ internal fun UpdateCheckBottomSheetContent(
                         }
                     } else {
                         val changelogPagerState = rememberPagerState(pageCount = { changelogPages.size })
-                        val pagerContainerModifier = Modifier
-                            .fillMaxWidth()
-                            .let { modifier ->
-                                if (isLandscape) {
-                                    modifier.wrapContentHeight().padding(horizontal = 8.dp, vertical = 2.dp)
-                                } else {
-                                    modifier.height(maxSheetHeight * 0.72f).padding(horizontal = 8.dp, vertical = 2.dp)
+                        val pagerContainerModifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .let { modifier ->
+                                    if (isLandscape) {
+                                        modifier.wrapContentHeight().padding(horizontal = 8.dp, vertical = 2.dp)
+                                    } else {
+                                        modifier.height(maxSheetHeight * 0.72f).padding(horizontal = 8.dp, vertical = 2.dp)
+                                    }
                                 }
-                            }
                         Column(Modifier.fillMaxWidth()) {
                             Row(
                                 modifier =
@@ -369,26 +373,28 @@ internal fun UpdateCheckBottomSheetContent(
                             ) {
                                 HorizontalPager(
                                     state = changelogPagerState,
-                                    modifier = Modifier
-                                        .let { modifier ->
-                                            if (isLandscape) {
-                                                modifier.fillMaxWidth().wrapContentHeight()
-                                            } else {
-                                                modifier.fillMaxSize()
-                                            }
-                                        },
+                                    modifier =
+                                        Modifier
+                                            .let { modifier ->
+                                                if (isLandscape) {
+                                                    modifier.fillMaxWidth().wrapContentHeight()
+                                                } else {
+                                                    modifier.fillMaxSize()
+                                                }
+                                            },
                                 ) { pageIndex ->
                                     val innerScroll = rememberScrollState()
                                     val innerScrollable = innerScroll.maxValue > 0 && innerScroll.maxValue != Int.MAX_VALUE
                                     Column(
-                                        modifier = Modifier
-                                            .let { modifier ->
-                                                if (isLandscape) {
-                                                    modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
-                                                } else {
-                                                    modifier.fillMaxSize().verticalScroll(innerScroll, enabled = innerScrollable).padding(16.dp)
-                                                }
-                                            }
+                                        modifier =
+                                            Modifier
+                                                .let { modifier ->
+                                                    if (isLandscape) {
+                                                        modifier.fillMaxWidth().wrapContentHeight().padding(16.dp)
+                                                    } else {
+                                                        modifier.fillMaxSize().verticalScroll(innerScroll, enabled = innerScrollable).padding(16.dp)
+                                                    }
+                                                },
                                     ) {
                                         MarkdownText(
                                             markdown = changelogPages[pageIndex],

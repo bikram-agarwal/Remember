@@ -235,7 +235,7 @@ private fun AboutSettingsBlock(
                         modifier =
                             Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(top = if (isSmallLandscape) 4.dp else 8.dp, end = if (isSmallLandscape) 4.dp else 8.dp)
+                                .padding(top = if (isSmallLandscape) 4.dp else 8.dp, end = if (isSmallLandscape) 4.dp else 8.dp),
                     ) {
                         RememberIconButton(
                             onClick = shareDiagnostics,
@@ -259,7 +259,7 @@ private fun AboutSettingsBlock(
                             .padding(horizontal = if (isSmallLandscape) 16.dp else 20.dp)
                             .padding(
                                 top = if (isSmallLandscape) 20.dp else 24.dp,
-                                bottom = if (isSmallLandscape) 16.dp else 8.dp
+                                bottom = if (isSmallLandscape) 16.dp else 8.dp,
                             ),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
@@ -371,127 +371,7 @@ private fun AboutSettingsBlock(
                         verticalArrangement = Arrangement.spacedBy(if (isSmallLandscape) 8.dp else 12.dp),
                         itemVerticalAlignment = Alignment.CenterVertically,
                     ) {
-                    if (BuildConfig.FLAVOR == "github") {
-                        Surface(
-                            shape = aboutPillShape,
-                            color = Color.Transparent,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                            modifier =
-                                Modifier
-                                    .clip(aboutPillShape)
-                                    .tapSoundCombinedClickable(
-                                        onClick = {
-                                            runCatching {
-                                                context.startActivity(
-                                                    Intent(Intent.ACTION_VIEW, playStoreListingUrl.toUri()),
-                                                )
-                                            }
-                                        },
-                                        onLongClick = { copyAboutLink(playStoreListingUrl) },
-                                    ),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(pillPadding),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                            ) {
-                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primary, size = pillIconSize)
-                                Spacer(Modifier.width(pillIconSpacer))
-                                Text(
-                                    text = stringResource(R.string.settings_rate_on_play_store),
-                                    style = pillTextStyle,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    softWrap = false,
-                                )
-                            }
-                        }
-                        if (githubRepoForSourceLink.isNotEmpty()) {
-                            val repoUrl = "https://github.com/$githubRepoForSourceLink"
-                            Surface(
-                                shape = aboutPillShape,
-                                color = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary,
-                                modifier =
-                                    Modifier
-                                        .clip(aboutPillShape)
-                                        .tapSoundCombinedClickable(
-                                            onClick = {
-                                                runCatching {
-                                                    context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
-                                                }
-                                            },
-                                            onLongClick = { copyAboutLink(repoUrl) },
-                                        ),
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(pillPadding),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.Center,
-                                ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ic_github_mark),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(pillIconSize),
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                    )
-                                    Spacer(Modifier.width(pillIconSpacer))
-                                    Text(
-                                        text = stringResource(R.string.settings_star_on_github),
-                                        style = pillTextStyle,
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        softWrap = false,
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Surface(
-                            shape = aboutPillShape,
-                            color = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary,
-                            modifier =
-                                Modifier
-                                    .clip(aboutPillShape)
-                                    .tapSoundCombinedClickable(
-                                        onClick = {
-                                            if (playStoreAboutUsesListingOnly) {
-                                                runCatching {
-                                                    context.startActivity(
-                                                        Intent(Intent.ACTION_VIEW, playStoreListingUrl.toUri()),
-                                                    )
-                                                }
-                                            } else {
-                                                onLaunchPlayReview {
-                                                    playStoreAboutUsesListingOnly = true
-                                                }
-                                            }
-                                        },
-                                        onLongClick = { copyAboutLink(playStoreListingUrl) },
-                                    ),
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(pillPadding),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                            ) {
-                                AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.onPrimary, size = pillIconSize)
-                                Spacer(Modifier.width(pillIconSpacer))
-                                Text(
-                                    text = stringResource(R.string.settings_rate_on_play_store),
-                                    style = pillTextStyle,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    softWrap = false,
-                                )
-                            }
-                        }
-                        if (githubRepoForSourceLink.isNotEmpty()) {
-                            val repoUrl = "https://github.com/$githubRepoForSourceLink"
+                        if (BuildConfig.FLAVOR == "github") {
                             Surface(
                                 shape = aboutPillShape,
                                 color = Color.Transparent,
@@ -502,10 +382,12 @@ private fun AboutSettingsBlock(
                                         .tapSoundCombinedClickable(
                                             onClick = {
                                                 runCatching {
-                                                    context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
+                                                    context.startActivity(
+                                                        Intent(Intent.ACTION_VIEW, playStoreListingUrl.toUri()),
+                                                    )
                                                 }
                                             },
-                                            onLongClick = { copyAboutLink(repoUrl) },
+                                            onLongClick = { copyAboutLink(playStoreListingUrl) },
                                         ),
                             ) {
                                 Row(
@@ -513,15 +395,10 @@ private fun AboutSettingsBlock(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center,
                                 ) {
-                                    Icon(
-                                        painter = painterResource(R.drawable.ic_github_mark),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(pillIconSize),
-                                        tint = MaterialTheme.colorScheme.primary,
-                                    )
+                                    AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.primary, size = pillIconSize)
                                     Spacer(Modifier.width(pillIconSpacer))
                                     Text(
-                                        text = stringResource(R.string.settings_star_on_github),
+                                        text = stringResource(R.string.settings_rate_on_play_store),
                                         style = pillTextStyle,
                                         color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
@@ -530,8 +407,131 @@ private fun AboutSettingsBlock(
                                     )
                                 }
                             }
+                            if (githubRepoForSourceLink.isNotEmpty()) {
+                                val repoUrl = "https://github.com/$githubRepoForSourceLink"
+                                Surface(
+                                    shape = aboutPillShape,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                                    modifier =
+                                        Modifier
+                                            .clip(aboutPillShape)
+                                            .tapSoundCombinedClickable(
+                                                onClick = {
+                                                    runCatching {
+                                                        context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
+                                                    }
+                                                },
+                                                onLongClick = { copyAboutLink(repoUrl) },
+                                            ),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(pillPadding),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center,
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_github_mark),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(pillIconSize),
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                        )
+                                        Spacer(Modifier.width(pillIconSpacer))
+                                        Text(
+                                            text = stringResource(R.string.settings_star_on_github),
+                                            style = pillTextStyle,
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            softWrap = false,
+                                        )
+                                    }
+                                }
+                            }
+                        } else {
+                            Surface(
+                                shape = aboutPillShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                modifier =
+                                    Modifier
+                                        .clip(aboutPillShape)
+                                        .tapSoundCombinedClickable(
+                                            onClick = {
+                                                if (playStoreAboutUsesListingOnly) {
+                                                    runCatching {
+                                                        context.startActivity(
+                                                            Intent(Intent.ACTION_VIEW, playStoreListingUrl.toUri()),
+                                                        )
+                                                    }
+                                                } else {
+                                                    onLaunchPlayReview {
+                                                        playStoreAboutUsesListingOnly = true
+                                                    }
+                                                }
+                                            },
+                                            onLongClick = { copyAboutLink(playStoreListingUrl) },
+                                        ),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(pillPadding),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
+                                ) {
+                                    AboutPlayStoreIcon(tint = MaterialTheme.colorScheme.onPrimary, size = pillIconSize)
+                                    Spacer(Modifier.width(pillIconSpacer))
+                                    Text(
+                                        text = stringResource(R.string.settings_rate_on_play_store),
+                                        style = pillTextStyle,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        softWrap = false,
+                                    )
+                                }
+                            }
+                            if (githubRepoForSourceLink.isNotEmpty()) {
+                                val repoUrl = "https://github.com/$githubRepoForSourceLink"
+                                Surface(
+                                    shape = aboutPillShape,
+                                    color = Color.Transparent,
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                    modifier =
+                                        Modifier
+                                            .clip(aboutPillShape)
+                                            .tapSoundCombinedClickable(
+                                                onClick = {
+                                                    runCatching {
+                                                        context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
+                                                    }
+                                                },
+                                                onLongClick = { copyAboutLink(repoUrl) },
+                                            ),
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(pillPadding),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center,
+                                    ) {
+                                        Icon(
+                                            painter = painterResource(R.drawable.ic_github_mark),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(pillIconSize),
+                                            tint = MaterialTheme.colorScheme.primary,
+                                        )
+                                        Spacer(Modifier.width(pillIconSpacer))
+                                        Text(
+                                            text = stringResource(R.string.settings_star_on_github),
+                                            style = pillTextStyle,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            softWrap = false,
+                                        )
+                                    }
+                                }
+                            }
                         }
-                    }
                     }
                     Spacer(Modifier.height(if (isSmallLandscape) 12.dp else 24.dp))
                     AboutOtherAppsAndLinks(
@@ -546,7 +546,10 @@ private fun AboutSettingsBlock(
 }
 
 @Composable
-private fun AboutPlayStoreIcon(tint: Color, size: androidx.compose.ui.unit.Dp = 20.dp) {
+private fun AboutPlayStoreIcon(
+    tint: Color,
+    size: androidx.compose.ui.unit.Dp = 20.dp,
+) {
     Icon(
         painter = painterResource(R.drawable.ic_google_play_mark),
         contentDescription = null,
