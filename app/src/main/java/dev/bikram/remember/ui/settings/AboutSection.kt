@@ -36,6 +36,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +67,7 @@ import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.pillShape
+import kotlinx.coroutines.launch
 
 /**
  * Static "About" section. Includes the section header (no expand/collapse since the
@@ -147,33 +149,37 @@ internal fun AboutSection(
 private fun rememberDiagnosticsShareAction(
     context: Context,
     diagnosticsChooserTitle: String,
-): () -> Unit =
-    remember(context, diagnosticsChooserTitle) {
+): () -> Unit {
+    val scope = rememberCoroutineScope()
+    return remember(context, diagnosticsChooserTitle, scope) {
         {
-            DiagnosticLog.record(context, "Diagnostic log shared from Settings")
-            val diagnosticsFile = DiagnosticLog.createShareFile(context)
-            val diagnosticsUri =
-                FileProvider.getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
-                    diagnosticsFile,
-                )
-            val shareIntent =
-                Intent(Intent.ACTION_SEND).apply {
-                    setDataAndType(diagnosticsUri, "text/plain")
-                    putExtra(Intent.EXTRA_STREAM, diagnosticsUri)
-                    putExtra(Intent.EXTRA_TITLE, diagnosticsFile.name)
-                    putExtra(Intent.EXTRA_SUBJECT, diagnosticsFile.name)
-                    clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, diagnosticsUri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            scope.launch {
+                DiagnosticLog.record(context, "Diagnostic log shared from Settings")
+                val diagnosticsFile = DiagnosticLog.createShareFile(context)
+                val diagnosticsUri =
+                    FileProvider.getUriForFile(
+                        context,
+                        "${context.packageName}.fileprovider",
+                        diagnosticsFile,
+                    )
+                val shareIntent =
+                    Intent(Intent.ACTION_SEND).apply {
+                        setDataAndType(diagnosticsUri, "text/plain")
+                        putExtra(Intent.EXTRA_STREAM, diagnosticsUri)
+                        putExtra(Intent.EXTRA_TITLE, diagnosticsFile.name)
+                        putExtra(Intent.EXTRA_SUBJECT, diagnosticsFile.name)
+                        clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, diagnosticsUri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                runCatching {
+                    context.startActivity(Intent.createChooser(shareIntent, diagnosticsChooserTitle))
+                }.onFailure { throwable ->
+                    DiagnosticLog.record(context, "Diagnostic log share sheet failed", throwable)
                 }
-            runCatching {
-                context.startActivity(Intent.createChooser(shareIntent, diagnosticsChooserTitle))
-            }.onFailure { throwable ->
-                DiagnosticLog.record(context, "Diagnostic log share sheet failed", throwable)
             }
         }
     }
+}
 
 @OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable

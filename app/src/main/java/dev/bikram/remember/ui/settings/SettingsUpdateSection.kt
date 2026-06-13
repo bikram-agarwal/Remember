@@ -54,11 +54,11 @@ import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.ui.common.isLandscape
-import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberSwitch
+import dev.bikram.remember.ui.components.text.SimpleMarkdown
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.compactControlShape
 import dev.bikram.remember.ui.theme.pillShape
@@ -261,9 +261,9 @@ internal fun UpdateCheckBottomSheetContent(
                                             }
                                         },
                             ) {
-                                MarkdownText(
-                                    markdown = readyMarkdown,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                SimpleMarkdown(
+                                    content = readyMarkdown,
+                                    modifier = Modifier.fillMaxWidth(),
                                 )
                             }
                         }
@@ -396,10 +396,7 @@ internal fun UpdateCheckBottomSheetContent(
                                                     }
                                                 },
                                     ) {
-                                        MarkdownText(
-                                            markdown = changelogPages[pageIndex],
-                                            style = MaterialTheme.typography.bodyMedium,
-                                        )
+                                        SimpleMarkdown(content = changelogPages[pageIndex])
                                     }
                                 }
                             }
@@ -569,9 +566,9 @@ private fun UpdateSheetChangelog(changelogState: ChangelogUiState) {
                                 .verticalScroll(rememberScrollState())
                                 .padding(16.dp),
                     ) {
-                        MarkdownText(
-                            markdown = changelogPages.firstOrNull().orEmpty(),
-                            style = MaterialTheme.typography.bodyMedium,
+                        SimpleMarkdown(
+                            content = changelogPages.firstOrNull().orEmpty(),
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 } else {
@@ -639,10 +636,7 @@ private fun UpdateSheetChangelog(changelogState: ChangelogUiState) {
                                         .verticalScroll(innerScrollState, enabled = innerScrollable)
                                         .padding(4.dp),
                             ) {
-                                MarkdownText(
-                                    markdown = changelogPages[pageIndex],
-                                    style = MaterialTheme.typography.bodyMedium,
-                                )
+                                SimpleMarkdown(content = changelogPages[pageIndex])
                             }
                         }
                     }

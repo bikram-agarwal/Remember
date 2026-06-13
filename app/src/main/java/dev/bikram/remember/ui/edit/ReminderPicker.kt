@@ -94,6 +94,7 @@ import dev.bikram.remember.data.MonthlyMode
 import dev.bikram.remember.data.RecurrenceEndKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
+import dev.bikram.remember.domain.formatTimeOfDay
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
@@ -647,19 +648,7 @@ private const val DEFAULT_END_COUNT = 10
 private fun formatReminderTimePill(
     hour24: Int,
     minute: Int,
-): String {
-    val context = LocalContext.current
-    return if (DateFormat.is24HourFormat(context)) {
-        "%02d:%02d".format(hour24, minute)
-    } else {
-        val calendar =
-            Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, hour24)
-                set(Calendar.MINUTE, minute)
-            }
-        DateFormat.getTimeFormat(context).format(calendar.time)
-    }
-}
+): String = formatTimeOfDay(LocalContext.current, hour24, minute)
 
 /**
  * Full-screen-width [Dialog] plus capped-width [Surface] (same pattern as the time picker).

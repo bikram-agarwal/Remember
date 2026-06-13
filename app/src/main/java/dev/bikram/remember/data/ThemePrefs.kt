@@ -316,6 +316,7 @@ class ThemePrefs(
             put(Keys.USE_GRADIENT.name, prefs[Keys.USE_GRADIENT] ?: true)
             put(Keys.SHADING_INTENSITY_FACTOR.name, (prefs[Keys.SHADING_INTENSITY_FACTOR] ?: DEFAULT_SHADING_INTENSITY).toDouble())
             put(Keys.HERO_ON_CARDS.name, prefs[Keys.HERO_ON_CARDS] ?: true)
+            put(Keys.ADAPTIVE_NOTE_THEMES.name, prefs[Keys.ADAPTIVE_NOTE_THEMES] ?: true)
             put(Keys.BLUR_BARS.name, prefs[Keys.BLUR_BARS] ?: true)
         }
     }
@@ -389,6 +390,9 @@ class ThemePrefs(
             importedShadingFactor?.let { value -> mutable[Keys.SHADING_INTENSITY_FACTOR] = value }
             booleanOrNull(Keys.HERO_ON_CARDS.name)?.let { value ->
                 mutable[Keys.HERO_ON_CARDS] = value
+            }
+            booleanOrNull(Keys.ADAPTIVE_NOTE_THEMES.name)?.let { value ->
+                mutable[Keys.ADAPTIVE_NOTE_THEMES] = value
             }
             booleanOrNull(Keys.BLUR_BARS.name)?.let { value ->
                 mutable[Keys.BLUR_BARS] = value

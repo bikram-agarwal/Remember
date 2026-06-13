@@ -67,6 +67,7 @@ import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.data.recycleNoteActionIconBitmap
 import dev.bikram.remember.data.toNoteActionIconDrawable
+import dev.bikram.remember.domain.formatTimeOfDay
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
@@ -293,9 +294,7 @@ fun OptionsPanel(
                                 android.text.format.DateFormat
                                     .getMediumDateFormat(context)
                                     .format(createdDate) + " " +
-                                    android.text.format.DateFormat
-                                        .getTimeFormat(context)
-                                        .format(createdDate)
+                                    formatTimeOfDay(context, createdAt)
                             }
                         Text(
                             text = stringResource(R.string.options_created, createdFormatted),
@@ -319,9 +318,7 @@ fun OptionsPanel(
                                     android.text.format.DateFormat
                                         .getMediumDateFormat(context)
                                         .format(updatedDate) + " " +
-                                        android.text.format.DateFormat
-                                            .getTimeFormat(context)
-                                            .format(updatedDate)
+                                        formatTimeOfDay(context, updatedAt)
                                 }
                             Text(
                                 text = stringResource(R.string.options_updated, updatedFormatted),
@@ -505,13 +502,10 @@ private fun ReminderOptionSummary(
     val summaryContext = LocalContext.current
     val datePart =
         remember(reminderAt, summaryContext) {
-            val reminderDate = Date(reminderAt)
             android.text.format.DateFormat
                 .getMediumDateFormat(summaryContext)
-                .format(reminderDate) + " " +
-                android.text.format.DateFormat
-                    .getTimeFormat(summaryContext)
-                    .format(reminderDate)
+                .format(Date(reminderAt)) + " " +
+                formatTimeOfDay(summaryContext, reminderAt)
         }
     val rule = recurrence?.sanitized()
     val recurrenceLabel = rule?.let { compactRecurrenceLabel(it) }.orEmpty()

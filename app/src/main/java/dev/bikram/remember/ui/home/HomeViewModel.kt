@@ -17,19 +17,18 @@ import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -62,8 +61,10 @@ class HomeViewModel
         private val filter = MutableStateFlow(NotesFilter())
         private val selectedIds = MutableStateFlow(persistentSetOf<Long>())
         private val viewOptionsFlow = viewOptionsPrefs.state.distinctUntilChanged()
-        private val _events = MutableSharedFlow<HomeEvent>()
-        val events: SharedFlow<HomeEvent> = _events.asSharedFlow()
+        // One-shot UI events: a Channel (not a SharedFlow) so emission never suspends the
+        // view model, each event is delivered exactly once, and nothing replays on rotation.
+        private val _events = Channel<HomeEvent>(Channel.BUFFERED)
+        val events: Flow<HomeEvent> = _events.receiveAsFlow()
 
         /**
          * Trimmed, deduplicated, debounced search text shared by the three search sources
@@ -228,9 +229,7 @@ class HomeViewModel
         }
 
         fun openNote(note: NoteWithItems) {
-            viewModelScope.launch {
-                _events.emit(HomeEvent.OpenNote(note = note, forceEdit = false))
-            }
+            _events.trySend(HomeEvent.OpenNote(note = note, forceEdit = false))
         }
 
         fun handleSwipeAction(
@@ -240,7 +239,7 @@ class HomeViewModel
             val id = note.note.id
             viewModelScope.launch {
                 when (action) {
-                    NoteSwipeAction.EDIT -> _events.emit(HomeEvent.OpenNote(note = note, forceEdit = true))
+                    NoteSwipeAction.EDIT -> _events.trySend(HomeEvent.OpenNote(note = note, forceEdit = true))
                     NoteSwipeAction.TRASH -> {
                         repository.moveToTrash(id)
                         emitSingleSwipeAction(BulkUndoableAction.Trashed(setOf(id)))
@@ -287,9 +286,9 @@ class HomeViewModel
          * mode; both paths route through [HomeEvent.BulkActionPerformed] and rely on
          * [undoLastBulkAction] for reversal.
          */
-        private suspend fun emitSingleSwipeAction(action: BulkUndoableAction) {
+        private fun emitSingleSwipeAction(action: BulkUndoableAction) {
             lastBulkAction = action
-            _events.emit(HomeEvent.BulkActionPerformed(action))
+            _events.trySend(HomeEvent.BulkActionPerformed(action))
         }
 
         /**
@@ -320,7 +319,7 @@ class HomeViewModel
                 selectedIds.value = persistentSetOf()
                 val action = BulkUndoableAction.MarkedDone(toComplete, snapshots)
                 lastBulkAction = action
-                _events.emit(HomeEvent.BulkActionPerformed(action))
+                _events.trySend(HomeEvent.BulkActionPerformed(action))
             }
         }
 
@@ -333,7 +332,7 @@ class HomeViewModel
                 selectedIds.value = persistentSetOf()
                 val action = BulkUndoableAction.Archived(ids)
                 lastBulkAction = action
-                _events.emit(HomeEvent.BulkActionPerformed(action))
+                _events.trySend(HomeEvent.BulkActionPerformed(action))
             }
         }
 
@@ -346,7 +345,7 @@ class HomeViewModel
                 selectedIds.value = persistentSetOf()
                 val action = BulkUndoableAction.Trashed(ids)
                 lastBulkAction = action
-                _events.emit(HomeEvent.BulkActionPerformed(action))
+                _events.trySend(HomeEvent.BulkActionPerformed(action))
             }
         }
 

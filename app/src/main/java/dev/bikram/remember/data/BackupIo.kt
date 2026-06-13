@@ -8,6 +8,7 @@ import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import dev.bikram.remember.backup.SettingsBackup
 import dev.bikram.remember.diagnostics.DiagnosticLog
+import dev.bikram.remember.domain.backupFileTimestamp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -17,9 +18,6 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -59,12 +57,7 @@ class BackupIo(
         var mediaFailedCount: Int = 0,
     )
 
-    // Fixed format + Locale.US on purpose: this is a file name, not a user-facing date. A stable,
-    // sortable, ASCII-only stamp keeps exported file names portable and chronologically ordered
-    // regardless of device locale or 12h/24h setting.
-    private fun backupStamp(): String = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
-
-    fun suggestedBackupFileName(): String = "remember_backup_${backupStamp()}.zip"
+    fun suggestedBackupFileName(): String = "remember_backup_${backupFileTimestamp()}.zip"
 
     private suspend fun buildSettingsJson(): JSONObject = SettingsBackup.exportJson(themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
 
@@ -352,8 +345,7 @@ class BackupIo(
                 val includeMedia = backupPrefs.snapshot().includeMediaInBackup
                 val snapshot = snapshotNotes()
                 val bytes = writeZipArchive(snapshot.root, includeMedia)
-                val stamp = backupStamp()
-                val fileName = "remember_backup_$stamp.zip"
+                val fileName = "remember_backup_${backupFileTimestamp()}.zip"
                 destinations.forEach { destinationUriString ->
                     if (!destinationUriString.startsWith("content://")) error("Invalid export folder")
                     val destinationUri = destinationUriString.toUri()

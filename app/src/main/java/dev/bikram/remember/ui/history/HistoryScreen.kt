@@ -108,13 +108,13 @@ import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.LocalSnackbarHostState
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
-import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -175,15 +175,15 @@ class HistoryViewModel
         private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
         val selectedIds: StateFlow<Set<Long>> = _selectedIds.asStateFlow()
 
-        private val _events = MutableSharedFlow<HistoryEvent>()
-
         /**
          * One-shot events for the UI: bulk-action completions surface a snackbar with
          * Undo. The repository has already coalesced row writes into a single Flow
          * emission by the time these fire, so the list has reflowed and the snackbar
-         * lands on settled state.
+         * lands on settled state. Backed by a Channel (not a SharedFlow) so emission never
+         * suspends the view model, each event delivers exactly once, and nothing replays on rotation.
          */
-        val events: SharedFlow<HistoryEvent> = _events.asSharedFlow()
+        private val _events = Channel<HistoryEvent>(Channel.BUFFERED)
+        val events: Flow<HistoryEvent> = _events.receiveAsFlow()
 
         /**
          * Most recent bulk action originating from selection mode. Cleared after undo,
@@ -267,9 +267,9 @@ class HistoryViewModel
          * snackbar plumbing as bulk-selection mode; both routes through
          * [HistoryEvent.BulkActionPerformed] and [undoLastBulkAction].
          */
-        private suspend fun emitSingleCardAction(action: BulkUndoableAction) {
+        private fun emitSingleCardAction(action: BulkUndoableAction) {
             lastBulkAction = action
-            _events.emit(HistoryEvent.BulkActionPerformed(action))
+            _events.trySend(HistoryEvent.BulkActionPerformed(action))
         }
 
         fun emptyTrash() {
@@ -289,7 +289,7 @@ class HistoryViewModel
                 _selectedIds.value = emptySet()
                 val action = BulkUndoableAction.Restored(snapshot)
                 lastBulkAction = action
-                _events.emit(HistoryEvent.BulkActionPerformed(action))
+                _events.trySend(HistoryEvent.BulkActionPerformed(action))
             }
         }
 
@@ -302,7 +302,7 @@ class HistoryViewModel
                 _selectedIds.value = emptySet()
                 val action = BulkUndoableAction.ArchivedFromTrash(snapshot)
                 lastBulkAction = action
-                _events.emit(HistoryEvent.BulkActionPerformed(action))
+                _events.trySend(HistoryEvent.BulkActionPerformed(action))
             }
         }
 
@@ -315,7 +315,7 @@ class HistoryViewModel
                 _selectedIds.value = emptySet()
                 val action = BulkUndoableAction.Unarchived(snapshot)
                 lastBulkAction = action
-                _events.emit(HistoryEvent.BulkActionPerformed(action))
+                _events.trySend(HistoryEvent.BulkActionPerformed(action))
             }
         }
 
@@ -328,7 +328,7 @@ class HistoryViewModel
                 _selectedIds.value = emptySet()
                 val action = BulkUndoableAction.MovedArchiveToTrash(snapshot)
                 lastBulkAction = action
-                _events.emit(HistoryEvent.BulkActionPerformed(action))
+                _events.trySend(HistoryEvent.BulkActionPerformed(action))
             }
         }
 

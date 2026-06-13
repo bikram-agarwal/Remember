@@ -679,12 +679,14 @@ fun DevOptionsRoute(
                                 DevActionRow(
                                     label = stringResource(R.string.dev_options_copy_diagnostics),
                                     onClick = {
-                                        DiagnosticLog.record(context, "Diagnostic dump copied from Developer options")
-                                        val file = DiagnosticLog.createShareFile(context)
-                                        val text = runCatching { file.readText() }.getOrElse { "Failed to read diagnostic log" }
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        clipboard.setPrimaryClip(ClipData.newPlainText("Diagnostics", text))
-                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_diagnostics_copied), Toast.LENGTH_SHORT).show()
+                                        scope.launch {
+                                            DiagnosticLog.record(context, "Diagnostic dump copied from Developer options")
+                                            val file = DiagnosticLog.createShareFile(context)
+                                            val text = runCatching { file.readText() }.getOrElse { "Failed to read diagnostic log" }
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            clipboard.setPrimaryClip(ClipData.newPlainText("Diagnostics", text))
+                                            Toast.makeText(context, resources.getString(R.string.dev_options_toast_diagnostics_copied), Toast.LENGTH_SHORT).show()
+                                        }
                                     },
                                 )
                             }
@@ -692,23 +694,25 @@ fun DevOptionsRoute(
                                 DevActionRow(
                                     label = stringResource(R.string.dev_options_export_logs),
                                     onClick = {
-                                        DiagnosticLog.record(context, "Diagnostic log exported from Developer options")
-                                        val diagnosticsFile = DiagnosticLog.createShareFile(context)
-                                        val diagnosticsUri =
-                                            FileProvider.getUriForFile(
-                                                context,
-                                                "${context.packageName}.fileprovider",
-                                                diagnosticsFile,
-                                            )
-                                        val shareIntent =
-                                            Intent(Intent.ACTION_SEND).apply {
-                                                setDataAndType(diagnosticsUri, "text/plain")
-                                                putExtra(Intent.EXTRA_STREAM, diagnosticsUri)
-                                                putExtra(Intent.EXTRA_TITLE, diagnosticsFile.name)
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, diagnosticsUri)
-                                            }
-                                        runCatching { context.startActivity(Intent.createChooser(shareIntent, resources.getString(R.string.dev_options_export_logs_chooser))) }
+                                        scope.launch {
+                                            DiagnosticLog.record(context, "Diagnostic log exported from Developer options")
+                                            val diagnosticsFile = DiagnosticLog.createShareFile(context)
+                                            val diagnosticsUri =
+                                                FileProvider.getUriForFile(
+                                                    context,
+                                                    "${context.packageName}.fileprovider",
+                                                    diagnosticsFile,
+                                                )
+                                            val shareIntent =
+                                                Intent(Intent.ACTION_SEND).apply {
+                                                    setDataAndType(diagnosticsUri, "text/plain")
+                                                    putExtra(Intent.EXTRA_STREAM, diagnosticsUri)
+                                                    putExtra(Intent.EXTRA_TITLE, diagnosticsFile.name)
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, diagnosticsUri)
+                                                }
+                                            runCatching { context.startActivity(Intent.createChooser(shareIntent, resources.getString(R.string.dev_options_export_logs_chooser))) }
+                                        }
                                     },
                                 )
                             }
@@ -716,7 +720,7 @@ fun DevOptionsRoute(
                                 DevActionRow(
                                     label = stringResource(R.string.dev_options_clear_logs),
                                     onClick = {
-                                        java.io.File(context.filesDir, "diagnostics/remember-diagnostics.log").delete()
+                                        DiagnosticLog.clear(context)
                                         Toast.makeText(context, resources.getString(R.string.dev_options_toast_logs_cleared), Toast.LENGTH_SHORT).show()
                                     },
                                 )
