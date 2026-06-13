@@ -62,6 +62,7 @@ import dev.bikram.remember.ui.main.MainTabScaffold
 import dev.bikram.remember.ui.onboarding.OnboardingPermissionsScreen
 import dev.bikram.remember.ui.onboarding.OnboardingTitleScreen
 import dev.bikram.remember.ui.settings.DevOptionsRoute
+import dev.bikram.remember.ui.settings.RememberUpdateViewModel
 import dev.bikram.remember.ui.settings.SettingsRoute
 import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -158,10 +159,7 @@ fun RememberNavGraph(
     appScope: CoroutineScope,
     launchFlow: MutableStateFlow<LaunchAction?>? = null,
     openSettingsRequest: Int = 0,
-    openUpdateSheetRequest: Int = 0,
-    onOpenUpdateSheetRequestHandled: () -> Unit = {},
-    startPlayInAppUpdateRequest: Int = 0,
-    onStartPlayInAppUpdateRequestHandled: () -> Unit = {},
+    updateVm: RememberUpdateViewModel,
     onUpdateCheckStarted: () -> Unit = {},
     updateBarState: UpdateChromeState = UpdateChromeState.Hidden,
     updateSignalEpoch: Int = 0,
@@ -173,7 +171,6 @@ fun RememberNavGraph(
     val helpVm: HelpViewModel = hiltViewModel()
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
     var openSettingsUpdatesRequest by remember { mutableIntStateOf(0) }
-    var openSettingsUpdateSheetRequest by remember { mutableIntStateOf(0) }
     val onboardingState by onboardingPrefs.state.collectAsStateWithLifecycle(initialValue = null)
     val currentOnboardingState = onboardingState
     val onboardingScope = rememberCoroutineScope()
@@ -318,7 +315,7 @@ fun RememberNavGraph(
                             launchSingleTop = true
                         }
                         openSettingsUpdatesRequest += 1
-                        openSettingsUpdateSheetRequest += 1
+                        updateVm.requestOpenSheet()
                     }
                 }
             } finally {
@@ -576,13 +573,7 @@ fun RememberNavGraph(
                                                 onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
                                                 onOpenHelp = { navController.navigate(Routes.HELP) },
                                                 onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
-                                                openUpdateSheetRequest = openUpdateSheetRequest + openSettingsUpdateSheetRequest,
-                                                onOpenUpdateSheetRequestHandled = {
-                                                    onOpenUpdateSheetRequestHandled()
-                                                    openSettingsUpdateSheetRequest = 0
-                                                },
-                                                startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
-                                                onStartPlayInAppUpdateRequestHandled = onStartPlayInAppUpdateRequestHandled,
+                                                updateVm = updateVm,
                                                 onUpdateCheckStarted = handleUpdateCheckStarted,
                                                 onShareApp = shareApp,
                                                 highlightSectionKey = settingsHighlightSection,
@@ -593,13 +584,7 @@ fun RememberNavGraph(
                                                 onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
                                                 onOpenHelp = { navController.navigate(Routes.HELP) },
                                                 onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
-                                                openUpdateSheetRequest = openUpdateSheetRequest + openSettingsUpdateSheetRequest,
-                                                onOpenUpdateSheetRequestHandled = {
-                                                    onOpenUpdateSheetRequestHandled()
-                                                    openSettingsUpdateSheetRequest = 0
-                                                },
-                                                startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
-                                                onStartPlayInAppUpdateRequestHandled = onStartPlayInAppUpdateRequestHandled,
+                                                updateVm = updateVm,
                                                 onUpdateCheckStarted = handleUpdateCheckStarted,
                                                 highlightSectionKey = settingsHighlightSection,
                                                 onHighlightHandled = { settingsHighlightSection = null },

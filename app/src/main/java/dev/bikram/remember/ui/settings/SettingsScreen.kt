@@ -83,7 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.remember.BuildConfig
@@ -124,13 +124,10 @@ import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
 import dev.bikram.remember.update.RememberUpdateInfo
 import dev.bikram.remember.update.RememberUpdateState
-import dev.bikram.remember.update.notificationDedupeKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 
 private enum class BackupFolderTarget {
     Local,
@@ -193,10 +190,7 @@ fun SettingsRoute(
     onOpenIntro: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
     onOpenDevOptions: () -> Unit = {},
-    openUpdateSheetRequest: Int = 0,
-    onOpenUpdateSheetRequestHandled: () -> Unit = {},
-    startPlayInAppUpdateRequest: Int = 0,
-    onStartPlayInAppUpdateRequestHandled: () -> Unit = {},
+    updateVm: RememberUpdateViewModel = hiltViewModel(),
     onUpdateCheckStarted: () -> Unit = {},
     selectedSectionKey: SettingsSectionKey? = null,
     showTopActions: Boolean = true,
@@ -228,13 +222,8 @@ fun SettingsRoute(
     val viewOptionsPrefs = settingsDependencies.viewOptionsPrefs()
     val noteRepository = settingsDependencies.noteRepository()
     val updatePrefs = settingsDependencies.updatePrefs()
-    val rememberUpdateChecker = settingsDependencies.rememberUpdateChecker()
-    val playStoreUpdateChecker = settingsDependencies.playStoreUpdateChecker()
-    val playInAppUpdateStarter = settingsDependencies.playInAppUpdateStarter()
     val playInAppUpdateProgressController = settingsDependencies.playInAppUpdateProgressController()
-    val playUpdateSessionHandle = settingsDependencies.playUpdateSessionHandle()
     val rememberUpdateState: RememberUpdateState = settingsDependencies.rememberUpdateState()
-    val updateAvailableNotifier = settingsDependencies.updateAvailableNotifier()
     val updateCheckWorkScheduler = settingsDependencies.updateCheckWorkScheduler()
     val appReviewLauncher = settingsDependencies.appReviewLauncher()
     val scope = rememberCoroutineScope()
@@ -292,12 +281,13 @@ fun SettingsRoute(
     val maxUpdateSheetHeight = (configuration.screenHeightDp * heightFraction).dp
 
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
-    var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
-    var isCheckingUpdate by rememberSaveable { mutableStateOf(false) }
-    var updateCheckFinishedWithoutResult by rememberSaveable { mutableStateOf(false) }
-    var downloadProgress by rememberSaveable { mutableStateOf<Float?>(null) }
-    var updateInfo by remember { mutableStateOf<RememberUpdateInfo?>(null) }
-    var updateSheetChangelog by remember { mutableStateOf<ChangelogUiState>(ChangelogUiState.Hidden) }
+    val showUpdateSheet by updateVm.showUpdateSheet.collectAsStateWithLifecycle()
+    val isCheckingUpdate by updateVm.isCheckingUpdate.collectAsStateWithLifecycle()
+    val updateCheckFinishedWithoutResult by updateVm.updateCheckFinishedWithoutResult.collectAsStateWithLifecycle()
+    val downloadProgress by updateVm.downloadProgress.collectAsStateWithLifecycle()
+    val updateInfo by updateVm.updateInfo.collectAsStateWithLifecycle()
+    val updateSheetChangelog by updateVm.updateSheetChangelog.collectAsStateWithLifecycle()
+    val openSheetRequested by updateVm.openSheetRequested.collectAsStateWithLifecycle()
 
     val playInAppUpdateLauncher =
         rememberLauncherForActivityResult(
@@ -315,36 +305,9 @@ fun SettingsRoute(
             }
         }
 
-    var handledStartPlayInAppUpdateRequest by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(startPlayInAppUpdateRequest) {
-        if (startPlayInAppUpdateRequest == 0) {
-            handledStartPlayInAppUpdateRequest = 0
-            return@LaunchedEffect
-        }
-        if (startPlayInAppUpdateRequest <= handledStartPlayInAppUpdateRequest) return@LaunchedEffect
-        handledStartPlayInAppUpdateRequest = startPlayInAppUpdateRequest
-        onStartPlayInAppUpdateRequestHandled()
-        if (!BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
-        val hostActivity = context as? ComponentActivity
-        val started =
-            hostActivity != null &&
-                playInAppUpdateStarter.startUpdateIfPending(hostActivity, playInAppUpdateLauncher)
-        if (started) {
-            playInAppUpdateProgressController.onFlexibleUpdateFlowStarted()
-        } else {
-            Toast
-                .makeText(
-                    context,
-                    resources.getString(R.string.settings_play_in_app_update_failed),
-                    Toast.LENGTH_SHORT,
-                ).show()
-        }
-    }
 
     LaunchedEffect(globalUpdateInfo) {
-        if (globalUpdateInfo != null && updateInfo == null) {
-            updateInfo = globalUpdateInfo
-        }
+        updateVm.adoptGlobalUpdateIfNone(globalUpdateInfo)
     }
 
     var pendingBackupFolderTarget by remember { mutableStateOf<BackupFolderTarget?>(null) }
@@ -541,245 +504,24 @@ fun SettingsRoute(
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pillInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
-    val fetchRawChangelog = {
-        val repo = BuildConfig.CHANGELOG_GITHUB_REPO
-        val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
-        val connection =
-            URL("https://raw.githubusercontent.com/$repo/$branch/docs/CHANGELOG.md").openConnection() as HttpURLConnection
-        connection.instanceFollowRedirects = true
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 20_000
-        try {
-            connection.connect()
-            connection.inputStream.bufferedReader().use { reader -> reader.readText() }
-        } finally {
-            connection.disconnect()
-        }
-    }
-    val loadUpdateSheetChangelog = {
-        if (BuildConfig.CHANGELOG_GITHUB_REPO.isBlank()) {
-            updateSheetChangelog =
-                ChangelogUiState.Failed(
-                    resources.getString(R.string.settings_changelog_load_failed),
-                )
-        } else {
-            updateSheetChangelog = ChangelogUiState.Loading
-            scope.launch {
-                val loaded =
-                    withContext(Dispatchers.IO) {
-                        runCatching { fetchRawChangelog() }
-                    }
-                updateSheetChangelog =
-                    loaded.fold(
-                        onSuccess = { markdown -> ChangelogUiState.Ready(markdown) },
-                        onFailure = {
-                            ChangelogUiState.Failed(
-                                resources.getString(R.string.settings_changelog_load_failed),
-                            )
-                        },
-                    )
-            }
-        }
-        Unit
-    }
-
     LaunchedEffect(showUpdateSheet) {
         if (showUpdateSheet) {
-            loadUpdateSheetChangelog()
+            updateVm.loadChangelog()
         }
     }
 
     val beginUpdateCheck: (Boolean) -> Unit = { redisplayAvailableAlert ->
         if (redisplayAvailableAlert) onUpdateCheckStarted()
-        showUpdateSheet = true
-        loadUpdateSheetChangelog()
-        isCheckingUpdate = true
-        updateCheckFinishedWithoutResult = false
-        downloadProgress = null
-        if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
-            scope.launch {
-                val checkedUpdate =
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            playStoreUpdateChecker.checkForUpdate()
-                        }
-                    }
-                isCheckingUpdate = false
-                checkedUpdate.fold(
-                    onSuccess = { availableUpdate ->
-                        updateInfo = availableUpdate
-                        rememberUpdateState.showUpdate(availableUpdate)
-                        if (availableUpdate != null && availableUpdate.isPlayStoreUpdateInProgress) {
-                            playInAppUpdateProgressController.ensureInstallStateListenerRegistered()
-                            updateAvailableNotifier.notifyIfNewUpdateAvailable(availableUpdate, updatePrefs.snapshot())
-                        } else if (availableUpdate != null) {
-                            updateAvailableNotifier.notifyIfNewUpdateAvailable(availableUpdate, updatePrefs.snapshot())
-                        }
-                        updateCheckFinishedWithoutResult = availableUpdate == null
-                    },
-                    onFailure = { throwable ->
-                        DiagnosticLog.record(context, "Play Store update check failed from Settings", throwable)
-                        updateInfo = null
-                        updateCheckFinishedWithoutResult = true
-                        Toast
-                            .makeText(
-                                context,
-                                resources.getString(R.string.settings_update_check_failed),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                    },
-                )
-            }
-        } else {
-            scope.launch {
-                val checkedUpdate =
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            rememberUpdateChecker.checkGithubReleaseForUpdate(
-                                repositoryName = BuildConfig.GITHUB_REPO,
-                                currentVersionName = BuildConfig.VERSION_NAME,
-                            )
-                        }
-                    }
-                isCheckingUpdate = false
-                checkedUpdate.fold(
-                    onSuccess = { availableUpdate ->
-                        updateInfo = availableUpdate
-                        rememberUpdateState.showUpdate(availableUpdate)
-                        if (availableUpdate != null) {
-                            updateAvailableNotifier.notifyIfNewUpdateAvailable(availableUpdate, updatePrefs.snapshot())
-                        }
-                        updateCheckFinishedWithoutResult = availableUpdate == null
-                    },
-                    onFailure = { throwable ->
-                        DiagnosticLog.record(context, "GitHub update check failed from Settings", throwable)
-                        updateInfo = null
-                        updateCheckFinishedWithoutResult = true
-                        Toast
-                            .makeText(
-                                context,
-                                resources.getString(R.string.settings_update_check_failed),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                    },
-                )
-            }
-        }
+        updateVm.openSheetAndCheck()
     }
     val downloadUpdate = { availableUpdate: RememberUpdateInfo ->
-        scope.launch {
-            if (BuildConfig.USE_PLAY_IN_APP_UPDATES && availableUpdate.downloadUrl.isBlank()) {
-                val hostActivity = context as? ComponentActivity
-                val started =
-                    hostActivity != null &&
-                        playInAppUpdateStarter.startUpdateIfPending(hostActivity, playInAppUpdateLauncher)
-                if (started) {
-                    showUpdateSheet = false
-                    playInAppUpdateProgressController.onFlexibleUpdateFlowStarted()
-                } else {
-                    Toast
-                        .makeText(
-                            context,
-                            resources.getString(R.string.settings_play_in_app_update_failed),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                }
-                return@launch
-            }
-            downloadProgress = 0f
-            val downloadResult =
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        updatePrefs.clearUpdateApkDownloadsCopySucceeded()
-                        downloadUpdateApk(
-                            context = context,
-                            updateInfo = availableUpdate,
-                            onProgress = { progress ->
-                                withContext(Dispatchers.Main) {
-                                    downloadProgress = progress
-                                }
-                            },
-                        )
-                    }
-                }
-            downloadResult.fold(
-                onSuccess = { apkFile ->
-                    if (BuildConfig.FLAVOR == "github" && updateState.saveUpdateApkToDownloads) {
-                        withContext(Dispatchers.IO) {
-                            copyUpdateApkToMediaStoreDownloads(
-                                context = context,
-                                cacheApkFile = apkFile,
-                                displayName =
-                                    availableUpdate.remoteApkFileName.ifBlank {
-                                        "Remember-${availableUpdate.versionName}.apk"
-                                    },
-                            )
-                        }.onFailure { throwable ->
-                            DiagnosticLog.record(context, "Saving update APK to Downloads failed", throwable)
-                            Toast
-                                .makeText(
-                                    context,
-                                    resources.getString(R.string.settings_update_apk_save_to_downloads_failed),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                        }.onSuccess {
-                            updatePrefs.markUpdateApkDownloadsCopySucceeded()
-                        }
-                    }
-                    downloadProgress = -1f
-                    val apkUri =
-                        FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            apkFile,
-                        )
-                    val installIntent =
-                        Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(apkUri, "application/vnd.android.package-archive")
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        }
-                    runCatching { context.startActivity(installIntent) }
-                        .onFailure { throwable ->
-                            DiagnosticLog.record(context, "Launching update APK installer failed", throwable)
-                            Toast
-                                .makeText(
-                                    context,
-                                    resources.getString(R.string.settings_update_download_failed),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                        }
-                    if (BuildConfig.FLAVOR == "github" && availableUpdate.remoteApkAssetUpdatedAt.isNotBlank()) {
-                        updatePrefs.writeGithubReleaseAck(
-                            fingerprint = availableUpdate.notificationDedupeKey(),
-                            installedVersionName = BuildConfig.VERSION_NAME,
-                        )
-                    }
-                    downloadProgress = null
-                },
-                onFailure = { throwable ->
-                    DiagnosticLog.record(context, "Update APK download failed", throwable)
-                    downloadProgress = null
-                    Toast
-                        .makeText(
-                            context,
-                            resources.getString(R.string.settings_update_download_failed),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                },
-            )
-        }
-        Unit
+        updateVm.downloadOrInstall(availableUpdate, context as? ComponentActivity, playInAppUpdateLauncher)
     }
-    var handledOpenUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(openUpdateSheetRequest) {
-        if (openUpdateSheetRequest == 0) {
-            handledOpenUpdateSheetRequest = 0
-            return@LaunchedEffect
+    LaunchedEffect(openSheetRequested) {
+        if (openSheetRequested) {
+            updateVm.markOpenSheetHandled()
+            updateVm.openSheetAndCheck()
         }
-        if (openUpdateSheetRequest <= handledOpenUpdateSheetRequest) return@LaunchedEffect
-        handledOpenUpdateSheetRequest = openUpdateSheetRequest
-        onOpenUpdateSheetRequestHandled()
-        if (openUpdateSheetRequest > 0) beginUpdateCheck(false)
     }
     LaunchedEffect(playBannerState, showUpdateSheet) {
         if (!showUpdateSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
@@ -787,9 +529,7 @@ fun SettingsRoute(
             is PlayInAppUpdateBannerUiState.Downloading,
             PlayInAppUpdateBannerUiState.ReadyToInstall,
             -> {
-                showUpdateSheet = false
-                downloadProgress = null
-                updateSheetChangelog = ChangelogUiState.Hidden
+                updateVm.closeSheetForPlayProgress()
             }
             PlayInAppUpdateBannerUiState.Hidden -> Unit
         }
@@ -883,17 +623,7 @@ fun SettingsRoute(
         // 2. It needs a height cap (maxUpdateSheetHeight) and to re-expand on rotation below.
         // The shared AppBottomSheetDragHandle is still reused so the handle stays consistent.
         ModalBottomSheet(
-            onDismissRequest = {
-                showUpdateSheet = false
-                downloadProgress = null
-                updateSheetChangelog = ChangelogUiState.Hidden
-                val blocksPendingPlayClear =
-                    playBannerState is PlayInAppUpdateBannerUiState.Downloading ||
-                        playBannerState is PlayInAppUpdateBannerUiState.ReadyToInstall
-                if (!blocksPendingPlayClear) {
-                    playUpdateSessionHandle.clearPendingPlayUpdate()
-                }
-            },
+            onDismissRequest = { updateVm.dismissSheet() },
             sheetState = updateSheetState,
             dragHandle = { AppBottomSheetDragHandle() },
         ) {
@@ -907,20 +637,7 @@ fun SettingsRoute(
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
                 onDownloadClick = downloadUpdate,
-                onSkipVersionClick = skipVersion@{
-                    val availableUpdate = updateInfo ?: return@skipVersion
-                    if (availableUpdate.remoteApkAssetUpdatedAt.isBlank()) return@skipVersion
-                    scope.launch {
-                        updatePrefs.writeGithubReleaseAck(
-                            fingerprint = availableUpdate.notificationDedupeKey(),
-                            installedVersionName = BuildConfig.VERSION_NAME,
-                        )
-                        updateInfo = null
-                        rememberUpdateState.showUpdate(null)
-                        showUpdateSheet = false
-                        updateSheetChangelog = ChangelogUiState.Hidden
-                    }
-                },
+                onSkipVersionClick = { updateInfo?.let { availableUpdate -> updateVm.skipVersion(availableUpdate) } },
             )
         }
     }

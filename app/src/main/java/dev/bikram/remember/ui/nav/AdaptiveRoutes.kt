@@ -103,6 +103,7 @@ import dev.bikram.remember.ui.home.buildBulkTagCoverage
 import dev.bikram.remember.ui.main.NotesCreateFabMenu
 import dev.bikram.remember.ui.settings.AboutSection
 import dev.bikram.remember.ui.settings.DevOptionsRoute
+import dev.bikram.remember.ui.settings.RememberUpdateViewModel
 import dev.bikram.remember.ui.settings.SettingsRoute
 import dev.bikram.remember.ui.settings.SettingsSectionKey
 import dev.bikram.remember.ui.settings.settingsPaneSections
@@ -427,10 +428,7 @@ fun SettingsTwoPaneRoute(
     onOpenIntro: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenDevOptions: () -> Unit,
-    openUpdateSheetRequest: Int,
-    onOpenUpdateSheetRequestHandled: () -> Unit,
-    startPlayInAppUpdateRequest: Int,
-    onStartPlayInAppUpdateRequestHandled: () -> Unit,
+    updateVm: RememberUpdateViewModel,
     onUpdateCheckStarted: () -> Unit,
     onShareApp: () -> Unit,
     highlightSectionKey: String?,
@@ -446,10 +444,7 @@ fun SettingsTwoPaneRoute(
             onOpenIntro = onOpenIntro,
             onOpenHelp = onOpenHelp,
             onOpenDevOptions = onOpenDevOptions,
-            openUpdateSheetRequest = openUpdateSheetRequest,
-            onOpenUpdateSheetRequestHandled = onOpenUpdateSheetRequestHandled,
-            startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
-            onStartPlayInAppUpdateRequestHandled = onStartPlayInAppUpdateRequestHandled,
+            updateVm = updateVm,
             onUpdateCheckStarted = onUpdateCheckStarted,
             highlightSectionKey = highlightSectionKey,
             onHighlightHandled = onHighlightHandled,
@@ -535,10 +530,7 @@ fun SettingsTwoPaneRoute(
                             onOpenDevOptions = {
                                 showSection(SettingsSectionKey.DevOptions)
                             },
-                            openUpdateSheetRequest = openUpdateSheetRequest,
-                            onOpenUpdateSheetRequestHandled = onOpenUpdateSheetRequestHandled,
-                            startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
-                            onStartPlayInAppUpdateRequestHandled = onStartPlayInAppUpdateRequestHandled,
+                            updateVm = updateVm,
                             onUpdateCheckStarted = onUpdateCheckStarted,
                             selectedSectionKey = selectedSectionKey,
                             showTopActions = false,

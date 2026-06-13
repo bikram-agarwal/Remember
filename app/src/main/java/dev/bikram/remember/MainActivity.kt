@@ -40,10 +40,12 @@ import dev.bikram.remember.data.UpdatePreferencesState
 import dev.bikram.remember.data.UpdatePrefs
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.di.LaunchAction
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import dev.bikram.remember.ui.InAppRatingAutoPromptHost
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.lock.LockScreen
 import dev.bikram.remember.ui.nav.RememberNavGraph
+import dev.bikram.remember.ui.settings.RememberUpdateViewModel
 import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
 import dev.bikram.remember.update.AppReviewLauncher
@@ -224,9 +226,8 @@ private fun AppRoot(
         }
     val context = LocalContext.current
     val activity = LocalActivity.current as? FragmentActivity
+    val updateVm: RememberUpdateViewModel = hiltViewModel()
     var openSettingsRequest by rememberSaveable { mutableIntStateOf(0) }
-    var openUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
-    var startPlayInAppUpdateRequest by rememberSaveable { mutableIntStateOf(0) }
     var dismissedUpdateBarKey by rememberSaveable { mutableStateOf<String?>(null) }
     // Every update-flow (re-)trigger resurrects a dismissed update bar. The handled
     // epoch is saveable so rotation does not count as a new trigger.
@@ -292,10 +293,7 @@ private fun AppRoot(
                 appScope = appScope,
                 launchFlow = launchFlow,
                 openSettingsRequest = openSettingsRequest,
-                openUpdateSheetRequest = openUpdateSheetRequest,
-                onOpenUpdateSheetRequestHandled = { openUpdateSheetRequest = 0 },
-                startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
-                onStartPlayInAppUpdateRequestHandled = { startPlayInAppUpdateRequest = 0 },
+                updateVm = updateVm,
                 onUpdateCheckStarted = { dismissedUpdateBarKey = null },
                 updateBarState = updateBarState,
                 updateSignalEpoch = updateSignalEpoch,
@@ -306,7 +304,7 @@ private fun AppRoot(
                     // Check only surfaces the update sheet; starting the actual
                     // download is the sheet's job.
                     openSettingsRequest += 1
-                    openUpdateSheetRequest += 1
+                    updateVm.requestOpenSheet()
                 },
                 onDismissUpdateAvailable = { dismissedUpdateBarKey = updateKey },
                 onInstallUpdate = {
