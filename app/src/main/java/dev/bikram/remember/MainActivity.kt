@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.data.InteractionPrefs
@@ -40,7 +41,6 @@ import dev.bikram.remember.data.UpdatePreferencesState
 import dev.bikram.remember.data.UpdatePrefs
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.di.LaunchAction
-import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import dev.bikram.remember.ui.InAppRatingAutoPromptHost
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.lock.LockScreen

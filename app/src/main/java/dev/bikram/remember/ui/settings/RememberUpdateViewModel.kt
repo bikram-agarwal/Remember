@@ -74,7 +74,7 @@ class RememberUpdateViewModel
         val downloadProgress: StateFlow<Float?> = _downloadProgress.asStateFlow()
 
         private val _updateSheetChangelog = MutableStateFlow<ChangelogUiState>(ChangelogUiState.Hidden)
-        internal val updateSheetChangelog: StateFlow<ChangelogUiState> = _updateSheetChangelog.asStateFlow()
+        val updateSheetChangelog: StateFlow<ChangelogUiState> = _updateSheetChangelog.asStateFlow()
 
         private val _showUpdateSheet = MutableStateFlow(false)
         val showUpdateSheet: StateFlow<Boolean> = _showUpdateSheet.asStateFlow()

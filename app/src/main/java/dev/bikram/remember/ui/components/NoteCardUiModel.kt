@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RememberReservedTags
+import dev.bikram.remember.data.getActiveReminders
 import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.edit.resolveNoteIcon
 import kotlinx.collections.immutable.PersistentList
@@ -22,6 +23,7 @@ data class NoteCardUiModel(
     val pictureHeroFraming: String?,
     val pictureCacheRevision: Long,
     val reminderAt: Long?,
+    val remindersCount: Int,
     val recurring: Boolean,
     val hasAttachment: Boolean,
     val visibleTags: PersistentList<String>,
@@ -55,6 +57,7 @@ fun NoteWithItems.toNoteCardUiModel(
         pictureHeroFraming = note.pictureHeroFraming,
         pictureCacheRevision = note.updatedAt,
         reminderAt = note.reminderAt,
+        remindersCount = note.getActiveReminders().size,
         recurring = note.recurrence != null,
         hasAttachment = attachments.isNotEmpty(),
         visibleTags = RememberReservedTags.userVisibleTags(note.tags).toPersistentList(),

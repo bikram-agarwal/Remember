@@ -58,8 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.graphics.shapes.Morph
 import dev.bikram.remember.R
-import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlin.math.roundToInt

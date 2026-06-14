@@ -7,13 +7,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.res.stringResource
 import dev.bikram.remember.R
 import dev.bikram.remember.data.Importance
-import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteKind
-import dev.bikram.remember.data.RecurrenceRule
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFraming
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import java.io.File
 import dev.bikram.remember.data.Visibility as NoteVisibility
 
@@ -24,8 +24,7 @@ import dev.bikram.remember.data.Visibility as NoteVisibility
  */
 @Composable
 fun EditorOptionsPanel(
-    reminderAt: Long?,
-    recurrence: RecurrenceRule?,
+    reminders: List<NoteReminder>,
     importance: Importance,
     visibility: NoteVisibility,
     pictureUri: String?,
@@ -48,8 +47,7 @@ fun EditorOptionsPanel(
     onPickAttachment: () -> Unit,
 ) {
     OptionsPanel(
-        reminderAt = reminderAt,
-        recurrence = recurrence,
+        reminders = reminders,
         importance = importance,
         visibility = visibility,
         pictureUri = pictureUri,
@@ -57,7 +55,7 @@ fun EditorOptionsPanel(
         tags = tags,
         attachments = attachments,
         onOpenReminder = if (readOnly) ({}) else onOpenReminder,
-        reminderPermissionMissing = reminderAt != null && !notificationsAllowed,
+        reminderPermissionMissing = reminders.isNotEmpty() && !notificationsAllowed,
         onSetImportance = if (readOnly) ({ _ -> }) else onImportanceChange,
         onSetVisibility = if (readOnly) ({ _ -> }) else onVisibilityChange,
         onOpenPicture = if (readOnly) ({}) else onOpenPicture,
@@ -100,13 +98,12 @@ fun EditorOptionSheets(
     readOnly: Boolean,
     activeTagSuggestions: List<String>,
     attachments: List<NoteAttachmentEntity>,
-    currentReminderAt: Long?,
-    currentRecurrence: RecurrenceRule?,
+    currentReminders: List<NoteReminder>,
     currentIconKey: String?,
     currentActions: List<NoteAction>,
     currentTags: List<String>,
     heroImageContentDescription: String,
-    onReminderChange: (Long?, RecurrenceRule?) -> Unit,
+    onReminderChange: (List<NoteReminder>) -> Unit,
     onIconKeyChange: (String?) -> Unit,
     onActionsChange: (List<NoteAction>) -> Unit,
     onTagsWithColorsChange: (List<String>, Map<String, String>) -> Unit,
@@ -128,10 +125,9 @@ fun EditorOptionSheets(
 ) {
     if (reminderPickerOpen) {
         ReminderPickerSheet(
-            initialMillis = currentReminderAt,
-            initialRule = currentRecurrence,
-            onConfirm = { at, rule ->
-                onReminderChange(at, rule)
+            initialReminders = currentReminders,
+            onConfirm = { reminders ->
+                onReminderChange(reminders)
                 onDismissReminder()
             },
             onDismiss = onDismissReminder,

@@ -61,23 +61,23 @@ class EditNoteViewModel
         override suspend fun persistNewDraftForAttachment(): Long {
             val newId =
                 repository.createNote(
-                    title = _title.value,
+                    title = title.value,
                     body = _body.value,
                     colorIndex = 0,
                     options = currentOptions(),
                 )
             loadedId = newId
             syncHasPersistedRow()
-            if (_starred.value) repository.setStarred(newId, true)
+            if (starred.value) repository.setStarred(newId, true)
             return newId
         }
 
         private fun hasNetChanges(): Boolean {
             val id = loadedId
-            val t = _title.value
+            val t = title.value
             val b = _body.value
             val opts = currentOptions()
-            val starred = _starred.value
+            val starred = starred.value
             if (id == null) {
                 return t.isNotBlank() || b.isNotBlank() || attachments.value.isNotEmpty() || opts.pictureUri != null || opts.tags.isNotEmpty() || opts.reminderAt != null || opts.actions.isNotEmpty() || opts.iconKey != null
             } else {
@@ -105,7 +105,7 @@ class EditNoteViewModel
                     persistence.clearDirty()
                     return@withLock null
                 }
-                val titleValue = _title.value
+                val titleValue = title.value
                 val bodyValue = _body.value
                 val id = loadedId
                 val finalTitle = titleValue.ifBlank { untitledName }
@@ -115,15 +115,14 @@ class EditNoteViewModel
                     val newId = repository.createNote(finalTitle, bodyValue, 0, currentOptions())
                     loadedId = newId
                     syncHasPersistedRow()
-                    if (titleValue.isBlank()) _title.value = finalTitle
-                    if (_starred.value) repository.setStarred(newId, true)
+                    if (titleValue.isBlank()) setTitle(finalTitle)
+                    if (starred.value) repository.setStarred(newId, true)
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val savedNote = repository.get(newId)?.note
                     originalNote = savedNote
                     if (savedNote != null) {
-                        _createdAt.value = savedNote.createdAt
-                        _updatedAt.value = savedNote.updatedAt
+                        updateTimestamps(savedNote.createdAt, savedNote.updatedAt)
                     }
 
                     return@withLock {
@@ -133,10 +132,10 @@ class EditNoteViewModel
                     if (!persistence.isDirty) return@withLock null
                     val epochAtWrite = persistence.currentEpoch()
                     repository.updateNote(id, finalTitle, bodyValue, 0, currentOptions())
-                    if (titleValue.isBlank()) _title.value = finalTitle
+                    if (titleValue.isBlank()) setTitle(finalTitle)
                     val cur = repository.get(id)?.note
-                    if (cur != null && cur.starred != _starred.value) {
-                        repository.setStarred(id, _starred.value)
+                    if (cur != null && cur.starred != starred.value) {
+                        repository.setStarred(id, starred.value)
                     }
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
@@ -144,8 +143,7 @@ class EditNoteViewModel
                     val savedNote = repository.get(id)?.note
                     originalNote = savedNote
                     if (savedNote != null) {
-                        _createdAt.value = savedNote.createdAt
-                        _updatedAt.value = savedNote.updatedAt
+                        updateTimestamps(savedNote.createdAt, savedNote.updatedAt)
                     }
 
                     if (old != null) {

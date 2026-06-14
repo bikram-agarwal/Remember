@@ -46,8 +46,8 @@ Concept search for the picker is data-driven, fed by two committed JSON files un
 Both are emitted by Python scripts in `font_subset/`. Re-run them whenever upstream Unicode/CLDR or Material Symbols metadata changes (typically once a year), or after you add/remove icons in `BundledMaterialSymbolIcons.kt`:
 
 ```text
-python font_subset/build_emoji_data.py        # writes app/src/main/res/raw/emojis.json
-python font_subset/build_icon_keywords.py     # writes app/src/main/res/raw/icon_keywords.json
+python font_subset/build_search_emojis.py     # writes app/src/main/res/raw/emojis.json
+python font_subset/build_search_keywords.py   # writes app/src/main/res/raw/icon_keywords.json
 ```
 
 Both scripts use stdlib only (no `pip install` required) and cache their downloads under `font_subset/cache/`. Pass `--force-refresh` to bypass the cache. Pass `--emoji-version`, `--cldr-branch`, or `--metadata-url` to pin a specific upstream snapshot.

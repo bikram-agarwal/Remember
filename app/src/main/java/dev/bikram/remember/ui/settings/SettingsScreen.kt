@@ -101,8 +101,8 @@ import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.common.AppBottomSheetDragHandle
-import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
@@ -304,7 +304,6 @@ fun SettingsRoute(
                     ).show()
             }
         }
-
 
     LaunchedEffect(globalUpdateInfo) {
         updateVm.adoptGlobalUpdateIfNone(globalUpdateInfo)

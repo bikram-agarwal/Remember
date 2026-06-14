@@ -78,6 +78,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.HERO_MASK_ASPECT_RATIO
 import dev.bikram.remember.ui.common.MarkdownLinkInteraction
@@ -742,8 +743,7 @@ private fun OptionsPanelSection(
     onOpenTags: () -> Unit,
     onOpenAttachments: () -> Unit,
 ) {
-    val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
-    val recurrence by vm.recurrence.collectAsStateWithLifecycle()
+    val reminders by vm.reminders.collectAsStateWithLifecycle()
     val importance by vm.importance.collectAsStateWithLifecycle()
     val visibility by vm.visibility.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
@@ -755,8 +755,7 @@ private fun OptionsPanelSection(
     val updatedAt by vm.updatedAt.collectAsStateWithLifecycle()
 
     EditorOptionsPanel(
-        reminderAt = reminderAt,
-        recurrence = recurrence,
+        reminders = reminders,
         importance = importance,
         visibility = visibility,
         pictureUri = pictureUri,

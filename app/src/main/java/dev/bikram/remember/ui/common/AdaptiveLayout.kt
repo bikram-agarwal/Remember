@@ -8,7 +8,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
+/*
  * Single source of truth for the app's responsive breakpoints. Screens used to each re-derive
  * "is this a short landscape window?" inline - some from [LocalConfiguration] and some from
  * `BoxWithConstraints.maxHeight` - which let the same device be classified differently on

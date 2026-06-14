@@ -37,8 +37,8 @@ import androidx.core.view.WindowCompat
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemeState
 
-private const val MaxAppDisplayScale = 1.15f
-private const val MaxAppFontScale = 1.3f
+private const val MAX_APP_DISPLAY_SCALE = 1.15f
+private const val MAX_APP_FONT_SCALE = 1.3f
 
 val LocalIsDark = staticCompositionLocalOf { false }
 
@@ -74,8 +74,8 @@ fun RememberTheme(
     val responsiveDensity =
         remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale, stableDensity) {
             Density(
-                density = baseDensity.density.coerceAtMost(stableDensity * MaxAppDisplayScale),
-                fontScale = (baseDensity.fontScale * responsiveTextScale).coerceAtMost(MaxAppFontScale),
+                density = baseDensity.density.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE),
+                fontScale = (baseDensity.fontScale * responsiveTextScale).coerceAtMost(MAX_APP_FONT_SCALE),
             )
         }
     val wallpaperTint = rememberWallpaperTintColor(context, enabled = effectiveUseGradient)

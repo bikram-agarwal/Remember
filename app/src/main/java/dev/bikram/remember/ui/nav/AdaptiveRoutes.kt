@@ -81,9 +81,9 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.common.isSmallLandscape
-import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
 import dev.bikram.remember.ui.components.RememberFloatingActionButton

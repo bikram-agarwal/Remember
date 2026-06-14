@@ -91,6 +91,12 @@ data class NoteAction(
     val iconData: String? = null,
 )
 
+@Serializable
+data class NoteReminder(
+    val reminderAt: Long,
+    val recurrence: RecurrenceRule? = null,
+)
+
 @Entity(tableName = "notes")
 data class NoteEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -118,6 +124,7 @@ data class NoteEntity(
     val actions: List<NoteAction> = emptyList(),
     val tags: List<String> = emptyList(),
     val recurrence: RecurrenceRule? = null,
+    val reminders: List<NoteReminder> = emptyList(),
     /**
      * Distinct from [trashed]: archived notes are hidden from Home but remain searchable
      * and never auto-deleted. State-changing actions keep archive and trash mutually
@@ -140,6 +147,26 @@ data class NoteEntity(
      */
     val completedAt: Long? = null,
 )
+
+fun NoteEntity.getActiveReminders(): List<NoteReminder> {
+    if (reminders.isNotEmpty()) return reminders
+    val primaryAt = reminderAt
+    return if (primaryAt != null) {
+        listOf(NoteReminder(primaryAt, recurrence))
+    } else {
+        emptyList()
+    }
+}
+
+fun NoteEntity.withSyncedPrimaryReminder(): NoteEntity {
+    val active = getActiveReminders()
+    val soonest = active.minByOrNull { it.reminderAt }
+    return this.copy(
+        reminderAt = soonest?.reminderAt,
+        recurrence = soonest?.recurrence,
+        reminders = active,
+    )
+}
 
 /**
  * Content-less FTS4 shadow table over [NoteEntity]. Only the text-bearing columns are

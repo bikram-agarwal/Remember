@@ -338,7 +338,7 @@ class EditListViewModel
             val entities = currentItems()
             val newId =
                 repository.createList(
-                    title = _title.value,
+                    title = title.value,
                     colorIndex = 0,
                     items = entities.map { it.text },
                     options = currentOptions(),
@@ -350,10 +350,10 @@ class EditListViewModel
 
         private fun hasNetChanges(): Boolean {
             val id = loadedId
-            val t = _title.value
+            val t = title.value
             val nonEmpty = _items.value.filter { it.text.isNotBlank() }
             val opts = currentOptions()
-            val starred = _starred.value
+            val starred = starred.value
             if (id == null) {
                 return t.isNotBlank() || nonEmpty.isNotEmpty() || attachments.value.isNotEmpty() || opts.pictureUri != null || opts.tags.isNotEmpty() || opts.reminderAt != null || opts.actions.isNotEmpty() || opts.iconKey != null
             } else {
@@ -402,7 +402,7 @@ class EditListViewModel
                     persistence.clearDirty()
                     return@withLock null
                 }
-                val t = _title.value
+                val t = title.value
                 val id = loadedId
                 val finalTitle = t.ifBlank { untitledName }
                 val persistable = currentPersistable()
@@ -414,16 +414,15 @@ class EditListViewModel
                     val newId = repository.createListWithItems(finalTitle, 0, persistable, currentOptions())
                     loadedId = newId
                     syncHasPersistedRow()
-                    if (t.isBlank()) _title.value = finalTitle
-                    if (_starred.value) repository.setStarred(newId, true)
+                    if (t.isBlank()) setTitle(finalTitle)
+                    if (starred.value) repository.setStarred(newId, true)
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val savedList = repository.get(newId)
                     originalNote = savedList?.note
                     originalItems = savedList?.items ?: emptyList()
                     savedList?.note?.let { note ->
-                        _createdAt.value = note.createdAt
-                        _updatedAt.value = note.updatedAt
+                        updateTimestamps(note.createdAt, note.updatedAt)
                     }
 
                     return@withLock {
@@ -433,10 +432,10 @@ class EditListViewModel
                     if (!persistence.isDirty) return@withLock null
                     val epochAtWrite = persistence.currentEpoch()
                     repository.updateList(id, finalTitle, 0, persistable, currentOptions())
-                    if (t.isBlank()) _title.value = finalTitle
+                    if (t.isBlank()) setTitle(finalTitle)
                     val cur = repository.get(id)?.note
-                    if (cur != null && cur.starred != _starred.value) {
-                        repository.setStarred(id, _starred.value)
+                    if (cur != null && cur.starred != starred.value) {
+                        repository.setStarred(id, starred.value)
                     }
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
@@ -447,8 +446,7 @@ class EditListViewModel
                     originalNote = savedList?.note
                     originalItems = savedList?.items ?: emptyList()
                     savedList?.note?.let { note ->
-                        _createdAt.value = note.createdAt
-                        _updatedAt.value = note.updatedAt
+                        updateTimestamps(note.createdAt, note.updatedAt)
                     }
 
                     if (old != null) {

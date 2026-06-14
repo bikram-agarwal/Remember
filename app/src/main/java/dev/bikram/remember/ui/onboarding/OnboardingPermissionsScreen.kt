@@ -76,8 +76,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.bikram.remember.R
-import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec

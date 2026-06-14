@@ -10,10 +10,12 @@ import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteOptions
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RememberReservedTags
+import dev.bikram.remember.data.getActiveReminders
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.nav.Routes
@@ -51,10 +53,10 @@ abstract class BaseEditorViewModel(
     /** Only the Edit Note screen passes a prefill; lists leave this blank. */
     protected val prefillBody: String = savedStateHandle[Routes.ARG_PREFILL] ?: ""
 
-    protected val _title = MutableStateFlow("")
+    private val _title = MutableStateFlow("")
     val title: StateFlow<String> = _title.asStateFlow()
 
-    protected val _starred = MutableStateFlow(false)
+    private val _starred = MutableStateFlow(false)
     val starred: StateFlow<Boolean> = _starred.asStateFlow()
 
     /**
@@ -62,65 +64,76 @@ abstract class BaseEditorViewModel(
      * boolean. Driven by the live DB observer started in the subclass `init`, so external
      * completion via swipe / notification action / repository.markCompleted is reflected here too.
      */
-    protected val _completed = MutableStateFlow(false)
+    private val _completed = MutableStateFlow(false)
     val completed: StateFlow<Boolean> = _completed.asStateFlow()
 
-    protected val _reminderAt = MutableStateFlow<Long?>(null)
+    private val _reminderAt = MutableStateFlow<Long?>(null)
     val reminderAt: StateFlow<Long?> = _reminderAt.asStateFlow()
 
-    protected val _recurrence = MutableStateFlow<RecurrenceRule?>(null)
+    private val _recurrence = MutableStateFlow<RecurrenceRule?>(null)
     val recurrence: StateFlow<RecurrenceRule?> = _recurrence.asStateFlow()
 
-    protected val _importance = MutableStateFlow(Importance.DEFAULT)
+    private val _reminders = MutableStateFlow<List<NoteReminder>>(emptyList())
+    val reminders: StateFlow<List<NoteReminder>> = _reminders.asStateFlow()
+
+    private val _importance = MutableStateFlow(Importance.DEFAULT)
     val importance: StateFlow<Importance> = _importance.asStateFlow()
 
-    protected val _visibility = MutableStateFlow(NoteVisibility.DEFAULT)
+    private val _visibility = MutableStateFlow(NoteVisibility.DEFAULT)
     val visibility: StateFlow<NoteVisibility> = _visibility.asStateFlow()
 
-    protected val _locked = MutableStateFlow(false)
+    private val _locked = MutableStateFlow(false)
     val locked: StateFlow<Boolean> = _locked.asStateFlow()
 
-    protected val _pictureUri = MutableStateFlow<String?>(null)
+    private val _pictureUri = MutableStateFlow<String?>(null)
     val pictureUri: StateFlow<String?> = _pictureUri.asStateFlow()
 
     /** Bumped whenever the hero bytes change, including in-place edits that keep the same URI string. */
     private val _pictureRevision = MutableStateFlow(0L)
     val pictureRevision: StateFlow<Long> = _pictureRevision.asStateFlow()
 
-    protected val _pictureHeroFraming = MutableStateFlow<String?>(null)
+    private val _pictureHeroFraming = MutableStateFlow<String?>(null)
     val pictureHeroFraming: StateFlow<String?> = _pictureHeroFraming.asStateFlow()
 
-    protected val _iconKey = MutableStateFlow<String?>(null)
+    private val _iconKey = MutableStateFlow<String?>(null)
     val iconKey: StateFlow<String?> = _iconKey.asStateFlow()
 
-    protected val _actions = MutableStateFlow<List<NoteAction>>(emptyList())
+    private val _actions = MutableStateFlow<List<NoteAction>>(emptyList())
     val actions: StateFlow<List<NoteAction>> = _actions.asStateFlow()
 
-    protected val _tags = MutableStateFlow<List<String>>(emptyList())
+    private val _tags = MutableStateFlow<List<String>>(emptyList())
     val tags: StateFlow<List<String>> = _tags.asStateFlow()
     val activeTagSuggestions: StateFlow<List<String>> =
         repository
             .observeActiveTagSuggestions()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
-    protected val _attachments = MutableStateFlow<List<NoteAttachmentEntity>>(emptyList())
+    private val _attachments = MutableStateFlow<List<NoteAttachmentEntity>>(emptyList())
     val attachments: StateFlow<List<NoteAttachmentEntity>> = _attachments.asStateFlow()
 
-    protected val _createdAt = MutableStateFlow<Long?>(null)
+    private val _createdAt = MutableStateFlow<Long?>(null)
     val createdAt: StateFlow<Long?> = _createdAt.asStateFlow()
 
-    protected val _updatedAt = MutableStateFlow<Long?>(null)
+    private val _updatedAt = MutableStateFlow<Long?>(null)
     val updatedAt: StateFlow<Long?> = _updatedAt.asStateFlow()
 
     /**
      * Mirrors the underlying note's archived / trashed shelf. Used by the edit screen to flip into
      * read-only mode and swap the bottom-bar action set. New notes/lists always start active.
      */
-    protected val _archived = MutableStateFlow(false)
+    private val _archived = MutableStateFlow(false)
     val archived: StateFlow<Boolean> = _archived.asStateFlow()
 
-    protected val _trashed = MutableStateFlow(false)
+    private val _trashed = MutableStateFlow(false)
     val trashed: StateFlow<Boolean> = _trashed.asStateFlow()
+
+    protected fun updateTimestamps(
+        createdAt: Long?,
+        updatedAt: Long?,
+    ) {
+        _createdAt.value = createdAt
+        _updatedAt.value = updatedAt
+    }
 
     /**
      * True once this session is backed by a database row ([loadedId] non-null). New drafts start
@@ -158,8 +171,11 @@ abstract class BaseEditorViewModel(
         originalNote = n
         _title.value = n.title
         _starred.value = n.starred || n.tags.contains(RememberReservedTags.STARRED)
-        _reminderAt.value = n.reminderAt
-        _recurrence.value = n.recurrence?.sanitized()
+        val activeRems = n.getActiveReminders()
+        _reminders.value = activeRems
+        val soonest = activeRems.minByOrNull { it.reminderAt }
+        _reminderAt.value = soonest?.reminderAt
+        _recurrence.value = soonest?.recurrence?.sanitized()
         _importance.value = n.importance
         _visibility.value = n.visibility
         _locked.value = n.locked
@@ -187,6 +203,8 @@ abstract class BaseEditorViewModel(
         viewModelScope.launch {
             repository.observe(id).collect { row ->
                 val n = row?.note ?: return@collect
+                val activeRems = n.getActiveReminders()
+                if (_reminders.value != activeRems) _reminders.value = activeRems
                 if (_reminderAt.value != n.reminderAt) _reminderAt.value = n.reminderAt
                 val sanitized = n.recurrence?.sanitized()
                 if (_recurrence.value != sanitized) _recurrence.value = sanitized
@@ -218,6 +236,20 @@ abstract class BaseEditorViewModel(
         if (_reminderAt.value == at && _recurrence.value == normalized) return
         _reminderAt.value = at
         _recurrence.value = normalized
+        if (at != null) {
+            _reminders.value = listOf(NoteReminder(at, normalized))
+        } else {
+            _reminders.value = emptyList()
+        }
+        markDirty()
+    }
+
+    fun setReminders(remindersList: List<NoteReminder>) {
+        if (_reminders.value == remindersList) return
+        _reminders.value = remindersList
+        val soonest = remindersList.minByOrNull { it.reminderAt }
+        _reminderAt.value = soonest?.reminderAt
+        _recurrence.value = soonest?.recurrence?.sanitized()
         markDirty()
     }
 
@@ -400,6 +432,7 @@ abstract class BaseEditorViewModel(
             actions = _actions.value,
             tags = tagsForPersistence(),
             recurrence = _recurrence.value,
+            reminders = _reminders.value,
         )
 
     /**

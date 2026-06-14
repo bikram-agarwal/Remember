@@ -61,6 +61,7 @@ class HomeViewModel
         private val filter = MutableStateFlow(NotesFilter())
         private val selectedIds = MutableStateFlow(persistentSetOf<Long>())
         private val viewOptionsFlow = viewOptionsPrefs.state.distinctUntilChanged()
+
         // One-shot UI events: a Channel (not a SharedFlow) so emission never suspends the
         // view model, each event is delivered exactly once, and nothing replays on rotation.
         private val _events = Channel<HomeEvent>(Channel.BUFFERED)

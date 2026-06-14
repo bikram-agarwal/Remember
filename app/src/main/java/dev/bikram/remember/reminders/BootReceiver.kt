@@ -50,17 +50,7 @@ class BootReceiver : BroadcastReceiver() {
                         .keepReminderNotificationsUntilDone
                 val all = noteRepository.observeActive().first()
                 all.forEach { item ->
-                    val at = item.note.reminderAt ?: return@forEach
-                    if (at > now) {
-                        reminderScheduler.schedule(item.note.id, at, item.note.importance)
-                    } else if (item.note.completedAt == null) {
-                        ReminderReceiver.showNotification(
-                            context = context,
-                            note = item.note,
-                            items = item.items,
-                            keepUntilDone = keepUntilDone,
-                        )
-                    }
+                    reminderScheduler.scheduleOrShow(item.note, item.items)
                 }
                 noteRepository.refreshReminderSummaryNotification()
                 // Re-post the quick-capture notification if the user has it enabled. The

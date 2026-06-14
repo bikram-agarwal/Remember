@@ -55,9 +55,9 @@ import androidx.core.net.toUri
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.diagnostics.DiagnosticLog
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.common.isSmallLandscape
-import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.AboutAuthorPhoto
 import dev.bikram.remember.ui.components.AppIconImage
 import dev.bikram.remember.ui.components.RememberIconButton

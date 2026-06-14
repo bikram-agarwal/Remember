@@ -134,6 +134,7 @@ private fun PendingNewNoteCard(
                 pictureHeroFraming = null,
                 pictureCacheRevision = 0L,
                 reminderAt = null,
+                remindersCount = 0,
                 recurring = false,
                 hasAttachment = false,
                 visibleTags = persistentListOf(),

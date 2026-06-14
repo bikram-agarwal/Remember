@@ -139,6 +139,7 @@ class ThemePrefs(
         val CUSTOM_SEEDS = stringPreferencesKey("custom_seeds")
         val ACTIVE_CUSTOM_SEED = stringPreferencesKey("active_custom_seed")
         val USE_GRADIENT = booleanPreferencesKey("use_gradient")
+
         // Legacy shading keys, read-only: migrated to SHADING_INTENSITY_FACTOR on read for installs
         // that predate it. setShadingIntensity / backup import no longer write them.
         val USE_ENHANCED_SHADING = booleanPreferencesKey("use_enhanced_shading")

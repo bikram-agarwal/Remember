@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.NoteAdaptiveTheme
 import dev.bikram.remember.ui.common.NotePageBackground
@@ -196,8 +197,7 @@ fun EditListScreen(
     val starred by vm.starred.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
-    val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
-    val recurrence by vm.recurrence.collectAsStateWithLifecycle()
+    val reminders by vm.reminders.collectAsStateWithLifecycle()
     val importance by vm.importance.collectAsStateWithLifecycle()
     val visibility by vm.visibility.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
@@ -865,8 +865,7 @@ fun EditListScreen(
                     editorContentOptionsItem(padding = padding) {
                         Spacer(Modifier.height(20.dp))
                         EditorOptionsPanel(
-                            reminderAt = reminderAt,
-                            recurrence = recurrence,
+                            reminders = reminders,
                             importance = importance,
                             visibility = visibility,
                             pictureUri = pictureUri,
@@ -908,13 +907,12 @@ fun EditListScreen(
                 readOnly = readOnly,
                 activeTagSuggestions = activeTagSuggestions,
                 attachments = attachments,
-                currentReminderAt = reminderAt,
-                currentRecurrence = recurrence,
+                currentReminders = reminders,
                 currentIconKey = iconKey,
                 currentActions = actions,
                 currentTags = tags,
                 heroImageContentDescription = stringResource(R.string.viewer_cover_image_cd),
-                onReminderChange = vm::setReminder,
+                onReminderChange = vm::setReminders,
                 onIconKeyChange = vm::setIconKey,
                 onActionsChange = vm::setActions,
                 onTagsWithColorsChange = vm::saveTagsWithColors,

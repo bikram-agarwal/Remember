@@ -20,9 +20,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NotesFilter
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.emptyStateSpacing
 import dev.bikram.remember.ui.common.isSmallLandscape
-import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.EmptyFilterIllustration
 import dev.bikram.remember.ui.components.EmptyNotesIllustration
 import dev.bikram.remember.ui.components.RememberButton

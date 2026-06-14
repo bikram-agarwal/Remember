@@ -26,6 +26,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.ui.common.NoteAdaptiveTheme
 import dev.bikram.remember.ui.common.NotePageBackground
 import dev.bikram.remember.ui.common.rememberImageDerivedColorScheme
@@ -302,8 +303,7 @@ fun EditNoteScreen(
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
     val pictureRevision by vm.pictureRevision.collectAsStateWithLifecycle()
     val pictureHeroFraming by vm.pictureHeroFraming.collectAsStateWithLifecycle()
-    val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
-    val recurrence by vm.recurrence.collectAsStateWithLifecycle()
+    val reminders by vm.reminders.collectAsStateWithLifecycle()
     val iconKey by vm.iconKey.collectAsStateWithLifecycle()
     val actions by vm.actions.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
@@ -522,13 +522,12 @@ fun EditNoteScreen(
                 readOnly = readOnly,
                 activeTagSuggestions = activeTagSuggestions,
                 attachments = attachments,
-                currentReminderAt = reminderAt,
-                currentRecurrence = recurrence,
+                currentReminders = reminders,
                 currentIconKey = iconKey,
                 currentActions = actions,
                 currentTags = tags,
                 heroImageContentDescription = stringResource(R.string.viewer_cover_image_cd),
-                onReminderChange = vm::setReminder,
+                onReminderChange = vm::setReminders,
                 onIconKeyChange = vm::setIconKey,
                 onActionsChange = vm::setActions,
                 onTagsWithColorsChange = vm::saveTagsWithColors,

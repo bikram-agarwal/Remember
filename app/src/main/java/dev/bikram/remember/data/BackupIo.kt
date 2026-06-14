@@ -138,6 +138,19 @@ class BackupIo(
             put("tags", JSONArray().apply { note.tags.forEach { put(it) } })
             RecurrenceRule.toJson(note.recurrence)?.let { put("recurrence", it) }
             put(
+                "reminders",
+                JSONArray().apply {
+                    note.reminders.forEach { r ->
+                        put(
+                            JSONObject().apply {
+                                put("reminderAt", r.reminderAt)
+                                RecurrenceRule.toJson(r.recurrence)?.let { put("recurrence", it) }
+                            },
+                        )
+                    }
+                },
+            )
+            put(
                 "items",
                 JSONArray().apply {
                     n.items.forEach { it2 ->
@@ -710,7 +723,20 @@ class BackupIo(
             actions = o.optJSONArray("actions")?.let { decodeActions(it) } ?: emptyList(),
             tags = o.optJSONArray("tags")?.let { decodeStringArray(it) } ?: emptyList(),
             recurrence = o.optStringOrNull("recurrence")?.let { RecurrenceRule.fromJson(it) },
+            reminders = o.optJSONArray("reminders")?.let { decodeReminders(it) } ?: emptyList(),
         )
+    }
+
+    private fun decodeReminders(a: JSONArray): List<NoteReminder> {
+        val out = ArrayList<NoteReminder>(a.length())
+        for (i in 0 until a.length()) {
+            val o = a.optJSONObject(i) ?: continue
+            val reminderAt = o.optLong("reminderAt", 0L)
+            if (reminderAt <= 0L) continue
+            val recurrence = o.optStringOrNull("recurrence")?.let { RecurrenceRule.fromJson(it) }
+            out.add(NoteReminder(reminderAt, recurrence))
+        }
+        return out
     }
 
     private fun decodeChecklistItems(o: JSONObject): List<ChecklistItemEntity> {
@@ -813,7 +839,7 @@ class BackupIo(
     private fun JSONObject.optStringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
 
     companion object {
-        const val SCHEMA_VERSION = 3
+        const val SCHEMA_VERSION = 4
         const val LEGACY_SCHEMA_VERSION = 1
         const val ENTRY_MANIFEST = "backup_manifest.json"
         const val ENTRY_NOTES = "notes.json"

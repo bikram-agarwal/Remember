@@ -41,8 +41,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
-import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.components.AppIconImage
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec

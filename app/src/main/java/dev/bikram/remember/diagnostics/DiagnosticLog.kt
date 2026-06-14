@@ -221,7 +221,14 @@ object DiagnosticLog {
         appendLine(context.getString(R.string.diagnostics_color_source_format, snapshot.theme.colorSource.toString()))
         appendLine(context.getString(R.string.diagnostics_palette_style_format, snapshot.theme.paletteStyle.toString()))
         appendLine(context.getString(R.string.diagnostics_saved_custom_seeds_format, snapshot.theme.customSeeds.size))
-        appendLine(context.getString(R.string.diagnostics_active_custom_seed_format, snapshot.theme.activeCustomSeed.isNotBlank().toString()))
+        appendLine(
+            context.getString(
+                R.string.diagnostics_active_custom_seed_format,
+                snapshot.theme.activeCustomSeed
+                    .isNotBlank()
+                    .toString(),
+            ),
+        )
         appendLine(context.getString(R.string.diagnostics_gradient_background_format, snapshot.theme.useGradient.toString()))
         appendLine(context.getString(R.string.diagnostics_surface_shading_format, snapshot.theme.shadingIntensity.toString()))
         appendLine(context.getString(R.string.diagnostics_hero_on_cards_format, snapshot.theme.heroOnCards.toString()))

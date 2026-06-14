@@ -53,8 +53,8 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.data.UpdateCheckSchedule
-import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberSwitch
@@ -788,7 +788,7 @@ private fun updateScheduleLabel(schedule: UpdateCheckSchedule): String =
         UpdateCheckSchedule.NEVER -> stringResource(R.string.settings_update_schedule_never)
     }
 
-internal sealed class ChangelogUiState {
+sealed class ChangelogUiState {
     data object Hidden : ChangelogUiState()
 
     data object Loading : ChangelogUiState()

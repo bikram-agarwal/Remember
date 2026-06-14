@@ -23,7 +23,7 @@ Output JSON shape:
       ...
     ]
 
-Run: `python font_subset/build_emoji_data.py` (no extra deps; stdlib only).
+Run: `python font_subset/build_search_emojis.py` (no extra deps; stdlib only).
 Pass `--force-refresh` to bypass the cache and re-download.
 """
 

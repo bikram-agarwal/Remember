@@ -56,6 +56,7 @@ class ReminderReceiver : BroadcastReceiver() {
     ) {
         val noteId = intent.getLongExtra(ReminderScheduler.EXTRA_NOTE_ID, -1L)
         if (noteId <= 0L) return
+        val reminderIndex = intent.getIntExtra(ReminderScheduler.EXTRA_REMINDER_INDEX, 0)
 
         val pendingResult = goAsync()
 
