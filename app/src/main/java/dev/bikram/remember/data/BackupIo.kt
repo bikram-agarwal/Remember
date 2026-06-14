@@ -140,7 +140,7 @@ class BackupIo(
             put(
                 "reminders",
                 JSONArray().apply {
-                    note.reminders.forEach { r ->
+                    note.reminders.limitedToReminderSlots().forEach { r ->
                         put(
                             JSONObject().apply {
                                 put("reminderAt", r.reminderAt)
@@ -736,7 +736,7 @@ class BackupIo(
             val recurrence = o.optStringOrNull("recurrence")?.let { RecurrenceRule.fromJson(it) }
             out.add(NoteReminder(reminderAt, recurrence))
         }
-        return out
+        return out.limitedToReminderSlots()
     }
 
     private fun decodeChecklistItems(o: JSONObject): List<ChecklistItemEntity> {

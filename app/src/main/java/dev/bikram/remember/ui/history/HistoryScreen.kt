@@ -36,6 +36,10 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
+import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
+import androidx.compose.foundation.lazy.staggeredgrid.rememberLazyStaggeredGridState
 import androidx.compose.material3.Badge
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
@@ -59,7 +63,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
@@ -80,8 +91,10 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
+import dev.bikram.remember.data.NoteLayoutMode
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.data.ViewOptionsPrefs
 import dev.bikram.remember.ui.common.BulkUndoableAction
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
@@ -114,6 +127,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -155,6 +170,7 @@ class HistoryViewModel
     @Inject
     constructor(
         private val repository: NoteRepository,
+        viewOptionsPrefs: ViewOptionsPrefs,
     ) : ViewModel() {
         /**
          * Wall-clock instant captured when the view-model is created -- used to derive the
@@ -171,6 +187,13 @@ class HistoryViewModel
             repository
                 .observeArchived()
                 .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+        val noteLayoutMode: StateFlow<NoteLayoutMode> =
+            viewOptionsPrefs
+                .state
+                .map { viewOptions -> viewOptions.noteLayoutMode }
+                .distinctUntilChanged()
+                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), NoteLayoutMode.LIST)
 
         private val _selectedIds = MutableStateFlow<Set<Long>>(emptySet())
         val selectedIds: StateFlow<Set<Long>> = _selectedIds.asStateFlow()
@@ -362,11 +385,7 @@ class HistoryViewModel
                     is BulkUndoableAction.Archived -> repository.unarchiveNotes(action.ids)
                     is BulkUndoableAction.Trashed -> repository.restoreFromTrash(action.ids)
                     is BulkUndoableAction.MarkedDone ->
-                        if (action.snapshots.isNotEmpty()) {
-                            repository.restoreCompletionStates(action.snapshots)
-                        } else {
-                            repository.markIncomplete(action.ids)
-                        }
+                        repository.markIncomplete(action.ids, action.snapshots)
                     is BulkUndoableAction.Restored -> repository.moveToTrash(action.ids)
                     is BulkUndoableAction.Unarchived -> repository.archiveNotes(action.ids)
                     is BulkUndoableAction.ArchivedFromTrash -> repository.moveToTrash(action.ids)
@@ -404,6 +423,7 @@ fun HistoryRoute(
     val vm: HistoryViewModel = hiltViewModel()
     val trashed by vm.trashedItems.collectAsStateWithLifecycle()
     val archived by vm.archivedItems.collectAsStateWithLifecycle()
+    val noteLayoutMode by vm.noteLayoutMode.collectAsStateWithLifecycle()
     val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
         initialValue =
             dev.bikram.remember.data
@@ -412,6 +432,8 @@ fun HistoryRoute(
     val selectedIds by vm.selectedIds.collectAsStateWithLifecycle()
     val archivedListState = rememberLazyListState()
     val trashedListState = rememberLazyListState()
+    val archivedGridState = rememberLazyStaggeredGridState()
+    val trashedGridState = rememberLazyStaggeredGridState()
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val topBarInset = statusBarInset + HistoryTopBarContentHeight
     val blurStyle =
@@ -441,15 +463,30 @@ fun HistoryRoute(
             HistorySection.ARCHIVE -> archivedListState
             HistorySection.TRASH -> trashedListState
         }
+    val gridState =
+        when (section) {
+            HistorySection.ARCHIVE -> archivedGridState
+            HistorySection.TRASH -> trashedGridState
+        }
     val density = LocalDensity.current
-    val topAlphaMultiplier by remember(listState) {
+    val topAlphaMultiplier by remember(listState, gridState, noteLayoutMode) {
         derivedStateOf {
-            if (listState.firstVisibleItemIndex > 0) {
-                1f
-            } else {
-                val offsetPx = listState.firstVisibleItemScrollOffset.toFloat()
-                val thresholdPx = with(density) { 24.dp.toPx() }
-                (offsetPx / thresholdPx).coerceIn(0f, 1f)
+            val thresholdPx = with(density) { 24.dp.toPx() }
+            when (noteLayoutMode) {
+                NoteLayoutMode.LIST ->
+                    if (listState.firstVisibleItemIndex > 0) {
+                        1f
+                    } else {
+                        val offsetPx = listState.firstVisibleItemScrollOffset.toFloat()
+                        (offsetPx / thresholdPx).coerceIn(0f, 1f)
+                    }
+                NoteLayoutMode.MOSAIC ->
+                    if (gridState.firstVisibleItemIndex > 0) {
+                        1f
+                    } else {
+                        val offsetPx = gridState.firstVisibleItemScrollOffset.toFloat()
+                        (offsetPx / thresholdPx).coerceIn(0f, 1f)
+                    }
             }
         }
     }
@@ -488,9 +525,23 @@ fun HistoryRoute(
     // is non-saveable (NoteWithItems isn't Parcelable) so a config change while the
     // dialog is up dismisses it - acceptable for a transient permanent-delete prompt.
     var pendingDeleteForeverNote by remember { mutableStateOf<NoteWithItems?>(null) }
+    var revealedNoteCardId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var revealedNoteCardBounds by remember { mutableStateOf<Rect?>(null) }
+    var historyScreenBounds by remember { mutableStateOf<Rect?>(null) }
 
     BackHandler(enabled = inSelectionMode) { vm.clearSelection() }
     LaunchedEffect(section) { vm.clearSelection() }
+    LaunchedEffect(section, noteLayoutMode) { revealedNoteCardId = null }
+    LaunchedEffect(inSelectionMode) {
+        if (inSelectionMode) {
+            revealedNoteCardId = null
+        }
+    }
+    LaunchedEffect(revealedNoteCardId) {
+        if (revealedNoteCardId == null) {
+            revealedNoteCardBounds = null
+        }
+    }
     LaunchedEffect(selectableVisibleIds) { vm.pruneSelection(selectableVisibleIds) }
     LaunchedEffect(section, rows.size) { onVisibleItemCountChange(rows.size) }
     LaunchedEffect(vm, snackbarHostState, context, undoLabel) {
@@ -513,7 +564,42 @@ fun HistoryRoute(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { coordinates ->
+                    historyScreenBounds = coordinates.boundsInRoot()
+                }.pointerInput(revealedNoteCardId, revealedNoteCardBounds) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val downChange =
+                                event.changes.firstOrNull { change ->
+                                    change.changedToDownIgnoreConsumed()
+                                } ?: continue
+                            val activeCardBounds = revealedNoteCardBounds
+                            val screenBounds = historyScreenBounds
+                            val tapPositionInRoot =
+                                if (screenBounds != null) {
+                                    Offset(
+                                        x = screenBounds.left + downChange.position.x,
+                                        y = screenBounds.top + downChange.position.y,
+                                    )
+                                } else {
+                                    downChange.position
+                                }
+                            if (
+                                revealedNoteCardId != null &&
+                                activeCardBounds != null &&
+                                !activeCardBounds.contains(tapPositionInRoot)
+                            ) {
+                                revealedNoteCardId = null
+                            }
+                        }
+                    }
+                },
+    ) {
         // Blur only on the scroll layer (Home pattern). Top bar sits above so scrim/blur do not
         // paint over the toggles; list contentPadding lets rows scroll under the transparent bar.
         Box(modifier = Modifier.fillMaxSize()) {
@@ -557,6 +643,11 @@ fun HistoryRoute(
                         HistorySection.ARCHIVE -> archivedListState
                         HistorySection.TRASH -> trashedListState
                     }
+                val targetGridState =
+                    when (targetSection) {
+                        HistorySection.ARCHIVE -> archivedGridState
+                        HistorySection.TRASH -> trashedGridState
+                    }
                 val targetListScrollEnabled =
                     rememberContentOverflowScrollEnabled(
                         listState = targetListState,
@@ -573,74 +664,185 @@ fun HistoryRoute(
                         }
                     }
                 if (targetRows.isNotEmpty()) {
-                    LazyColumn(
-                        state = targetListState,
-                        modifier =
-                            Modifier
-                                .fillMaxSize()
-                                .then(listBlurMod),
-                        contentPadding =
-                            PaddingValues(
-                                start = 16.dp,
-                                end = 16.dp,
-                                top = listTopPadding,
-                                bottom = pillInset + 24.dp,
-                            ),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
-                        userScrollEnabled = targetListScrollEnabled,
-                    ) {
-                        if (targetSection == HistorySection.TRASH) {
-                            item(key = "retention_notice", contentType = "retention") {
-                                RetentionNotice(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(
-                                                top = HistoryTopBarBlurBelowExtra,
-                                                bottom = 12.dp,
-                                            ),
-                                )
+                    val contentPadding =
+                        PaddingValues(
+                            start = 16.dp,
+                            end = 16.dp,
+                            top = listTopPadding,
+                            bottom = pillInset + 24.dp,
+                        )
+                    if (noteLayoutMode == NoteLayoutMode.MOSAIC) {
+                        LazyVerticalStaggeredGrid(
+                            columns = StaggeredGridCells.Adaptive(180.dp),
+                            state = targetGridState,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .then(listBlurMod),
+                            contentPadding = contentPadding,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalItemSpacing = 6.dp,
+                        ) {
+                            if (targetSection == HistorySection.TRASH) {
+                                item(
+                                    key = "retention_notice",
+                                    contentType = "retention",
+                                    span = StaggeredGridItemSpan.FullLine,
+                                ) {
+                                    RetentionNotice(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(
+                                                    top = HistoryTopBarBlurBelowExtra,
+                                                    bottom = 12.dp,
+                                                ),
+                                    )
+                                }
+                            }
+                            targetRows.forEach { row ->
+                                item(
+                                    key = row.card.id,
+                                    contentType =
+                                        if (targetSection == HistorySection.TRASH) {
+                                            "trashedRow"
+                                        } else {
+                                            "archivedRow"
+                                        },
+                                ) {
+                                    val noteId = row.card.id
+                                    val isSelected = noteId in selectedIds
+                                    val isActiveInDetailPane = !inSelectionMode && activeNoteId == noteId
+                                    var cardBounds by remember { mutableStateOf<Rect?>(null) }
+                                    HistorySwipeCard(
+                                        model = row.card,
+                                        section = targetSection,
+                                        daysLeft =
+                                            vm
+                                                .daysLeftInTrash(row.note)
+                                                .takeIf { targetSection == HistorySection.TRASH },
+                                        onOpenNote = {
+                                            if (inSelectionMode) {
+                                                vm.toggleSelection(noteId)
+                                            } else {
+                                                onOpenNote(row.note, false)
+                                            }
+                                        },
+                                        onRestore = { vm.restore(row.note) },
+                                        onArchive = { vm.archiveFromTrash(row.note) },
+                                        onDeleteForever = { pendingDeleteForeverNote = row.note },
+                                        onUnarchive = { vm.unarchive(row.note) },
+                                        onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
+                                        selected = isSelected,
+                                        activeInDetailPane = isActiveInDetailPane,
+                                        onLongClick = { vm.toggleSelection(noteId) },
+                                        swipeEnabled = !inSelectionMode,
+                                        reminderNotificationsAllowed = notificationsAllowed,
+                                        modifier =
+                                            Modifier.onGloballyPositioned { coordinates ->
+                                                cardBounds = coordinates.boundsInRoot()
+                                                if (revealedNoteCardId == noteId) {
+                                                    revealedNoteCardBounds = cardBounds
+                                                }
+                                            },
+                                        revealKey = noteId,
+                                        activeRevealKey = revealedNoteCardId,
+                                        onRevealStarted = {
+                                            revealedNoteCardId = noteId
+                                            revealedNoteCardBounds = cardBounds
+                                        },
+                                        onRevealClosed = {
+                                            if (revealedNoteCardId == noteId) {
+                                                revealedNoteCardId = null
+                                            }
+                                        },
+                                    )
+                                }
                             }
                         }
-                        items(
-                            items = targetRows,
-                            key = { row -> row.card.id },
-                            contentType = {
-                                if (targetSection == HistorySection.TRASH) {
-                                    "trashedRow"
-                                } else {
-                                    "archivedRow"
+                    } else {
+                        LazyColumn(
+                            state = targetListState,
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .then(listBlurMod),
+                            contentPadding = contentPadding,
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            userScrollEnabled = targetListScrollEnabled,
+                        ) {
+                            if (targetSection == HistorySection.TRASH) {
+                                item(key = "retention_notice", contentType = "retention") {
+                                    RetentionNotice(
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(
+                                                    top = HistoryTopBarBlurBelowExtra,
+                                                    bottom = 12.dp,
+                                                ),
+                                    )
                                 }
-                            },
-                        ) { row ->
-                            val noteId = row.card.id
-                            val isSelected = noteId in selectedIds
-                            val isActiveInDetailPane = !inSelectionMode && activeNoteId == noteId
-                            HistorySwipeCard(
-                                model = row.card,
-                                section = targetSection,
-                                daysLeft =
-                                    vm
-                                        .daysLeftInTrash(row.note)
-                                        .takeIf { targetSection == HistorySection.TRASH },
-                                onOpenNote = {
-                                    if (inSelectionMode) {
-                                        vm.toggleSelection(noteId)
+                            }
+                            items(
+                                items = targetRows,
+                                key = { row -> row.card.id },
+                                contentType = {
+                                    if (targetSection == HistorySection.TRASH) {
+                                        "trashedRow"
                                     } else {
-                                        onOpenNote(row.note, false)
+                                        "archivedRow"
                                     }
                                 },
-                                onRestore = { vm.restore(row.note) },
-                                onArchive = { vm.archiveFromTrash(row.note) },
-                                onDeleteForever = { pendingDeleteForeverNote = row.note },
-                                onUnarchive = { vm.unarchive(row.note) },
-                                onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
-                                selected = isSelected,
-                                activeInDetailPane = isActiveInDetailPane,
-                                onLongClick = { vm.toggleSelection(noteId) },
-                                swipeEnabled = !inSelectionMode,
-                                reminderNotificationsAllowed = notificationsAllowed,
-                            )
+                            ) { row ->
+                                val noteId = row.card.id
+                                val isSelected = noteId in selectedIds
+                                val isActiveInDetailPane = !inSelectionMode && activeNoteId == noteId
+                                var cardBounds by remember { mutableStateOf<Rect?>(null) }
+                                HistorySwipeCard(
+                                    model = row.card,
+                                    section = targetSection,
+                                    daysLeft =
+                                        vm
+                                            .daysLeftInTrash(row.note)
+                                            .takeIf { targetSection == HistorySection.TRASH },
+                                    onOpenNote = {
+                                        if (inSelectionMode) {
+                                            vm.toggleSelection(noteId)
+                                        } else {
+                                            onOpenNote(row.note, false)
+                                        }
+                                    },
+                                    onRestore = { vm.restore(row.note) },
+                                    onArchive = { vm.archiveFromTrash(row.note) },
+                                    onDeleteForever = { pendingDeleteForeverNote = row.note },
+                                    onUnarchive = { vm.unarchive(row.note) },
+                                    onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
+                                    selected = isSelected,
+                                    activeInDetailPane = isActiveInDetailPane,
+                                    onLongClick = { vm.toggleSelection(noteId) },
+                                    swipeEnabled = !inSelectionMode,
+                                    reminderNotificationsAllowed = notificationsAllowed,
+                                    modifier =
+                                        Modifier.onGloballyPositioned { coordinates ->
+                                            cardBounds = coordinates.boundsInRoot()
+                                            if (revealedNoteCardId == noteId) {
+                                                revealedNoteCardBounds = cardBounds
+                                            }
+                                        },
+                                    revealKey = noteId,
+                                    activeRevealKey = revealedNoteCardId,
+                                    onRevealStarted = {
+                                        revealedNoteCardId = noteId
+                                        revealedNoteCardBounds = cardBounds
+                                    },
+                                    onRevealClosed = {
+                                        if (revealedNoteCardId == noteId) {
+                                            revealedNoteCardId = null
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 } else {
@@ -1092,9 +1294,14 @@ private fun HistorySwipeCard(
     activeInDetailPane: Boolean = false,
     swipeEnabled: Boolean = true,
     reminderNotificationsAllowed: Boolean = true,
+    modifier: Modifier = Modifier,
+    revealKey: Any? = null,
+    activeRevealKey: Any? = null,
+    onRevealStarted: (() -> Unit)? = null,
+    onRevealClosed: (() -> Unit)? = null,
 ) {
     if (!swipeEnabled) {
-        Box(Modifier.fillMaxWidth()) {
+        Box(modifier.fillMaxWidth()) {
             NoteCard(
                 model = model,
                 onClick = onOpenNote,
@@ -1181,7 +1388,11 @@ private fun HistorySwipeCard(
         startActions = startActions,
         endActions = endActions,
         cardShape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
+        revealKey = revealKey,
+        activeRevealKey = activeRevealKey,
+        onRevealStarted = onRevealStarted,
+        onRevealClosed = onRevealClosed,
     ) {
         Box(Modifier.fillMaxWidth()) {
             NoteCard(

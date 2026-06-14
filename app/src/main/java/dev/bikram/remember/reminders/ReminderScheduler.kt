@@ -81,6 +81,7 @@ class ReminderScheduler(
                     context = context,
                     note = note,
                     items = items,
+                    reminderIndex = index,
                     keepUntilDone = keepUntilDone,
                 )
             }
@@ -97,6 +98,9 @@ class ReminderScheduler(
     fun cancelNotification(noteId: Long) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(pendingRequestCodeForNote(noteId))
+        for (index in 0 until MAX_REMINDERS_PER_NOTE) {
+            notificationManager.cancel(pendingRequestCodeForNoteReminder(noteId, index))
+        }
     }
 
     suspend fun refreshNotificationIfActive(
@@ -104,18 +108,28 @@ class ReminderScheduler(
         items: List<ChecklistItemEntity>,
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notificationId = pendingRequestCodeForNote(note.id)
-        val active =
-            notificationManager.activeNotifications.any { notification ->
-                notification.id == notificationId
-            }
-        if (active) {
+        val activeNotificationIds = notificationManager.activeNotifications.map { notification -> notification.id }.toSet()
+        val keepUntilDone = keepReminderNotificationsUntilDone()
+        if (pendingRequestCodeForNote(note.id) in activeNotificationIds) {
+            notificationManager.cancel(pendingRequestCodeForNote(note.id))
             ReminderReceiver.showNotification(
                 context = context,
                 note = note,
                 items = items,
-                keepUntilDone = keepReminderNotificationsUntilDone(),
+                reminderIndex = 0,
+                keepUntilDone = keepUntilDone,
             )
+        }
+        for (index in 0 until MAX_REMINDERS_PER_NOTE) {
+            if (pendingRequestCodeForNoteReminder(note.id, index) in activeNotificationIds) {
+                ReminderReceiver.showNotification(
+                    context = context,
+                    note = note,
+                    items = items,
+                    reminderIndex = index,
+                    keepUntilDone = keepUntilDone,
+                )
+            }
         }
     }
 
@@ -314,7 +328,7 @@ class ReminderScheduler(
 
     companion object {
         private const val TAG = "ReminderScheduler"
-        const val MAX_REMINDERS_PER_NOTE = 3
+        const val MAX_REMINDERS_PER_NOTE = dev.bikram.remember.data.MAX_REMINDERS_PER_NOTE
         private val inexactFallbackScheduleCounter = AtomicInteger(0)
 
         const val ACTION_FIRE_REMINDER = "dev.bikram.remember.reminders.FIRE"
@@ -378,8 +392,11 @@ class ReminderScheduler(
             return (salted xor (salted ushr 32)).toInt()
         }
 
-        fun pendingRequestCodeForDismiss(noteId: Long): Int {
-            val salted = noteId xor (0x4B4DL shl 32)
+        fun pendingRequestCodeForDismiss(
+            noteId: Long,
+            reminderIndex: Int = 0,
+        ): Int {
+            val salted = noteId xor (0x4B4DL shl 32) xor ((reminderIndex.toLong() + 1L) shl 44)
             return (salted xor (salted ushr 32)).toInt()
         }
     }

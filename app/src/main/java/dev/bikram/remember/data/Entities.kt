@@ -97,6 +97,10 @@ data class NoteReminder(
     val recurrence: RecurrenceRule? = null,
 )
 
+const val MAX_REMINDERS_PER_NOTE = 3
+
+fun List<NoteReminder>.limitedToReminderSlots(): List<NoteReminder> = take(MAX_REMINDERS_PER_NOTE)
+
 @Entity(tableName = "notes")
 data class NoteEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -149,10 +153,10 @@ data class NoteEntity(
 )
 
 fun NoteEntity.getActiveReminders(): List<NoteReminder> {
-    if (reminders.isNotEmpty()) return reminders
+    if (reminders.isNotEmpty()) return reminders.limitedToReminderSlots()
     val primaryAt = reminderAt
     return if (primaryAt != null) {
-        listOf(NoteReminder(primaryAt, recurrence))
+        listOf(NoteReminder(primaryAt, recurrence)).limitedToReminderSlots()
     } else {
         emptyList()
     }

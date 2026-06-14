@@ -28,7 +28,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,7 +35,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,26 +61,16 @@ fun AppBottomSheet(
     actionsImePadding: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val scope = rememberCoroutineScope()
-    val dismissWithAnimation: () -> Unit = {
-        scope.launch {
-            runCatching {
-                if (sheetState.isVisible) {
-                    sheetState.hide()
-                }
-            }
-            onDismiss()
-        }
-    }
+    val dismissSheet: () -> Unit = onDismiss
     ModalBottomSheet(
-        onDismissRequest = dismissWithAnimation,
+        onDismissRequest = dismissSheet,
         sheetState = sheetState,
         sheetGesturesEnabled = sheetGesturesEnabled,
         containerColor = containerColor,
         contentColor = contentColor,
         dragHandle = { AppBottomSheetDragHandle() },
     ) {
-        RememberPredictiveBackHandler(onBack = dismissWithAnimation)
+        RememberPredictiveBackHandler(onBack = dismissSheet)
         Column(modifier = Modifier.navigationBarsPadding()) {
             if (showTitleBar) {
                 Column(

@@ -488,22 +488,15 @@ fun EditListScreen(
                     )
                 },
             ) { padding ->
-                val activeIds = activeEntries.filterIsInstance<ActiveEntry.Row>().map { it.item.localId }
-                val completedRowIds = completedEntries.filterIsInstance<CompletedEntry.Row>().map { it.item.localId }
+                val activeIds = visibleActiveEntries.filterIsInstance<ActiveEntry.Row>().map { it.item.localId }
                 val reorderState =
                     rememberReorderableLazyListState(lazyListState) { from, to ->
-                        // ignored here. We only reorder within the matching sublist (no cross-section drags).
+                        // Reorder only the rows currently rendered in the active section.
                         val fromId = from.key as? Long ?: return@rememberReorderableLazyListState
                         val toId = to.key as? Long ?: return@rememberReorderableLazyListState
-                        val (list, fromIdx, toIdx) =
-                            when {
-                                fromId in activeIds && toId in activeIds ->
-                                    Triple(activeIds, activeIds.indexOf(fromId), activeIds.indexOf(toId))
-                                fromId in completedRowIds && toId in completedRowIds ->
-                                    Triple(completedRowIds, completedRowIds.indexOf(fromId), completedRowIds.indexOf(toId))
-                                else -> return@rememberReorderableLazyListState
-                            }
-                        if (fromIdx >= 0 && toIdx >= 0) vm.reorderWithin(list, fromIdx, toIdx)
+                        val fromIdx = activeIds.indexOf(fromId)
+                        val toIdx = activeIds.indexOf(toId)
+                        if (fromIdx >= 0 && toIdx >= 0) vm.reorderWithin(activeIds, fromIdx, toIdx)
                     }
 
                 androidx.compose.foundation.lazy.LazyColumn(

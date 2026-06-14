@@ -364,16 +364,7 @@ class HomeViewModel
                     is BulkUndoableAction.Archived -> repository.unarchiveNotes(action.ids)
                     is BulkUndoableAction.Trashed -> repository.restoreFromTrash(action.ids)
                     is BulkUndoableAction.MarkedDone ->
-                        // Prefer snapshot-based restore so recurring notes get their
-                        // pre-advancement rule + reminderAt back. Fall back to the old
-                        // markIncomplete path only when snapshots weren't captured (older
-                        // call sites or notification-action paths) -- correct for non-
-                        // recurring notes, partial for recurring.
-                        if (action.snapshots.isNotEmpty()) {
-                            repository.restoreCompletionStates(action.snapshots)
-                        } else {
-                            repository.markIncomplete(action.ids)
-                        }
+                        repository.markIncomplete(action.ids, action.snapshots)
                     // The rest aren't produced by HomeViewModel, but exhaustiveness keeps
                     // the inverse mapping correct if a new variant is ever added.
                     is BulkUndoableAction.Restored -> repository.moveToTrash(action.ids)

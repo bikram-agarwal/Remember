@@ -276,7 +276,7 @@ class EditListViewModel
             if (!result.changed) {
                 return
             }
-            _items.value = result.items
+            _items.value = result.items.sortedBy { item -> item.sortOrder }
             markDirty()
         }
 
