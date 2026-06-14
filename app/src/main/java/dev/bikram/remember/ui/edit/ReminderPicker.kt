@@ -12,7 +12,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -90,6 +96,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -390,6 +397,9 @@ fun ReminderPickerSheet(
         )
     }
     var expandedIndex by rememberSaveable { mutableIntStateOf(0) }
+    var draftKeys by rememberSaveable { mutableStateOf(List(drafts.size) { index -> index.toLong() }) }
+    var nextDraftKey by rememberSaveable { mutableLongStateOf(drafts.size.toLong()) }
+    var enteringExpandedDraftKey by remember { mutableLongStateOf(Long.MIN_VALUE) }
 
     val hasChanges =
         if (initialReminders.isEmpty()) {
@@ -487,255 +497,285 @@ fun ReminderPickerSheet(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                val expansionSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
+                val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+                val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
                 drafts.forEachIndexed { index, draft ->
+                    val draftKey = draftKeys.getOrElse(index) { index.toLong() }
                     val isExpanded = expandedIndex == index
 
-                    Surface(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .animateContentSize()
-                                .border(
-                                    width = 1.dp,
-                                    color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
-                                    shape = MaterialTheme.shapes.medium,
-                                ),
-                        shape = MaterialTheme.shapes.medium,
-                        color = if (isExpanded) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerHighest,
-                    ) {
-                        Column {
-                            Row(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .clip(MaterialTheme.shapes.medium)
-                                        .clickable {
-                                            expandedIndex = if (isExpanded) -1 else index
-                                        }.padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                RememberMaterialRoundedSymbol(
-                                    name = if (isExpanded) "keyboard_arrow_down" else "keyboard_arrow_right",
-                                    size = 20.dp,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    weight = FontWeight.Medium,
-                                )
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text =
-                                        if (isExpanded) {
-                                            stringResource(R.string.reminder_header_index, index + 1)
-                                        } else {
-                                            formatCollapsedHeader(context, draft)
-                                        },
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.weight(1f),
-                                )
-                                if (drafts.size > 1) {
-                                    RememberIconButton(
-                                        onClick = {
-                                            val nextDrafts = drafts.toMutableList()
-                                            nextDrafts.removeAt(index)
-                                            drafts = nextDrafts
-                                            if (expandedIndex >= nextDrafts.size) {
-                                                expandedIndex = nextDrafts.size - 1
-                                            }
-                                        },
-                                    ) {
-                                        RememberMaterialRoundedSymbol(
-                                            name = "delete",
-                                            size = 20.dp,
-                                            tint = MaterialTheme.colorScheme.error,
-                                            weight = FontWeight.Medium,
-                                        )
+                    key(draftKey) {
+                        val expandedContentState =
+                            remember {
+                                MutableTransitionState(isExpanded && enteringExpandedDraftKey != draftKey)
+                            }
+                        expandedContentState.targetState = isExpanded
+
+                        Surface(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .animateContentSize()
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                                        shape = MaterialTheme.shapes.medium,
+                                    ),
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (isExpanded) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ) {
+                            Column {
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .clip(MaterialTheme.shapes.medium)
+                                            .clickable {
+                                                expandedIndex = if (isExpanded) -1 else index
+                                            }.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    RememberMaterialRoundedSymbol(
+                                        name = if (isExpanded) "keyboard_arrow_down" else "keyboard_arrow_right",
+                                        size = 20.dp,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        weight = FontWeight.Medium,
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text =
+                                            if (isExpanded) {
+                                                stringResource(R.string.reminder_header_index, index + 1)
+                                            } else {
+                                                formatCollapsedHeader(context, draft)
+                                            },
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (drafts.size > 1) {
+                                        RememberIconButton(
+                                            onClick = {
+                                                val removedKey = draftKeys.getOrNull(index)
+                                                val nextDrafts = drafts.toMutableList()
+                                                val nextDraftKeys = draftKeys.toMutableList()
+                                                nextDrafts.removeAt(index)
+                                                if (index in nextDraftKeys.indices) {
+                                                    nextDraftKeys.removeAt(index)
+                                                }
+                                                drafts = nextDrafts
+                                                draftKeys = nextDraftKeys
+                                                if (removedKey == enteringExpandedDraftKey) {
+                                                    enteringExpandedDraftKey = Long.MIN_VALUE
+                                                }
+                                                expandedIndex =
+                                                    when {
+                                                        nextDrafts.isEmpty() -> -1
+                                                        index == expandedIndex -> index.coerceAtMost(nextDrafts.lastIndex)
+                                                        index < expandedIndex -> expandedIndex - 1
+                                                        expandedIndex >= nextDrafts.size -> nextDrafts.lastIndex
+                                                        else -> expandedIndex
+                                                    }
+                                            },
+                                        ) {
+                                            RememberMaterialRoundedSymbol(
+                                                name = "delete",
+                                                size = 20.dp,
+                                                tint = MaterialTheme.colorScheme.error,
+                                                weight = FontWeight.Medium,
+                                            )
+                                        }
                                     }
                                 }
-                            }
 
-                            if (isExpanded) {
-                                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                                    PillRow(
-                                        materialSymbolName = "calendar_month",
-                                        label =
-                                            if (draft.reminderDateExplicit) {
-                                                formatDate(draft.selectedDate)
-                                            } else {
-                                                stringResource(R.string.reminder_pick_date)
-                                            },
-                                        hasValue = draft.reminderDateExplicit,
-                                        enabled = controlsEnabled,
-                                        onClick = {
-                                            dateDialogOpen = true
-                                        },
-                                    )
-
-                                    Spacer(Modifier.height(8.dp))
-
-                                    PillRow(
-                                        materialSymbolName = "schedule",
-                                        label =
-                                            if (draft.reminderTimeExplicit) {
-                                                formatReminderTimePill(draft.reminderHour, draft.reminderMinute)
-                                            } else {
-                                                stringResource(R.string.reminder_pick_time)
-                                            },
-                                        hasValue = draft.reminderTimeExplicit,
-                                        enabled = controlsEnabled,
-                                        onClick = {
-                                            timePickerOpen = true
-                                        },
-                                        onClear = null,
-                                    )
-
-                                    Spacer(Modifier.height(8.dp))
-
-                                    PillRow(
-                                        materialSymbolName = "repeat",
-                                        label =
-                                            if (draft.repeatOn) {
-                                                repeatSummary(
-                                                    unit = draft.unit,
-                                                    interval = draft.intervalText.toIntOrNull() ?: 1,
-                                                    daysOfWeek = draft.daysOfWeek,
-                                                    monthlyKind = draft.monthlyKind,
-                                                    dayOfMonth = draft.dayOfMonth,
-                                                    nthOrdinal = draft.nthOrdinal,
-                                                    nthWeekday = draft.nthWeekday,
-                                                    endKind = draft.endKind,
-                                                    endDate = draft.endDate,
-                                                    endCount = draft.endCountText.toIntOrNull(),
-                                                )
-                                            } else {
-                                                stringResource(R.string.reminder_repeat)
-                                            },
-                                        hasValue = draft.repeatOn,
-                                        enabled = controlsEnabled,
-                                        onClick = {
-                                            drafts =
-                                                drafts.mapIndexed { idx, d ->
-                                                    if (idx == index) {
-                                                        if (!d.repeatOn) {
-                                                            d.copy(repeatOn = true, repeatExpanded = true)
-                                                        } else {
-                                                            d.copy(repeatExpanded = !d.repeatExpanded)
-                                                        }
-                                                    } else {
-                                                        d
-                                                    }
-                                                }
-                                        },
-                                        onClear =
-                                            if (draft.repeatOn && controlsEnabled) {
-                                                {
-                                                    drafts =
-                                                        drafts.mapIndexed { idx, d ->
-                                                            if (idx == index) d.copy(repeatOn = false, repeatExpanded = false) else d
-                                                        }
-                                                }
-                                            } else {
-                                                null
-                                            },
-                                    )
-
-                                    if (draft.repeatOn && draft.repeatExpanded && controlsEnabled) {
-                                        Spacer(Modifier.height(10.dp))
-                                        RepeatConfig(
-                                            unit = draft.unit,
-                                            onUnit = { nextUnit ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(unit = nextUnit) else d
-                                                    }
-                                            },
-                                            unitMenuOpen = draft.unitMenuOpen,
-                                            onUnitMenuOpen = { open ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(unitMenuOpen = open) else d
-                                                    }
-                                            },
-                                            intervalText = draft.intervalText,
-                                            onIntervalText = { nextText ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(intervalText = nextText) else d
-                                                    }
-                                            },
-                                            daysOfWeek = draft.daysOfWeek,
-                                            onDaysOfWeek = { nextDays ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(daysOfWeek = nextDays) else d
-                                                    }
-                                            },
-                                            monthlyKind = draft.monthlyKind,
-                                            onMonthlyKind = { nextKind ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(monthlyKind = nextKind) else d
-                                                    }
-                                            },
-                                            dayOfMonth = draft.dayOfMonth,
-                                            onDayOfMonth = { nextDay ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(dayOfMonth = nextDay) else d
-                                                    }
-                                            },
-                                            dayOfMonthMenuOpen = draft.dayOfMonthMenuOpen,
-                                            onDayOfMonthMenuOpen = { open ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(dayOfMonthMenuOpen = open) else d
-                                                    }
-                                            },
-                                            nthOrdinal = draft.nthOrdinal,
-                                            onNthOrdinal = { nextOrd ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(nthOrdinal = nextOrd) else d
-                                                    }
-                                            },
-                                            nthOrdinalMenuOpen = draft.nthOrdinalMenuOpen,
-                                            onNthOrdinalMenuOpen = { open ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(nthOrdinalMenuOpen = open) else d
-                                                    }
-                                            },
-                                            nthWeekday = draft.nthWeekday,
-                                            onNthWeekday = { nextWd ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(nthWeekday = nextWd) else d
-                                                    }
-                                            },
-                                            nthWeekdayMenuOpen = draft.nthWeekdayMenuOpen,
-                                            onNthWeekdayMenuOpen = { open ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(nthWeekdayMenuOpen = open) else d
-                                                    }
-                                            },
-                                            endKind = draft.endKind,
-                                            onEndKind = { nextKind ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(endKind = nextKind) else d
-                                                    }
-                                            },
-                                            endDate = draft.endDate,
-                                            onOpenEndDatePicker = { endDateDialogOpen = true },
-                                            endCountText = draft.endCountText,
-                                            onEndCountText = { nextCount ->
-                                                drafts =
-                                                    drafts.mapIndexed { idx, d ->
-                                                        if (idx == index) d.copy(endCountText = nextCount) else d
-                                                    }
+                                AnimatedVisibility(
+                                    visibleState = expandedContentState,
+                                    enter = expandVertically(animationSpec = expansionSpec) + fadeIn(animationSpec = fadeInSpec),
+                                    exit = shrinkVertically(animationSpec = expansionSpec) + fadeOut(animationSpec = fadeOutSpec),
+                                ) {
+                                    Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                                        PillRow(
+                                            materialSymbolName = "calendar_month",
+                                            label =
+                                                if (draft.reminderDateExplicit) {
+                                                    formatDate(draft.selectedDate)
+                                                } else {
+                                                    stringResource(R.string.reminder_pick_date)
+                                                },
+                                            hasValue = draft.reminderDateExplicit,
+                                            enabled = controlsEnabled,
+                                            onClick = {
+                                                dateDialogOpen = true
                                             },
                                         )
+
+                                        Spacer(Modifier.height(8.dp))
+
+                                        PillRow(
+                                            materialSymbolName = "schedule",
+                                            label =
+                                                if (draft.reminderTimeExplicit) {
+                                                    formatReminderTimePill(draft.reminderHour, draft.reminderMinute)
+                                                } else {
+                                                    stringResource(R.string.reminder_pick_time)
+                                                },
+                                            hasValue = draft.reminderTimeExplicit,
+                                            enabled = controlsEnabled,
+                                            onClick = {
+                                                timePickerOpen = true
+                                            },
+                                            onClear = null,
+                                        )
+
+                                        Spacer(Modifier.height(8.dp))
+
+                                        PillRow(
+                                            materialSymbolName = "repeat",
+                                            label =
+                                                if (draft.repeatOn) {
+                                                    repeatSummary(
+                                                        unit = draft.unit,
+                                                        interval = draft.intervalText.toIntOrNull() ?: 1,
+                                                        daysOfWeek = draft.daysOfWeek,
+                                                        monthlyKind = draft.monthlyKind,
+                                                        dayOfMonth = draft.dayOfMonth,
+                                                        nthOrdinal = draft.nthOrdinal,
+                                                        nthWeekday = draft.nthWeekday,
+                                                        endKind = draft.endKind,
+                                                        endDate = draft.endDate,
+                                                        endCount = draft.endCountText.toIntOrNull(),
+                                                    )
+                                                } else {
+                                                    stringResource(R.string.reminder_repeat)
+                                                },
+                                            hasValue = draft.repeatOn,
+                                            enabled = controlsEnabled,
+                                            onClick = {
+                                                drafts =
+                                                    drafts.mapIndexed { idx, d ->
+                                                        if (idx == index) {
+                                                            if (!d.repeatOn) {
+                                                                d.copy(repeatOn = true, repeatExpanded = true)
+                                                            } else {
+                                                                d.copy(repeatExpanded = !d.repeatExpanded)
+                                                            }
+                                                        } else {
+                                                            d
+                                                        }
+                                                    }
+                                            },
+                                            onClear =
+                                                if (draft.repeatOn && controlsEnabled) {
+                                                    {
+                                                        drafts =
+                                                            drafts.mapIndexed { idx, d ->
+                                                                if (idx == index) d.copy(repeatOn = false, repeatExpanded = false) else d
+                                                            }
+                                                    }
+                                                } else {
+                                                    null
+                                                },
+                                        )
+
+                                        if (draft.repeatOn && draft.repeatExpanded && controlsEnabled) {
+                                            Spacer(Modifier.height(10.dp))
+                                            RepeatConfig(
+                                                unit = draft.unit,
+                                                onUnit = { nextUnit ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(unit = nextUnit) else d
+                                                        }
+                                                },
+                                                unitMenuOpen = draft.unitMenuOpen,
+                                                onUnitMenuOpen = { open ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(unitMenuOpen = open) else d
+                                                        }
+                                                },
+                                                intervalText = draft.intervalText,
+                                                onIntervalText = { nextText ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(intervalText = nextText) else d
+                                                        }
+                                                },
+                                                daysOfWeek = draft.daysOfWeek,
+                                                onDaysOfWeek = { nextDays ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(daysOfWeek = nextDays) else d
+                                                        }
+                                                },
+                                                monthlyKind = draft.monthlyKind,
+                                                onMonthlyKind = { nextKind ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(monthlyKind = nextKind) else d
+                                                        }
+                                                },
+                                                dayOfMonth = draft.dayOfMonth,
+                                                onDayOfMonth = { nextDay ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(dayOfMonth = nextDay) else d
+                                                        }
+                                                },
+                                                dayOfMonthMenuOpen = draft.dayOfMonthMenuOpen,
+                                                onDayOfMonthMenuOpen = { open ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(dayOfMonthMenuOpen = open) else d
+                                                        }
+                                                },
+                                                nthOrdinal = draft.nthOrdinal,
+                                                onNthOrdinal = { nextOrd ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(nthOrdinal = nextOrd) else d
+                                                        }
+                                                },
+                                                nthOrdinalMenuOpen = draft.nthOrdinalMenuOpen,
+                                                onNthOrdinalMenuOpen = { open ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(nthOrdinalMenuOpen = open) else d
+                                                        }
+                                                },
+                                                nthWeekday = draft.nthWeekday,
+                                                onNthWeekday = { nextWd ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(nthWeekday = nextWd) else d
+                                                        }
+                                                },
+                                                nthWeekdayMenuOpen = draft.nthWeekdayMenuOpen,
+                                                onNthWeekdayMenuOpen = { open ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(nthWeekdayMenuOpen = open) else d
+                                                        }
+                                                },
+                                                endKind = draft.endKind,
+                                                onEndKind = { nextKind ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(endKind = nextKind) else d
+                                                        }
+                                                },
+                                                endDate = draft.endDate,
+                                                onOpenEndDatePicker = { endDateDialogOpen = true },
+                                                endCountText = draft.endCountText,
+                                                onEndCountText = { nextCount ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(endCountText = nextCount) else d
+                                                        }
+                                                },
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -765,8 +805,12 @@ fun ReminderPickerSheet(
                                     }
                                 }.clip(MaterialTheme.shapes.medium)
                                 .clickable {
+                                    val newDraftKey = nextDraftKey
                                     val nextDrafts = drafts + createBlankDraft(now)
+                                    nextDraftKey += 1L
                                     drafts = nextDrafts
+                                    draftKeys = draftKeys + newDraftKey
+                                    enteringExpandedDraftKey = newDraftKey
                                     expandedIndex = nextDrafts.lastIndex
                                 },
                         contentAlignment = Alignment.Center,

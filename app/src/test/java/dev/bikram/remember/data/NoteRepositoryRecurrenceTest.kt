@@ -172,6 +172,106 @@ class NoteRepositoryRecurrenceTest {
             assertNotNull(noteDao.stored.note.recurrence)
         }
 
+    @Test
+    fun `mark incomplete with completion snapshot restores multi reminders`() =
+        runBlocking {
+            val completedAt = calendarMillis(2026, Calendar.APRIL, 26, 9, 0)
+            val firstReminder = calendarMillis(2026, Calendar.APRIL, 27, 8, 0)
+            val secondReminder = calendarMillis(2026, Calendar.APRIL, 28, 17, 30)
+            val reminders =
+                listOf(
+                    NoteReminder(firstReminder, RecurrenceRule(unit = RecurrenceUnit.DAY)),
+                    NoteReminder(secondReminder),
+                )
+            val noteDao =
+                FakeNoteDao(
+                    NoteEntity(
+                        id = 1L,
+                        kind = NoteKind.NOTE,
+                        title = "Done task",
+                        body = "",
+                        colorIndex = 0,
+                        starred = false,
+                        trashed = false,
+                        createdAt = completedAt,
+                        updatedAt = completedAt,
+                        completedAt = completedAt,
+                    ),
+                )
+            val repository =
+                NoteRepository(
+                    noteDao = noteDao,
+                    itemDao = FakeChecklistItemDao(),
+                    attachmentDao = FakeAttachmentDao(),
+                    clock = { completedAt + 1_000L },
+                )
+
+            repository.markIncomplete(
+                noteId = 1L,
+                snapshot =
+                    NoteCompletionSnapshot(
+                        reminderAt = firstReminder,
+                        recurrence = reminders.first().recurrence,
+                        reminders = reminders,
+                    ),
+            )
+
+            val restored = noteDao.stored.note
+            assertNull(restored.completedAt)
+            assertEquals(firstReminder, restored.reminderAt)
+            assertEquals(reminders.first().recurrence, restored.recurrence)
+            assertEquals(reminders, restored.reminders)
+        }
+
+    @Test
+    fun `resolve updated reminders caps provided reminders`() {
+        val reminders =
+            listOf(
+                NoteReminder(1_000L),
+                NoteReminder(2_000L),
+                NoteReminder(3_000L),
+                NoteReminder(4_000L),
+            )
+        val repository =
+            NoteRepository(
+                noteDao = FakeNoteDao(baseNote()),
+                itemDao = FakeChecklistItemDao(),
+                attachmentDao = FakeAttachmentDao(),
+            )
+
+        val resolved = repository.resolveUpdatedReminders(null, NoteOptions(reminders = reminders))
+
+        assertEquals(reminders.take(MAX_REMINDERS_PER_NOTE), resolved)
+    }
+
+    @Test
+    fun `import note with children caps reminders before insert`() =
+        runBlocking {
+            val reminders =
+                listOf(
+                    NoteReminder(1_000L),
+                    NoteReminder(2_000L),
+                    NoteReminder(3_000L),
+                    NoteReminder(4_000L),
+                )
+            val noteDao = FakeNoteDao(baseNote())
+            val repository =
+                NoteRepository(
+                    noteDao = noteDao,
+                    itemDao = FakeChecklistItemDao(),
+                    attachmentDao = FakeAttachmentDao(),
+                )
+
+            repository.importNoteWithChildren(
+                note = baseNote().copy(reminders = reminders),
+                items = emptyList(),
+                attachments = emptyList(),
+                suppressReminderSchedule = true,
+            )
+
+            assertEquals(reminders.take(MAX_REMINDERS_PER_NOTE), noteDao.stored.note.reminders)
+        }
+
     private fun calendarMillis(
         year: Int,
         month: Int,
@@ -190,6 +290,19 @@ class NoteRepositoryRecurrenceTest {
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
             }.timeInMillis
+
+    private fun baseNote(): NoteEntity =
+        NoteEntity(
+            id = 1L,
+            kind = NoteKind.NOTE,
+            title = "Task",
+            body = "",
+            colorIndex = 0,
+            starred = false,
+            trashed = false,
+            createdAt = 0L,
+            updatedAt = 0L,
+        )
 
     private class FakeNoteDao(
         initialNote: NoteEntity,

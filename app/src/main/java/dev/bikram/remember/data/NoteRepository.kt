@@ -165,10 +165,10 @@ class NoteRepository(
         options: NoteOptions,
     ): List<NoteReminder> {
         if (options.reminders.isNotEmpty()) {
-            return options.reminders
+            return options.reminders.limitedToReminderSlots()
         }
         val optionPrimaryAt = options.reminderAt ?: return emptyList()
-        val existingReminders = existingNote?.reminders ?: emptyList()
+        val existingReminders = existingNote?.reminders?.limitedToReminderSlots() ?: emptyList()
         if (existingReminders.isNotEmpty()) {
             val soonest = existingReminders.minByOrNull { it.reminderAt }
             return existingReminders.map { reminder ->
@@ -179,7 +179,7 @@ class NoteRepository(
                 }
             }
         }
-        return listOf(NoteReminder(optionPrimaryAt, options.recurrence))
+        return listOf(NoteReminder(optionPrimaryAt, options.recurrence)).limitedToReminderSlots()
     }
 
     suspend fun createNote(
@@ -654,10 +654,13 @@ class NoteRepository(
         return snapshots
     }
 
-    suspend fun markIncomplete(ids: Collection<Long>) {
+    suspend fun markIncomplete(
+        ids: Collection<Long>,
+        snapshots: Map<Long, NoteCompletionSnapshot> = emptyMap(),
+    ) {
         if (ids.isEmpty()) return
         runInTransaction {
-            ids.forEach { id -> markIncomplete(id) }
+            ids.forEach { id -> markIncomplete(id, snapshots[id]) }
         }
     }
 
@@ -1266,15 +1269,14 @@ class NoteRepository(
         return snapshot
     }
 
-    suspend fun markIncomplete(noteId: Long): Boolean {
+    suspend fun markIncomplete(
+        noteId: Long,
+        snapshot: NoteCompletionSnapshot? = null,
+    ): Boolean {
         val existingWithItems = noteDao.get(noteId) ?: return false
         val existing = existingWithItems.note
-        if (existing.completedAt == null) return false
-        val restoredNote =
-            existing.copy(
-                completedAt = null,
-                updatedAt = clock(),
-            )
+        if (existing.completedAt == null && snapshot == null) return false
+        val restoredNote = restoredIncompleteNote(existing, snapshot)
         noteDao.update(restoredNote)
         scheduler?.scheduleOrShow(restoredNote, existingWithItems.items)
         postWriteBookkeeping()
@@ -1287,14 +1289,7 @@ class NoteRepository(
             snapshots.forEach { (id, snapshot) ->
                 val existingWithItems = noteDao.get(id) ?: return@forEach
                 val existing = existingWithItems.note
-                val restoredNote =
-                    existing.copy(
-                        completedAt = null,
-                        reminderAt = snapshot.reminderAt,
-                        recurrence = snapshot.recurrence?.sanitized(),
-                        reminders = snapshot.reminders,
-                        updatedAt = clock(),
-                    )
+                val restoredNote = restoredIncompleteNote(existing, snapshot)
                 noteDao.update(restoredNote)
                 scheduler?.cancel(id)
                 scheduler?.scheduleOrShow(restoredNote, existingWithItems.items)
@@ -1302,6 +1297,21 @@ class NoteRepository(
         }
         if (database != null) database.withTransaction { applyAll() } else applyAll()
         postWriteBookkeeping()
+    }
+
+    private fun restoredIncompleteNote(
+        existing: NoteEntity,
+        snapshot: NoteCompletionSnapshot?,
+    ): NoteEntity {
+        val restoredNote =
+            existing.copy(
+                completedAt = null,
+                reminderAt = snapshot?.reminderAt ?: existing.reminderAt,
+                recurrence = snapshot?.recurrence?.sanitized() ?: existing.recurrence,
+                reminders = snapshot?.reminders ?: existing.reminders,
+                updatedAt = clock(),
+            )
+        return restoredNote.withSyncedPrimaryReminder()
     }
 
     companion object {

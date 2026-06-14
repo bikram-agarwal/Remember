@@ -40,8 +40,8 @@ sealed interface BulkUndoableAction {
      *     ran. Carrying these lets undo restore the exact prior reminderAt + recurrence
      *     rule even for recurring notes whose rule was advanced or consumed by the
      *     mark-done. Defaulted to empty for callers that don't capture (notification
-     *     action path, importer); the undo handler falls back to [markIncomplete] in
-     *     that case, which works correctly for non-recurring notes only.
+     *     action path, importer); without a snapshot, [markIncomplete] can only restore
+     *     the completion flag and whatever reminder state remains on the row.
      */
     data class MarkedDone(
         override val ids: Set<Long>,

@@ -74,6 +74,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     context = context,
                     note = note,
                     items = noteWithItems.items,
+                    reminderIndex = reminderIndex,
                     keepUntilDone = keepUntilDone,
                 )
             } finally {
@@ -103,6 +104,7 @@ class ReminderReceiver : BroadcastReceiver() {
             context: Context,
             note: NoteEntity,
             items: List<ChecklistItemEntity> = emptyList(),
+            reminderIndex: Int = 0,
             keepUntilDone: Boolean = false,
         ) {
             if (note.trashed) return
@@ -129,7 +131,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
                     .setVisibility(notificationVisibility(note))
                     .setContentIntent(openNotePendingIntent(context, note.id))
-                    .setDeleteIntent(dismissPendingIntent(context, note.id).takeIf { keepUntilDone })
+                    .setDeleteIntent(dismissPendingIntent(context, note.id, reminderIndex).takeIf { keepUntilDone })
                     .setOngoing(true)
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(true)
@@ -184,9 +186,9 @@ class ReminderReceiver : BroadcastReceiver() {
 
             postNotificationIfAllowed(
                 context = context,
-                notificationId = ReminderScheduler.pendingRequestCodeForNote(note.id),
+                notificationId = ReminderScheduler.pendingRequestCodeForNoteReminder(note.id, reminderIndex),
                 notification = builder.build(),
-                source = "Reminder noteId=${note.id}",
+                source = "Reminder noteId=${note.id} reminderIndex=$reminderIndex",
             )
         }
 
@@ -469,15 +471,17 @@ class ReminderReceiver : BroadcastReceiver() {
         private fun dismissPendingIntent(
             context: Context,
             noteId: Long,
+            reminderIndex: Int,
         ): PendingIntent {
             val dismiss =
                 Intent(context, ReminderDismissReceiver::class.java).apply {
                     action = ReminderDismissReceiver.ACTION_DISMISSED
                     putExtra(ReminderDismissReceiver.EXTRA_NOTE_ID, noteId)
+                    putExtra(ReminderDismissReceiver.EXTRA_REMINDER_INDEX, reminderIndex)
                 }
             return PendingIntent.getBroadcast(
                 context,
-                ReminderScheduler.pendingRequestCodeForDismiss(noteId),
+                ReminderScheduler.pendingRequestCodeForDismiss(noteId, reminderIndex),
                 dismiss,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
