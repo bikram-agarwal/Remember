@@ -65,6 +65,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize"
             android:exported="true"
             android:launchMode="singleTask"
             android:theme="@style/Theme.Remember.Starting"

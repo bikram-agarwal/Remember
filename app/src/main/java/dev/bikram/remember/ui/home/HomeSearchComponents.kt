@@ -90,6 +90,7 @@ internal fun SearchableTopBarTitle(
     query: String,
     noteLayoutMode: NoteLayoutMode,
     showLayoutToggle: Boolean,
+    layoutToggleEnabled: Boolean,
     onQueryChange: (String) -> Unit,
     onSearchFocusRequested: () -> Unit,
     onToggleLayout: () -> Unit,
@@ -173,6 +174,7 @@ internal fun SearchableTopBarTitle(
             RememberFilledTonalIconButton(
                 onClick = onToggleLayout,
                 modifier = Modifier.size(rememberResponsiveActionButtonSize()),
+                enabled = layoutToggleEnabled,
                 tooltipLabel = layoutToggleDescription,
             ) {
                 val layoutMorphProgress by animateFloatAsState(
