@@ -19,6 +19,14 @@ import androidx.compose.ui.unit.dp
 /** Below this many dp of usable height in landscape, screens switch to space-saving layouts. */
 const val SMALL_LANDSCAPE_HEIGHT_DP = 480
 
+internal fun noteMosaicColumnCount(availableWidth: Dp): Int =
+    when {
+        availableWidth < 340.dp -> 1
+        availableWidth < 960.dp -> 2
+        availableWidth < 1280.dp -> 3
+        else -> 4
+    }
+
 @Composable
 @ReadOnlyComposable
 fun isLandscape(): Boolean = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE

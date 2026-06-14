@@ -115,6 +115,7 @@ import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.domain.formatTimeOfDay
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
@@ -1273,7 +1274,7 @@ internal fun ReminderTimePickerDialog(
                 color = MaterialTheme.colorScheme.surfaceContainerLowest,
                 modifier =
                     Modifier
-                        .widthIn(max = 400.dp)
+                        .widthIn(max = if (isLandscape()) 560.dp else 400.dp)
                         .padding(16.dp),
             ) {
                 Column(

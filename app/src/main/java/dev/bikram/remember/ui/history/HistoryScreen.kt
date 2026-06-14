@@ -17,6 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -100,6 +101,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
 import dev.bikram.remember.ui.common.emptyStateSpacing
 import dev.bikram.remember.ui.common.isLandscape
+import dev.bikram.remember.ui.common.noteMosaicColumnCount
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.EmptyArchiveIllustration
 import dev.bikram.remember.ui.components.EmptyTrashIllustration
@@ -671,45 +673,132 @@ fun HistoryRoute(
                             top = listTopPadding,
                             bottom = pillInset + 24.dp,
                         )
-                    if (noteLayoutMode == NoteLayoutMode.MOSAIC) {
-                        LazyVerticalStaggeredGrid(
-                            columns = StaggeredGridCells.Adaptive(180.dp),
-                            state = targetGridState,
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .then(listBlurMod),
-                            contentPadding = contentPadding,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalItemSpacing = 6.dp,
-                        ) {
-                            if (targetSection == HistorySection.TRASH) {
-                                item(
-                                    key = "retention_notice",
-                                    contentType = "retention",
-                                    span = StaggeredGridItemSpan.FullLine,
-                                ) {
-                                    RetentionNotice(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .padding(
-                                                    top = HistoryTopBarBlurBelowExtra,
-                                                    bottom = 12.dp,
-                                                ),
-                                    )
+                    BoxWithConstraints(Modifier.fillMaxSize()) {
+                        val mosaicColumnCount = noteMosaicColumnCount(maxWidth)
+                        if (noteLayoutMode == NoteLayoutMode.MOSAIC && mosaicColumnCount > 1) {
+                            LazyVerticalStaggeredGrid(
+                                columns = StaggeredGridCells.Fixed(mosaicColumnCount),
+                                state = targetGridState,
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .then(listBlurMod),
+                                contentPadding = contentPadding,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalItemSpacing = 6.dp,
+                            ) {
+                                if (targetSection == HistorySection.TRASH) {
+                                    item(
+                                        key = "retention_notice",
+                                        contentType = "retention",
+                                        span = StaggeredGridItemSpan.FullLine,
+                                    ) {
+                                        RetentionNotice(
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(
+                                                        top = HistoryTopBarBlurBelowExtra,
+                                                        bottom = 12.dp,
+                                                    ),
+                                        )
+                                    }
+                                }
+                                targetRows.forEach { row ->
+                                    item(
+                                        key = row.card.id,
+                                        contentType =
+                                            if (targetSection == HistorySection.TRASH) {
+                                                "trashedRow"
+                                            } else {
+                                                "archivedRow"
+                                            },
+                                    ) {
+                                        val noteId = row.card.id
+                                        val isSelected = noteId in selectedIds
+                                        val isActiveInDetailPane = !inSelectionMode && activeNoteId == noteId
+                                        var cardBounds by remember { mutableStateOf<Rect?>(null) }
+                                        HistorySwipeCard(
+                                            model = row.card,
+                                            section = targetSection,
+                                            daysLeft =
+                                                vm
+                                                    .daysLeftInTrash(row.note)
+                                                    .takeIf { targetSection == HistorySection.TRASH },
+                                            onOpenNote = {
+                                                if (inSelectionMode) {
+                                                    vm.toggleSelection(noteId)
+                                                } else {
+                                                    onOpenNote(row.note, false)
+                                                }
+                                            },
+                                            onRestore = { vm.restore(row.note) },
+                                            onArchive = { vm.archiveFromTrash(row.note) },
+                                            onDeleteForever = { pendingDeleteForeverNote = row.note },
+                                            onUnarchive = { vm.unarchive(row.note) },
+                                            onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
+                                            selected = isSelected,
+                                            activeInDetailPane = isActiveInDetailPane,
+                                            onLongClick = { vm.toggleSelection(noteId) },
+                                            swipeEnabled = !inSelectionMode,
+                                            reminderNotificationsAllowed = notificationsAllowed,
+                                            modifier =
+                                                Modifier.onGloballyPositioned { coordinates ->
+                                                    cardBounds = coordinates.boundsInRoot()
+                                                    if (revealedNoteCardId == noteId) {
+                                                        revealedNoteCardBounds = cardBounds
+                                                    }
+                                                },
+                                            revealKey = noteId,
+                                            activeRevealKey = revealedNoteCardId,
+                                            onRevealStarted = {
+                                                revealedNoteCardId = noteId
+                                                revealedNoteCardBounds = cardBounds
+                                            },
+                                            onRevealClosed = {
+                                                if (revealedNoteCardId == noteId) {
+                                                    revealedNoteCardId = null
+                                                }
+                                            },
+                                        )
+                                    }
                                 }
                             }
-                            targetRows.forEach { row ->
-                                item(
-                                    key = row.card.id,
-                                    contentType =
+                        } else {
+                            LazyColumn(
+                                state = targetListState,
+                                modifier =
+                                    Modifier
+                                        .fillMaxSize()
+                                        .then(listBlurMod),
+                                contentPadding = contentPadding,
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                userScrollEnabled = targetListScrollEnabled,
+                            ) {
+                                if (targetSection == HistorySection.TRASH) {
+                                    item(key = "retention_notice", contentType = "retention") {
+                                        RetentionNotice(
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(
+                                                        top = HistoryTopBarBlurBelowExtra,
+                                                        bottom = 12.dp,
+                                                    ),
+                                        )
+                                    }
+                                }
+                                items(
+                                    items = targetRows,
+                                    key = { row -> row.card.id },
+                                    contentType = {
                                         if (targetSection == HistorySection.TRASH) {
                                             "trashedRow"
                                         } else {
                                             "archivedRow"
-                                        },
-                                ) {
+                                        }
+                                    },
+                                ) { row ->
                                     val noteId = row.card.id
                                     val isSelected = noteId in selectedIds
                                     val isActiveInDetailPane = !inSelectionMode && activeNoteId == noteId
@@ -758,90 +847,6 @@ fun HistoryRoute(
                                         },
                                     )
                                 }
-                            }
-                        }
-                    } else {
-                        LazyColumn(
-                            state = targetListState,
-                            modifier =
-                                Modifier
-                                    .fillMaxSize()
-                                    .then(listBlurMod),
-                            contentPadding = contentPadding,
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            userScrollEnabled = targetListScrollEnabled,
-                        ) {
-                            if (targetSection == HistorySection.TRASH) {
-                                item(key = "retention_notice", contentType = "retention") {
-                                    RetentionNotice(
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .padding(
-                                                    top = HistoryTopBarBlurBelowExtra,
-                                                    bottom = 12.dp,
-                                                ),
-                                    )
-                                }
-                            }
-                            items(
-                                items = targetRows,
-                                key = { row -> row.card.id },
-                                contentType = {
-                                    if (targetSection == HistorySection.TRASH) {
-                                        "trashedRow"
-                                    } else {
-                                        "archivedRow"
-                                    }
-                                },
-                            ) { row ->
-                                val noteId = row.card.id
-                                val isSelected = noteId in selectedIds
-                                val isActiveInDetailPane = !inSelectionMode && activeNoteId == noteId
-                                var cardBounds by remember { mutableStateOf<Rect?>(null) }
-                                HistorySwipeCard(
-                                    model = row.card,
-                                    section = targetSection,
-                                    daysLeft =
-                                        vm
-                                            .daysLeftInTrash(row.note)
-                                            .takeIf { targetSection == HistorySection.TRASH },
-                                    onOpenNote = {
-                                        if (inSelectionMode) {
-                                            vm.toggleSelection(noteId)
-                                        } else {
-                                            onOpenNote(row.note, false)
-                                        }
-                                    },
-                                    onRestore = { vm.restore(row.note) },
-                                    onArchive = { vm.archiveFromTrash(row.note) },
-                                    onDeleteForever = { pendingDeleteForeverNote = row.note },
-                                    onUnarchive = { vm.unarchive(row.note) },
-                                    onMoveToTrash = { vm.moveArchivedToTrash(row.note) },
-                                    selected = isSelected,
-                                    activeInDetailPane = isActiveInDetailPane,
-                                    onLongClick = { vm.toggleSelection(noteId) },
-                                    swipeEnabled = !inSelectionMode,
-                                    reminderNotificationsAllowed = notificationsAllowed,
-                                    modifier =
-                                        Modifier.onGloballyPositioned { coordinates ->
-                                            cardBounds = coordinates.boundsInRoot()
-                                            if (revealedNoteCardId == noteId) {
-                                                revealedNoteCardBounds = cardBounds
-                                            }
-                                        },
-                                    revealKey = noteId,
-                                    activeRevealKey = revealedNoteCardId,
-                                    onRevealStarted = {
-                                        revealedNoteCardId = noteId
-                                        revealedNoteCardBounds = cardBounds
-                                    },
-                                    onRevealClosed = {
-                                        if (revealedNoteCardId == noteId) {
-                                            revealedNoteCardId = null
-                                        }
-                                    },
-                                )
                             }
                         }
                     }
