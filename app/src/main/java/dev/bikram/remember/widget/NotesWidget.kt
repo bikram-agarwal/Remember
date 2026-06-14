@@ -90,6 +90,33 @@ private fun Int.scaledSp(): TextUnit {
     return (this * (cappedScale / fontScale)).sp
 }
 
+internal fun quickCaptureNeedsCondensedCopy(
+    widgetWidthDp: Float,
+    density: Float,
+    fontScale: Float,
+    title: String,
+    trailingText: String,
+    measureTextWidthPx: (String, Float) -> Float = ::measureWidgetTextWidthPx,
+): Boolean {
+    val contentWidthPx = (widgetWidthDp - QUICK_CAPTURE_HORIZONTAL_PADDING_DP * 2) * density
+    val cappedScale = fontScale.coerceAtLeast(0.01f).coerceAtMost(1.3f)
+    val titleWidthPx = measureTextWidthPx(title, QUICK_CAPTURE_HEADER_TITLE_SP * cappedScale * density)
+    val trailingWidthPx = measureTextWidthPx(trailingText, QUICK_CAPTURE_HEADER_TRAILING_SP * cappedScale * density)
+    return titleWidthPx + trailingWidthPx + QUICK_CAPTURE_HEADER_FIT_BUFFER_DP * density > contentWidthPx
+}
+
+private fun measureWidgetTextWidthPx(
+    text: String,
+    textSizePx: Float,
+): Float {
+    val paint =
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            this.textSize = textSizePx
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+        }
+    return paint.measureText(text)
+}
+
 class NotesWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode =
         SizeMode.Responsive(
@@ -317,6 +344,15 @@ private fun QuickCaptureContent(
     dueTodayCount: Int,
 ) {
     val context = LocalContext.current
+    val fullStatusText = quickCaptureStatus(context, overdueCount, dueTodayCount)
+    val useCondensedCopy =
+        quickCaptureNeedsCondensedCopy(
+            widgetWidthDp = LocalSize.current.width.value,
+            density = context.resources.displayMetrics.density,
+            fontScale = context.resources.configuration.fontScale,
+            title = context.getString(R.string.widget_header_title),
+            trailingText = fullStatusText,
+        )
     Column(
         modifier =
             GlanceModifier
@@ -328,19 +364,38 @@ private fun QuickCaptureContent(
         WidgetHeader(
             compact = true,
             showActions = false,
-            trailingText = quickCaptureStatus(context, overdueCount, dueTodayCount),
+            trailingText =
+                if (useCondensedCopy && overdueCount == 0 && dueTodayCount == 0) {
+                    context.getString(R.string.widget_empty_no_due)
+                } else {
+                    fullStatusText
+                },
             widgetKind = WIDGET_KIND_QUICK_CAPTURE,
         )
         Spacer(GlanceModifier.height(10.dp))
         QuickCaptureButton(
-            label = context.getString(R.string.widget_create_new_note),
+            label =
+                context.getString(
+                    if (useCondensedCopy) {
+                        R.string.widget_new_note
+                    } else {
+                        R.string.widget_create_new_note
+                    },
+                ),
             imageProvider = ImageProvider(R.drawable.ic_widget_note_add),
             intent = newNoteIntent(context),
             modifier = GlanceModifier.defaultWeight(),
         )
         Spacer(GlanceModifier.height(8.dp))
         QuickCaptureButton(
-            label = context.getString(R.string.widget_create_new_list),
+            label =
+                context.getString(
+                    if (useCondensedCopy) {
+                        R.string.widget_new_list
+                    } else {
+                        R.string.widget_create_new_list
+                    },
+                ),
             imageProvider = ImageProvider(R.drawable.ic_widget_list_add),
             intent = newListIntent(context),
             modifier = GlanceModifier.defaultWeight(),
@@ -1153,3 +1208,7 @@ private const val WIDGET_SYMBOL_BITMAP_SIZE_PX = 64
 private const val WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX = 192
 private const val WIDGET_SYMBOL_TEXT_SIZE_PX = 144f
 private const val WIDGET_SYMBOL_OUTPUT_PADDING_PX = 4f
+private const val QUICK_CAPTURE_HORIZONTAL_PADDING_DP = 12f
+private const val QUICK_CAPTURE_HEADER_TITLE_SP = 13
+private const val QUICK_CAPTURE_HEADER_TRAILING_SP = 11
+private const val QUICK_CAPTURE_HEADER_FIT_BUFFER_DP = 4f

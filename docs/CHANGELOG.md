@@ -1,10 +1,10 @@
 ## v1.1.2: Hourly reminders, widget improvements
 
 ### ✨ New Features
-- **Hourly reminder** - New option to set hourly reminders for a note.
+- **Hourly reminders.** New option to set hourly reminders for a note.
 
 ### 🛠 Improved Features
-- **Widgets now caps font scaling.** If the device is using huge display / font size, the widget will now cap the font scaling to prevent text from overflowing the widget bounds.
+- **Widgets now cap font scaling.** If the device is using huge display / font size, the widget will now cap the font scaling to prevent text from overflowing the widget bounds.
 - **Reduced app size** by removing unnecessary app bundles, making the app lighter and more efficient.
 
 ---
