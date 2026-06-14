@@ -1,6 +1,6 @@
 # Remember
 
-<img alt="Remember: Notes, tasks, reminders - done right." src="./fastlane/metadata/android/en-US/images/featureGraphic.png" />
+<img alt="Remember: Notes, tasks, reminders - done right." src="./fastlane/metadata/android/en-US/images/featureGraphic.jpg" />
 
 **Never lose an important reminder to an accidental swipe.**
 
@@ -14,6 +14,7 @@ If a reminder notification gets swiped away without being marked Done, Remember 
 
 - **Keep reminders until done.** The feature the app is built around. Enable it, and accidental dismissals stop mattering — Remember re-posts the notification until the note is marked done.
 - **Snooze that speaks human.** Presets like *soon*, *later today*, *this evening*, *tomorrow morning*, or pick a custom date and time — not arbitrary minute counts.
+- **Multiple reminders per note.** Add up to three reminders to the same note, each with its own time and repeat pattern.
 - **Action buttons in the notification.** A reminder to call someone shows a call button right there. A reminder to pick something up shows directions. You can act on the reminder right from the notification.
 - **High-importance mode.** Heads-up alerts, sound, and vibration for the things that cannot wait.
 - **Recurring reminders.** Simple intervals (*daily, weekly, monthly, yearly*) or calendar-grade patterns like *the last Friday of every month* — the kind most reminder apps can't do. With an end date or repeat count. When you mark one done, the next is automatically scheduled.
@@ -38,6 +39,7 @@ Reminders are more useful when they carry information. Remember's notes and list
 - **Star** notes for quick access. **Archive** ones you want to keep but not see. Or send to **Trash** that clears after 30 days automatically.
 - **Filter** by type, tag, starred status, has-reminder, has-picture, or has-attachment.
 - **Sort and group** by last modified, created date, or reminder time — grouped by date, type, or tag.
+- **List or grid view** for note cards, so you can choose a compact list or a visual mosaic.
 
 
 ### 🎨 Looks the way you want it to
@@ -77,37 +79,37 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 <table>
 <tr>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/1_home.png" alt="Home Page: All notes, sorted the way you choose" width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/1_home.jpg" alt="Home Page: All notes, sorted the way you choose" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/2_note_page.png" alt="Note page: every reminder carries the full story" width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/2_note_page.jpg" alt="Note page: every reminder carries the full story" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/3_markdown.png" alt="Notes support markdown with live preview" width="300" /><br />
-</td>
-</tr>
-
-<tr>
-<td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/4_checklist.png" alt="Checklist with nesting and drag & drop" width="300" /><br />
-</td>
-<td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/5_icons.png" alt="Assign icon to your notes. Choose from hundreds of symbols and entire emoji set" width="300" /><br />
-</td>
-<td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/6_actions.png" alt="Act on reminders directly from the notification" width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/3_markdown.jpg" alt="Notes support markdown with live preview" width="300" /><br />
 </td>
 </tr>
 
 <tr>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/7_reminders.png" alt="Extensive flexibility in setting recurring reminders" width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/4_checklist.jpg" alt="Checklist with nesting and drag & drop" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/8_settings.png" alt="Extensive theming options. Make it your own." width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/5_icons.jpg" alt="Assign icon to your notes. Choose from hundreds of symbols and entire emoji set" width="300" /><br />
 </td>
 <td width="33%" align="center" valign="top">
-<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/9_widgets.png" alt="Widgets to keep you informed and in control." width="300" /><br />
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/6_actions.jpg" alt="Act on reminders directly from the notification" width="300" /><br />
+</td>
+</tr>
+
+<tr>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/7_reminders.jpg" alt="Extensive flexibility in setting recurring reminders" width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/8_settings.jpg" alt="Extensive theming options. Make it your own." width="300" /><br />
+</td>
+<td width="33%" align="center" valign="top">
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/9_widgets.jpg" alt="Widgets to keep you informed and in control." width="300" /><br />
 </td>
 </tr>
 </table>

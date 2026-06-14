@@ -12,7 +12,13 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,6 +50,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimeInput
@@ -52,6 +59,7 @@ import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberTooltipState
@@ -64,13 +72,21 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -80,6 +96,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -91,12 +108,15 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.bikram.remember.R
 import dev.bikram.remember.data.MonthlyMode
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.data.RecurrenceEndKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
+import dev.bikram.remember.domain.formatTimeOfDay
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
 import dev.bikram.remember.ui.components.RememberIconButton
@@ -111,27 +131,302 @@ import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
 
+internal data class ReminderDraft(
+    val selectedDate: Long,
+    val reminderDateExplicit: Boolean,
+    val reminderHour: Int,
+    val reminderMinute: Int,
+    val reminderTimeExplicit: Boolean,
+    val repeatOn: Boolean,
+    val repeatExpanded: Boolean,
+    val unit: RecurrenceUnit,
+    val intervalText: String,
+    val daysOfWeek: Set<Int>,
+    val monthlyKind: MonthlyKind,
+    val dayOfMonth: Int,
+    val nthOrdinal: Int,
+    val nthWeekday: Int,
+    val endKind: RecurrenceEndKind,
+    val endDate: Long?,
+    val endCountText: String,
+    val unitMenuOpen: Boolean = false,
+    val dayOfMonthMenuOpen: Boolean = false,
+    val nthOrdinalMenuOpen: Boolean = false,
+    val nthWeekdayMenuOpen: Boolean = false,
+)
+
+internal val ReminderDraftSaver =
+    listSaver<ReminderDraft, Any?>(
+        save = { draft ->
+            listOf(
+                draft.selectedDate,
+                draft.reminderDateExplicit,
+                draft.reminderHour,
+                draft.reminderMinute,
+                draft.reminderTimeExplicit,
+                draft.repeatOn,
+                draft.repeatExpanded,
+                draft.unit.name,
+                draft.intervalText,
+                draft.daysOfWeek.toList(),
+                draft.monthlyKind.name,
+                draft.dayOfMonth,
+                draft.nthOrdinal,
+                draft.nthWeekday,
+                draft.endKind.name,
+                draft.endDate,
+                draft.endCountText,
+                draft.unitMenuOpen,
+                draft.dayOfMonthMenuOpen,
+                draft.nthOrdinalMenuOpen,
+                draft.nthWeekdayMenuOpen,
+            )
+        },
+        restore = { list ->
+            ReminderDraft(
+                selectedDate = list[0] as Long,
+                reminderDateExplicit = list[1] as Boolean,
+                reminderHour = list[2] as Int,
+                reminderMinute = list[3] as Int,
+                reminderTimeExplicit = list[4] as Boolean,
+                repeatOn = list[5] as Boolean,
+                repeatExpanded = list[6] as Boolean,
+                unit = RecurrenceUnit.valueOf(list[7] as String),
+                intervalText = list[8] as String,
+                daysOfWeek = (list[9] as List<*>).map { (it as Number).toInt() }.toSet(),
+                monthlyKind = MonthlyKind.valueOf(list[10] as String),
+                dayOfMonth = list[11] as Int,
+                nthOrdinal = list[12] as Int,
+                nthWeekday = list[13] as Int,
+                endKind = RecurrenceEndKind.valueOf(list[14] as String),
+                endDate = list[15] as Long?,
+                endCountText = list[16] as String,
+                unitMenuOpen = list[17] as Boolean,
+                dayOfMonthMenuOpen = list[18] as Boolean,
+                nthOrdinalMenuOpen = list[19] as Boolean,
+                nthWeekdayMenuOpen = list[20] as Boolean,
+            )
+        },
+    )
+
+internal val ReminderDraftListSaver =
+    listSaver<List<ReminderDraft>, Any?>(
+        save = { list ->
+            list.map { draft ->
+                with(ReminderDraftSaver) { save(draft) }
+            }
+        },
+        restore = { list ->
+            list.map { element ->
+                ReminderDraftSaver.restore(element as List<*>)!!
+            }
+        },
+    )
+
+private fun createBlankDraft(now: Long): ReminderDraft {
+    val cal = Calendar.getInstance().apply { timeInMillis = now + 60 * 60 * 1000L }
+    return ReminderDraft(
+        selectedDate = pickerDayMillisForLocalWallClock(cal.timeInMillis),
+        reminderDateExplicit = false,
+        reminderHour = 9,
+        reminderMinute = 0,
+        reminderTimeExplicit = false,
+        repeatOn = false,
+        repeatExpanded = false,
+        unit = RecurrenceUnit.DAY,
+        intervalText = "1",
+        daysOfWeek = setOf(cal.get(Calendar.DAY_OF_WEEK)),
+        monthlyKind = MonthlyKind.BY_DAY,
+        dayOfMonth = cal.get(Calendar.DAY_OF_MONTH),
+        nthOrdinal = ((cal.get(Calendar.DAY_OF_MONTH) - 1) / 7) + 1,
+        nthWeekday = cal.get(Calendar.DAY_OF_WEEK),
+        endKind = RecurrenceEndKind.NEVER,
+        endDate = null,
+        endCountText = "10",
+    )
+}
+
+private fun NoteReminder.toDraft(): ReminderDraft {
+    val cal = Calendar.getInstance().apply { timeInMillis = reminderAt }
+    val rule = recurrence
+    return ReminderDraft(
+        selectedDate = pickerDayMillisForLocalWallClock(reminderAt),
+        reminderDateExplicit = true,
+        reminderHour = cal.get(Calendar.HOUR_OF_DAY),
+        reminderMinute = cal.get(Calendar.MINUTE),
+        reminderTimeExplicit = true,
+        repeatOn = rule != null,
+        repeatExpanded = false,
+        unit = rule?.unit ?: RecurrenceUnit.DAY,
+        intervalText = (rule?.interval ?: 1).toString(),
+        daysOfWeek = rule?.daysOfWeek ?: setOf(cal.get(Calendar.DAY_OF_WEEK)),
+        monthlyKind =
+            when (rule?.monthlyMode) {
+                is MonthlyMode.ByNthWeekday -> MonthlyKind.BY_WEEKDAY
+                else -> MonthlyKind.BY_DAY
+            },
+        dayOfMonth = (rule?.monthlyMode as? MonthlyMode.ByDayOfMonth)?.day ?: cal.get(Calendar.DAY_OF_MONTH),
+        nthOrdinal = (rule?.monthlyMode as? MonthlyMode.ByNthWeekday)?.ordinal ?: (((cal.get(Calendar.DAY_OF_MONTH) - 1) / 7) + 1),
+        nthWeekday = (rule?.monthlyMode as? MonthlyMode.ByNthWeekday)?.weekday ?: cal.get(Calendar.DAY_OF_WEEK),
+        endKind = rule?.endKind ?: RecurrenceEndKind.NEVER,
+        endDate = rule?.endDate,
+        endCountText = (rule?.endCount ?: DEFAULT_END_COUNT).toString(),
+    )
+}
+
+private fun ReminderDraft.toReminder(): NoteReminder {
+    val hour24 = if (reminderTimeExplicit) reminderHour else 9
+    val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
+    val selectedDay = Instant.ofEpochMilli(selectedDate).atZone(ZoneOffset.UTC).toLocalDate()
+    val fireAt =
+        selectedDay
+            .atTime(LocalTime.of(hour24, minuteVal))
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+    val rule =
+        if (!repeatOn) {
+            null
+        } else {
+            val interval = intervalText.toIntOrNull()?.coerceIn(1, 999) ?: 1
+            val mode: MonthlyMode? =
+                if (unit == RecurrenceUnit.MONTH) {
+                    if (monthlyKind == MonthlyKind.BY_DAY) {
+                        MonthlyMode.ByDayOfMonth(dayOfMonth)
+                    } else {
+                        MonthlyMode.ByNthWeekday(nthOrdinal, nthWeekday)
+                    }
+                } else {
+                    null
+                }
+            val daysSet = if (unit == RecurrenceUnit.WEEK) daysOfWeek else emptySet()
+            val count = endCountText.toIntOrNull()?.coerceIn(1, 9999) ?: DEFAULT_END_COUNT
+            RecurrenceRule(
+                unit = unit,
+                interval = interval,
+                daysOfWeek = daysSet,
+                monthlyMode = mode,
+                endKind = endKind,
+                endDate = if (endKind == RecurrenceEndKind.ON_DATE) endDate else null,
+                endCount = if (endKind == RecurrenceEndKind.AFTER_COUNT) count else null,
+            )
+        }
+    return NoteReminder(fireAt, rule)
+}
+
+private fun getCompactRecurrenceLabel(
+    context: Context,
+    rule: RecurrenceRule,
+): String {
+    val interval = rule.interval.coerceAtLeast(1)
+    return if (interval == 1) {
+        when (rule.unit) {
+            RecurrenceUnit.DAY -> context.getString(R.string.reminder_recurrence_daily)
+            RecurrenceUnit.WEEK -> context.getString(R.string.reminder_recurrence_weekly)
+            RecurrenceUnit.MONTH -> context.getString(R.string.reminder_recurrence_monthly)
+            RecurrenceUnit.YEAR -> context.getString(R.string.reminder_recurrence_yearly)
+        }
+    } else {
+        val resId =
+            when (rule.unit) {
+                RecurrenceUnit.DAY -> R.plurals.reminder_recurrence_every_days
+                RecurrenceUnit.WEEK -> R.plurals.reminder_recurrence_every_weeks
+                RecurrenceUnit.MONTH -> R.plurals.reminder_recurrence_every_months
+                RecurrenceUnit.YEAR -> R.plurals.reminder_recurrence_every_years
+            }
+        context.resources.getQuantityString(resId, interval, interval)
+    }
+}
+
+private fun formatCollapsedHeader(
+    context: Context,
+    draft: ReminderDraft,
+): String {
+    if (!draft.reminderDateExplicit) {
+        return context.getString(R.string.options_reminder)
+    }
+    val timePart =
+        if (draft.reminderTimeExplicit) {
+            formatTimeOfDay(context, draft.reminderHour, draft.reminderMinute)
+        } else {
+            formatTimeOfDay(context, 9, 0)
+        }
+    val formatter = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
+    val formattedDate =
+        Instant
+            .ofEpochMilli(draft.selectedDate)
+            .atZone(ZoneOffset.UTC)
+            .toLocalDate()
+            .format(formatter)
+    val base = "$formattedDate • $timePart"
+    return if (draft.repeatOn) {
+        val interval = draft.intervalText.toIntOrNull()?.coerceIn(1, 999) ?: 1
+        val dummyRule =
+            RecurrenceRule(
+                unit = draft.unit,
+                interval = interval,
+                daysOfWeek = if (draft.unit == RecurrenceUnit.WEEK) draft.daysOfWeek else emptySet(),
+                monthlyMode = null,
+                endKind = draft.endKind,
+                endDate = draft.endDate,
+                endCount = draft.endCountText.toIntOrNull(),
+            )
+        val repeatText = getCompactRecurrenceLabel(context, dummyRule)
+        "$base • $repeatText"
+    } else {
+        base
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun ReminderPickerSheet(
-    initialMillis: Long?,
-    initialRule: RecurrenceRule?,
-    onConfirm: (Long?, RecurrenceRule?) -> Unit,
+    initialReminders: List<NoteReminder>,
+    onConfirm: (List<NoteReminder>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val now = remember { System.currentTimeMillis() }
-    val initial = initialMillis ?: (now + 60 * 60 * 1000L)
-    val initialCal = remember(initial) { Calendar.getInstance().apply { timeInMillis = initial } }
-
-    // Date: always store Material's "UTC start-of-Gregorian-day" millis (same as DatePicker
-    // output). [initial] is a wall-clock reminder instant on reopen; normalizing avoids the pill
-    // jumping to the next calendar day when that instant falls on the next day in UTC.
-    var selectedDate by rememberSaveable {
-        mutableLongStateOf(pickerDayMillisForLocalWallClock(initial))
+    var drafts by rememberSaveable(stateSaver = ReminderDraftListSaver) {
+        mutableStateOf(
+            if (initialReminders.isEmpty()) {
+                listOf(createBlankDraft(now))
+            } else {
+                initialReminders.map { it.toDraft() }
+            },
+        )
     }
-    var reminderDateExplicit by rememberSaveable { mutableStateOf(initialMillis != null) }
-    var reminderCleared by rememberSaveable { mutableStateOf(false) }
-    var dateDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var expandedIndex by rememberSaveable { mutableIntStateOf(0) }
+    var draftKeys by rememberSaveable { mutableStateOf(List(drafts.size) { index -> index.toLong() }) }
+    var nextDraftKey by rememberSaveable { mutableLongStateOf(drafts.size.toLong()) }
+    var enteringExpandedDraftKey by remember { mutableLongStateOf(Long.MIN_VALUE) }
+
+    val hasChanges =
+        if (initialReminders.isEmpty()) {
+            drafts.any { it.reminderDateExplicit }
+        } else {
+            drafts.map { it.toReminder() } != initialReminders
+        }
+    val currentHasChanges = rememberUpdatedState(hasChanges)
+    var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }
+    var showClearAllConfirmDialog by rememberSaveable { mutableStateOf(false) }
+
+    val sheetState =
+        rememberBottomSheetState(
+            initialValue = SheetValue.Hidden,
+            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            confirmValueChange =
+                remember {
+                    { sheetValue ->
+                        if (sheetValue == SheetValue.Hidden && currentHasChanges.value) {
+                            showUnsavedDialog = true
+                            false
+                        } else {
+                            true
+                        }
+                    }
+                },
+        )
 
     val context = LocalContext.current
     val am = remember { context.getSystemService(Context.ALARM_SERVICE) as AlarmManager }
@@ -159,65 +454,21 @@ fun ReminderPickerSheet(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    var reminderTimeExplicit by rememberSaveable { mutableStateOf(initialMillis != null) }
-    var reminderHour by rememberSaveable { mutableIntStateOf(initialCal.get(Calendar.HOUR_OF_DAY)) }
-    var reminderMinute by rememberSaveable { mutableIntStateOf(initialCal.get(Calendar.MINUTE)) }
-    var timePickerOpen by rememberSaveable { mutableStateOf(false) }
-
-    // Repeat
-    var repeatOn by rememberSaveable { mutableStateOf(initialRule != null) }
-    var repeatExpanded by rememberSaveable { mutableStateOf(false) }
-    var unit by rememberSaveable { mutableStateOf(initialRule?.unit ?: RecurrenceUnit.DAY) }
-    var unitMenuOpen by rememberSaveable { mutableStateOf(false) }
-    var intervalText by rememberSaveable {
-        mutableStateOf((initialRule?.interval ?: 1).toString())
-    }
-    val defaultDayOfWeek = initialCal.get(Calendar.DAY_OF_WEEK)
-    var daysOfWeek by rememberSaveable {
-        mutableStateOf(initialRule?.daysOfWeek ?: setOf(defaultDayOfWeek))
-    }
-    var monthlyKind by rememberSaveable {
-        mutableStateOf(
-            when (initialRule?.monthlyMode) {
-                is MonthlyMode.ByNthWeekday -> MonthlyKind.BY_WEEKDAY
-                else -> MonthlyKind.BY_DAY
-            },
-        )
-    }
-    val defaultDayOfMonth = initialCal.get(Calendar.DAY_OF_MONTH)
-    var dayOfMonth by rememberSaveable {
-        mutableIntStateOf(
-            (initialRule?.monthlyMode as? MonthlyMode.ByDayOfMonth)?.day ?: defaultDayOfMonth,
-        )
-    }
-    var dayOfMonthMenuOpen by rememberSaveable { mutableStateOf(false) }
-    val defaultWeekOrdinal = ((defaultDayOfMonth - 1) / 7) + 1
-    var nthOrdinal by rememberSaveable {
-        mutableIntStateOf(
-            (initialRule?.monthlyMode as? MonthlyMode.ByNthWeekday)?.ordinal ?: defaultWeekOrdinal,
-        )
-    }
-    var nthOrdinalMenuOpen by rememberSaveable { mutableStateOf(false) }
-    var nthWeekday by rememberSaveable {
-        mutableIntStateOf(
-            (initialRule?.monthlyMode as? MonthlyMode.ByNthWeekday)?.weekday ?: defaultDayOfWeek,
-        )
-    }
-    var nthWeekdayMenuOpen by rememberSaveable { mutableStateOf(false) }
-
-    // Ends
-    var endKind by rememberSaveable { mutableStateOf(initialRule?.endKind ?: RecurrenceEndKind.NEVER) }
-    var endDate by rememberSaveable { mutableStateOf(initialRule?.endDate) }
-    var endDateDialogOpen by rememberSaveable { mutableStateOf(false) }
-    var endCountText by rememberSaveable {
-        mutableStateOf((initialRule?.endCount ?: DEFAULT_END_COUNT).toString())
-    }
-
     val controlsEnabled = notificationsGranted
+    var dateDialogOpen by rememberSaveable { mutableStateOf(false) }
+    var timePickerOpen by rememberSaveable { mutableStateOf(false) }
+    var endDateDialogOpen by rememberSaveable { mutableStateOf(false) }
 
     AppBottomSheet(
         title = stringResource(R.string.reminder_set_title),
-        onDismiss = onDismiss,
+        onDismiss = {
+            if (hasChanges) {
+                showUnsavedDialog = true
+            } else {
+                onDismiss()
+            }
+        },
+        sheetState = sheetState,
         showTitleBar = notificationsGranted,
         scrollable = true,
         actions = null,
@@ -241,123 +492,347 @@ fun ReminderPickerSheet(
             Spacer(Modifier.height(8.dp))
         }
 
-        // Date pill
-        PillRow(
-            materialSymbolName = "calendar_month",
-            label =
-                if (reminderDateExplicit) {
-                    formatDate(selectedDate)
-                } else {
-                    stringResource(R.string.reminder_pick_date)
-                },
-            hasValue = reminderDateExplicit && !reminderCleared,
-            enabled = controlsEnabled,
-            onClick = {
-                reminderCleared = false
-                dateDialogOpen = true
-            },
-        )
+        if (notificationsGranted) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                val expansionSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntSize>())
+                val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+                val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
+                drafts.forEachIndexed { index, draft ->
+                    val draftKey = draftKeys.getOrElse(index) { index.toLong() }
+                    val isExpanded = expandedIndex == index
 
-        Spacer(Modifier.height(8.dp))
+                    key(draftKey) {
+                        val expandedContentState =
+                            remember {
+                                MutableTransitionState(isExpanded && enteringExpandedDraftKey != draftKey)
+                            }
+                        expandedContentState.targetState = isExpanded
 
-        PillRow(
-            materialSymbolName = "schedule",
-            label =
-                if (reminderTimeExplicit && !reminderCleared) {
-                    formatReminderTimePill(reminderHour, reminderMinute)
-                } else {
-                    stringResource(R.string.reminder_pick_time)
-                },
-            hasValue = reminderTimeExplicit && !reminderCleared,
-            enabled = controlsEnabled,
-            onClick = {
-                reminderCleared = false
-                timePickerOpen = true
-            },
-            onClear =
-                if (reminderTimeExplicit && controlsEnabled) {
-                    { reminderTimeExplicit = false }
-                } else {
-                    null
-                },
-        )
+                        Surface(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .animateContentSize()
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isExpanded) MaterialTheme.colorScheme.primary.copy(alpha = 0.5f) else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f),
+                                        shape = MaterialTheme.shapes.medium,
+                                    ),
+                            shape = MaterialTheme.shapes.medium,
+                            color = if (isExpanded) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ) {
+                            Column {
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .clip(MaterialTheme.shapes.medium)
+                                            .clickable {
+                                                expandedIndex = if (isExpanded) -1 else index
+                                            }.padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    RememberMaterialRoundedSymbol(
+                                        name = if (isExpanded) "keyboard_arrow_down" else "keyboard_arrow_right",
+                                        size = 20.dp,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        weight = FontWeight.Medium,
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text =
+                                            if (isExpanded) {
+                                                stringResource(R.string.reminder_header_index, index + 1)
+                                            } else {
+                                                formatCollapsedHeader(context, draft)
+                                            },
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (isExpanded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f),
+                                    )
+                                    if (drafts.size > 1) {
+                                        RememberIconButton(
+                                            onClick = {
+                                                val removedKey = draftKeys.getOrNull(index)
+                                                val nextDrafts = drafts.toMutableList()
+                                                val nextDraftKeys = draftKeys.toMutableList()
+                                                nextDrafts.removeAt(index)
+                                                if (index in nextDraftKeys.indices) {
+                                                    nextDraftKeys.removeAt(index)
+                                                }
+                                                drafts = nextDrafts
+                                                draftKeys = nextDraftKeys
+                                                if (removedKey == enteringExpandedDraftKey) {
+                                                    enteringExpandedDraftKey = Long.MIN_VALUE
+                                                }
+                                                expandedIndex =
+                                                    when {
+                                                        nextDrafts.isEmpty() -> -1
+                                                        index == expandedIndex -> index.coerceAtMost(nextDrafts.lastIndex)
+                                                        index < expandedIndex -> expandedIndex - 1
+                                                        expandedIndex >= nextDrafts.size -> nextDrafts.lastIndex
+                                                        else -> expandedIndex
+                                                    }
+                                            },
+                                        ) {
+                                            RememberMaterialRoundedSymbol(
+                                                name = "delete",
+                                                size = 20.dp,
+                                                tint = MaterialTheme.colorScheme.error,
+                                                weight = FontWeight.Medium,
+                                            )
+                                        }
+                                    }
+                                }
 
-        Spacer(Modifier.height(8.dp))
+                                AnimatedVisibility(
+                                    visibleState = expandedContentState,
+                                    enter = expandVertically(animationSpec = expansionSpec) + fadeIn(animationSpec = fadeInSpec),
+                                    exit = shrinkVertically(animationSpec = expansionSpec) + fadeOut(animationSpec = fadeOutSpec),
+                                ) {
+                                    Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                                        PillRow(
+                                            materialSymbolName = "calendar_month",
+                                            label =
+                                                if (draft.reminderDateExplicit) {
+                                                    formatDate(draft.selectedDate)
+                                                } else {
+                                                    stringResource(R.string.reminder_pick_date)
+                                                },
+                                            hasValue = draft.reminderDateExplicit,
+                                            enabled = controlsEnabled,
+                                            onClick = {
+                                                dateDialogOpen = true
+                                            },
+                                        )
 
-        // Repeat pill
-        PillRow(
-            materialSymbolName = "repeat",
-            label =
-                if (repeatOn && !reminderCleared) {
-                    repeatSummary(
-                        unit = unit,
-                        interval = intervalText.toIntOrNull() ?: 1,
-                        daysOfWeek = daysOfWeek,
-                        monthlyKind = monthlyKind,
-                        dayOfMonth = dayOfMonth,
-                        nthOrdinal = nthOrdinal,
-                        nthWeekday = nthWeekday,
-                        endKind = endKind,
-                        endDate = endDate,
-                        endCount = endCountText.toIntOrNull(),
-                    )
-                } else {
-                    stringResource(R.string.reminder_repeat)
-                },
-            hasValue = repeatOn && !reminderCleared,
-            enabled = controlsEnabled,
-            onClick = {
-                reminderCleared = false
-                if (!repeatOn) {
-                    repeatOn = true
-                    repeatExpanded = true
-                } else {
-                    repeatExpanded = !repeatExpanded
-                }
-            },
-            onClear =
-                if (repeatOn && controlsEnabled) {
-                    {
-                        repeatOn = false
-                        repeatExpanded = false
+                                        Spacer(Modifier.height(8.dp))
+
+                                        PillRow(
+                                            materialSymbolName = "schedule",
+                                            label =
+                                                if (draft.reminderTimeExplicit) {
+                                                    formatReminderTimePill(draft.reminderHour, draft.reminderMinute)
+                                                } else {
+                                                    stringResource(R.string.reminder_pick_time)
+                                                },
+                                            hasValue = draft.reminderTimeExplicit,
+                                            enabled = controlsEnabled,
+                                            onClick = {
+                                                timePickerOpen = true
+                                            },
+                                            onClear = null,
+                                        )
+
+                                        Spacer(Modifier.height(8.dp))
+
+                                        PillRow(
+                                            materialSymbolName = "repeat",
+                                            label =
+                                                if (draft.repeatOn) {
+                                                    repeatSummary(
+                                                        unit = draft.unit,
+                                                        interval = draft.intervalText.toIntOrNull() ?: 1,
+                                                        daysOfWeek = draft.daysOfWeek,
+                                                        monthlyKind = draft.monthlyKind,
+                                                        dayOfMonth = draft.dayOfMonth,
+                                                        nthOrdinal = draft.nthOrdinal,
+                                                        nthWeekday = draft.nthWeekday,
+                                                        endKind = draft.endKind,
+                                                        endDate = draft.endDate,
+                                                        endCount = draft.endCountText.toIntOrNull(),
+                                                    )
+                                                } else {
+                                                    stringResource(R.string.reminder_repeat)
+                                                },
+                                            hasValue = draft.repeatOn,
+                                            enabled = controlsEnabled,
+                                            onClick = {
+                                                drafts =
+                                                    drafts.mapIndexed { idx, d ->
+                                                        if (idx == index) {
+                                                            if (!d.repeatOn) {
+                                                                d.copy(repeatOn = true, repeatExpanded = true)
+                                                            } else {
+                                                                d.copy(repeatExpanded = !d.repeatExpanded)
+                                                            }
+                                                        } else {
+                                                            d
+                                                        }
+                                                    }
+                                            },
+                                            onClear =
+                                                if (draft.repeatOn && controlsEnabled) {
+                                                    {
+                                                        drafts =
+                                                            drafts.mapIndexed { idx, d ->
+                                                                if (idx == index) d.copy(repeatOn = false, repeatExpanded = false) else d
+                                                            }
+                                                    }
+                                                } else {
+                                                    null
+                                                },
+                                        )
+
+                                        if (draft.repeatOn && draft.repeatExpanded && controlsEnabled) {
+                                            Spacer(Modifier.height(10.dp))
+                                            RepeatConfig(
+                                                unit = draft.unit,
+                                                onUnit = { nextUnit ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(unit = nextUnit) else d
+                                                        }
+                                                },
+                                                unitMenuOpen = draft.unitMenuOpen,
+                                                onUnitMenuOpen = { open ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(unitMenuOpen = open) else d
+                                                        }
+                                                },
+                                                intervalText = draft.intervalText,
+                                                onIntervalText = { nextText ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(intervalText = nextText) else d
+                                                        }
+                                                },
+                                                daysOfWeek = draft.daysOfWeek,
+                                                onDaysOfWeek = { nextDays ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(daysOfWeek = nextDays) else d
+                                                        }
+                                                },
+                                                monthlyKind = draft.monthlyKind,
+                                                onMonthlyKind = { nextKind ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(monthlyKind = nextKind) else d
+                                                        }
+                                                },
+                                                dayOfMonth = draft.dayOfMonth,
+                                                onDayOfMonth = { nextDay ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(dayOfMonth = nextDay) else d
+                                                        }
+                                                },
+                                                dayOfMonthMenuOpen = draft.dayOfMonthMenuOpen,
+                                                onDayOfMonthMenuOpen = { open ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(dayOfMonthMenuOpen = open) else d
+                                                        }
+                                                },
+                                                nthOrdinal = draft.nthOrdinal,
+                                                onNthOrdinal = { nextOrd ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(nthOrdinal = nextOrd) else d
+                                                        }
+                                                },
+                                                nthOrdinalMenuOpen = draft.nthOrdinalMenuOpen,
+                                                onNthOrdinalMenuOpen = { open ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(nthOrdinalMenuOpen = open) else d
+                                                        }
+                                                },
+                                                nthWeekday = draft.nthWeekday,
+                                                onNthWeekday = { nextWd ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(nthWeekday = nextWd) else d
+                                                        }
+                                                },
+                                                nthWeekdayMenuOpen = draft.nthWeekdayMenuOpen,
+                                                onNthWeekdayMenuOpen = { open ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(nthWeekdayMenuOpen = open) else d
+                                                        }
+                                                },
+                                                endKind = draft.endKind,
+                                                onEndKind = { nextKind ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(endKind = nextKind) else d
+                                                        }
+                                                },
+                                                endDate = draft.endDate,
+                                                onOpenEndDatePicker = { endDateDialogOpen = true },
+                                                endCountText = draft.endCountText,
+                                                onEndCountText = { nextCount ->
+                                                    drafts =
+                                                        drafts.mapIndexed { idx, d ->
+                                                            if (idx == index) d.copy(endCountText = nextCount) else d
+                                                        }
+                                                },
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                } else {
-                    null
-                },
-        )
+                }
 
-        if (repeatOn && repeatExpanded && controlsEnabled && !reminderCleared) {
-            Spacer(Modifier.height(10.dp))
-            RepeatConfig(
-                unit = unit,
-                onUnit = { unit = it },
-                unitMenuOpen = unitMenuOpen,
-                onUnitMenuOpen = { unitMenuOpen = it },
-                intervalText = intervalText,
-                onIntervalText = { intervalText = it },
-                daysOfWeek = daysOfWeek,
-                onDaysOfWeek = { daysOfWeek = it },
-                monthlyKind = monthlyKind,
-                onMonthlyKind = { monthlyKind = it },
-                dayOfMonth = dayOfMonth,
-                onDayOfMonth = { dayOfMonth = it },
-                dayOfMonthMenuOpen = dayOfMonthMenuOpen,
-                onDayOfMonthMenuOpen = { dayOfMonthMenuOpen = it },
-                nthOrdinal = nthOrdinal,
-                onNthOrdinal = { nthOrdinal = it },
-                nthOrdinalMenuOpen = nthOrdinalMenuOpen,
-                onNthOrdinalMenuOpen = { nthOrdinalMenuOpen = it },
-                nthWeekday = nthWeekday,
-                onNthWeekday = { nthWeekday = it },
-                nthWeekdayMenuOpen = nthWeekdayMenuOpen,
-                onNthWeekdayMenuOpen = { nthWeekdayMenuOpen = it },
-                endKind = endKind,
-                onEndKind = { endKind = it },
-                endDate = endDate,
-                onOpenEndDatePicker = { endDateDialogOpen = true },
-                endCountText = endCountText,
-                onEndCountText = { endCountText = it },
-            )
+                if (drafts.size < 3 && controlsEnabled) {
+                    val primaryColor = MaterialTheme.colorScheme.primary
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(52.dp)
+                                .drawWithCache {
+                                    val stroke =
+                                        Stroke(
+                                            width = 1.dp.toPx(),
+                                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f),
+                                        )
+                                    onDrawBehind {
+                                        drawRoundRect(
+                                            color = primaryColor.copy(alpha = 0.5f),
+                                            style = stroke,
+                                            cornerRadius = CornerRadius(12.dp.toPx()),
+                                        )
+                                    }
+                                }.clip(MaterialTheme.shapes.medium)
+                                .clickable {
+                                    val newDraftKey = nextDraftKey
+                                    val nextDrafts = drafts + createBlankDraft(now)
+                                    nextDraftKey += 1L
+                                    drafts = nextDrafts
+                                    draftKeys = draftKeys + newDraftKey
+                                    enteringExpandedDraftKey = newDraftKey
+                                    expandedIndex = nextDrafts.lastIndex
+                                },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            RememberMaterialRoundedSymbol(
+                                name = "add",
+                                size = 20.dp,
+                                tint = MaterialTheme.colorScheme.primary,
+                                weight = FontWeight.Medium,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.reminder_add_button),
+                                style = MaterialTheme.typography.titleMedium,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Spacer(Modifier.height(12.dp))
@@ -370,7 +845,6 @@ fun ReminderPickerSheet(
                         .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.errorContainer)
                         .tapSoundClickable {
-                            // This branch is unreachable below API 31 because exact alarms are always allowed there.
                             @SuppressLint("InlinedApi")
                             val intent =
                                 Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
@@ -390,91 +864,53 @@ fun ReminderPickerSheet(
             Spacer(Modifier.height(12.dp))
         }
 
-        // Bottom action row — Material 3 filled/tonal buttons
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
         ) {
-            val hasReminderDraft =
-                initialMillis != null ||
-                    reminderDateExplicit ||
-                    reminderTimeExplicit ||
-                    repeatOn ||
-                    reminderCleared
-            if (hasReminderDraft) {
-                RememberFilledTonalButton(
-                    onClick = {
-                        reminderCleared = true
-                        reminderDateExplicit = false
-                        reminderTimeExplicit = false
-                        repeatOn = false
-                        repeatExpanded = false
-                    },
-                ) { Text(stringResource(R.string.common_clear)) }
-            }
-            RememberFilledTonalButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+            RememberFilledTonalButton(
+                enabled = drafts.any { it.reminderDateExplicit },
+                onClick = {
+                    showClearAllConfirmDialog = true
+                },
+            ) { Text(stringResource(R.string.reminder_clear_all)) }
+
+            RememberFilledTonalButton(
+                onClick = {
+                    if (hasChanges) {
+                        showUnsavedDialog = true
+                    } else {
+                        onDismiss()
+                    }
+                },
+            ) { Text(stringResource(R.string.common_cancel)) }
 
             val isDoneEnabled =
                 run {
-                    if (reminderCleared) return@run true
-                    if (!controlsEnabled) return@run initialMillis != null
-                    if (!reminderDateExplicit) return@run false
-                    if (repeatOn) {
-                        if (unit == RecurrenceUnit.WEEK && daysOfWeek.isEmpty()) return@run false
-                        if (endKind == RecurrenceEndKind.ON_DATE && endDate == null) return@run false
-                        if (endKind == RecurrenceEndKind.AFTER_COUNT && (endCountText.toIntOrNull() == null || endCountText.toInt() < 1)) return@run false
-                        if (intervalText.toIntOrNull() == null || intervalText.toInt() < 1) return@run false
+                    if (drafts.isEmpty()) return@run initialReminders.isNotEmpty()
+                    if (!controlsEnabled) return@run initialReminders.isNotEmpty()
+                    drafts.forEach { draft ->
+                        if (!draft.reminderDateExplicit) return@run false
+                        if (draft.repeatOn) {
+                            if (draft.unit == RecurrenceUnit.WEEK && draft.daysOfWeek.isEmpty()) return@run false
+                            if (draft.endKind == RecurrenceEndKind.ON_DATE && draft.endDate == null) return@run false
+                            if (draft.endKind == RecurrenceEndKind.AFTER_COUNT && (draft.endCountText.toIntOrNull() == null || draft.endCountText.toInt() < 1)) return@run false
+                            if (draft.intervalText.toIntOrNull() == null || draft.intervalText.toInt() < 1) return@run false
+                        }
                     }
+                    val currentReminders = drafts.map { it.toReminder() }
+                    if (currentReminders == initialReminders) return@run false
                     true
                 }
 
             RememberButton(
                 enabled = isDoneEnabled,
                 onClick = {
-                    if (reminderCleared) {
-                        onConfirm(null, null)
+                    if (drafts.isEmpty()) {
+                        onConfirm(emptyList())
                     } else {
-                        val hour24 = if (reminderTimeExplicit) reminderHour else 18
-                        val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
-                        val selectedDay =
-                            Instant.ofEpochMilli(selectedDate).atZone(ZoneOffset.UTC).toLocalDate()
-                        val fireAt =
-                            selectedDay
-                                .atTime(LocalTime.of(hour24, minuteVal))
-                                .atZone(ZoneId.systemDefault())
-                                .toInstant()
-                                .toEpochMilli()
-                        val rule =
-                            if (!repeatOn) {
-                                null
-                            } else {
-                                val interval = intervalText.toIntOrNull()?.coerceIn(1, 999) ?: 1
-                                val mode: MonthlyMode? =
-                                    if (unit == RecurrenceUnit.MONTH) {
-                                        if (monthlyKind == MonthlyKind.BY_DAY) {
-                                            MonthlyMode.ByDayOfMonth(dayOfMonth)
-                                        } else {
-                                            MonthlyMode.ByNthWeekday(nthOrdinal, nthWeekday)
-                                        }
-                                    } else {
-                                        null
-                                    }
-                                val daysSet = if (unit == RecurrenceUnit.WEEK) daysOfWeek else emptySet()
-                                // Fall back to the same default the picker pre-populates (10) when the field is
-                                // empty or otherwise unparseable. [RecurrenceRule.sanitized] also maps invalid
-                                // AFTER_COUNT + null endCount to NEVER so reminders never stop after one fire.
-                                val count = endCountText.toIntOrNull()?.coerceIn(1, 9999) ?: DEFAULT_END_COUNT
-                                RecurrenceRule(
-                                    unit = unit,
-                                    interval = interval,
-                                    daysOfWeek = daysSet,
-                                    monthlyMode = mode,
-                                    endKind = endKind,
-                                    endDate = if (endKind == RecurrenceEndKind.ON_DATE) endDate else null,
-                                    endCount = if (endKind == RecurrenceEndKind.AFTER_COUNT) count else null,
-                                )
-                            }
-                        onConfirm(fireAt, rule)
+                        val remindersList = drafts.map { it.toReminder() }
+                        onConfirm(remindersList)
                     }
                 },
             ) { Text(stringResource(R.string.common_save)) }
@@ -482,48 +918,77 @@ fun ReminderPickerSheet(
         Spacer(Modifier.height(8.dp))
     }
 
-    if (dateDialogOpen) {
+    if (dateDialogOpen && expandedIndex in drafts.indices) {
+        val currentDraft = drafts[expandedIndex]
         CalendarPickerDialog(
-            initial = selectedDate,
-            onConfirm = {
-                selectedDate = it
-                reminderDateExplicit = true
-                reminderCleared = false
+            initial = currentDraft.selectedDate,
+            onConfirm = { dateMillis ->
+                drafts =
+                    drafts.mapIndexed { idx, d ->
+                        if (idx == expandedIndex) d.copy(selectedDate = dateMillis, reminderDateExplicit = true) else d
+                    }
                 dateDialogOpen = false
             },
             onDismiss = { dateDialogOpen = false },
         )
     }
-    if (endDateDialogOpen) {
-        // Fallback has to be pre-normalized to UTC-midnight because CalendarPickerDialog
-        // feeds [initial] straight to rememberDatePickerState, and Material's DatePicker
-        // decodes that millis in UTC to pick the displayed day. A raw "now + 30 days" epoch
-        // is a wall-clock instant, so in negative-offset zones near midnight local it would
-        // render the grid one day ahead of what the user expects. endDate itself is already
-        // UTC-midnight (DatePicker round-trip) so it doesn't need the helper.
+
+    if (endDateDialogOpen && expandedIndex in drafts.indices) {
+        val currentDraft = drafts[expandedIndex]
         CalendarPickerDialog(
-            initial = endDate ?: pickerDayMillisForLocalWallClock(now + 30L * 24 * 60 * 60 * 1000L),
-            onConfirm = {
-                endDate = it
-                endKind = RecurrenceEndKind.ON_DATE
+            initial = currentDraft.endDate ?: pickerDayMillisForLocalWallClock(now + 30L * 24 * 60 * 60 * 1000L),
+            onConfirm = { dateMillis ->
+                drafts =
+                    drafts.mapIndexed { idx, d ->
+                        if (idx == expandedIndex) d.copy(endDate = dateMillis, endKind = RecurrenceEndKind.ON_DATE) else d
+                    }
                 endDateDialogOpen = false
             },
             onDismiss = { endDateDialogOpen = false },
         )
     }
 
-    if (timePickerOpen) {
+    if (timePickerOpen && expandedIndex in drafts.indices) {
+        val currentDraft = drafts[expandedIndex]
         ReminderTimePickerDialog(
-            initialHour = reminderHour,
-            initialMinute = reminderMinute,
+            initialHour = currentDraft.reminderHour,
+            initialMinute = currentDraft.reminderMinute,
             onDismiss = { timePickerOpen = false },
             onConfirm = { pickedHour, pickedMinute ->
-                reminderHour = pickedHour
-                reminderMinute = pickedMinute
-                reminderTimeExplicit = true
-                reminderCleared = false
+                drafts =
+                    drafts.mapIndexed { idx, d ->
+                        if (idx == expandedIndex) d.copy(reminderHour = pickedHour, reminderMinute = pickedMinute, reminderTimeExplicit = true) else d
+                    }
                 timePickerOpen = false
             },
+        )
+    }
+    if (showUnsavedDialog) {
+        RememberConfirmDialog(
+            title = stringResource(R.string.reminder_editor_unsaved_title),
+            text = stringResource(R.string.reminder_editor_unsaved_body),
+            confirmLabel = stringResource(R.string.reminder_editor_unsaved_discard),
+            onConfirm = {
+                showUnsavedDialog = false
+                onDismiss()
+            },
+            onDismiss = { showUnsavedDialog = false },
+            destructive = true,
+            dismissLabel = stringResource(R.string.reminder_editor_unsaved_keep_editing),
+        )
+    }
+    if (showClearAllConfirmDialog) {
+        RememberConfirmDialog(
+            title = stringResource(R.string.reminder_clear_all_confirm_title),
+            text = stringResource(R.string.reminder_clear_all_confirm_body),
+            confirmLabel = stringResource(R.string.reminder_clear_all_confirm_action),
+            onConfirm = {
+                showClearAllConfirmDialog = false
+                drafts = emptyList()
+                onConfirm(emptyList())
+            },
+            onDismiss = { showClearAllConfirmDialog = false },
+            destructive = true,
         )
     }
 }
@@ -633,7 +1098,7 @@ private fun notificationSettingsIntent(context: Context): Intent =
         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
     }
 
-private enum class MonthlyKind { BY_DAY, BY_WEEKDAY }
+internal enum class MonthlyKind { BY_DAY, BY_WEEKDAY }
 
 // Saveable replacement for Material's [DisplayMode], which is a @JvmInline value class and
 // therefore has no default Saver - trying to `rememberSaveable { mutableStateOf(DisplayMode.X) }`
@@ -647,19 +1112,7 @@ private const val DEFAULT_END_COUNT = 10
 private fun formatReminderTimePill(
     hour24: Int,
     minute: Int,
-): String {
-    val context = LocalContext.current
-    return if (DateFormat.is24HourFormat(context)) {
-        "%02d:%02d".format(hour24, minute)
-    } else {
-        val calendar =
-            Calendar.getInstance().apply {
-                set(Calendar.HOUR_OF_DAY, hour24)
-                set(Calendar.MINUTE, minute)
-            }
-        DateFormat.getTimeFormat(context).format(calendar.time)
-    }
-}
+): String = formatTimeOfDay(LocalContext.current, hour24, minute)
 
 /**
  * Full-screen-width [Dialog] plus capped-width [Surface] (same pattern as the time picker).
@@ -944,7 +1397,7 @@ private fun PillRow(
                     } else if (hasValue) {
                         scheme.primaryContainer
                     } else {
-                        scheme.surfaceContainerHigh
+                        scheme.surfaceVariant
                     },
                 ).let { modifier ->
                     if (enabled) {
@@ -1020,6 +1473,11 @@ private fun RepeatConfig(
     endCountText: String,
     onEndCountText: (String) -> Unit,
 ) {
+    val configuration = LocalConfiguration.current
+    val isSmallScreenPortrait =
+        configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT &&
+            configuration.screenWidthDp < 480
+
     Surface(
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainer,
@@ -1150,7 +1608,12 @@ private fun RepeatConfig(
                                     Modifier
                                         .weight(1f)
                                         .height(RepeatRowHeight),
-                                value = weekdayFullName(nthWeekday),
+                                value =
+                                    if (isSmallScreenPortrait) {
+                                        weekdayShort(nthWeekday)
+                                    } else {
+                                        weekdayFullName(nthWeekday)
+                                    },
                                 expanded = nthWeekdayMenuOpen,
                                 onExpandedChange = {
                                     if (it) {

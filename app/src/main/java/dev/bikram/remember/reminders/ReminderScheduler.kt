@@ -13,9 +13,11 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteEntity
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.Visibility
+import dev.bikram.remember.data.getActiveReminders
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.notifications.canPostNotifications
 import dev.bikram.remember.notifications.postNotificationIfAllowed
@@ -30,12 +32,13 @@ class ReminderScheduler(
     @SuppressLint("MissingPermission")
     fun schedule(
         noteId: Long,
+        reminderIndex: Int,
         whenMillis: Long,
         importance: Importance = Importance.DEFAULT,
     ) {
         if (whenMillis <= System.currentTimeMillis()) return
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        val pi = pendingIntent(noteId)
+        val pi = pendingIntent(noteId, reminderIndex)
         if (importance == Importance.HIGH) {
             // HIGH-importance reminders use setAlarmClock: it is exempt from Doze and
             // the per-app exact-alarm rate limit, needs no SCHEDULE_EXACT_ALARM
@@ -61,29 +64,43 @@ class ReminderScheduler(
         note: NoteEntity,
         items: List<ChecklistItemEntity> = emptyList(),
     ) {
-        val reminderAtTime = note.reminderAt ?: return
-        if (reminderAtTime > System.currentTimeMillis()) {
-            schedule(note.id, reminderAtTime, note.importance)
-        } else if (note.completedAt == null && !note.trashed && !note.archived) {
-            ReminderReceiver.showNotification(
-                context = context,
-                note = note,
-                items = items,
-                keepUntilDone = keepReminderNotificationsUntilDone(),
-            )
+        val activeReminders = note.getActiveReminders()
+        if (activeReminders.isEmpty()) {
+            cancel(note.id)
+            return
+        }
+        cancel(note.id)
+        val now = System.currentTimeMillis()
+        val keepUntilDone = keepReminderNotificationsUntilDone()
+        activeReminders.take(MAX_REMINDERS_PER_NOTE).forEachIndexed { index, reminder ->
+            val at = reminder.reminderAt
+            if (at > now) {
+                schedule(note.id, index, at, note.importance)
+            } else if (note.completedAt == null && !note.trashed && !note.archived) {
+                ReminderReceiver.showNotification(
+                    context = context,
+                    note = note,
+                    items = items,
+                    reminderIndex = index,
+                    keepUntilDone = keepUntilDone,
+                )
+            }
         }
     }
 
-
-
     fun cancel(noteId: Long) {
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        am.cancel(pendingIntent(noteId))
+        for (index in 0 until MAX_REMINDERS_PER_NOTE) {
+            am.cancel(pendingIntent(noteId, index))
+        }
     }
 
     fun cancelNotification(noteId: Long) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(pendingRequestCodeForNote(noteId))
+        for (index in 0 until MAX_REMINDERS_PER_NOTE) {
+            notificationManager.cancel(pendingRequestCodeForNoteReminder(noteId, index))
+        }
     }
 
     suspend fun refreshNotificationIfActive(
@@ -91,18 +108,28 @@ class ReminderScheduler(
         items: List<ChecklistItemEntity>,
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notificationId = pendingRequestCodeForNote(note.id)
-        val active =
-            notificationManager.activeNotifications.any { notification ->
-                notification.id == notificationId
-            }
-        if (active) {
+        val activeNotificationIds = notificationManager.activeNotifications.map { notification -> notification.id }.toSet()
+        val keepUntilDone = keepReminderNotificationsUntilDone()
+        if (pendingRequestCodeForNote(note.id) in activeNotificationIds) {
+            notificationManager.cancel(pendingRequestCodeForNote(note.id))
             ReminderReceiver.showNotification(
                 context = context,
                 note = note,
                 items = items,
-                keepUntilDone = keepReminderNotificationsUntilDone(),
+                reminderIndex = 0,
+                keepUntilDone = keepUntilDone,
             )
+        }
+        for (index in 0 until MAX_REMINDERS_PER_NOTE) {
+            if (pendingRequestCodeForNoteReminder(note.id, index) in activeNotificationIds) {
+                ReminderReceiver.showNotification(
+                    context = context,
+                    note = note,
+                    items = items,
+                    reminderIndex = index,
+                    keepUntilDone = keepUntilDone,
+                )
+            }
         }
     }
 
@@ -281,15 +308,19 @@ class ReminderScheduler(
         endMillis: Long,
     ): Int = ((endMillis - startMillis) / DAY_MILLIS).toInt()
 
-    private fun pendingIntent(noteId: Long): PendingIntent {
+    private fun pendingIntent(
+        noteId: Long,
+        reminderIndex: Int,
+    ): PendingIntent {
         val intent =
             Intent(context, ReminderReceiver::class.java).apply {
                 action = ACTION_FIRE_REMINDER
                 putExtra(EXTRA_NOTE_ID, noteId)
+                putExtra(EXTRA_REMINDER_INDEX, reminderIndex)
             }
         return PendingIntent.getBroadcast(
             context,
-            pendingRequestCodeForNote(noteId),
+            pendingRequestCodeForNoteReminder(noteId, reminderIndex),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
@@ -297,10 +328,12 @@ class ReminderScheduler(
 
     companion object {
         private const val TAG = "ReminderScheduler"
+        const val MAX_REMINDERS_PER_NOTE = dev.bikram.remember.data.MAX_REMINDERS_PER_NOTE
         private val inexactFallbackScheduleCounter = AtomicInteger(0)
 
         const val ACTION_FIRE_REMINDER = "dev.bikram.remember.reminders.FIRE"
         const val EXTRA_NOTE_ID = "note_id"
+        const val EXTRA_REMINDER_INDEX = "reminder_index"
 
         // Channel IDs are versioned (_v2 suffix) because Android freezes channel
         // settings - importance, sound, vibration - the moment a channel is first
@@ -337,6 +370,14 @@ class ReminderScheduler(
          */
         fun pendingRequestCodeForNote(noteId: Long): Int = noteId.hashCode()
 
+        fun pendingRequestCodeForNoteReminder(
+            noteId: Long,
+            reminderIndex: Int,
+        ): Int {
+            val salted = noteId xor ((reminderIndex.toLong() + 1L) shl 40)
+            return (salted xor (salted ushr 32)).toInt()
+        }
+
         /**
          * Distinct request codes for per-note notification action [PendingIntent]s.
          * Folds [noteId] and [actionIndex] with 64-bit xor before collapsing to [Int], so we avoid
@@ -351,8 +392,11 @@ class ReminderScheduler(
             return (salted xor (salted ushr 32)).toInt()
         }
 
-        fun pendingRequestCodeForDismiss(noteId: Long): Int {
-            val salted = noteId xor (0x4B4DL shl 32)
+        fun pendingRequestCodeForDismiss(
+            noteId: Long,
+            reminderIndex: Int = 0,
+        ): Int {
+            val salted = noteId xor (0x4B4DL shl 32) xor ((reminderIndex.toLong() + 1L) shl 44)
             return (salted xor (salted ushr 32)).toInt()
         }
     }

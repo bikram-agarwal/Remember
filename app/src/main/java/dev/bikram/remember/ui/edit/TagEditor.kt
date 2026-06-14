@@ -30,7 +30,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -85,6 +84,7 @@ import dev.bikram.remember.ui.common.HueColorSlider
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.colorHexFromHue
 import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.TagChipFilled
@@ -610,25 +610,17 @@ fun TagEditorSheet(
     }
 
     if (showUnsavedChangesDialog) {
-        AlertDialog(
-            onDismissRequest = { showUnsavedChangesDialog = false },
-            title = { Text(stringResource(R.string.tag_editor_unsaved_title)) },
-            text = { Text(stringResource(R.string.tag_editor_unsaved_body)) },
-            confirmButton = {
-                RememberButton(
-                    onClick = {
-                        showUnsavedChangesDialog = false
-                        onDismiss()
-                    },
-                ) {
-                    Text(stringResource(R.string.tag_editor_unsaved_discard))
-                }
+        RememberConfirmDialog(
+            title = stringResource(R.string.tag_editor_unsaved_title),
+            text = stringResource(R.string.tag_editor_unsaved_body),
+            confirmLabel = stringResource(R.string.tag_editor_unsaved_discard),
+            onConfirm = {
+                showUnsavedChangesDialog = false
+                onDismiss()
             },
-            dismissButton = {
-                RememberTextButton(onClick = { showUnsavedChangesDialog = false }) {
-                    Text(stringResource(R.string.tag_editor_unsaved_keep_editing))
-                }
-            },
+            onDismiss = { showUnsavedChangesDialog = false },
+            destructive = true,
+            dismissLabel = stringResource(R.string.tag_editor_unsaved_keep_editing),
         )
     }
 }

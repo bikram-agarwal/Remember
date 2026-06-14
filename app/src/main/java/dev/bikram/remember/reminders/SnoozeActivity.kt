@@ -183,6 +183,9 @@ class SnoozeActivity : ComponentActivity() {
             }
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             notificationManager.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
+            for (index in 0 until ReminderScheduler.MAX_REMINDERS_PER_NOTE) {
+                notificationManager.cancel(ReminderScheduler.pendingRequestCodeForNoteReminder(noteId, index))
+            }
 
             finish()
         }

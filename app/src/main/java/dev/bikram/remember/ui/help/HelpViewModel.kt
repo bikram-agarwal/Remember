@@ -9,6 +9,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -53,10 +54,10 @@ class HelpViewModel
             }
 
         private val _expandedKeys = MutableStateFlow(emptySet<String>())
-        val expandedKeys: StateFlow<Set<String>> = _expandedKeys
+        val expandedKeys: StateFlow<Set<String>> = _expandedKeys.asStateFlow()
 
         private val _searchQuery = MutableStateFlow("")
-        val searchQuery: StateFlow<String> = _searchQuery
+        val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
         val filteredSections: StateFlow<List<HelpSection>> =
             _searchQuery
@@ -83,7 +84,7 @@ class HelpViewModel
                             if (matching.isEmpty()) null else section.copy(subsections = matching)
                         }
                     }
-                }.stateIn(viewModelScope, SharingStarted.Eagerly, sections)
+                }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), sections)
 
         var scrollIndex: Int = 0
             private set

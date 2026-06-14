@@ -29,7 +29,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ColorScheme
@@ -103,9 +102,9 @@ import dev.bikram.remember.ui.common.HueColorSlider
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.colorHexFromHue
 import dev.bikram.remember.ui.common.hueFromHexColor
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
-import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
@@ -249,21 +248,16 @@ fun AppearanceSection(
     }
 
     pendingDelete?.let { hex ->
-        AlertDialog(
-            onDismissRequest = { pendingDelete = null },
-            title = { Text(stringResource(R.string.appearance_remove_custom_color_title)) },
-            text = { Text(stringResource(R.string.appearance_remove_custom_color_message)) },
-            confirmButton = {
-                RememberTextButton(onClick = {
-                    scope.launch { prefs.removeCustomSeed(hex) }
-                    pendingDelete = null
-                }) { Text(stringResource(R.string.common_remove)) }
+        RememberConfirmDialog(
+            title = stringResource(R.string.appearance_remove_custom_color_title),
+            text = stringResource(R.string.appearance_remove_custom_color_message),
+            confirmLabel = stringResource(R.string.common_remove),
+            onConfirm = {
+                scope.launch { prefs.removeCustomSeed(hex) }
+                pendingDelete = null
             },
-            dismissButton = {
-                RememberTextButton(onClick = { pendingDelete = null }) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
+            onDismiss = { pendingDelete = null },
+            destructive = true,
         )
     }
 }

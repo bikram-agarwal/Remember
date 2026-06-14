@@ -11,10 +11,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.overscroll
@@ -45,6 +48,22 @@ internal object EditorContentBodyDefaults {
     val ShelfNoticeTopSpacing = 16.dp
     val BodyTopSpacing = 16.dp
     val BottomSpacing = 40.dp
+    val BottomFloorExtra = 24.dp
+}
+
+/**
+ * Scaffold bottom padding for the editor content, floored at the nav-bar inset plus
+ * [EditorContentBodyDefaults.BottomFloorExtra]. The editors' bottom-bar slot renders a
+ * zero-height Box when no bar is shown, which collapses the Scaffold padding to 0 — the
+ * options panel must keep a real margin from the screen bottom even then.
+ */
+@Composable
+internal fun editorBottomPaddingWithFloor(padding: PaddingValues): Dp {
+    val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    return maxOf(
+        padding.calculateBottomPadding(),
+        navBarInset + EditorContentBodyDefaults.BottomFloorExtra,
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -124,7 +143,7 @@ internal fun LazyListScope.editorContentOptionsItem(
         Spacer(
             Modifier.height(
                 EditorContentBodyDefaults.BottomSpacing +
-                    padding.calculateBottomPadding() +
+                    editorBottomPaddingWithFloor(padding) +
                     bottomExtra,
             ),
         )

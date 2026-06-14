@@ -41,10 +41,12 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
@@ -143,64 +145,87 @@ fun NoteActionBottomBarContent(
     modifier: Modifier = Modifier,
     showEditAction: Boolean = true,
 ) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        color = MaterialTheme.colorScheme.surfaceContainer,
-        contentColor = MaterialTheme.colorScheme.onSurface,
-        tonalElevation = 3.dp,
-    ) {
+    val compact = isSmallLandscape()
+    val actionRow: @Composable () -> Unit = {
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                    .then(if (compact) Modifier.height(36.dp) else Modifier.windowInsetsPadding(WindowInsets.navigationBars))
+                    .padding(
+                        start = if (compact) 4.dp else 8.dp,
+                        top = if (compact) 0.dp else 8.dp,
+                        end = if (compact) 4.dp else 8.dp,
+                        bottom = if (compact) 4.dp else 8.dp,
+                    ),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            val activeActionModifier = if (compact) Modifier.weight(1f) else Modifier.width(72.dp)
             when (shelfState) {
                 NoteShelfState.ACTIVE -> {
                     if (showEditAction) {
-                        EditActionItem(isEditMode = isEditMode, onClick = onToggleEdit)
+                        EditActionItem(
+                            isEditMode = isEditMode,
+                            onClick = onToggleEdit,
+                            compact = compact,
+                            modifier = activeActionModifier,
+                        )
                     }
-                    StarActionItem(starred = starred, onClick = onToggleStar)
+                    StarActionItem(
+                        starred = starred,
+                        onClick = onToggleStar,
+                        compact = compact,
+                        modifier = activeActionModifier,
+                    )
                     if (existing) {
                         ActionItem(
                             icon = "notifications",
                             label = stringResource(R.string.edit_bottom_bar_notification),
                             onClick = onNotification,
-                            modifier = Modifier.width(72.dp),
+                            modifier = activeActionModifier,
+                            compact = compact,
                         )
                         // Mark done / not done. Filled check_circle when completed,
                         // outlined when active, so the toggle state reads at a glance.
                         // Label flips to match: "Mark done" vs "Mark not done".
-                        DoneActionItem(completed = completed, onClick = onToggleCompleted)
+                        DoneActionItem(
+                            completed = completed,
+                            onClick = onToggleCompleted,
+                            compact = compact,
+                            modifier = activeActionModifier,
+                        )
                         ActionItem(
                             icon = "archive",
                             label = stringResource(R.string.edit_bottom_bar_archive),
                             onClick = onArchive,
-                            modifier = Modifier.width(72.dp),
+                            modifier = activeActionModifier,
+                            compact = compact,
                         )
                         ActionItem(
                             icon = "delete_outline",
                             label = stringResource(R.string.edit_bottom_bar_trash),
                             onClick = onTrash,
-                            modifier = Modifier.width(72.dp),
+                            modifier = activeActionModifier,
+                            compact = compact,
                         )
                     }
                 }
                 NoteShelfState.ARCHIVED -> {
+                    val archivedActionModifier = if (compact) Modifier.weight(1f) else Modifier.width(72.dp)
                     ActionItem(
                         icon = "unarchive",
                         label = stringResource(R.string.edit_bottom_bar_unarchive),
                         onClick = onUnarchive,
-                        modifier = Modifier.width(72.dp),
+                        modifier = archivedActionModifier,
+                        compact = compact,
                     )
                     ActionItem(
                         icon = "delete_outline",
                         label = stringResource(R.string.edit_bottom_bar_trash),
                         onClick = onTrash,
-                        modifier = Modifier.width(72.dp),
+                        modifier = archivedActionModifier,
+                        compact = compact,
                     )
                 }
                 NoteShelfState.TRASHED -> {
@@ -209,21 +234,39 @@ fun NoteActionBottomBarContent(
                         label = stringResource(R.string.edit_bottom_bar_restore),
                         onClick = onRestore,
                         modifier = Modifier.weight(1f),
+                        compact = compact,
                     )
                     ActionItem(
                         icon = "archive",
                         label = stringResource(R.string.edit_bottom_bar_archive),
                         onClick = onArchive,
                         modifier = Modifier.weight(1f),
+                        compact = compact,
                     )
                     ActionItem(
                         icon = "delete_forever",
                         label = stringResource(R.string.edit_bottom_bar_delete_forever),
                         onClick = onDeleteForever,
                         modifier = Modifier.weight(1f),
+                        compact = compact,
                     )
                 }
             }
+        }
+    }
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        tonalElevation = 3.dp,
+    ) {
+        if (compact) {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                actionRow()
+                Spacer(Modifier.height(12.dp))
+            }
+        } else {
+            actionRow()
         }
     }
 }
@@ -241,13 +284,39 @@ private fun ActionItem(
     modifier: Modifier = Modifier,
     iconTint: Color = MaterialTheme.colorScheme.onSurface,
     iconScale: Float = 1f,
+    compact: Boolean = false,
 ) {
+    val clickableModifier =
+        modifier
+            .clip(MaterialTheme.shapes.large)
+            .clickable(onClick = onClick)
+    if (compact) {
+        Row(
+            modifier = clickableModifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = icon,
+                size = 19.dp,
+                tint = iconTint,
+                weight = FontWeight.Medium,
+                modifier = Modifier.scale(iconScale),
+            )
+            Spacer(Modifier.width(3.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        return
+    }
     Column(
-        modifier =
-            modifier
-                .clip(MaterialTheme.shapes.large)
-                .clickable(onClick = onClick)
-                .padding(vertical = 8.dp),
+        modifier = clickableModifier.padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -277,25 +346,23 @@ private fun ActionItem(
 private fun EditActionItem(
     isEditMode: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val haptic = LocalHapticFeedback.current
-    Column(
-        modifier =
-            Modifier
-                .width(72.dp)
-                .clip(MaterialTheme.shapes.large)
-                .clickable(
-                    onClick = {
-                        if (isEditMode) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        }
-                        onClick()
-                    },
-                ).padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
+    val clickableModifier =
+        modifier
+            .clip(MaterialTheme.shapes.large)
+            .clickable(
+                onClick = {
+                    if (isEditMode) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                    onClick()
+                },
+            )
+    val iconContent: @Composable () -> Unit = {
         androidx.compose.animation.AnimatedContent(
             targetState = isEditMode,
             label = "bottomBarEditIcon",
@@ -306,12 +373,13 @@ private fun EditActionItem(
         ) { editing ->
             RememberMaterialRoundedSymbol(
                 name = if (editing) "done" else "edit",
-                size = 24.dp,
+                size = if (compact) 19.dp else 24.dp,
                 tint = MaterialTheme.colorScheme.onSurface,
                 weight = FontWeight.Medium,
             )
         }
-        Spacer(Modifier.height(4.dp))
+    }
+    val labelContent: @Composable () -> Unit = {
         androidx.compose.animation.AnimatedContent(
             targetState = isEditMode,
             label = "bottomBarEditLabel",
@@ -329,7 +397,29 @@ private fun EditActionItem(
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
+        }
+    }
+    if (compact) {
+        Row(
+            modifier = clickableModifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            iconContent()
+            Spacer(Modifier.width(3.dp))
+            labelContent()
+        }
+    } else {
+        Column(
+            modifier = clickableModifier.padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            iconContent()
+            Spacer(Modifier.height(4.dp))
+            labelContent()
         }
     }
 }
@@ -345,6 +435,8 @@ private fun EditActionItem(
 private fun DoneActionItem(
     completed: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
@@ -363,32 +455,29 @@ private fun DoneActionItem(
         animationSpec = colorEffectsSpec,
         label = "bottomBarDoneColor",
     )
-    Column(
-        modifier =
-            Modifier
-                .width(72.dp)
-                .clip(MaterialTheme.shapes.large)
-                .clickable(
-                    onClick = {
-                        if (!completed) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            pulsing = true
-                        }
-                        onClick()
-                    },
-                ).padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
+    val clickableModifier =
+        modifier
+            .clip(MaterialTheme.shapes.large)
+            .clickable(
+                onClick = {
+                    if (!completed) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        pulsing = true
+                    }
+                    onClick()
+                },
+            )
+    val iconContent: @Composable () -> Unit = {
         RememberMaterialRoundedSymbol(
             name = "check_circle",
             filled = completed,
-            size = 24.dp,
+            size = if (compact) 19.dp else 24.dp,
             tint = tint,
             weight = FontWeight.Medium,
             modifier = Modifier.scale(scale),
         )
-        Spacer(Modifier.height(4.dp))
+    }
+    val labelContent: @Composable () -> Unit = {
         Text(
             text =
                 stringResource(
@@ -402,7 +491,29 @@ private fun DoneActionItem(
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
+    }
+    if (compact) {
+        Row(
+            modifier = clickableModifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            iconContent()
+            Spacer(Modifier.width(3.dp))
+            labelContent()
+        }
+    } else {
+        Column(
+            modifier = clickableModifier.padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            iconContent()
+            Spacer(Modifier.height(4.dp))
+            labelContent()
+        }
     }
 }
 
@@ -413,6 +524,8 @@ private fun DoneActionItem(
 private fun StarActionItem(
     starred: Boolean,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
@@ -429,23 +542,19 @@ private fun StarActionItem(
         animationSpec = colorEffectsSpec,
         label = "bottomBarStarColor",
     )
-    Column(
-        modifier =
-            Modifier
-                .width(72.dp)
-                .clip(MaterialTheme.shapes.large)
-                .clickable(
-                    onClick = {
-                        if (!starred) {
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            starPulsing = true
-                        }
-                        onClick()
-                    },
-                ).padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
+    val clickableModifier =
+        modifier
+            .clip(MaterialTheme.shapes.large)
+            .clickable(
+                onClick = {
+                    if (!starred) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        starPulsing = true
+                    }
+                    onClick()
+                },
+            )
+    val iconContent: @Composable () -> Unit = {
         // Shape + color together, so the starred state reads clearly even for users who
         // can't distinguish the yellow tint (color-blindness, high-contrast themes, grayscale).
         // We swap the underlying FILL-instanced font family via `filled = starred` rather
@@ -454,19 +563,42 @@ private fun StarActionItem(
         RememberMaterialRoundedSymbol(
             name = "star",
             filled = starred,
-            size = 24.dp,
+            size = if (compact) 19.dp else 24.dp,
             tint = starColor,
             weight = FontWeight.Medium,
             opticalCenterYOffset = 1.5.dp,
             modifier = Modifier.scale(starScale),
         )
-        Spacer(Modifier.height(4.dp))
+    }
+    val labelContent: @Composable () -> Unit = {
         Text(
             text = stringResource(R.string.edit_bottom_bar_star),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
+    }
+    if (compact) {
+        Row(
+            modifier = clickableModifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            iconContent()
+            Spacer(Modifier.width(3.dp))
+            labelContent()
+        }
+    } else {
+        Column(
+            modifier = clickableModifier.padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            iconContent()
+            Spacer(Modifier.height(4.dp))
+            labelContent()
+        }
     }
 }

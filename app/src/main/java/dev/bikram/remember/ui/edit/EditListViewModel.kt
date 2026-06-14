@@ -1,166 +1,46 @@
 package dev.bikram.remember.ui.edit
 
-import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.ChecklistItemEntity
-import dev.bikram.remember.data.Importance
-import dev.bikram.remember.data.NoteAction
-import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
-import dev.bikram.remember.data.RecurrenceRule
-import dev.bikram.remember.data.RememberReservedTags
-import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.domain.checklist.ChecklistEditResult
 import dev.bikram.remember.domain.checklist.ChecklistEditor
 import dev.bikram.remember.domain.checklist.EditableItem
-import dev.bikram.remember.ui.common.HeroFraming
-import dev.bikram.remember.ui.nav.Routes
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
-import dev.bikram.remember.data.Visibility as NoteVisibility
 
+/**
+ * Owns the checklist hierarchy for the Edit List screen on top of every persisted field shared
+ * with notes in [BaseEditorViewModel]. Only the item list, its editing/reorder operations, and the
+ * create/update/diff calls that depend on it live here; everything else is inherited.
+ */
 @HiltViewModel
 class EditListViewModel
     @Inject
     constructor(
-        private val repository: NoteRepository,
-        private val appMediaStorage: AppMediaStorage? = null,
+        repository: NoteRepository,
+        appMediaStorage: AppMediaStorage? = null,
         savedStateHandle: SavedStateHandle,
-    ) : ViewModel() {
-        private val noteId: Long? =
-            savedStateHandle
-                .get<Long>(Routes.ARG_ID)
-                ?.takeIf { it > 0L }
-
-        private val _title = MutableStateFlow("")
-        val title: StateFlow<String> = _title.asStateFlow()
-
-        private val _starred = MutableStateFlow(false)
-        val starred: StateFlow<Boolean> = _starred.asStateFlow()
-
-        /** Bool projection of NoteEntity.completedAt; same semantics as EditNoteViewModel.completed. */
-        private val _completed = MutableStateFlow(false)
-        val completed: StateFlow<Boolean> = _completed.asStateFlow()
-
+    ) : BaseEditorViewModel(repository, appMediaStorage, savedStateHandle) {
         private val _items = MutableStateFlow<List<EditableItem>>(emptyList())
         val items: StateFlow<List<EditableItem>> = _items.asStateFlow()
 
-        private val _reminderAt = MutableStateFlow<Long?>(null)
-        val reminderAt: StateFlow<Long?> = _reminderAt.asStateFlow()
-
-        private val _recurrence = MutableStateFlow<RecurrenceRule?>(null)
-        val recurrence: StateFlow<RecurrenceRule?> = _recurrence.asStateFlow()
-
-        private val _importance = MutableStateFlow(Importance.DEFAULT)
-        val importance: StateFlow<Importance> = _importance.asStateFlow()
-
-        private val _visibility = MutableStateFlow(NoteVisibility.DEFAULT)
-        val visibility: StateFlow<NoteVisibility> = _visibility.asStateFlow()
-
-        private val _locked = MutableStateFlow(false)
-        val locked: StateFlow<Boolean> = _locked.asStateFlow()
-
-        private val _pictureUri = MutableStateFlow<String?>(null)
-        val pictureUri: StateFlow<String?> = _pictureUri.asStateFlow()
-
-        private val _pictureRevision = MutableStateFlow(0L)
-        val pictureRevision: StateFlow<Long> = _pictureRevision.asStateFlow()
-
-        private val _pictureHeroFraming = MutableStateFlow<String?>(null)
-        val pictureHeroFraming: StateFlow<String?> = _pictureHeroFraming.asStateFlow()
-
-        private val _iconKey = MutableStateFlow<String?>(null)
-        val iconKey: StateFlow<String?> = _iconKey.asStateFlow()
-
-        private val _actions = MutableStateFlow<List<NoteAction>>(emptyList())
-        val actions: StateFlow<List<NoteAction>> = _actions.asStateFlow()
-
-        private val _tags = MutableStateFlow<List<String>>(emptyList())
-        val tags: StateFlow<List<String>> = _tags.asStateFlow()
-        val activeTagSuggestions: StateFlow<List<String>> =
-            repository
-                .observeActiveTagSuggestions()
-                .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
-
-        private val _attachments = MutableStateFlow<List<NoteAttachmentEntity>>(emptyList())
-        val attachments: StateFlow<List<NoteAttachmentEntity>> = _attachments.asStateFlow()
-
-        private val _createdAt = MutableStateFlow<Long?>(null)
-        val createdAt: StateFlow<Long?> = _createdAt.asStateFlow()
-
-        private val _updatedAt = MutableStateFlow<Long?>(null)
-        val updatedAt: StateFlow<Long?> = _updatedAt.asStateFlow()
-
-        /**
-         * Mirrors the underlying note's archived / trashed shelf. The edit screen uses these to
-         * flip into read-only mode and swap the bottom-bar action set. New lists always start on
-         * the active shelf.
-         */
-        private val _archived = MutableStateFlow(false)
-        val archived: StateFlow<Boolean> = _archived.asStateFlow()
-
-        private val _trashed = MutableStateFlow(false)
-        val trashed: StateFlow<Boolean> = _trashed.asStateFlow()
-
-        /**
-         * True once this session is backed by a database row ([loadedId] non-null). Drives archive /
-         * trash on the bottom bar after the first save without using the navigation [noteId] alone.
-         */
-        private val _hasPersistedRow = MutableStateFlow(noteId != null)
-        val hasPersistedRow: StateFlow<Boolean> = _hasPersistedRow.asStateFlow()
-
-        private val persistence = EditorPersistenceSession()
-        val hasUnsavedChanges: StateFlow<Boolean> = persistence.hasUnsavedChanges
-
-        private var loadedId: Long? = noteId
         private var nextLocalId: Long = -1L
-        private var originalNote: dev.bikram.remember.data.NoteEntity? = null
-        private var originalItems: List<dev.bikram.remember.data.ChecklistItemEntity> = emptyList()
-
-        private fun markDirty() {
-            persistence.markDirty()
-        }
-
-        private fun syncHasPersistedRow() {
-            _hasPersistedRow.value = loadedId != null
-        }
+        private var originalItems: List<ChecklistItemEntity> = emptyList()
 
         init {
             if (noteId != null) {
                 viewModelScope.launch {
                     val existing = repository.get(noteId) ?: return@launch
-                    val n = existing.note
-                    originalNote = n
+                    applyLoadedCommon(existing)
                     originalItems = existing.items
-                    _title.value = n.title
-                    _starred.value = n.starred || n.tags.contains(RememberReservedTags.STARRED)
-                    _reminderAt.value = n.reminderAt
-                    _recurrence.value = n.recurrence?.sanitized()
-                    _importance.value = n.importance
-                    _visibility.value = n.visibility
-                    _locked.value = n.locked
-                    _pictureUri.value = n.pictureUri
-                    _pictureHeroFraming.value = n.pictureHeroFraming
-                    _iconKey.value = n.iconKey
-                    _actions.value = n.actions
-                    _tags.value = n.tags.filterNot { it == RememberReservedTags.STARRED }
-                    _attachments.value = existing.attachments
-                    _archived.value = n.archived
-                    _trashed.value = n.trashed
-                    _completed.value = n.completedAt != null
-                    _createdAt.value = n.createdAt
-                    _updatedAt.value = n.updatedAt
                     _items.value =
                         existing.items
                             .map {
@@ -175,156 +55,7 @@ class EditListViewModel
                                 )
                             }.sortedBy { it.sortOrder }
                 }
-                // Same rationale as EditNoteViewModel: mirror only fields that get
-                // written from outside this VM (snooze action, recurrence advance,
-                // mark-as-done) so the open list reflects them live.
-                viewModelScope.launch {
-                    repository.observe(noteId).collect { row ->
-                        val n = row?.note ?: return@collect
-                        if (_reminderAt.value != n.reminderAt) _reminderAt.value = n.reminderAt
-                        val sanitized = n.recurrence?.sanitized()
-                        if (_recurrence.value != sanitized) _recurrence.value = sanitized
-                        if (_trashed.value != n.trashed) _trashed.value = n.trashed
-                        val isCompleted = n.completedAt != null
-                        if (_completed.value != isCompleted) _completed.value = isCompleted
-                        if (_createdAt.value != n.createdAt) _createdAt.value = n.createdAt
-                        if (_updatedAt.value != n.updatedAt) _updatedAt.value = n.updatedAt
-                    }
-                }
-            }
-        }
-
-        /**
-         * Mark this list done / not done. Routes to the recurrence-aware repository methods
-         * - completing a recurring list rolls its reminder forward instead of moving it
-         * to Done. The live observer in [init] will reflect the new value back into
-         * [completed] automatically.
-         */
-        suspend fun toggleCompleted() {
-            val id = loadedId ?: return
-            if (_completed.value) {
-                repository.markIncomplete(id)
-            } else {
-                repository.markCompleted(id)
-            }
-            syncTimestamps()
-        }
-
-        fun setTitle(v: String) {
-            _title.value = v
-            markDirty()
-        }
-
-        fun toggleStar() {
-            _starred.value = !_starred.value
-            markDirty()
-        }
-
-        fun setReminder(
-            at: Long?,
-            rule: RecurrenceRule?,
-        ) {
-            _reminderAt.value = at
-            _recurrence.value = rule?.sanitized()
-            markDirty()
-        }
-
-        fun setImportance(v: Importance) {
-            _importance.value = v
-            markDirty()
-        }
-
-        fun setVisibility(v: NoteVisibility) {
-            if (_visibility.value == v) return
-            _visibility.value = v
-            markDirty()
-            refreshActiveNotificationVisibility(v)
-        }
-
-        private fun refreshActiveNotificationVisibility(value: NoteVisibility) {
-            val id = loadedId ?: return
-            viewModelScope.launch {
-                repository.refreshNotificationVisibilityPreview(id, value)
-            }
-        }
-
-        fun toggleLock() {
-            _locked.value = !_locked.value
-            markDirty()
-        }
-
-        fun setPictureUri(v: String?) {
-            _pictureUri.value = v
-            if (v == null) {
-                _pictureHeroFraming.value = null
-            }
-            _pictureRevision.value = _pictureRevision.value + 1L
-            markDirty()
-        }
-
-        fun setHeroWithFraming(
-            pictureUri: String,
-            framing: HeroFraming,
-        ) {
-            _pictureUri.value = pictureUri
-            _pictureHeroFraming.value = framing.toJsonString()
-            _pictureRevision.value = _pictureRevision.value + 1L
-            markDirty()
-        }
-
-        fun setIconKey(v: String?) {
-            _iconKey.value = v
-            markDirty()
-        }
-
-        fun setActions(v: List<NoteAction>) {
-            _actions.value = v
-            markDirty()
-        }
-
-        fun setTags(v: List<String>) {
-            _tags.value = v.filterNot { it == RememberReservedTags.STARRED }
-            markDirty()
-        }
-
-        fun saveTagsWithColors(
-            tags: List<String>,
-            newColors: Map<String, String>,
-        ) {
-            _tags.value = tags.filterNot { it == RememberReservedTags.STARRED }
-            markDirty()
-            if (newColors.isNotEmpty()) {
-                viewModelScope.launch {
-                    newColors.forEach { (name, hex) ->
-                        repository.tagRepository?.setTagColor(name, hex)
-                    }
-                }
-            }
-        }
-
-        fun editExistingTag(
-            oldName: String,
-            newName: String,
-            colorHex: String?,
-            resetColor: Boolean,
-        ) {
-            viewModelScope.launch {
-                val result =
-                    repository.tagRepository?.editTag(
-                        oldName = oldName,
-                        newName = newName,
-                        colorHex = colorHex,
-                        resetColor = resetColor,
-                    ) ?: return@launch
-                val updatedTags =
-                    _tags.value
-                        .map { tagName ->
-                            if (tagName.equals(result.oldName, ignoreCase = true)) result.newName else tagName
-                        }.distinctBy { tagName -> tagName.lowercase() }
-                if (_tags.value != updatedTags) {
-                    _tags.value = updatedTags
-                    markDirty()
-                }
+                startExternalFieldMirror(noteId)
             }
         }
 
@@ -545,7 +276,7 @@ class EditListViewModel
             if (!result.changed) {
                 return
             }
-            _items.value = result.items
+            _items.value = result.items.sortedBy { item -> item.sortOrder }
             markDirty()
         }
 
@@ -565,81 +296,6 @@ class EditListViewModel
                     }
             markDirty()
         }
-
-        fun addAttachment(
-            uri: Uri,
-            name: String,
-            mime: String?,
-        ) {
-            viewModelScope.launch {
-                persistence.withLock {
-                    val id =
-                        loadedId ?: run {
-                            val entities = currentItems()
-                            val newId =
-                                repository.createList(
-                                    title = _title.value,
-                                    colorIndex = 0,
-                                    items = entities.map { it.text },
-                                    options = currentOptions(),
-                                )
-                            loadedId = newId
-                            syncHasPersistedRow()
-                            newId
-                        }
-                    val attachmentUri =
-                        appMediaStorage
-                            ?.copyAttachmentToPrivateStorage(
-                                noteId = id,
-                                sourceUri = uri,
-                                displayName = name,
-                                mimeType = mime,
-                            )?.uriString ?: uri.toString()
-                    repository.addAttachment(id, attachmentUri, name, mime)
-                    _attachments.value = repository.get(id)?.attachments ?: emptyList()
-                    markDirty()
-                }
-            }
-        }
-
-        fun removeAttachment(attachmentId: Long) {
-            viewModelScope.launch {
-                persistence.withLock {
-                    repository.removeAttachment(attachmentId)
-                    val id = loadedId
-                    _attachments.value =
-                        if (id != null) {
-                            repository.get(id)?.attachments ?: emptyList()
-                        } else {
-                            _attachments.value.filterNot { it.id == attachmentId }
-                        }
-                    markDirty()
-                }
-            }
-        }
-
-        private fun tagsForPersistence(): List<String> {
-            val base = _tags.value.filterNot { it == RememberReservedTags.STARRED }
-            return if (_starred.value) {
-                (base + RememberReservedTags.STARRED).distinct()
-            } else {
-                base
-            }
-        }
-
-        private fun currentOptions() =
-            NoteOptions(
-                reminderAt = _reminderAt.value,
-                recurrence = _recurrence.value,
-                importance = _importance.value,
-                visibility = _visibility.value,
-                pictureUri = _pictureUri.value,
-                pictureHeroFraming = _pictureHeroFraming.value,
-                locked = _locked.value,
-                iconKey = _iconKey.value,
-                actions = _actions.value,
-                tags = tagsForPersistence(),
-            )
 
         private fun currentItems(): List<ChecklistItemEntity> {
             val id = loadedId ?: 0L
@@ -678,14 +334,28 @@ class EditListViewModel
                     )
                 }
 
+        override suspend fun persistNewDraftForAttachment(): Long {
+            val entities = currentItems()
+            val newId =
+                repository.createList(
+                    title = title.value,
+                    colorIndex = 0,
+                    items = entities.map { it.text },
+                    options = currentOptions(),
+                )
+            loadedId = newId
+            syncHasPersistedRow()
+            return newId
+        }
+
         private fun hasNetChanges(): Boolean {
             val id = loadedId
-            val t = _title.value
+            val t = title.value
             val nonEmpty = _items.value.filter { it.text.isNotBlank() }
             val opts = currentOptions()
-            val starred = _starred.value
+            val starred = starred.value
             if (id == null) {
-                return t.isNotBlank() || nonEmpty.isNotEmpty() || _attachments.value.isNotEmpty() || opts.pictureUri != null || opts.tags.isNotEmpty() || opts.reminderAt != null || opts.actions.isNotEmpty() || opts.iconKey != null
+                return t.isNotBlank() || nonEmpty.isNotEmpty() || attachments.value.isNotEmpty() || opts.pictureUri != null || opts.tags.isNotEmpty() || opts.reminderAt != null || opts.actions.isNotEmpty() || opts.iconKey != null
             } else {
                 val old = originalNote ?: return true
                 val oldItems = originalItems
@@ -726,36 +396,33 @@ class EditListViewModel
             }
         }
 
-        suspend fun saveIfNeeded(untitledName: String): (suspend () -> Unit)? {
+        override suspend fun saveIfNeeded(untitledName: String): (suspend () -> Unit)? {
             return persistence.withLock {
                 if (!hasNetChanges()) {
                     persistence.clearDirty()
                     return@withLock null
                 }
-                val t = _title.value
+                val t = title.value
                 val id = loadedId
                 val finalTitle = t.ifBlank { untitledName }
-                val nonEmpty = _items.value.filter { it.text.isNotBlank() }
                 val persistable = currentPersistable()
                 if (id == null) {
                     if (!persistence.isDirty) return@withLock null
                     val epochAtWrite = persistence.currentEpoch()
-                    // Creation still goes through createList which assigns sortOrder itself. If the
-                    // user pre-composed hierarchy/checked state in the draft, we re-run updateList
-                    // immediately afterwards with the real persistable payload.
+                    // Creation goes through createListWithItems with the real persistable payload so
+                    // pre-composed hierarchy/checked state in the draft is preserved on first save.
                     val newId = repository.createListWithItems(finalTitle, 0, persistable, currentOptions())
                     loadedId = newId
                     syncHasPersistedRow()
-                    if (t.isBlank()) _title.value = finalTitle
-                    if (_starred.value) repository.setStarred(newId, true)
+                    if (t.isBlank()) setTitle(finalTitle)
+                    if (starred.value) repository.setStarred(newId, true)
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val savedList = repository.get(newId)
                     originalNote = savedList?.note
                     originalItems = savedList?.items ?: emptyList()
                     savedList?.note?.let { note ->
-                        _createdAt.value = note.createdAt
-                        _updatedAt.value = note.updatedAt
+                        updateTimestamps(note.createdAt, note.updatedAt)
                     }
 
                     return@withLock {
@@ -765,10 +432,10 @@ class EditListViewModel
                     if (!persistence.isDirty) return@withLock null
                     val epochAtWrite = persistence.currentEpoch()
                     repository.updateList(id, finalTitle, 0, persistable, currentOptions())
-                    if (t.isBlank()) _title.value = finalTitle
+                    if (t.isBlank()) setTitle(finalTitle)
                     val cur = repository.get(id)?.note
-                    if (cur != null && cur.starred != _starred.value) {
-                        repository.setStarred(id, _starred.value)
+                    if (cur != null && cur.starred != starred.value) {
+                        repository.setStarred(id, starred.value)
                     }
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
@@ -779,8 +446,7 @@ class EditListViewModel
                     originalNote = savedList?.note
                     originalItems = savedList?.items ?: emptyList()
                     savedList?.note?.let { note ->
-                        _createdAt.value = note.createdAt
-                        _updatedAt.value = note.updatedAt
+                        updateTimestamps(note.createdAt, note.updatedAt)
                     }
 
                     if (old != null) {
@@ -821,99 +487,6 @@ class EditListViewModel
                         return@withLock null
                     }
                 }
-            }
-        }
-
-        private fun syncTimestamps() {
-            val id = loadedId ?: return
-            viewModelScope.launch {
-                val cur = repository.get(id)?.note
-                if (cur != null) {
-                    _createdAt.value = cur.createdAt
-                    _updatedAt.value = cur.updatedAt
-                }
-            }
-        }
-
-        suspend fun trashCurrent() {
-            persistence.withLock {
-                val id = loadedId ?: return@withLock
-                repository.moveToTrash(id)
-                persistence.clearDirty()
-                _trashed.value = true
-                _archived.value = false
-            }
-            syncTimestamps()
-        }
-
-        /** Flip the list onto the archive shelf. Saves any in-flight edits first. */
-        suspend fun archiveCurrent(untitledName: String) {
-            saveIfNeeded(untitledName)
-            persistence.withLock {
-                val id = loadedId ?: return@withLock
-                repository.archiveNote(id)
-                _archived.value = true
-                _trashed.value = false
-                persistence.clearDirty()
-            }
-            syncTimestamps()
-        }
-
-        suspend fun unarchiveCurrent() {
-            persistence.withLock {
-                val id = loadedId ?: return@withLock
-                repository.unarchiveNote(id)
-                _archived.value = false
-                _trashed.value = false
-                persistence.clearDirty()
-            }
-            syncTimestamps()
-        }
-
-        suspend fun restoreFromTrashCurrent() {
-            persistence.withLock {
-                val id = loadedId ?: return@withLock
-                repository.restoreFromTrash(id)
-                _trashed.value = false
-                _archived.value = false
-                persistence.clearDirty()
-            }
-            syncTimestamps()
-        }
-
-        suspend fun fireNotification(
-            context: android.content.Context,
-            untitledName: String,
-        ) {
-            saveIfNeeded(untitledName)
-            val id = loadedId ?: return
-            val noteWithItems = repository.get(id) ?: return
-            val settingsDependencies =
-                EntryPointAccessors.fromApplication(
-                    context.applicationContext,
-                    SettingsDependenciesEntryPoint::class.java,
-                )
-            val reminderPrefs = settingsDependencies.reminderPrefs()
-            val keepUntilDone = reminderPrefs.snapshot().keepReminderNotificationsUntilDone
-            dev.bikram.remember.reminders.ReminderReceiver.showNotification(
-                context = context,
-                note = noteWithItems.note,
-                items = noteWithItems.items,
-                keepUntilDone = keepUntilDone,
-            )
-            android.widget.Toast
-                .makeText(
-                    context,
-                    context.getString(dev.bikram.remember.R.string.notification_created),
-                    android.widget.Toast.LENGTH_SHORT,
-                ).show()
-        }
-
-        suspend fun deleteForeverCurrent() {
-            persistence.withLock {
-                val id = loadedId ?: return@withLock
-                repository.deleteForever(id)
-                persistence.clearDirty()
             }
         }
     }

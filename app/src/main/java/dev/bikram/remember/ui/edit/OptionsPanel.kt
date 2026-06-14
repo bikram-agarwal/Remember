@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
@@ -62,11 +63,13 @@ import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.data.recycleNoteActionIconBitmap
 import dev.bikram.remember.data.toNoteActionIconDrawable
+import dev.bikram.remember.domain.formatTimeOfDay
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberButton
@@ -85,8 +88,7 @@ private const val STARRED_WATERMARK_ALPHA = 0.28f
 
 @Composable
 fun OptionsPanel(
-    reminderAt: Long?,
-    recurrence: RecurrenceRule?,
+    reminders: List<NoteReminder>,
     importance: Importance,
     visibility: NoteVisibility,
     pictureUri: String?,
@@ -227,8 +229,7 @@ fun OptionsPanel(
                             },
                         summaryContent = {
                             ReminderOptionSummary(
-                                reminderAt = reminderAt,
-                                recurrence = recurrence,
+                                reminders = reminders,
                                 permissionMissing = reminderPermissionMissing,
                             )
                         },
@@ -280,17 +281,21 @@ fun OptionsPanel(
                 if (createdAt != null && createdAt > 0L) {
                     Spacer(Modifier.height(6.dp))
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 2.dp),
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 2.dp),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val createdFormatted = remember(createdAt, context) {
-                            val createdDate = Date(createdAt)
-                            android.text.format.DateFormat.getMediumDateFormat(context).format(createdDate) + " " +
-                                    android.text.format.DateFormat.getTimeFormat(context).format(createdDate)
-                        }
+                        val createdFormatted =
+                            remember(createdAt, context) {
+                                val createdDate = Date(createdAt)
+                                android.text.format.DateFormat
+                                    .getMediumDateFormat(context)
+                                    .format(createdDate) + " " +
+                                    formatTimeOfDay(context, createdAt)
+                            }
                         Text(
                             text = stringResource(R.string.options_created, createdFormatted),
                             style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
@@ -299,18 +304,22 @@ fun OptionsPanel(
                         if (updatedAt != null && updatedAt > 0L) {
                             Text(
                                 text = "·",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
+                                style =
+                                    MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
                                 modifier = Modifier.padding(horizontal = 6.dp),
                             )
-                            val updatedFormatted = remember(updatedAt, context) {
-                                val updatedDate = Date(updatedAt)
-                                android.text.format.DateFormat.getMediumDateFormat(context).format(updatedDate) + " " +
-                                        android.text.format.DateFormat.getTimeFormat(context).format(updatedDate)
-                            }
+                            val updatedFormatted =
+                                remember(updatedAt, context) {
+                                    val updatedDate = Date(updatedAt)
+                                    android.text.format.DateFormat
+                                        .getMediumDateFormat(context)
+                                        .format(updatedDate) + " " +
+                                        formatTimeOfDay(context, updatedAt)
+                                }
                             Text(
                                 text = stringResource(R.string.options_updated, updatedFormatted),
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
@@ -459,9 +468,9 @@ private fun DotSeparatedSummary(
                 softWrap = false,
                 modifier =
                     if (index == parts.lastIndex) {
-                        Modifier.weight(1f, fill = false)
-                    } else {
                         Modifier
+                    } else {
+                        Modifier.weight(1f, fill = false)
                     },
             )
         }
@@ -470,17 +479,16 @@ private fun DotSeparatedSummary(
 
 @Composable
 private fun ReminderOptionSummary(
-    reminderAt: Long?,
-    recurrence: RecurrenceRule?,
+    reminders: List<NoteReminder>,
     permissionMissing: Boolean,
 ) {
     val summaryColor =
-        if (permissionMissing && reminderAt != null) {
+        if (permissionMissing && reminders.isNotEmpty()) {
             MaterialTheme.colorScheme.error
         } else {
             MaterialTheme.colorScheme.onSurfaceVariant
         }
-    if (reminderAt == null) {
+    if (reminders.isEmpty()) {
         Text(
             text = stringResource(R.string.common_none),
             style = MaterialTheme.typography.bodySmall,
@@ -490,24 +498,52 @@ private fun ReminderOptionSummary(
         )
         return
     }
+    val soonest = reminders.minByOrNull { it.reminderAt } ?: return
+    val reminderAt = soonest.reminderAt
+    val recurrence = soonest.recurrence
     val summaryContext = LocalContext.current
-    val datePart = remember(reminderAt, summaryContext) {
-        val reminderDate = Date(reminderAt)
-        android.text.format.DateFormat.getMediumDateFormat(summaryContext).format(reminderDate) + " " +
-                android.text.format.DateFormat.getTimeFormat(summaryContext).format(reminderDate)
-    }
+    val datePart =
+        remember(reminderAt, summaryContext) {
+            android.text.format.DateFormat
+                .getMediumDateFormat(summaryContext)
+                .format(Date(reminderAt)) + " " +
+                formatTimeOfDay(summaryContext, reminderAt)
+        }
     val rule = recurrence?.sanitized()
     val recurrenceLabel = rule?.let { compactRecurrenceLabel(it) }.orEmpty()
-    if (recurrenceLabel.isEmpty()) {
-        Text(
-            text = datePart,
-            style = MaterialTheme.typography.bodySmall,
-            color = summaryColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-    } else {
-        DotSeparatedSummary(listOf(datePart, recurrenceLabel), color = summaryColor)
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.weight(1f, fill = false)) {
+            if (recurrenceLabel.isEmpty()) {
+                Text(
+                    text = datePart,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = summaryColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            } else {
+                DotSeparatedSummary(listOf(datePart, recurrenceLabel), color = summaryColor)
+            }
+        }
+        if (reminders.size > 1) {
+            Spacer(Modifier.width(4.dp))
+            val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+            val greenBg = if (isDark) Color(0xFF1B5E20) else Color(0xFFE8F5E9)
+            val greenText = if (isDark) Color(0xFFC8E6C9) else Color(0xFF2E7D32)
+            Surface(
+                shape = MaterialTheme.shapes.extraSmall,
+                color = greenBg,
+                contentColor = greenText,
+            ) {
+                Text(
+                    text = "+${reminders.size - 1} more",
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                )
+            }
+        }
     }
 }
 

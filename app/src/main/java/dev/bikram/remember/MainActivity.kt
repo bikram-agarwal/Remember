@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -24,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.data.InteractionPrefs
@@ -43,6 +45,7 @@ import dev.bikram.remember.ui.InAppRatingAutoPromptHost
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.lock.LockScreen
 import dev.bikram.remember.ui.nav.RememberNavGraph
+import dev.bikram.remember.ui.settings.RememberUpdateViewModel
 import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
 import dev.bikram.remember.update.AppReviewLauncher
@@ -223,10 +226,19 @@ private fun AppRoot(
         }
     val context = LocalContext.current
     val activity = LocalActivity.current as? FragmentActivity
+    val updateVm: RememberUpdateViewModel = hiltViewModel()
     var openSettingsRequest by rememberSaveable { mutableIntStateOf(0) }
-    var openUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
-    var startPlayInAppUpdateRequest by rememberSaveable { mutableIntStateOf(0) }
     var dismissedUpdateBarKey by rememberSaveable { mutableStateOf<String?>(null) }
+    // Every update-flow (re-)trigger resurrects a dismissed update bar. The handled
+    // epoch is saveable so rotation does not count as a new trigger.
+    val updateSignalEpoch by rememberUpdateState.updateSignalEpoch.collectAsStateWithLifecycle()
+    var lastHandledUpdateSignalEpoch by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(updateSignalEpoch) {
+        if (updateSignalEpoch != lastHandledUpdateSignalEpoch) {
+            lastHandledUpdateSignalEpoch = updateSignalEpoch
+            dismissedUpdateBarKey = null
+        }
+    }
     val currentLockState = lockState
 
     if (currentLockState == null) {
@@ -281,22 +293,18 @@ private fun AppRoot(
                 appScope = appScope,
                 launchFlow = launchFlow,
                 openSettingsRequest = openSettingsRequest,
-                openUpdateSheetRequest = openUpdateSheetRequest,
-                onOpenUpdateSheetRequestHandled = { openUpdateSheetRequest = 0 },
-                startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
-                onStartPlayInAppUpdateRequestHandled = { startPlayInAppUpdateRequest = 0 },
+                updateVm = updateVm,
                 onUpdateCheckStarted = { dismissedUpdateBarKey = null },
                 updateBarState = updateBarState,
+                updateSignalEpoch = updateSignalEpoch,
                 onUpdateClick = {
                     if (updateBarState == UpdateChromeState.Available) {
                         dismissedUpdateBarKey = updateKey
                     }
+                    // Check only surfaces the update sheet; starting the actual
+                    // download is the sheet's job.
                     openSettingsRequest += 1
-                    if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
-                        startPlayInAppUpdateRequest += 1
-                    } else {
-                        openUpdateSheetRequest += 1
-                    }
+                    updateVm.requestOpenSheet()
                 },
                 onDismissUpdateAvailable = { dismissedUpdateBarKey = updateKey },
                 onInstallUpdate = {

@@ -1,6 +1,8 @@
 package dev.bikram.remember.ui.home
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -19,6 +21,8 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NotesFilter
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.emptyStateSpacing
+import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.components.EmptyFilterIllustration
 import dev.bikram.remember.ui.components.EmptyNotesIllustration
 import dev.bikram.remember.ui.components.RememberButton
@@ -31,9 +35,16 @@ internal fun NotesEmptyState(
     onCreateNote: () -> Unit,
     onCreateList: () -> Unit,
     modifier: Modifier = Modifier,
+    // Pane mode hosts its own create FAB, so the inline buttons are redundant there —
+    // and dropping them frees the height the subtitle needs on short landscape panes.
+    showCreateActions: Boolean = true,
 ) {
     val pristineVault =
         totalUnfilteredNotes == 0 && filter.text.isBlank() && !filter.facetActive
+    val isSmallLandscape = isSmallLandscape()
+    val heroSpacing = emptyStateSpacing(prominent = true)
+    val filterSpacing = emptyStateSpacing(prominent = false)
+
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -44,48 +55,87 @@ internal fun NotesEmptyState(
                 modifier = Modifier.semantics(mergeDescendants = true) {},
             ) {
                 EmptyNotesIllustration()
-                Spacer(Modifier.height(24.dp))
+                Spacer(Modifier.height(heroSpacing.titleSpacer))
                 Text(
                     text = stringResource(R.string.home_no_notes_title),
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(heroSpacing.subtitleSpacer))
                 Text(
                     text = stringResource(R.string.home_no_notes_subtitle),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 24.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp),
                 )
             }
-            Spacer(Modifier.height(24.dp))
-            RememberButton(
-                onClick = onCreateNote,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.fillMaxWidth(0.78f),
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = "add",
-                    size = 20.dp,
-                    weight = FontWeight.Medium,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_create_note))
-            }
-            Spacer(Modifier.height(12.dp))
-            RememberOutlinedButton(
-                onClick = onCreateList,
-                shape = MaterialTheme.shapes.large,
-                modifier = Modifier.fillMaxWidth(0.78f),
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = "add",
-                    size = 20.dp,
-                    weight = FontWeight.Medium,
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.home_create_list))
+            if (showCreateActions) {
+                Spacer(Modifier.height(heroSpacing.titleSpacer))
+                if (isSmallLandscape) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(0.9f),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        RememberButton(
+                            onClick = onCreateNote,
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "add",
+                                size = 20.dp,
+                                weight = FontWeight.Medium,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.home_create_note))
+                        }
+                        RememberOutlinedButton(
+                            onClick = onCreateList,
+                            shape = MaterialTheme.shapes.large,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = "add",
+                                size = 20.dp,
+                                weight = FontWeight.Medium,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.home_create_list))
+                        }
+                    }
+                } else {
+                    RememberButton(
+                        onClick = onCreateNote,
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.fillMaxWidth(0.78f),
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "add",
+                            size = 20.dp,
+                            weight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.home_create_note))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    RememberOutlinedButton(
+                        onClick = onCreateList,
+                        shape = MaterialTheme.shapes.large,
+                        modifier = Modifier.fillMaxWidth(0.78f),
+                    ) {
+                        RememberMaterialRoundedSymbol(
+                            name = "add",
+                            size = 20.dp,
+                            weight = FontWeight.Medium,
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(stringResource(R.string.home_create_list))
+                    }
+                }
             }
         } else {
             val titleText =
@@ -107,19 +157,20 @@ internal fun NotesEmptyState(
                 modifier = Modifier.semantics(mergeDescendants = true) {},
             ) {
                 EmptyFilterIllustration()
-                Spacer(Modifier.height(18.dp))
+                Spacer(Modifier.height(filterSpacing.titleSpacer))
                 Text(
                     text = titleText,
                     style = MaterialTheme.typography.headlineSmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(filterSpacing.subtitleSpacer))
                 Text(
                     text = hintText,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }

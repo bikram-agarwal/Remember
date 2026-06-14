@@ -54,6 +54,15 @@ class Converters {
 
     @TypeConverter
     fun toRecurrence(value: String?): RecurrenceRule? = RecurrenceRule.fromJson(value)
+
+    @TypeConverter
+    fun fromReminders(v: List<NoteReminder>): String = json.encodeToString(v)
+
+    @TypeConverter
+    fun toReminders(value: String): List<NoteReminder> {
+        if (value.isBlank()) return emptyList()
+        return runCatching { json.decodeFromString<List<NoteReminder>>(value) }.getOrDefault(emptyList())
+    }
 }
 
 @Database(
@@ -65,7 +74,7 @@ class Converters {
         TagEntity::class,
         NoteTagCrossRef::class,
     ],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(Converters::class)
@@ -82,7 +91,7 @@ abstract class RememberDatabase : RoomDatabase() {
         fun build(context: Context): RememberDatabase =
             Room
                 .databaseBuilder(context, RememberDatabase::class.java, "remember.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .fallbackToDestructiveMigration(false)
                 .build()
 
@@ -155,6 +164,13 @@ abstract class RememberDatabase : RoomDatabase() {
             object : Migration(2, 3) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE checklist_items ADD COLUMN details TEXT NOT NULL DEFAULT ''")
+                }
+            }
+
+        private val MIGRATION_3_4 =
+            object : Migration(3, 4) {
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL("ALTER TABLE notes ADD COLUMN reminders TEXT NOT NULL DEFAULT '[]'")
                 }
             }
 

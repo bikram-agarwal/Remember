@@ -161,6 +161,10 @@
     <string name="view_options_group_none">None</string>
     <string name="view_options_group_tags">Tags</string>
     <string name="view_options_group_type">Type</string>
+    <string name="home_layout_switch_to_list_cd">Switch to list layout</string>
+    <string name="home_layout_switch_to_mosaic_cd">Switch to mosaic layout</string>
+    <string name="home_group_state_collapsed">Collapsed</string>
+    <string name="home_group_state_expanded">Expanded</string>
 
     <!-- Note cards -->
     <string name="notecard_starred_cd">Starred</string>
@@ -311,6 +315,9 @@
     <string name="home_bulk_trash_cd">Move selected notes to trash</string>
     <string name="home_bulk_mark_done_cd">Mark selected notes done</string>
     <string name="home_bulk_tag_cd">Tag selected notes</string>
+    <string name="two_pane_notes_empty_detail_title">Select a note</string>
+    <string name="two_pane_notes_empty_detail_body">Choose a note from the list or create a new one.</string>
+    <string name="two_pane_notes_selection_title">%1$d selected</string>
 
     <!-- Snackbar messages shown after a bulk action completes. The single Undo button
          on the snackbar reverses the action by calling the inverse repository method. -->
@@ -430,6 +437,18 @@
     <string name="visibility_secret_description">Redact all info. Don\'t show in widgets.</string>
 
     <!-- Reminders -->
+    <string name="reminder_add_button">Add reminder</string>
+    <string name="reminder_count_format">%1$d of %2$d</string>
+    <string name="reminder_max_limit">Maximum of %1$d reminders</string>
+    <string name="reminder_clear_all">Clear all</string>
+    <string name="reminder_clear_all_confirm_title">Remove all reminders?</string>
+    <string name="reminder_clear_all_confirm_body">All scheduled reminders for this note will be removed.</string>
+    <string name="reminder_clear_all_confirm_action">Remove</string>
+    <string name="reminder_header_index">Reminder %1$d</string>
+    <string name="reminder_editor_unsaved_title">Unsaved changes</string>
+    <string name="reminder_editor_unsaved_body">Reminder changes are not saved yet. Discard them?</string>
+    <string name="reminder_editor_unsaved_discard">Discard</string>
+    <string name="reminder_editor_unsaved_keep_editing">Keep editing</string>
     <string name="reminder_set_title">Set reminder</string>
     <string name="reminder_exact_alarm_permission_prompt">Exact reminders require permission. Tap to enable in Settings.</string>
     <string name="reminder_notifications_required_title">Setting Reminders</string>
@@ -556,7 +575,7 @@
     <string name="tag_editor_edit_mode_cd">Edit tags</string>
     <string name="tag_editor_edit_mode_hint">Create new tag or tap a tag to change its name and color</string>
     <string name="tag_editor_assign_mode_hint">Tap a tag to change its state: (+) Assign, (x) Remove</string>
-    <string name="tag_editor_unsaved_title">Unsaved tag changes</string>
+    <string name="tag_editor_unsaved_title">Unsaved changes</string>
     <string name="tag_editor_unsaved_body">Tag changes are not saved yet. Discard them?</string>
     <string name="tag_editor_unsaved_discard">Discard</string>
     <string name="tag_editor_unsaved_keep_editing">Keep editing</string>
@@ -659,7 +678,7 @@
     <string name="icon_picker_emoji_category_objects">Objects</string>
     <string name="icon_picker_emoji_category_symbols">Symbols</string>
     <string name="icon_picker_emoji_category_flags">Flags</string>
-    <string name="reminder_time_picker_title">Pick time</string>
+    <string name="reminder_time_picker_title">Set time</string>
     <string name="reminder_time_input_mode">Type time with keyboard</string>
     <string name="reminder_time_dial_mode">Pick time with clock dial</string>
     <string name="reminder_pick_time">Set time</string>
@@ -1091,5 +1110,76 @@
     <string name="dev_options_test_notif_summary_line1">Buy milk — overdue</string>
     <string name="dev_options_test_notif_summary_line2">Call doctor — overdue</string>
     <string name="dev_options_test_notif_summary_line3">Pack for trip — today</string>
+
+    <!-- Diagnostics export: header, system snapshot, preferences snapshot -->
+    <string name="diagnostics_title">Remember diagnostics</string>
+    <string name="diagnostics_generated_format">Generated: %1$s</string>
+    <string name="diagnostics_package_format">Package: %1$s</string>
+    <string name="diagnostics_version_format">Version: %1$s (%2$d)</string>
+    <string name="diagnostics_flavor_format">Flavor: %1$s</string>
+    <string name="diagnostics_build_type_format">Build type: %1$s</string>
+    <string name="diagnostics_device_format">Device: %1$s %2$s</string>
+    <string name="diagnostics_android_format">Android: %1$s (SDK %2$d)</string>
+    <string name="diagnostics_section_environment">Environment</string>
+    <string name="diagnostics_locale_format">Locale: %1$s</string>
+    <string name="diagnostics_timezone_format">Timezone: %1$s</string>
+    <string name="diagnostics_uptime_format">Uptime: %1$d ms</string>
+    <string name="diagnostics_elapsed_realtime_format">Elapsed realtime: %1$d ms</string>
+    <string name="diagnostics_target_sdk_format">Target SDK: %1$s</string>
+    <string name="diagnostics_first_install_format">First install: %1$s</string>
+    <string name="diagnostics_last_update_format">Last update: %1$s</string>
+    <string name="diagnostics_installer_format">Installer: %1$s</string>
+    <string name="diagnostics_files_dir_space_format">Files dir allocatable: %1$d bytes</string>
+    <string name="diagnostics_cache_dir_space_format">Cache dir allocatable: %1$d bytes</string>
+    <string name="diagnostics_external_storage_state_format">External storage state: %1$s</string>
+    <string name="diagnostics_section_permissions_app_access">Permissions and app access</string>
+    <string name="diagnostics_notifications_enabled_format">Notifications enabled: %1$s</string>
+    <string name="diagnostics_post_notifications_granted_format">POST_NOTIFICATIONS granted: %1$s</string>
+    <string name="diagnostics_ignoring_battery_optimizations_format">Ignoring battery optimizations: %1$s</string>
+    <string name="diagnostics_exact_alarms_allowed_format">Exact alarms allowed: %1$s</string>
+    <string name="diagnostics_section_settings">Remember settings</string>
+    <string name="diagnostics_settings_snapshot_unavailable">Settings snapshot unavailable.</string>
+    <string name="diagnostics_theme_mode_format">Theme mode: %1$s</string>
+    <string name="diagnostics_color_source_format">Color source: %1$s</string>
+    <string name="diagnostics_palette_style_format">Palette style: %1$s</string>
+    <string name="diagnostics_saved_custom_seeds_format">Saved custom seeds: %1$d</string>
+    <string name="diagnostics_active_custom_seed_format">Active custom seed set: %1$s</string>
+    <string name="diagnostics_gradient_background_format">Gradient background: %1$s</string>
+    <string name="diagnostics_surface_shading_format">Surface shading: %1$s</string>
+    <string name="diagnostics_hero_on_cards_format">Hero images on cards: %1$s</string>
+    <string name="diagnostics_adaptive_note_themes_format">Adaptive note themes: %1$s</string>
+    <string name="diagnostics_blur_bars_format">Blur bars: %1$s</string>
+    <string name="diagnostics_swipe_gesture_mode_format">Swipe gesture mode: %1$s</string>
+    <string name="diagnostics_swipe_start_to_end_format">Swipe start-to-end: %1$s</string>
+    <string name="diagnostics_swipe_end_to_start_format">Swipe end-to-start: %1$s</string>
+    <string name="diagnostics_keep_reminders_until_done_format">Keep reminders until done: %1$s</string>
+    <string name="diagnostics_reminder_summary_enabled_format">Reminder summary notification: %1$s</string>
+    <string name="diagnostics_auto_export_on_change_format">Auto export on change: %1$s</string>
+    <string name="diagnostics_scheduled_export_enabled_format">Scheduled export enabled: %1$s</string>
+    <string name="diagnostics_include_media_in_backup_format">Include media in backup: %1$s</string>
+    <string name="diagnostics_local_backup_folder_format">Local backup folder: %1$s</string>
+    <string name="diagnostics_cloud_backup_folder_format">Cloud backup folder: %1$s</string>
+    <string name="diagnostics_update_check_schedule_format">Update check schedule: %1$s</string>
+    <string name="diagnostics_notify_new_updates_format">Notify on new updates: %1$s</string>
+    <string name="diagnostics_save_apk_downloads_format">Save update APK to Downloads: %1$s</string>
+    <string name="diagnostics_apk_downloads_copy_succeeded_format">APK Downloads copy succeeded: %1$s</string>
+    <string name="diagnostics_in_app_review_never_ask_again_format">In-app review never ask again: %1$s</string>
+    <string name="diagnostics_quick_capture_enabled_format">Quick capture enabled: %1$s</string>
+    <string name="diagnostics_intro_seen_format">Intro seen: %1$s</string>
+    <string name="diagnostics_app_lock_enabled_format">App lock enabled: %1$s</string>
+    <string name="diagnostics_app_lock_biometric_format">App lock biometric: %1$s</string>
+    <string name="diagnostics_app_lock_has_pin_format">App lock PIN set: %1$s</string>
+    <string name="diagnostics_section_notification_channels">Notification channels</string>
+    <string name="diagnostics_no_channels_registered">No channels registered.</string>
+    <string name="diagnostics_notification_channel_format">%1$s: importance=%2$d, sound=%3$s, vibrate=%4$s, lights=%5$s, bypassDnd=%6$s, lockscreenVisibility=%7$d</string>
+    <string name="diagnostics_section_app_log">App log</string>
+    <string name="diagnostics_no_app_log_entries">No app log entries captured yet.\n</string>
+    <string name="diagnostics_uncaught_exception_format">Uncaught exception on %1$s</string>
+    <string name="diagnostics_value_unknown">unknown</string>
+    <string name="diagnostics_value_not_required">not required</string>
+    <string name="diagnostics_value_not_configured">not configured</string>
+    <string name="diagnostics_value_configured_content_uri">configured: content URI</string>
+    <string name="diagnostics_value_configured_filesystem_path">configured: filesystem path</string>
+    <string name="diagnostics_value_configured_reference_format">configured: %1$s reference</string>
 
 </resources>

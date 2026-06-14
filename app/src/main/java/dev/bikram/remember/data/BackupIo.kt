@@ -8,6 +8,7 @@ import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import dev.bikram.remember.backup.SettingsBackup
 import dev.bikram.remember.diagnostics.DiagnosticLog
+import dev.bikram.remember.domain.backupFileTimestamp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -17,9 +18,6 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -33,6 +31,9 @@ class BackupIo(
     private val lockPrefs: LockPrefs,
     private val interactionPrefs: InteractionPrefs,
     private val backupPrefs: BackupPrefs,
+    private val quickCapturePrefs: QuickCapturePrefs,
+    private val reminderPrefs: ReminderPrefs,
+    private val updatePrefs: UpdatePrefs,
 ) {
     private val fileProviderAuthority: String
         get() = "${context.packageName}.fileprovider"
@@ -56,14 +57,12 @@ class BackupIo(
         var mediaFailedCount: Int = 0,
     )
 
-    private fun backupStamp(): String = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
+    fun suggestedBackupFileName(): String = "remember_backup_${backupFileTimestamp()}.zip"
 
-    fun suggestedBackupFileName(): String = "remember_backup_${backupStamp()}.zip"
-
-    private suspend fun buildSettingsJson(): JSONObject = SettingsBackup.exportJson(themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs)
+    private suspend fun buildSettingsJson(): JSONObject = SettingsBackup.exportJson(themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
 
     private suspend fun importSettingsFromJson(settingsJson: JSONObject?) {
-        SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs)
+        SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
     }
 
     private data class NotesSnapshot(
@@ -138,6 +137,19 @@ class BackupIo(
             )
             put("tags", JSONArray().apply { note.tags.forEach { put(it) } })
             RecurrenceRule.toJson(note.recurrence)?.let { put("recurrence", it) }
+            put(
+                "reminders",
+                JSONArray().apply {
+                    note.reminders.limitedToReminderSlots().forEach { r ->
+                        put(
+                            JSONObject().apply {
+                                put("reminderAt", r.reminderAt)
+                                RecurrenceRule.toJson(r.recurrence)?.let { put("recurrence", it) }
+                            },
+                        )
+                    }
+                },
+            )
             put(
                 "items",
                 JSONArray().apply {
@@ -346,8 +358,7 @@ class BackupIo(
                 val includeMedia = backupPrefs.snapshot().includeMediaInBackup
                 val snapshot = snapshotNotes()
                 val bytes = writeZipArchive(snapshot.root, includeMedia)
-                val stamp = backupStamp()
-                val fileName = "remember_backup_$stamp.zip"
+                val fileName = "remember_backup_${backupFileTimestamp()}.zip"
                 destinations.forEach { destinationUriString ->
                     if (!destinationUriString.startsWith("content://")) error("Invalid export folder")
                     val destinationUri = destinationUriString.toUri()
@@ -712,7 +723,20 @@ class BackupIo(
             actions = o.optJSONArray("actions")?.let { decodeActions(it) } ?: emptyList(),
             tags = o.optJSONArray("tags")?.let { decodeStringArray(it) } ?: emptyList(),
             recurrence = o.optStringOrNull("recurrence")?.let { RecurrenceRule.fromJson(it) },
+            reminders = o.optJSONArray("reminders")?.let { decodeReminders(it) } ?: emptyList(),
         )
+    }
+
+    private fun decodeReminders(a: JSONArray): List<NoteReminder> {
+        val out = ArrayList<NoteReminder>(a.length())
+        for (i in 0 until a.length()) {
+            val o = a.optJSONObject(i) ?: continue
+            val reminderAt = o.optLong("reminderAt", 0L)
+            if (reminderAt <= 0L) continue
+            val recurrence = o.optStringOrNull("recurrence")?.let { RecurrenceRule.fromJson(it) }
+            out.add(NoteReminder(reminderAt, recurrence))
+        }
+        return out.limitedToReminderSlots()
     }
 
     private fun decodeChecklistItems(o: JSONObject): List<ChecklistItemEntity> {
@@ -815,7 +839,7 @@ class BackupIo(
     private fun JSONObject.optStringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
 
     companion object {
-        const val SCHEMA_VERSION = 3
+        const val SCHEMA_VERSION = 4
         const val LEGACY_SCHEMA_VERSION = 1
         const val ENTRY_MANIFEST = "backup_manifest.json"
         const val ENTRY_NOTES = "notes.json"

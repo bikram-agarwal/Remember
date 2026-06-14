@@ -8,6 +8,8 @@ enum class SortDir { ASC, DESC }
 
 enum class GroupBy { DATE, NONE, TAG, TYPE }
 
+enum class NoteLayoutMode { LIST, MOSAIC }
+
 @Immutable
 data class ViewOptions(
     // Default to Reminder ascending so the task-first sectioning (Today / Upcoming /
@@ -16,4 +18,6 @@ data class ViewOptions(
     val sortKey: SortKey = SortKey.REMINDER,
     val sortDir: SortDir = SortDir.ASC,
     val groupBy: GroupBy = GroupBy.DATE,
+    val noteLayoutMode: NoteLayoutMode = NoteLayoutMode.LIST,
+    val settingsCollapsedSectionKeys: List<String> = emptyList(),
 )

@@ -8,6 +8,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
+import android.util.DisplayMetrics
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -35,6 +36,9 @@ import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemeState
+
+private const val MAX_APP_DISPLAY_SCALE = 1.15f
+private const val MAX_APP_FONT_SCALE = 1.3f
 
 val LocalIsDark = staticCompositionLocalOf { false }
 
@@ -65,12 +69,13 @@ fun RememberTheme(
     val context = LocalContext.current
     val reducedMotion = rememberSystemReducedMotionEnabled(context)
     val baseDensity = LocalDensity.current
+    val stableDensity = DisplayMetrics.DENSITY_DEVICE_STABLE.toFloat() / DisplayMetrics.DENSITY_DEFAULT
     val responsiveTextScale = responsiveTextScaleForScreenWidth()
     val responsiveDensity =
-        remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale) {
+        remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale, stableDensity) {
             Density(
-                density = baseDensity.density,
-                fontScale = baseDensity.fontScale * responsiveTextScale,
+                density = baseDensity.density.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE),
+                fontScale = (baseDensity.fontScale * responsiveTextScale).coerceAtMost(MAX_APP_FONT_SCALE),
             )
         }
     val wallpaperTint = rememberWallpaperTintColor(context, enabled = effectiveUseGradient)

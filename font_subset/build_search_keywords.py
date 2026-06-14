@@ -16,7 +16,7 @@ Output JSON shape (compact, keyed by ligature name):
       ...
     }
 
-Run: `python font_subset/build_icon_keywords.py` (no extra deps; stdlib only).
+Run: `python font_subset/build_search_keywords.py` (no extra deps; stdlib only).
 Pass `--force-refresh` to bypass the cache and re-download.
 """
 

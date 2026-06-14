@@ -52,7 +52,11 @@ internal fun ActiveFilterChips(
 ) {
     val defaultFilter = NotesFilter()
     val defaultViewOptions = ViewOptions()
-    val canReset = filter != defaultFilter || viewOptions != defaultViewOptions
+    val canReset =
+        filter != defaultFilter ||
+            viewOptions.sortKey != defaultViewOptions.sortKey ||
+            viewOptions.sortDir != defaultViewOptions.sortDir ||
+            viewOptions.groupBy != defaultViewOptions.groupBy
     Row(
         modifier =
             modifier
@@ -200,7 +204,13 @@ internal fun ActiveFilterChips(
             selected = false,
             onClick = {
                 onChange(defaultFilter)
-                onViewOptionsChange?.invoke(defaultViewOptions)
+                onViewOptionsChange?.invoke(
+                    viewOptions.copy(
+                        sortKey = defaultViewOptions.sortKey,
+                        sortDir = defaultViewOptions.sortDir,
+                        groupBy = defaultViewOptions.groupBy,
+                    ),
+                )
             },
             enabled = canReset,
             label = { Text(stringResource(R.string.action_reset)) },

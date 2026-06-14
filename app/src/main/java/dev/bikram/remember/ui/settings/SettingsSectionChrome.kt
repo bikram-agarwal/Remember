@@ -55,6 +55,7 @@ internal fun SettingsExpandableSection(
     collapsedSectionKeys: Set<String>,
     onCollapsedSectionKeysChange: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
+    showHeader: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val collapsed = sectionKey in collapsedSectionKeys
@@ -63,22 +64,24 @@ internal fun SettingsExpandableSection(
     val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     Column(modifier = modifier) {
-        SettingsSectionHeader(
-            materialSymbolName = materialSymbolName,
-            title = title,
-            collapsed = collapsed,
-            onToggle = {
-                onCollapsedSectionKeysChange(
-                    if (collapsed) {
-                        collapsedSectionKeys - sectionKey
-                    } else {
-                        collapsedSectionKeys + sectionKey
-                    },
-                )
-            },
-        )
+        if (showHeader) {
+            SettingsSectionHeader(
+                materialSymbolName = materialSymbolName,
+                title = title,
+                collapsed = collapsed,
+                onToggle = {
+                    onCollapsedSectionKeysChange(
+                        if (collapsed) {
+                            collapsedSectionKeys - sectionKey
+                        } else {
+                            collapsedSectionKeys + sectionKey
+                        },
+                    )
+                },
+            )
+        }
         AnimatedVisibility(
-            visible = !collapsed,
+            visible = !showHeader || !collapsed,
             enter =
                 expandVertically(
                     animationSpec = spatialSpec,

@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -92,9 +91,9 @@ import dev.bikram.remember.reminders.ReminderReceiver
 import dev.bikram.remember.reminders.ReminderScheduler
 import dev.bikram.remember.trash.RememberTrashSweepWork
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
-import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
@@ -189,7 +188,10 @@ private object DevOptionsScreenSessionState {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
-fun DevOptionsRoute(onBack: () -> Unit) {
+fun DevOptionsRoute(
+    onBack: () -> Unit,
+    showNavigateBack: Boolean = true,
+) {
     val context = LocalContext.current
     val density = LocalDensity.current
     val resources = LocalResources.current
@@ -320,8 +322,12 @@ fun DevOptionsRoute(onBack: () -> Unit) {
             }
         }
     }
+    // Pane mode (no back arrow) drops the bottom blur band to match the settings pane.
     val blurMod =
-        blurStyle?.applyToScrollableList(topAlphaMultiplier = topAlphaMultiplier) ?: Modifier
+        blurStyle?.applyToScrollableList(
+            topAlphaMultiplier = topAlphaMultiplier,
+            bottomAlphaMultiplier = if (showNavigateBack) 1f else 0f,
+        ) ?: Modifier
     val bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 24.dp
     val sharedScope = LocalSharedTransitionScope.current
     val navScope = LocalNavAnimatedVisibilityScope.current
@@ -343,36 +349,29 @@ fun DevOptionsRoute(onBack: () -> Unit) {
     val installerPackage = remember(context) { installerPackageName(context) }
 
     if (showResetPrefsConfirm) {
-        AlertDialog(
-            onDismissRequest = { showResetPrefsConfirm = false },
-            title = { Text(stringResource(R.string.dev_options_reset_all_title)) },
-            text = { Text(stringResource(R.string.dev_options_reset_all_message)) },
-            confirmButton = {
-                RememberTextButton(
-                    onClick = {
-                        scope.launch {
-                            themePrefs.reset()
-                            viewOptionsPrefs.reset()
-                            interactionPrefs.reset()
-                            reminderPrefs.reset()
-                            quickCapturePrefs.reset()
-                            lockPrefs.reset()
-                            backupPrefs.reset()
-                            updatePrefs.reset()
-                            onboardingPrefs.resetIntroSeen()
-                            devModePrefs.setEnabled(false)
-                        }
-                        showResetPrefsConfirm = false
-                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_reset_done), Toast.LENGTH_SHORT).show()
-                        onBack()
-                    },
-                ) { Text(stringResource(R.string.dev_options_reset_all_confirm), color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                RememberTextButton(onClick = { showResetPrefsConfirm = false }) {
-                    Text(stringResource(R.string.common_cancel))
+        RememberConfirmDialog(
+            title = stringResource(R.string.dev_options_reset_all_title),
+            text = stringResource(R.string.dev_options_reset_all_message),
+            confirmLabel = stringResource(R.string.dev_options_reset_all_confirm),
+            onConfirm = {
+                scope.launch {
+                    themePrefs.reset()
+                    viewOptionsPrefs.reset()
+                    interactionPrefs.reset()
+                    reminderPrefs.reset()
+                    quickCapturePrefs.reset()
+                    lockPrefs.reset()
+                    backupPrefs.reset()
+                    updatePrefs.reset()
+                    onboardingPrefs.resetIntroSeen()
+                    devModePrefs.setEnabled(false)
                 }
+                showResetPrefsConfirm = false
+                Toast.makeText(context, resources.getString(R.string.dev_options_toast_reset_done), Toast.LENGTH_SHORT).show()
+                onBack()
             },
+            onDismiss = { showResetPrefsConfirm = false },
+            destructive = true,
         )
     }
 
@@ -680,12 +679,14 @@ fun DevOptionsRoute(onBack: () -> Unit) {
                                 DevActionRow(
                                     label = stringResource(R.string.dev_options_copy_diagnostics),
                                     onClick = {
-                                        DiagnosticLog.record(context, "Diagnostic dump copied from Developer options")
-                                        val file = DiagnosticLog.createShareFile(context)
-                                        val text = runCatching { file.readText() }.getOrElse { "Failed to read diagnostic log" }
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        clipboard.setPrimaryClip(ClipData.newPlainText("Diagnostics", text))
-                                        Toast.makeText(context, resources.getString(R.string.dev_options_toast_diagnostics_copied), Toast.LENGTH_SHORT).show()
+                                        scope.launch {
+                                            DiagnosticLog.record(context, "Diagnostic dump copied from Developer options")
+                                            val file = DiagnosticLog.createShareFile(context)
+                                            val text = runCatching { file.readText() }.getOrElse { "Failed to read diagnostic log" }
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            clipboard.setPrimaryClip(ClipData.newPlainText("Diagnostics", text))
+                                            Toast.makeText(context, resources.getString(R.string.dev_options_toast_diagnostics_copied), Toast.LENGTH_SHORT).show()
+                                        }
                                     },
                                 )
                             }
@@ -693,23 +694,25 @@ fun DevOptionsRoute(onBack: () -> Unit) {
                                 DevActionRow(
                                     label = stringResource(R.string.dev_options_export_logs),
                                     onClick = {
-                                        DiagnosticLog.record(context, "Diagnostic log exported from Developer options")
-                                        val diagnosticsFile = DiagnosticLog.createShareFile(context)
-                                        val diagnosticsUri =
-                                            FileProvider.getUriForFile(
-                                                context,
-                                                "${context.packageName}.fileprovider",
-                                                diagnosticsFile,
-                                            )
-                                        val shareIntent =
-                                            Intent(Intent.ACTION_SEND).apply {
-                                                setDataAndType(diagnosticsUri, "text/plain")
-                                                putExtra(Intent.EXTRA_STREAM, diagnosticsUri)
-                                                putExtra(Intent.EXTRA_TITLE, diagnosticsFile.name)
-                                                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, diagnosticsUri)
-                                            }
-                                        runCatching { context.startActivity(Intent.createChooser(shareIntent, resources.getString(R.string.dev_options_export_logs_chooser))) }
+                                        scope.launch {
+                                            DiagnosticLog.record(context, "Diagnostic log exported from Developer options")
+                                            val diagnosticsFile = DiagnosticLog.createShareFile(context)
+                                            val diagnosticsUri =
+                                                FileProvider.getUriForFile(
+                                                    context,
+                                                    "${context.packageName}.fileprovider",
+                                                    diagnosticsFile,
+                                                )
+                                            val shareIntent =
+                                                Intent(Intent.ACTION_SEND).apply {
+                                                    setDataAndType(diagnosticsUri, "text/plain")
+                                                    putExtra(Intent.EXTRA_STREAM, diagnosticsUri)
+                                                    putExtra(Intent.EXTRA_TITLE, diagnosticsFile.name)
+                                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    clipData = ClipData.newUri(context.contentResolver, diagnosticsFile.name, diagnosticsUri)
+                                                }
+                                            runCatching { context.startActivity(Intent.createChooser(shareIntent, resources.getString(R.string.dev_options_export_logs_chooser))) }
+                                        }
                                     },
                                 )
                             }
@@ -717,7 +720,7 @@ fun DevOptionsRoute(onBack: () -> Unit) {
                                 DevActionRow(
                                     label = stringResource(R.string.dev_options_clear_logs),
                                     onClick = {
-                                        java.io.File(context.filesDir, "diagnostics/remember-diagnostics.log").delete()
+                                        DiagnosticLog.clear(context)
                                         Toast.makeText(context, resources.getString(R.string.dev_options_toast_logs_cleared), Toast.LENGTH_SHORT).show()
                                     },
                                 )
@@ -813,6 +816,7 @@ fun DevOptionsRoute(onBack: () -> Unit) {
                 developerOptionsEnabled = isEnabled,
                 topPadding = padding.calculateTopPadding(),
                 allSectionsCollapsed = allDevOptionsSectionsCollapsed,
+                showNavigateBack = showNavigateBack,
                 onNavigateBack = onBack,
                 onToggleAllSections = {
                     val collapsed = !allDevOptionsSectionsCollapsed
@@ -856,6 +860,7 @@ private fun DevDeveloperModeHeader(
     developerOptionsEnabled: Boolean,
     topPadding: androidx.compose.ui.unit.Dp,
     allSectionsCollapsed: Boolean,
+    showNavigateBack: Boolean,
     onNavigateBack: () -> Unit,
     onToggleAllSections: () -> Unit,
     onDeveloperOptionsEnabledChange: (Boolean) -> Unit,
@@ -878,15 +883,17 @@ private fun DevDeveloperModeHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RememberFilledTonalIconButton(
-                onClick = onNavigateBack,
-                shape = CircleShape,
-                tooltipLabel = stringResource(R.string.dev_options_back_cd),
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = "arrow_back",
-                    size = 22.dp,
-                )
+            if (showNavigateBack) {
+                RememberFilledTonalIconButton(
+                    onClick = onNavigateBack,
+                    shape = CircleShape,
+                    tooltipLabel = stringResource(R.string.dev_options_back_cd),
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = "arrow_back",
+                        size = 22.dp,
+                    )
+                }
             }
             DevDeveloperModeCard(
                 developerOptionsEnabled = developerOptionsEnabled,

@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.CornerBasedShape
-import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
@@ -15,8 +14,6 @@ import dev.bikram.remember.ui.theme.elevatedCardColors
 
 enum class GroupPosition { FIRST, MIDDLE, LAST, ONLY }
 
-private val innerRadius = 4.dp
-
 @Composable
 fun groupedItemShape(position: GroupPosition): CornerBasedShape {
     val outerShape = MaterialTheme.shapes.large
@@ -24,14 +21,14 @@ fun groupedItemShape(position: GroupPosition): CornerBasedShape {
     return when (position) {
         GroupPosition.FIRST ->
             outerShape.copy(
-                bottomStart = CornerSize(innerRadius),
-                bottomEnd = CornerSize(innerRadius),
+                bottomStart = innerShape.bottomStart,
+                bottomEnd = innerShape.bottomEnd,
             )
         GroupPosition.MIDDLE -> innerShape
         GroupPosition.LAST ->
             outerShape.copy(
-                topStart = CornerSize(innerRadius),
-                topEnd = CornerSize(innerRadius),
+                topStart = innerShape.topStart,
+                topEnd = innerShape.topEnd,
             )
         GroupPosition.ONLY -> outerShape
     }

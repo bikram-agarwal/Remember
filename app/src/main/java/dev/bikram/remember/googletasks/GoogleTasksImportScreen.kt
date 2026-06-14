@@ -36,8 +36,12 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
@@ -335,10 +339,14 @@ fun GoogleTasksImportRoute(
             )
         }
         Column(
+            // Cap the content width on wide windows (landscape/tablet) so the method
+            // pill, panels, and task list don't stretch edge-to-edge.
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding()),
+                    .padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())
+                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    .widthIn(max = 720.dp),
         ) {
             // The Connect Google / Manual import segmented pill is a SETUP-time choice. Once
             // a source is loaded, the same affordance lives inside the bottom sheet's source
@@ -571,10 +579,12 @@ private fun SignedOutPanel(
     onSwitchAccount: () -> Unit,
 ) {
     Column(
+        // Same full-bleed scroll fallback as TakeoutImportPanel for short windows.
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -625,10 +635,13 @@ private fun TakeoutImportPanel(
     onPickJson: () -> Unit,
 ) {
     Column(
+        // Full-bleed scroll with the margins inside: short landscape windows scroll
+        // instead of cutting off the instructions card and the action buttons.
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp),
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp, vertical = 24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -714,7 +727,11 @@ private fun EmptyPanel(
     onSwitchAccount: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(24.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {

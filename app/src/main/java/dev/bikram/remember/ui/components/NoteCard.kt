@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -65,12 +66,12 @@ import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
-import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.elevatedCardColors
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
-import java.text.SimpleDateFormat
-import java.util.Date
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
@@ -87,6 +88,7 @@ fun NoteCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
+    activeInDetailPane: Boolean = false,
     reminderNotificationsAllowed: Boolean = true,
 ) {
     NoteCard(
@@ -95,6 +97,7 @@ fun NoteCard(
         modifier = modifier,
         onLongClick = onLongClick,
         selected = selected,
+        activeInDetailPane = activeInDetailPane,
         reminderNotificationsAllowed = reminderNotificationsAllowed,
     )
 }
@@ -107,6 +110,7 @@ fun NoteCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
     selected: Boolean = false,
+    activeInDetailPane: Boolean = false,
     reminderNotificationsAllowed: Boolean = true,
 ) {
     val cardColors = elevatedCardColors()
@@ -115,15 +119,14 @@ fun NoteCard(
     val heroEnabled = LocalHeroOnCards.current
     val heroPictureUri = model.pictureUri?.takeIf { heroEnabled }
     val showHero = heroPictureUri != null
-    val adaptiveNoteThemes = LocalThemeState.current.adaptiveNoteThemes
     val surface = MaterialTheme.colorScheme.surface
-    val imageDerivedColors =
+    val heroImageColors =
         rememberImageDerivedColors(
-            imageUri = if (adaptiveNoteThemes) heroPictureUri else null,
+            imageUri = heroPictureUri,
             cacheRevision = model.pictureCacheRevision,
         )
-    val cardContentColor = imageDerivedColors?.onImageColor ?: cardColors.contentColor
-    val heroScrimColor = if (showHero) imageDerivedColors?.imageScrimColor ?: Color.Black else surface
+    val cardContentColor = heroImageColors?.onImageColor ?: cardColors.contentColor
+    val heroScrimColor = if (showHero) heroImageColors?.imageScrimColor ?: Color.Black else surface
     val cardShape = MaterialTheme.shapes.medium
     val starredIconDescription = stringResource(R.string.notecard_starred_cd)
 
@@ -260,8 +263,14 @@ fun NoteCard(
         } else {
             Modifier
         }
+    val activePaneBorder =
+        if (activeInDetailPane && !selected) {
+            Modifier.border(BorderStroke(1.5.dp, MaterialTheme.colorScheme.secondary), cardShape)
+        } else {
+            Modifier
+        }
     val starredBorder =
-        if (model.starred && !selected) {
+        if (model.starred && !selected && !activeInDetailPane) {
             Modifier.border(BorderStroke(1.dp, Color(0xFFF9A825).copy(alpha = 0.70f)), cardShape)
         } else {
             Modifier
@@ -289,6 +298,7 @@ fun NoteCard(
                 }.then(sharedModifier)
                 .clip(cardShape)
                 .then(starredBorder)
+                .then(activePaneBorder)
                 .then(selectionBorder)
                 .then(clickableModifier)
                 .semantics(mergeDescendants = true) {
@@ -714,7 +724,8 @@ private fun formatShortReminderDate(epochMillis: Long): String {
     val now = System.currentTimeMillis()
     val twelveMonthsMs = 365L * 24 * 60 * 60 * 1000
     val pattern = if (kotlin.math.abs(epochMillis - now) > twelveMonthsMs) "MMM yyyy" else "MMM d"
-    return SimpleDateFormat(pattern, Locale.getDefault()).format(Date(epochMillis))
+    val formatter = DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
+    return Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault()).format(formatter)
 }
 
 @Composable

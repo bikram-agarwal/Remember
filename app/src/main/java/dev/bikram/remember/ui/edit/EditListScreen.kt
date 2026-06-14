@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.edit
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,10 +17,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -35,8 +39,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -53,9 +60,13 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.NoteAdaptiveTheme
 import dev.bikram.remember.ui.common.NotePageBackground
@@ -69,6 +80,7 @@ import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.theme.LocalSnackbarHostState
 import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.CoroutineScope
@@ -85,13 +97,68 @@ fun EditListRoute(
     appScope: CoroutineScope,
     noteId: Long?,
     forceEdit: Boolean = false,
+    showNavigateBack: Boolean = true,
+    allowInitialTitleFocus: Boolean = true,
+    interceptBack: Boolean = true,
+    onPersistedNoteIdChanged: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
     val vm: EditListViewModel = hiltViewModel()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
+    val currentNoteId by vm.currentNoteId.collectAsStateWithLifecycle()
     val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
     val sharedModifier = Modifier.rememberEditorSharedBoundsModifier(noteId)
+    LaunchedEffect(currentNoteId) {
+        currentNoteId?.let(onPersistedNoteIdChanged)
+    }
+    // Report the persisted id before leaving: a save-and-back disposes pane hosts before
+    // the currentNoteId LaunchedEffect gets a chance to run, so deliver it synchronously.
+    val handleBack = {
+        vm.currentNoteId.value?.let(onPersistedNoteIdChanged)
+        onBack()
+    }
+    val handleNavigateUp = {
+        vm.currentNoteId.value?.let(onPersistedNoteIdChanged)
+        onNavigateUp()
+    }
+
+    // The list editor has no body-bridge equivalent of the note editor's ON_STOP/dispose
+    // autosave, so add one here: pane hosts dispose this editor when another note is
+    // selected, and without this hook those edits would be silently dropped.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val snackbarHostState = LocalSnackbarHostState.current
+    val changesSavedMsg = stringResource(R.string.changes_saved)
+    val undoMsg = stringResource(R.string.common_undo)
+    val untitledName = stringResource(R.string.edit_list_title_new)
+    DisposableEffect(lifecycleOwner, vm, appScope) {
+        fun saveNow() {
+            appScope.launch {
+                val undoAction = vm.saveIfNeeded(untitledName) ?: return@launch
+                val result =
+                    snackbarHostState.showSnackbar(
+                        message = changesSavedMsg,
+                        actionLabel = undoMsg,
+                        withDismissAction = true,
+                        duration = SnackbarDuration.Short,
+                    )
+                if (result == SnackbarResult.ActionPerformed) {
+                    undoAction()
+                }
+            }
+        }
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_STOP) {
+                    saveNow()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            saveNow()
+        }
+    }
 
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
         EditListScreen(
@@ -101,8 +168,11 @@ fun EditListRoute(
             persistedForToolbar = hasPersistedRow,
             activeTagSuggestions = activeTagSuggestions,
             forceEdit = forceEdit,
-            onBack = onBack,
-            onNavigateUp = onNavigateUp,
+            showNavigateBack = showNavigateBack,
+            allowInitialTitleFocus = allowInitialTitleFocus,
+            interceptBack = interceptBack,
+            onBack = handleBack,
+            onNavigateUp = handleNavigateUp,
         )
     }
 }
@@ -117,6 +187,9 @@ fun EditListScreen(
     persistedForToolbar: Boolean,
     activeTagSuggestions: List<String>,
     forceEdit: Boolean = false,
+    showNavigateBack: Boolean = true,
+    allowInitialTitleFocus: Boolean = true,
+    interceptBack: Boolean = true,
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -124,8 +197,7 @@ fun EditListScreen(
     val starred by vm.starred.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
-    val reminderAt by vm.reminderAt.collectAsStateWithLifecycle()
-    val recurrence by vm.recurrence.collectAsStateWithLifecycle()
+    val reminders by vm.reminders.collectAsStateWithLifecycle()
     val importance by vm.importance.collectAsStateWithLifecycle()
     val visibility by vm.visibility.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
@@ -193,7 +265,7 @@ fun EditListScreen(
 
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val lazyListState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val lazyListState = rememberLazyListState()
     var bottomBarVisible by remember { mutableStateOf(true) }
 
     // Force-show the bar whenever the list is scrolled to the very top. derivedStateOf is
@@ -215,18 +287,18 @@ fun EditListScreen(
     // re-reveals the bar, giving a clean M3E overscroll feel.
     val barVisibilityNestedScroll =
         remember {
-            object : androidx.compose.ui.input.nestedscroll.NestedScrollConnection {
+            object : NestedScrollConnection {
                 override fun onPreScroll(
-                    available: androidx.compose.ui.geometry.Offset,
-                    source: androidx.compose.ui.input.nestedscroll.NestedScrollSource,
-                ): androidx.compose.ui.geometry.Offset {
+                    available: Offset,
+                    source: NestedScrollSource,
+                ): Offset {
                     val dy = available.y
                     when {
                         dy < -1f -> bottomBarVisible = false
-                        dy > 1f && source == androidx.compose.ui.input.nestedscroll.NestedScrollSource.UserInput ->
+                        dy > 1f && source == NestedScrollSource.UserInput ->
                             bottomBarVisible = true
                     }
-                    return androidx.compose.ui.geometry.Offset.Zero
+                    return Offset.Zero
                 }
             }
         }
@@ -280,8 +352,9 @@ fun EditListScreen(
         blurStyle?.applyToFullBleedLayer(topAlphaMultiplier = topAlphaMultiplier)
             ?: Modifier
 
-    // Save on back press.
-    androidx.activity.compose.BackHandler(onBack = editorActions.saveAndBack)
+    // Save on back press. Pane hosts disable interception (except for pending new lists)
+    // so system back is not swallowed; the route-level autosave covers persistence there.
+    BackHandler(enabled = interceptBack, onBack = editorActions.saveAndBack)
 
     val (completedItems, activeItems) = items.partition { it.checked }
     val activeParents = activeItems.associateBy { it.localId }
@@ -290,42 +363,45 @@ fun EditListScreen(
     val completedEntries = remember(items) { buildCompletedEntries(completedItems, activeParents, checkedParents) }
 
     var draggingParentLocalId by remember { mutableStateOf<Long?>(null) }
-    val visibleActiveEntries = remember(activeEntries, draggingParentLocalId) {
-        if (draggingParentLocalId == null) {
-            activeEntries
-        } else {
-            activeEntries.filter { entry ->
-                when (entry) {
-                    is ActiveEntry.Ghost -> entry.header.realParentLocalId != draggingParentLocalId
-                    is ActiveEntry.Row -> entry.item.localId == draggingParentLocalId || entry.item.parentLocalId != draggingParentLocalId
+    val visibleActiveEntries =
+        remember(activeEntries, draggingParentLocalId) {
+            if (draggingParentLocalId == null) {
+                activeEntries
+            } else {
+                activeEntries.filter { entry ->
+                    when (entry) {
+                        is ActiveEntry.Ghost -> entry.header.realParentLocalId != draggingParentLocalId
+                        is ActiveEntry.Row -> entry.item.localId == draggingParentLocalId || entry.item.parentLocalId != draggingParentLocalId
+                    }
                 }
             }
         }
-    }
-    val visibleCompletedEntries = remember(completedEntries, draggingParentLocalId) {
-        if (draggingParentLocalId == null) {
-            completedEntries
-        } else {
-            completedEntries.filter { entry ->
-                when (entry) {
-                    is CompletedEntry.Ghost -> entry.header.realParentLocalId != draggingParentLocalId
-                    is CompletedEntry.Row -> entry.item.parentLocalId != draggingParentLocalId
+    val visibleCompletedEntries =
+        remember(completedEntries, draggingParentLocalId) {
+            if (draggingParentLocalId == null) {
+                completedEntries
+            } else {
+                completedEntries.filter { entry ->
+                    when (entry) {
+                        is CompletedEntry.Ghost -> entry.header.realParentLocalId != draggingParentLocalId
+                        is CompletedEntry.Row -> entry.item.parentLocalId != draggingParentLocalId
+                    }
                 }
             }
         }
-    }
 
-    val titleFocusRequesters = remember { androidx.compose.runtime.mutableStateMapOf<Long, FocusRequester>() }
-    val detailsFocusRequesters = remember { androidx.compose.runtime.mutableStateMapOf<Long, FocusRequester>() }
+    val titleFocusRequesters = remember { mutableStateMapOf<Long, FocusRequester>() }
+    val detailsFocusRequesters = remember { mutableStateMapOf<Long, FocusRequester>() }
 
     LaunchedEffect(pendingFocusItemId, isEditMode) {
         if (isEditMode && pendingFocusItemId != null) {
             delay(80)
-            val requester = if (pendingFocusField == FocusField.DETAILS) {
-                detailsFocusRequesters[pendingFocusItemId]
-            } else {
-                titleFocusRequesters[pendingFocusItemId]
-            }
+            val requester =
+                if (pendingFocusField == FocusField.DETAILS) {
+                    detailsFocusRequesters[pendingFocusItemId]
+                } else {
+                    titleFocusRequesters[pendingFocusItemId]
+                }
             requester?.requestFocus()
             pendingFocusItemId = null
         }
@@ -374,6 +450,8 @@ fun EditListScreen(
                             pendingTitleFocusOffset = null
                         },
                         onTitleFocusChanged = { /* unused */ },
+                        showNavigateBack = showNavigateBack,
+                        allowInitialTitleFocus = allowInitialTitleFocus,
                         titleCollapseProgress = titleCollapseProgress,
                         onSave = saveAndExitEditMode,
                         onOpenIcon = { iconPickerOpen = true },
@@ -410,22 +488,15 @@ fun EditListScreen(
                     )
                 },
             ) { padding ->
-                val activeIds = activeEntries.filterIsInstance<ActiveEntry.Row>().map { it.item.localId }
-                val completedRowIds = completedEntries.filterIsInstance<CompletedEntry.Row>().map { it.item.localId }
+                val activeIds = visibleActiveEntries.filterIsInstance<ActiveEntry.Row>().map { it.item.localId }
                 val reorderState =
                     rememberReorderableLazyListState(lazyListState) { from, to ->
-                        // ignored here. We only reorder within the matching sublist (no cross-section drags).
+                        // Reorder only the rows currently rendered in the active section.
                         val fromId = from.key as? Long ?: return@rememberReorderableLazyListState
                         val toId = to.key as? Long ?: return@rememberReorderableLazyListState
-                        val (list, fromIdx, toIdx) =
-                            when {
-                                fromId in activeIds && toId in activeIds ->
-                                    Triple(activeIds, activeIds.indexOf(fromId), activeIds.indexOf(toId))
-                                fromId in completedRowIds && toId in completedRowIds ->
-                                    Triple(completedRowIds, completedRowIds.indexOf(fromId), completedRowIds.indexOf(toId))
-                                else -> return@rememberReorderableLazyListState
-                            }
-                        if (fromIdx >= 0 && toIdx >= 0) vm.reorderWithin(list, fromIdx, toIdx)
+                        val fromIdx = activeIds.indexOf(fromId)
+                        val toIdx = activeIds.indexOf(toId)
+                        if (fromIdx >= 0 && toIdx >= 0) vm.reorderWithin(activeIds, fromIdx, toIdx)
                     }
 
                 androidx.compose.foundation.lazy.LazyColumn(
@@ -787,8 +858,7 @@ fun EditListScreen(
                     editorContentOptionsItem(padding = padding) {
                         Spacer(Modifier.height(20.dp))
                         EditorOptionsPanel(
-                            reminderAt = reminderAt,
-                            recurrence = recurrence,
+                            reminders = reminders,
                             importance = importance,
                             visibility = visibility,
                             pictureUri = pictureUri,
@@ -830,13 +900,12 @@ fun EditListScreen(
                 readOnly = readOnly,
                 activeTagSuggestions = activeTagSuggestions,
                 attachments = attachments,
-                currentReminderAt = reminderAt,
-                currentRecurrence = recurrence,
+                currentReminders = reminders,
                 currentIconKey = iconKey,
                 currentActions = actions,
                 currentTags = tags,
                 heroImageContentDescription = stringResource(R.string.viewer_cover_image_cd),
-                onReminderChange = vm::setReminder,
+                onReminderChange = vm::setReminders,
                 onIconKeyChange = vm::setIconKey,
                 onActionsChange = vm::setActions,
                 onTagsWithColorsChange = vm::saveTagsWithColors,

@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
@@ -33,7 +34,10 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
@@ -239,12 +243,14 @@ private fun MarkdownLine(
     val checklistMatch = MarkdownChecklistLineRegex.matchEntire(line)
     if (checklistMatch != null) {
         val checked = checklistMatch.groupValues[2].equals("x", ignoreCase = true)
+        val checkboxSize = markdownChecklistCheckboxSize(style, LocalDensity.current)
         Row(
             modifier = Modifier.padding(start = styler.listStartPadding(checklistMatch.groupValues[1], baseIndent = 0.dp)),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             RememberMaterialRoundedSymbol(
                 name = if (checked) "check_box" else "check_box_outline_blank",
+                size = checkboxSize,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 weight = FontWeight.Medium,
                 modifier =
@@ -729,6 +735,18 @@ private class MarkdownInlineInteractionBuilder(
             sourceOffset + index
         }
     }
+}
+
+internal fun markdownChecklistCheckboxSize(
+    style: TextStyle,
+    density: Density,
+): Dp {
+    val fallbackSize = 24.dp
+    if (!style.fontSize.isSpecified || style.fontSize.value <= 0f) {
+        return fallbackSize
+    }
+    val requestedSize = with(density) { style.fontSize.toDp() }
+    return if (requestedSize > 0.dp) maxOf(requestedSize, 18.dp) else fallbackSize
 }
 
 private data class MarkdownPreviewSource(

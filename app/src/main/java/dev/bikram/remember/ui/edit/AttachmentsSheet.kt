@@ -12,12 +12,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +39,7 @@ import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
@@ -213,24 +212,16 @@ private fun AttachmentRow(
         }
     }
     if (deleteConfirmOpen) {
-        AlertDialog(
-            onDismissRequest = { deleteConfirmOpen = false },
-            title = { Text(stringResource(R.string.attachments_delete_confirm_title)) },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        deleteConfirmOpen = false
-                        onRemove()
-                    },
-                ) {
-                    Text(stringResource(R.string.common_yes))
-                }
+        RememberConfirmDialog(
+            title = stringResource(R.string.attachments_delete_confirm_title),
+            confirmLabel = stringResource(R.string.common_yes),
+            onConfirm = {
+                deleteConfirmOpen = false
+                onRemove()
             },
-            dismissButton = {
-                TextButton(onClick = { deleteConfirmOpen = false }) {
-                    Text(stringResource(R.string.common_no))
-                }
-            },
+            onDismiss = { deleteConfirmOpen = false },
+            destructive = true,
+            dismissLabel = stringResource(R.string.common_no),
         )
     }
 }

@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -52,6 +53,8 @@ fun UpdateFloatingBar(
     modifier: Modifier = Modifier,
     contentAlpha: Float = 1f,
     shadowAlpha: Float = 1f,
+    iconContainerSize: Dp = 44.dp,
+    contentScale: Float = 1f,
 ) {
     if (state == UpdateChromeState.Hidden) return
 
@@ -91,18 +94,32 @@ fun UpdateFloatingBar(
         shadowAlpha = shadowAlpha,
         modifier = modifier,
     ) {
+        val rowMinHeight = 64.dp * contentScale
+        val rowStartPadding = 14.dp * contentScale
+        val rowEndPadding = 10.dp * contentScale
+        val rowVerticalPadding = 8.dp * contentScale
+        val rowSpacing = 12.dp * contentScale
+        val symbolSize = 28.dp * contentScale
+        val buttonHorizontalPadding = 18.dp * contentScale
+        val buttonVerticalPadding = 8.dp * contentScale
+        val progressHeight = 8.dp * contentScale
         Column(modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = 64.dp)
-                        .padding(start = 14.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+                        .heightIn(min = rowMinHeight)
+                        .padding(
+                            start = rowStartPadding,
+                            end = rowEndPadding,
+                            top = rowVerticalPadding,
+                            bottom = rowVerticalPadding,
+                        ),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(rowSpacing),
             ) {
                 Surface(
-                    modifier = Modifier.size(44.dp),
+                    modifier = Modifier.size(iconContainerSize),
                     shape = CircleShape,
                     color = scheme.primaryContainer,
                     contentColor = scheme.onPrimaryContainer,
@@ -110,7 +127,7 @@ fun UpdateFloatingBar(
                     Box(contentAlignment = Alignment.Center) {
                         RememberMaterialRoundedSymbol(
                             name = if (state == UpdateChromeState.ReadyToInstall) "download_done" else "download",
-                            size = 28.dp,
+                            size = symbolSize,
                             weight = FontWeight.Medium,
                             tint = scheme.onPrimaryContainer,
                         )
@@ -120,13 +137,18 @@ fun UpdateFloatingBar(
                     title = title,
                     body = body,
                     modifier = Modifier.weight(1f),
+                    contentScale = contentScale,
                 )
 
                 when (state) {
                     UpdateChromeState.Available -> {
                         RememberButton(
                             onClick = onCheckClick,
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                            contentPadding =
+                                PaddingValues(
+                                    horizontal = buttonHorizontalPadding,
+                                    vertical = buttonVerticalPadding,
+                                ),
                             colors =
                                 ButtonDefaults.buttonColors(
                                     containerColor = scheme.primary,
@@ -140,7 +162,11 @@ fun UpdateFloatingBar(
                     UpdateChromeState.ReadyToInstall ->
                         RememberButton(
                             onClick = onInstallClick,
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                            contentPadding =
+                                PaddingValues(
+                                    horizontal = buttonHorizontalPadding,
+                                    vertical = buttonVerticalPadding,
+                                ),
                             colors =
                                 ButtonDefaults.buttonColors(
                                     containerColor = scheme.primary,
@@ -162,7 +188,7 @@ fun UpdateFloatingBar(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .height(8.dp),
+                                .height(progressHeight),
                         color = scheme.primary,
                         trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
                     )
@@ -175,7 +201,7 @@ fun UpdateFloatingBar(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
-                                .height(8.dp),
+                                .height(progressHeight),
                         color = scheme.primary,
                         trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
                     )

@@ -18,17 +18,20 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.contentColorFor
 import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -49,6 +52,8 @@ fun AppBottomSheet(
     scrollable: Boolean = true,
     contentPadding: PaddingValues = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
     subtitleSpacing: Dp = 6.dp,
+    containerColor: Color = BottomSheetDefaults.ContainerColor,
+    contentColor: Color = contentColorFor(containerColor),
     subtitleContent: (@Composable () -> Unit)? = null,
     titleAccessory: (@Composable RowScope.() -> Unit)? = null,
     titleActions: (@Composable RowScope.() -> Unit)? = null,
@@ -56,13 +61,16 @@ fun AppBottomSheet(
     actionsImePadding: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val dismissSheet: () -> Unit = onDismiss
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = dismissSheet,
         sheetState = sheetState,
         sheetGesturesEnabled = sheetGesturesEnabled,
+        containerColor = containerColor,
+        contentColor = contentColor,
         dragHandle = { AppBottomSheetDragHandle() },
     ) {
-        RememberPredictiveBackHandler(onBack = onDismiss)
+        RememberPredictiveBackHandler(onBack = dismissSheet)
         Column(modifier = Modifier.navigationBarsPadding()) {
             if (showTitleBar) {
                 Column(

@@ -22,19 +22,27 @@ class RememberUpdateState
         private val _updateInfo = MutableStateFlow<RememberUpdateInfo?>(null)
         val updateInfo: StateFlow<RememberUpdateInfo?> = _updateInfo.asStateFlow()
 
+        // Bumped every time an update is delivered, even when the value is identical to
+        // the current one (StateFlow would swallow that emission). Lets the alert chrome
+        // re-present on every (re-)trigger of the update flow, not just on value changes.
+        private val _updateSignalEpoch = MutableStateFlow(0)
+        val updateSignalEpoch: StateFlow<Int> = _updateSignalEpoch.asStateFlow()
+
         private val _devReleasePlayBannerMockUiState =
             MutableStateFlow<PlayInAppUpdateBannerUiState>(PlayInAppUpdateBannerUiState.Hidden)
         val devReleasePlayBannerMockUiState: StateFlow<PlayInAppUpdateBannerUiState> =
             _devReleasePlayBannerMockUiState.asStateFlow()
         private var devReleasePlayBannerMockSequenceJob: Job? = null
-        private val updateMocksAvailable = BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease"
 
         fun showUpdate(info: RememberUpdateInfo?) {
             _updateInfo.value = info
+            if (info != null) {
+                _updateSignalEpoch.value += 1
+            }
         }
 
         fun devReleaseMockShowUpdateAvailable() {
-            if (!updateMocksAvailable || !BuildConfig.SHOW_UPDATES) return
+            if (!BuildConfig.SHOW_UPDATES) return
             _updateInfo.value =
                 RememberUpdateInfo(
                     versionName = "9.9.9",
@@ -48,10 +56,10 @@ class RememberUpdateState
                         },
                     isDevReleaseMock = true,
                 )
+            _updateSignalEpoch.value += 1
         }
 
         fun devReleaseMockStartPlayUpdateBannerSequence() {
-            if (!updateMocksAvailable) return
             devReleasePlayBannerMockSequenceJob?.cancel()
             devReleasePlayBannerMockSequenceJob =
                 applicationScope.launch {
@@ -76,7 +84,6 @@ class RememberUpdateState
         }
 
         fun devReleaseCompletePlayUpdateIfReady(): Boolean {
-            if (!updateMocksAvailable) return false
             if (_devReleasePlayBannerMockUiState.value != PlayInAppUpdateBannerUiState.ReadyToInstall) return false
             devReleasePlayBannerMockSequenceJob?.cancel()
             _devReleasePlayBannerMockUiState.value = PlayInAppUpdateBannerUiState.Hidden

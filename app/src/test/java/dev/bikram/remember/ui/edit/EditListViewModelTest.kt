@@ -49,6 +49,28 @@ class EditListViewModelTest {
         }
 
     @Test
+    fun reorder_emits_items_in_new_sort_order() =
+        runTest {
+            val store = FakeRepositoryStore()
+            val viewModel = editListViewModel(store)
+
+            val firstId = viewModel.addItem()
+            val secondId = viewModel.addItem()
+            val thirdId = viewModel.addItem()
+
+            viewModel.reorderWithin(
+                visibleIds = listOf(firstId, secondId, thirdId),
+                fromIndex = 2,
+                toIndex = 0,
+            )
+
+            assertEquals(
+                listOf(thirdId, firstId, secondId),
+                viewModel.items.value.map { item -> item.localId },
+            )
+        }
+
+    @Test
     fun draft_save_preserves_parent_local_keys() =
         runTest {
             val store = FakeRepositoryStore()

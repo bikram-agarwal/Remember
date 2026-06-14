@@ -9,11 +9,15 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -43,6 +47,7 @@ import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.googletasks.GoogleTasksImportRoute
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
+import dev.bikram.remember.ui.common.rememberShareAppAction
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.components.alertChromeSummary
 import dev.bikram.remember.ui.edit.EditListRoute
@@ -57,6 +62,7 @@ import dev.bikram.remember.ui.main.MainTabScaffold
 import dev.bikram.remember.ui.onboarding.OnboardingPermissionsScreen
 import dev.bikram.remember.ui.onboarding.OnboardingTitleScreen
 import dev.bikram.remember.ui.settings.DevOptionsRoute
+import dev.bikram.remember.ui.settings.RememberUpdateViewModel
 import dev.bikram.remember.ui.settings.SettingsRoute
 import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -153,12 +159,10 @@ fun RememberNavGraph(
     appScope: CoroutineScope,
     launchFlow: MutableStateFlow<LaunchAction?>? = null,
     openSettingsRequest: Int = 0,
-    openUpdateSheetRequest: Int = 0,
-    onOpenUpdateSheetRequestHandled: () -> Unit = {},
-    startPlayInAppUpdateRequest: Int = 0,
-    onStartPlayInAppUpdateRequestHandled: () -> Unit = {},
+    updateVm: RememberUpdateViewModel,
     onUpdateCheckStarted: () -> Unit = {},
     updateBarState: UpdateChromeState = UpdateChromeState.Hidden,
+    updateSignalEpoch: Int = 0,
     onUpdateClick: () -> Unit = {},
     onDismissUpdateAvailable: () -> Unit = {},
     onInstallUpdate: () -> Unit = {},
@@ -167,7 +171,6 @@ fun RememberNavGraph(
     val helpVm: HelpViewModel = hiltViewModel()
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
     var openSettingsUpdatesRequest by remember { mutableIntStateOf(0) }
-    var openSettingsUpdateSheetRequest by remember { mutableIntStateOf(0) }
     val onboardingState by onboardingPrefs.state.collectAsStateWithLifecycle(initialValue = null)
     val currentOnboardingState = onboardingState
     val onboardingScope = rememberCoroutineScope()
@@ -181,6 +184,11 @@ fun RememberNavGraph(
     var currentMainTab by rememberSaveable { mutableStateOf(MainTab.Notes) }
     var alertBarsExpanded by rememberSaveable { mutableStateOf(false) }
     var lastPresentedAlertKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var createNoteInPane by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var createListInPane by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
+    val paneScaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
+    val useDualPaneMode = paneScaffoldDirective.maxHorizontalPartitions > 1
 
     if (currentOnboardingState == null) {
         Box(modifier = Modifier.fillMaxSize())
@@ -220,7 +228,10 @@ fun RememberNavGraph(
                 "${updateStatePresentationKey(updateBarState)}:notifications-disabled-${blockedReminderCount > 0}"
             }
         }
-    LaunchedEffect(alertPresentationKey) {
+    // Also keyed on lastPresentedAlertKey: re-running the update check clears it below,
+    // which must re-present the alert even when the alert state itself never changed
+    // (e.g. an update that is still "available" after a manual re-check).
+    LaunchedEffect(alertPresentationKey, lastPresentedAlertKey) {
         val currentAlertKey = alertPresentationKey
         if (currentAlertKey == null) {
             alertBarsExpanded = false
@@ -228,6 +239,21 @@ fun RememberNavGraph(
         } else if (currentAlertKey != lastPresentedAlertKey) {
             alertBarsExpanded = true
             lastPresentedAlertKey = currentAlertKey
+        }
+    }
+    val handleUpdateCheckStarted = {
+        // Forget the presented alert so the chrome pops again for the re-checked result.
+        lastPresentedAlertKey = null
+        onUpdateCheckStarted()
+    }
+    // Any (re-)delivery of an update — manual check, background worker, dev mock — bumps
+    // the epoch and re-presents the alert. The handled epoch is saveable so rotation
+    // does not count as a new delivery.
+    var lastHandledUpdateSignalEpoch by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(updateSignalEpoch) {
+        if (updateSignalEpoch != lastHandledUpdateSignalEpoch) {
+            lastHandledUpdateSignalEpoch = updateSignalEpoch
+            lastPresentedAlertKey = null
         }
     }
 
@@ -289,7 +315,7 @@ fun RememberNavGraph(
                             launchSingleTop = true
                         }
                         openSettingsUpdatesRequest += 1
-                        openSettingsUpdateSheetRequest += 1
+                        updateVm.requestOpenSheet()
                     }
                 }
             } finally {
@@ -423,6 +449,7 @@ fun RememberNavGraph(
                 }
 
                 composable(Routes.MAIN) {
+                    val shareApp = rememberShareAppAction()
                     androidx.compose.runtime.CompositionLocalProvider(
                         LocalSharedTransitionScope provides this@SharedTransitionLayout,
                         LocalNavAnimatedVisibilityScope provides this@composable,
@@ -430,9 +457,22 @@ fun RememberNavGraph(
                         MainTabScaffold(
                             repository = repository,
                             currentTab = currentMainTab,
+                            useDualPaneMode = useDualPaneMode,
                             onTabSelected = openMainTab,
-                            onCreateNote = { navController.navigate(Routes.editNote(null)) },
-                            onCreateList = { navController.navigate(Routes.editList(null)) },
+                            onCreateNote = {
+                                if (useDualPaneMode && createNoteInPane != null) {
+                                    createNoteInPane?.invoke()
+                                } else {
+                                    navController.navigate(Routes.editNote(null))
+                                }
+                            },
+                            onCreateList = {
+                                if (useDualPaneMode && createListInPane != null) {
+                                    createListInPane?.invoke()
+                                } else {
+                                    navController.navigate(Routes.editList(null))
+                                }
+                            },
                             onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
                             historySection = historySection,
                             historyVisibleItemCount = historyVisibleItemCount,
@@ -452,54 +492,104 @@ fun RememberNavGraph(
                                         EnterTransition.None togetherWith ExitTransition.None
                                     } else {
                                         val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                                        (
-                                            slideInHorizontally(animationSpec = navSpatialSpec) { direction * it } +
-                                                fadeIn(animationSpec = navFadeInSpec)
-                                        ) togetherWith (
-                                            slideOutHorizontally(animationSpec = navSpatialSpec) { -direction * it / 3 } +
-                                                fadeOut(animationSpec = navFadeOutSpec)
-                                        )
+                                        if (useDualPaneMode) {
+                                            (
+                                                slideInVertically(animationSpec = navSpatialSpec) { direction * it } +
+                                                    fadeIn(animationSpec = navFadeInSpec)
+                                            ) togetherWith (
+                                                slideOutVertically(animationSpec = navSpatialSpec) { -direction * it / 3 } +
+                                                    fadeOut(animationSpec = navFadeOutSpec)
+                                            )
+                                        } else {
+                                            (
+                                                slideInHorizontally(animationSpec = navSpatialSpec) { direction * it } +
+                                                    fadeIn(animationSpec = navFadeInSpec)
+                                            ) togetherWith (
+                                                slideOutHorizontally(animationSpec = navSpatialSpec) { -direction * it / 3 } +
+                                                    fadeOut(animationSpec = navFadeOutSpec)
+                                            )
+                                        }
                                     }.using(SizeTransform(clip = false))
                                 },
                                 label = "main_tab_content",
                             ) { tab ->
                                 when (tab) {
                                     MainTab.Notes ->
-                                        HomeRoute(
-                                            interactionPrefs = interactionPrefs,
-                                            closeRevealRequest = closeRevealRequest,
-                                            onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
-                                            onCreateNote = { navController.navigate(Routes.editNote(null)) },
-                                            onCreateList = { navController.navigate(Routes.editList(null)) },
-                                        )
+                                        if (useDualPaneMode) {
+                                            NotesTwoPaneRoute(
+                                                interactionPrefs = interactionPrefs,
+                                                appScope = appScope,
+                                                closeRevealRequest = closeRevealRequest,
+                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                                                onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
+                                                onOpenNoteInSinglePane = { note, forceEdit ->
+                                                    navController.openEditRouteFor(note, forceEdit)
+                                                },
+                                                onCreateNoteInSinglePane = { navController.navigate(Routes.editNote(null)) },
+                                                onCreateListInSinglePane = { navController.navigate(Routes.editList(null)) },
+                                                onRegisterCreateNoteInPane = { callback -> createNoteInPane = callback },
+                                                onRegisterCreateListInPane = { callback -> createListInPane = callback },
+                                            )
+                                        } else {
+                                            HomeRoute(
+                                                interactionPrefs = interactionPrefs,
+                                                closeRevealRequest = closeRevealRequest,
+                                                onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
+                                                onCreateNote = { navController.navigate(Routes.editNote(null)) },
+                                                onCreateList = { navController.navigate(Routes.editList(null)) },
+                                            )
+                                        }
 
                                     MainTab.History ->
-                                        HistoryRoute(
-                                            interactionPrefs = interactionPrefs,
-                                            section = historySection,
-                                            onSectionChange = { selectedSection -> historySection = selectedSection },
-                                            onVisibleItemCountChange = { visibleItemCount ->
-                                                historyVisibleItemCount = visibleItemCount
-                                            },
-                                            onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
-                                        )
+                                        if (useDualPaneMode) {
+                                            HistoryTwoPaneRoute(
+                                                interactionPrefs = interactionPrefs,
+                                                appScope = appScope,
+                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                                                section = historySection,
+                                                onSectionChange = { selectedSection -> historySection = selectedSection },
+                                                onVisibleItemCountChange = { visibleItemCount ->
+                                                    historyVisibleItemCount = visibleItemCount
+                                                },
+                                                onOpenNoteInSinglePane = { note, forceEdit ->
+                                                    navController.openEditRouteFor(note, forceEdit)
+                                                },
+                                            )
+                                        } else {
+                                            HistoryRoute(
+                                                interactionPrefs = interactionPrefs,
+                                                section = historySection,
+                                                onSectionChange = { selectedSection -> historySection = selectedSection },
+                                                onVisibleItemCountChange = { visibleItemCount ->
+                                                    historyVisibleItemCount = visibleItemCount
+                                                },
+                                                onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
+                                            )
+                                        }
 
                                     MainTab.Settings ->
-                                        SettingsRoute(
-                                            onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
-                                            onOpenHelp = { navController.navigate(Routes.HELP) },
-                                            onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
-                                            openUpdateSheetRequest = openUpdateSheetRequest + openSettingsUpdateSheetRequest,
-                                            onOpenUpdateSheetRequestHandled = {
-                                                onOpenUpdateSheetRequestHandled()
-                                                openSettingsUpdateSheetRequest = 0
-                                            },
-                                            startPlayInAppUpdateRequest = startPlayInAppUpdateRequest,
-                                            onStartPlayInAppUpdateRequestHandled = onStartPlayInAppUpdateRequestHandled,
-                                            onUpdateCheckStarted = onUpdateCheckStarted,
-                                            highlightSectionKey = settingsHighlightSection,
-                                            onHighlightHandled = { settingsHighlightSection = null },
-                                        )
+                                        if (useDualPaneMode) {
+                                            SettingsTwoPaneRoute(
+                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                                                onOpenHelp = { navController.navigate(Routes.HELP) },
+                                                onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
+                                                updateVm = updateVm,
+                                                onUpdateCheckStarted = handleUpdateCheckStarted,
+                                                onShareApp = shareApp,
+                                                highlightSectionKey = settingsHighlightSection,
+                                                onHighlightHandled = { settingsHighlightSection = null },
+                                            )
+                                        } else {
+                                            SettingsRoute(
+                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                                                onOpenHelp = { navController.navigate(Routes.HELP) },
+                                                onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
+                                                updateVm = updateVm,
+                                                onUpdateCheckStarted = handleUpdateCheckStarted,
+                                                highlightSectionKey = settingsHighlightSection,
+                                                onHighlightHandled = { settingsHighlightSection = null },
+                                            )
+                                        }
                                 }
                             }
                         }

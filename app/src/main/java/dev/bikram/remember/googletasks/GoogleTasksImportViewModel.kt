@@ -9,8 +9,9 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.di.IoDispatcher
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +47,7 @@ class GoogleTasksImportViewModel
         private val noteRepository: NoteRepository,
         private val importer: GoogleTasksImporter,
         private val prefs: GoogleTasksImportPrefs,
+        @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val auth: GoogleTasksAuthDelegate = DefaultGoogleTasksAuthDelegate
         private val takeoutParser = GoogleTasksTakeoutParser()
@@ -138,7 +140,7 @@ class GoogleTasksImportViewModel
                 val parsed =
                     runCatching {
                         val text =
-                            withContext(Dispatchers.IO) {
+                            withContext(ioDispatcher) {
                                 appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
                                     inputStream.reader(Charsets.UTF_8).readText()
                                 } ?: throw IllegalArgumentException("Could not open selected file")

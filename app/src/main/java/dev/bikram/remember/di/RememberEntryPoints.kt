@@ -46,6 +46,8 @@ interface SettingsDependenciesEntryPoint {
 
     fun themePrefs(): ThemePrefs
 
+    fun viewOptionsPrefs(): ViewOptionsPrefs
+
     fun noteRepository(): NoteRepository
 
     fun updatePrefs(): UpdatePrefs

@@ -9,6 +9,7 @@ import dagger.assisted.AssistedInject
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.data.UpdatePrefs
+import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.update.RememberUpdateChecker
 import dev.bikram.remember.update.RememberUpdateState
 import dev.bikram.remember.update.UpdateAvailableNotifier
@@ -35,14 +36,20 @@ class UpdateCheckWorker
                 return Result.success()
             }
             if (UpdateCheckWorkScheduler.supportsSilentChecks()) {
-                val updateInfo =
-                    rememberUpdateChecker.checkGithubReleaseForUpdate(
-                        repositoryName = BuildConfig.GITHUB_REPO,
-                        currentVersionName = BuildConfig.VERSION_NAME,
-                    )
-                if (updateInfo != null) {
-                    rememberUpdateState.showUpdate(updateInfo)
-                    updateAvailableNotifier.notifyIfNewUpdateAvailable(updateInfo, prefs)
+                runCatching {
+                    val updateInfo =
+                        rememberUpdateChecker.checkGithubReleaseForUpdate(
+                            repositoryName = BuildConfig.GITHUB_REPO,
+                            currentVersionName = BuildConfig.VERSION_NAME,
+                        )
+                    if (updateInfo != null) {
+                        rememberUpdateState.showUpdate(updateInfo)
+                        updateAvailableNotifier.notifyIfNewUpdateAvailable(updateInfo, prefs)
+                    }
+                }.onFailure { error ->
+                    DiagnosticLog.record(applicationContext, "Scheduled update check failed: attempt=$runAttemptCount", error)
+                    updateCheckWorkScheduler.syncFromPreferences()
+                    return Result.retry()
                 }
             }
             updateCheckWorkScheduler.syncFromPreferences()

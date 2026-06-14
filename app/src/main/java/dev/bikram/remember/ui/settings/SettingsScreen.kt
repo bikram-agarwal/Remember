@@ -16,6 +16,7 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.biometric.BiometricManager
 import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.ExperimentalSharedTransitionApi
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -45,6 +47,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -53,6 +56,7 @@ import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -65,6 +69,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
@@ -78,7 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.remember.BuildConfig
@@ -92,10 +97,12 @@ import dev.bikram.remember.data.QuickCaptureState
 import dev.bikram.remember.data.ReminderPreferencesState
 import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.data.UpdatePreferencesState
+import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.common.AppBottomSheetDragHandle
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
@@ -117,13 +124,10 @@ import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
 import dev.bikram.remember.update.RememberUpdateInfo
 import dev.bikram.remember.update.RememberUpdateState
-import dev.bikram.remember.update.notificationDedupeKey
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
 
 private enum class BackupFolderTarget {
     Local,
@@ -137,6 +141,41 @@ private data class PendingRestore(
 
 private const val SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS = 900L
 
+enum class SettingsSectionKey(
+    val routeKey: String,
+    val iconName: String,
+    @param:StringRes val titleRes: Int,
+) {
+    Appearance("appearance", "palette", R.string.settings_section_appearance),
+    Notifications("notifications", "notifications", R.string.settings_notifications_section),
+    Swipe("swipe", "swipe_left", R.string.settings_swipe_section),
+    Security("security", "security", R.string.settings_section_security),
+    Backup("backup", "save", R.string.settings_backup_section),
+    Updates("updates", "system_update", R.string.settings_updates_section),
+    About("about", "info", R.string.settings_section_about),
+    DevOptions("dev_options", "developer_board", R.string.dev_options_title),
+}
+
+val settingsPaneSections: List<SettingsSectionKey>
+    get() =
+        SettingsSectionKey.entries.filter { sectionKey ->
+            sectionKey != SettingsSectionKey.DevOptions
+        }
+
+fun settingsSectionKeyForHighlight(highlightSectionKey: String?): SettingsSectionKey? =
+    when (highlightSectionKey?.substringBefore(".")) {
+        SettingsSectionKey.Appearance.routeKey -> SettingsSectionKey.Appearance
+        SettingsSectionKey.Notifications.routeKey -> SettingsSectionKey.Notifications
+        SettingsSectionKey.Swipe.routeKey,
+        "swipe_actions",
+        -> SettingsSectionKey.Swipe
+        SettingsSectionKey.Security.routeKey -> SettingsSectionKey.Security
+        SettingsSectionKey.Backup.routeKey -> SettingsSectionKey.Backup
+        SettingsSectionKey.Updates.routeKey -> SettingsSectionKey.Updates
+        SettingsSectionKey.About.routeKey -> SettingsSectionKey.About
+        else -> null
+    }
+
 private object SettingsScreenSessionState {
     var collapsedSectionKeys: Set<String> = emptySet()
     var listFirstVisibleItemIndex: Int = 0
@@ -145,16 +184,19 @@ private object SettingsScreenSessionState {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
+@Suppress("CyclomaticComplexMethod")
 @Composable
 fun SettingsRoute(
     onOpenIntro: () -> Unit = {},
     onOpenHelp: () -> Unit = {},
     onOpenDevOptions: () -> Unit = {},
-    openUpdateSheetRequest: Int = 0,
-    onOpenUpdateSheetRequestHandled: () -> Unit = {},
-    startPlayInAppUpdateRequest: Int = 0,
-    onStartPlayInAppUpdateRequestHandled: () -> Unit = {},
+    updateVm: RememberUpdateViewModel = hiltViewModel(),
     onUpdateCheckStarted: () -> Unit = {},
+    selectedSectionKey: SettingsSectionKey? = null,
+    showTopActions: Boolean = true,
+    showSectionHeaders: Boolean = true,
+    showAboutHeader: Boolean = true,
+    showAboutHeaderTitle: Boolean = true,
     highlightSectionKey: String? = null,
     onHighlightHandled: () -> Unit = {},
 ) {
@@ -177,15 +219,11 @@ fun SettingsRoute(
     val backupPrefs = settingsDependencies.backupPrefs()
     val backupIo = settingsDependencies.backupIo()
     val themePrefs = settingsDependencies.themePrefs()
+    val viewOptionsPrefs = settingsDependencies.viewOptionsPrefs()
     val noteRepository = settingsDependencies.noteRepository()
     val updatePrefs = settingsDependencies.updatePrefs()
-    val rememberUpdateChecker = settingsDependencies.rememberUpdateChecker()
-    val playStoreUpdateChecker = settingsDependencies.playStoreUpdateChecker()
-    val playInAppUpdateStarter = settingsDependencies.playInAppUpdateStarter()
     val playInAppUpdateProgressController = settingsDependencies.playInAppUpdateProgressController()
-    val playUpdateSessionHandle = settingsDependencies.playUpdateSessionHandle()
     val rememberUpdateState: RememberUpdateState = settingsDependencies.rememberUpdateState()
-    val updateAvailableNotifier = settingsDependencies.updateAvailableNotifier()
     val updateCheckWorkScheduler = settingsDependencies.updateCheckWorkScheduler()
     val appReviewLauncher = settingsDependencies.appReviewLauncher()
     val scope = rememberCoroutineScope()
@@ -227,6 +265,7 @@ fun SettingsRoute(
     val updateState by updatePrefs.state.collectAsStateWithLifecycle(
         initialValue = UpdatePreferencesState(),
     )
+    val viewOptionsState by viewOptionsPrefs.state.collectAsStateWithLifecycle(initialValue = null)
     val globalUpdateInfo by rememberUpdateState.updateInfo.collectAsStateWithLifecycle(initialValue = null)
     val realPlayBannerState by playInAppUpdateProgressController.bannerUiState.collectAsStateWithLifecycle()
     val devReleaseMockPlayBannerState by rememberUpdateState.devReleasePlayBannerMockUiState.collectAsStateWithLifecycle()
@@ -236,20 +275,20 @@ fun SettingsRoute(
         } else {
             realPlayBannerState
         }
-    val maxUpdateSheetHeight = with(density) { (windowInfo.containerSize.height * 0.85f).toDp() }
+    val configuration = LocalConfiguration.current
+    val isLandscape = isLandscape()
+    val heightFraction = if (isLandscape) 0.95f else 0.85f
+    val maxUpdateSheetHeight = (configuration.screenHeightDp * heightFraction).dp
 
     var pendingRestore by remember { mutableStateOf<PendingRestore?>(null) }
-    var showUpdateSheet by rememberSaveable { mutableStateOf(false) }
-    var isCheckingUpdate by rememberSaveable { mutableStateOf(false) }
-    var updateCheckFinishedWithoutResult by rememberSaveable { mutableStateOf(false) }
-    var downloadProgress by rememberSaveable { mutableStateOf<Float?>(null) }
-    var updateInfo by remember { mutableStateOf<RememberUpdateInfo?>(null) }
-    var updateSheetChangelog by remember { mutableStateOf<ChangelogUiState>(ChangelogUiState.Hidden) }
-    val updateSheetState =
-        rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-        )
+    val showUpdateSheet by updateVm.showUpdateSheet.collectAsStateWithLifecycle()
+    val isCheckingUpdate by updateVm.isCheckingUpdate.collectAsStateWithLifecycle()
+    val updateCheckFinishedWithoutResult by updateVm.updateCheckFinishedWithoutResult.collectAsStateWithLifecycle()
+    val downloadProgress by updateVm.downloadProgress.collectAsStateWithLifecycle()
+    val updateInfo by updateVm.updateInfo.collectAsStateWithLifecycle()
+    val updateSheetChangelog by updateVm.updateSheetChangelog.collectAsStateWithLifecycle()
+    val openSheetRequested by updateVm.openSheetRequested.collectAsStateWithLifecycle()
+
     val playInAppUpdateLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.StartIntentSenderForResult(),
@@ -266,36 +305,8 @@ fun SettingsRoute(
             }
         }
 
-    var handledStartPlayInAppUpdateRequest by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(startPlayInAppUpdateRequest) {
-        if (startPlayInAppUpdateRequest == 0) {
-            handledStartPlayInAppUpdateRequest = 0
-            return@LaunchedEffect
-        }
-        if (startPlayInAppUpdateRequest <= handledStartPlayInAppUpdateRequest) return@LaunchedEffect
-        handledStartPlayInAppUpdateRequest = startPlayInAppUpdateRequest
-        onStartPlayInAppUpdateRequestHandled()
-        if (!BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
-        val hostActivity = context as? ComponentActivity
-        val started =
-            hostActivity != null &&
-                playInAppUpdateStarter.startUpdateIfPending(hostActivity, playInAppUpdateLauncher)
-        if (started) {
-            playInAppUpdateProgressController.onFlexibleUpdateFlowStarted()
-        } else {
-            Toast
-                .makeText(
-                    context,
-                    resources.getString(R.string.settings_play_in_app_update_failed),
-                    Toast.LENGTH_SHORT,
-                ).show()
-        }
-    }
-
     LaunchedEffect(globalUpdateInfo) {
-        if (globalUpdateInfo != null && updateInfo == null) {
-            updateInfo = globalUpdateInfo
-        }
+        updateVm.adoptGlobalUpdateIfNone(globalUpdateInfo)
     }
 
     var pendingBackupFolderTarget by remember { mutableStateOf<BackupFolderTarget?>(null) }
@@ -384,24 +395,49 @@ fun SettingsRoute(
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
     var pendingEnableUpdateNotificationsAfterPermission by rememberSaveable { mutableStateOf(false) }
-    var collapsedSettingsSectionKeys by rememberSaveable {
-        mutableStateOf(SettingsScreenSessionState.collapsedSectionKeys)
-    }
     val settingsExpandableSectionKeys =
         remember {
-            setOf(
-                "appearance",
-                "notifications",
-                "swipe",
-                "haptics",
-                "security",
-                "backup",
-                "updates",
-            ) + if (BuildConfig.DEBUG || BuildConfig.BUILD_TYPE == "devRelease") setOf("dev_release_mocks") else emptySet()
+            settingsPaneSections
+                .filter { sectionKey -> sectionKey != SettingsSectionKey.About }
+                .map { sectionKey -> sectionKey.routeKey }
+                .toSet()
+        }
+    var collapsedSettingsSectionKeys by rememberSaveable {
+        mutableStateOf<Set<String>?>(null)
+    }
+    val currentCollapsedSectionKeys =
+        collapsedSettingsSectionKeys
+            ?: viewOptionsState
+                ?.settingsCollapsedSectionKeys
+                ?.filter { it in settingsExpandableSectionKeys }
+                ?.toSet()
+            ?: SettingsScreenSessionState.collapsedSectionKeys
+    LaunchedEffect(viewOptionsState?.settingsCollapsedSectionKeys, settingsExpandableSectionKeys) {
+        val keys = viewOptionsState?.settingsCollapsedSectionKeys ?: return@LaunchedEffect
+        collapsedSettingsSectionKeys =
+            keys
+                .filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }
+                .toSet()
+    }
+
+    fun updateCollapsedSettingsSectionKeys(sectionKeys: Set<String>) {
+        val filteredSectionKeys = sectionKeys.filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }.toSet()
+        collapsedSettingsSectionKeys = filteredSectionKeys
+        scope.launch {
+            viewOptionsPrefs.setSettingsCollapsedSectionKeys(filteredSectionKeys)
+        }
+    }
+    val selectedSectionRouteKey = selectedSectionKey?.routeKey
+    val visibleCollapsedSectionKeys =
+        selectedSectionRouteKey?.let { sectionKey -> currentCollapsedSectionKeys - sectionKey }
+            ?: currentCollapsedSectionKeys
+    val includeSettingsSection: (SettingsSectionKey) -> Boolean =
+        remember(selectedSectionKey) {
+            { sectionKey -> selectedSectionKey == null || selectedSectionKey == sectionKey }
         }
     val allSettingsSectionsCollapsed =
         settingsExpandableSectionKeys.all { sectionKey ->
-            sectionKey in collapsedSettingsSectionKeys
+            sectionKey in currentCollapsedSectionKeys
         }
     val settingsListState =
         rememberLazyListState(
@@ -438,7 +474,7 @@ fun SettingsRoute(
 
     androidx.compose.runtime.DisposableEffect(settingsListState) {
         onDispose {
-            SettingsScreenSessionState.collapsedSectionKeys = collapsedSettingsSectionKeys
+            SettingsScreenSessionState.collapsedSectionKeys = currentCollapsedSectionKeys
             SettingsScreenSessionState.listFirstVisibleItemIndex = settingsListState.firstVisibleItemIndex
             SettingsScreenSessionState.listFirstVisibleItemScrollOffset = settingsListState.firstVisibleItemScrollOffset
         }
@@ -467,239 +503,24 @@ fun SettingsRoute(
     val statusBarInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pillInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
-    val fetchRawChangelog = {
-        val repo = BuildConfig.CHANGELOG_GITHUB_REPO
-        val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
-        val connection =
-            URL("https://raw.githubusercontent.com/$repo/$branch/docs/CHANGELOG.md").openConnection() as HttpURLConnection
-        connection.instanceFollowRedirects = true
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 20_000
-        try {
-            connection.connect()
-            connection.inputStream.bufferedReader().use { reader -> reader.readText() }
-        } finally {
-            connection.disconnect()
+    LaunchedEffect(showUpdateSheet) {
+        if (showUpdateSheet) {
+            updateVm.loadChangelog()
         }
     }
-    val loadUpdateSheetChangelog = {
-        if (BuildConfig.CHANGELOG_GITHUB_REPO.isBlank()) {
-            updateSheetChangelog =
-                ChangelogUiState.Failed(
-                    resources.getString(R.string.settings_changelog_load_failed),
-                )
-        } else {
-            updateSheetChangelog = ChangelogUiState.Loading
-            scope.launch {
-                val loaded =
-                    withContext(Dispatchers.IO) {
-                        runCatching { fetchRawChangelog() }
-                    }
-                updateSheetChangelog =
-                    loaded.fold(
-                        onSuccess = { markdown -> ChangelogUiState.Ready(markdown) },
-                        onFailure = {
-                            ChangelogUiState.Failed(
-                                resources.getString(R.string.settings_changelog_load_failed),
-                            )
-                        },
-                    )
-            }
-        }
-        Unit
-    }
+
     val beginUpdateCheck: (Boolean) -> Unit = { redisplayAvailableAlert ->
         if (redisplayAvailableAlert) onUpdateCheckStarted()
-        showUpdateSheet = true
-        loadUpdateSheetChangelog()
-        isCheckingUpdate = true
-        updateCheckFinishedWithoutResult = false
-        downloadProgress = null
-        if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
-            scope.launch {
-                val checkedUpdate =
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            playStoreUpdateChecker.checkForUpdate()
-                        }
-                    }
-                isCheckingUpdate = false
-                checkedUpdate.fold(
-                    onSuccess = { availableUpdate ->
-                        updateInfo = availableUpdate
-                        rememberUpdateState.showUpdate(availableUpdate)
-                        if (availableUpdate != null && availableUpdate.isPlayStoreUpdateInProgress) {
-                            playInAppUpdateProgressController.ensureInstallStateListenerRegistered()
-                            updateAvailableNotifier.notifyIfNewUpdateAvailable(availableUpdate, updatePrefs.snapshot())
-                        } else if (availableUpdate != null) {
-                            updateAvailableNotifier.notifyIfNewUpdateAvailable(availableUpdate, updatePrefs.snapshot())
-                        }
-                        updateCheckFinishedWithoutResult = availableUpdate == null
-                    },
-                    onFailure = { throwable ->
-                        DiagnosticLog.record(context, "Play Store update check failed from Settings", throwable)
-                        updateInfo = null
-                        updateCheckFinishedWithoutResult = true
-                        Toast
-                            .makeText(
-                                context,
-                                resources.getString(R.string.settings_update_check_failed),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                    },
-                )
-            }
-        } else {
-            scope.launch {
-                val checkedUpdate =
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            rememberUpdateChecker.checkGithubReleaseForUpdate(
-                                repositoryName = BuildConfig.GITHUB_REPO,
-                                currentVersionName = BuildConfig.VERSION_NAME,
-                            )
-                        }
-                    }
-                isCheckingUpdate = false
-                checkedUpdate.fold(
-                    onSuccess = { availableUpdate ->
-                        updateInfo = availableUpdate
-                        rememberUpdateState.showUpdate(availableUpdate)
-                        if (availableUpdate != null) {
-                            updateAvailableNotifier.notifyIfNewUpdateAvailable(availableUpdate, updatePrefs.snapshot())
-                        }
-                        updateCheckFinishedWithoutResult = availableUpdate == null
-                    },
-                    onFailure = { throwable ->
-                        DiagnosticLog.record(context, "GitHub update check failed from Settings", throwable)
-                        updateInfo = null
-                        updateCheckFinishedWithoutResult = true
-                        Toast
-                            .makeText(
-                                context,
-                                resources.getString(R.string.settings_update_check_failed),
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                    },
-                )
-            }
-        }
-        Unit
+        updateVm.openSheetAndCheck()
     }
     val downloadUpdate = { availableUpdate: RememberUpdateInfo ->
-        scope.launch {
-            if (BuildConfig.USE_PLAY_IN_APP_UPDATES && availableUpdate.downloadUrl.isBlank()) {
-                val hostActivity = context as? ComponentActivity
-                val started =
-                    hostActivity != null &&
-                        playInAppUpdateStarter.startUpdateIfPending(hostActivity, playInAppUpdateLauncher)
-                if (started) {
-                    showUpdateSheet = false
-                    playInAppUpdateProgressController.onFlexibleUpdateFlowStarted()
-                } else {
-                    Toast
-                        .makeText(
-                            context,
-                            resources.getString(R.string.settings_play_in_app_update_failed),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                }
-                return@launch
-            }
-            downloadProgress = 0f
-            val downloadResult =
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        updatePrefs.clearUpdateApkDownloadsCopySucceeded()
-                        downloadUpdateApk(
-                            context = context,
-                            updateInfo = availableUpdate,
-                            onProgress = { progress ->
-                                withContext(Dispatchers.Main) {
-                                    downloadProgress = progress
-                                }
-                            },
-                        )
-                    }
-                }
-            downloadResult.fold(
-                onSuccess = { apkFile ->
-                    if (BuildConfig.FLAVOR == "github" && updateState.saveUpdateApkToDownloads) {
-                        withContext(Dispatchers.IO) {
-                            copyUpdateApkToMediaStoreDownloads(
-                                context = context,
-                                cacheApkFile = apkFile,
-                                displayName =
-                                    availableUpdate.remoteApkFileName.ifBlank {
-                                        "Remember-${availableUpdate.versionName}.apk"
-                                    },
-                            )
-                        }.onFailure { throwable ->
-                            DiagnosticLog.record(context, "Saving update APK to Downloads failed", throwable)
-                            Toast
-                                .makeText(
-                                    context,
-                                    resources.getString(R.string.settings_update_apk_save_to_downloads_failed),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                        }.onSuccess {
-                            updatePrefs.markUpdateApkDownloadsCopySucceeded()
-                        }
-                    }
-                    downloadProgress = -1f
-                    val apkUri =
-                        FileProvider.getUriForFile(
-                            context,
-                            "${context.packageName}.fileprovider",
-                            apkFile,
-                        )
-                    val installIntent =
-                        Intent(Intent.ACTION_VIEW).apply {
-                            setDataAndType(apkUri, "application/vnd.android.package-archive")
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION
-                        }
-                    runCatching { context.startActivity(installIntent) }
-                        .onFailure { throwable ->
-                            DiagnosticLog.record(context, "Launching update APK installer failed", throwable)
-                            Toast
-                                .makeText(
-                                    context,
-                                    resources.getString(R.string.settings_update_download_failed),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                        }
-                    if (BuildConfig.FLAVOR == "github" && availableUpdate.remoteApkAssetUpdatedAt.isNotBlank()) {
-                        updatePrefs.writeGithubReleaseAck(
-                            fingerprint = availableUpdate.notificationDedupeKey(),
-                            installedVersionName = BuildConfig.VERSION_NAME,
-                        )
-                    }
-                    downloadProgress = null
-                },
-                onFailure = { throwable ->
-                    DiagnosticLog.record(context, "Update APK download failed", throwable)
-                    downloadProgress = null
-                    Toast
-                        .makeText(
-                            context,
-                            resources.getString(R.string.settings_update_download_failed),
-                            Toast.LENGTH_SHORT,
-                        ).show()
-                },
-            )
-        }
-        Unit
+        updateVm.downloadOrInstall(availableUpdate, context as? ComponentActivity, playInAppUpdateLauncher)
     }
-    var handledOpenUpdateSheetRequest by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(openUpdateSheetRequest) {
-        if (openUpdateSheetRequest == 0) {
-            handledOpenUpdateSheetRequest = 0
-            return@LaunchedEffect
+    LaunchedEffect(openSheetRequested) {
+        if (openSheetRequested) {
+            updateVm.markOpenSheetHandled()
+            updateVm.openSheetAndCheck()
         }
-        if (openUpdateSheetRequest <= handledOpenUpdateSheetRequest) return@LaunchedEffect
-        handledOpenUpdateSheetRequest = openUpdateSheetRequest
-        onOpenUpdateSheetRequestHandled()
-        if (openUpdateSheetRequest > 0) beginUpdateCheck(false)
     }
     LaunchedEffect(playBannerState, showUpdateSheet) {
         if (!showUpdateSheet || !BuildConfig.USE_PLAY_IN_APP_UPDATES) return@LaunchedEffect
@@ -707,9 +528,7 @@ fun SettingsRoute(
             is PlayInAppUpdateBannerUiState.Downloading,
             PlayInAppUpdateBannerUiState.ReadyToInstall,
             -> {
-                showUpdateSheet = false
-                downloadProgress = null
-                updateSheetChangelog = ChangelogUiState.Hidden
+                updateVm.closeSheetForPlayProgress()
             }
             PlayInAppUpdateBannerUiState.Hidden -> Unit
         }
@@ -721,8 +540,8 @@ fun SettingsRoute(
     LaunchedEffect(highlightSectionKey) {
         val key = highlightSection ?: return@LaunchedEffect
         activeHighlightItem = null
-        val wasCollapsed = key in collapsedSettingsSectionKeys
-        collapsedSettingsSectionKeys = collapsedSettingsSectionKeys - key
+        val wasCollapsed = key in currentCollapsedSectionKeys
+        updateCollapsedSettingsSectionKeys(currentCollapsedSectionKeys - key)
         // Wait for expandVertically to finish before scrolling or starting item-level highlights.
         if (wasCollapsed) delay(SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS)
         val index =
@@ -784,18 +603,26 @@ fun SettingsRoute(
     val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlightActive)
 
     if (showUpdateSheet) {
+        val updateSheetState =
+            rememberBottomSheetState(
+                initialValue = SheetValue.Expanded,
+                confirmValueChange = { true },
+                enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
+            )
+        val currentOrientation = LocalConfiguration.current.orientation
+        LaunchedEffect(currentOrientation) {
+            updateSheetState.expand()
+        }
+        // Deliberately a raw ModalBottomSheet rather than the shared AppBottomSheet wrapper:
+        // 1. AppBottomSheet always wraps its body in its own verticalScroll. The changelog needs
+        //    orientation-specific scrolling - a single outer scroll in landscape (so a downward
+        //    drag still bubbles up to dismiss the sheet) vs. an inner-scrolled changelog box in
+        //    portrait. A nested inner scroll under AppBottomSheet's outer scroll swallows the
+        //    drag-to-dismiss delta in landscape, which is exactly the "won't drag down" bug.
+        // 2. It needs a height cap (maxUpdateSheetHeight) and to re-expand on rotation below.
+        // The shared AppBottomSheetDragHandle is still reused so the handle stays consistent.
         ModalBottomSheet(
-            onDismissRequest = {
-                showUpdateSheet = false
-                downloadProgress = null
-                updateSheetChangelog = ChangelogUiState.Hidden
-                val blocksPendingPlayClear =
-                    playBannerState is PlayInAppUpdateBannerUiState.Downloading ||
-                        playBannerState is PlayInAppUpdateBannerUiState.ReadyToInstall
-                if (!blocksPendingPlayClear) {
-                    playUpdateSessionHandle.clearPendingPlayUpdate()
-                }
-            },
+            onDismissRequest = { updateVm.dismissSheet() },
             sheetState = updateSheetState,
             dragHandle = { AppBottomSheetDragHandle() },
         ) {
@@ -809,20 +636,7 @@ fun SettingsRoute(
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
                 onDownloadClick = downloadUpdate,
-                onSkipVersionClick = skipVersion@{
-                    val availableUpdate = updateInfo ?: return@skipVersion
-                    if (availableUpdate.remoteApkAssetUpdatedAt.isBlank()) return@skipVersion
-                    scope.launch {
-                        updatePrefs.writeGithubReleaseAck(
-                            fingerprint = availableUpdate.notificationDedupeKey(),
-                            installedVersionName = BuildConfig.VERSION_NAME,
-                        )
-                        updateInfo = null
-                        rememberUpdateState.showUpdate(null)
-                        showUpdateSheet = false
-                        updateSheetChangelog = ChangelogUiState.Hidden
-                    }
-                },
+                onSkipVersionClick = { updateInfo?.let { availableUpdate -> updateVm.skipVersion(availableUpdate) } },
             )
         }
     }
@@ -836,8 +650,16 @@ fun SettingsRoute(
             )
         },
     ) { _ ->
-        val blurMod = remember(blurStyle) { blurStyle?.applyToScrollableList() ?: Modifier }
-        val topInset = statusBarInset + 68.dp
+        // Pane mode (selectedSectionKey set) has no floating pill over this list, so the
+        // bottom blur band that exists to sit under the pill is dropped.
+        val paneHosted = selectedSectionKey != null
+        val blurMod =
+            remember(blurStyle, paneHosted) {
+                blurStyle
+                    ?.applyToScrollableList(bottomAlphaMultiplier = if (paneHosted) 0f else 1f)
+                    ?: Modifier
+            }
+        val topInset = statusBarInset + if (showTopActions) 68.dp else 24.dp
         val bottomPadding = pillInset + 24.dp
         val listContentPadding =
             remember(topInset, bottomPadding) {
@@ -848,405 +670,434 @@ fun SettingsRoute(
                     bottom = bottomPadding,
                 )
             }
-        Box(Modifier.fillMaxSize()) {
-            LazyColumn(
-                state = settingsListState,
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .then(blurMod),
-                contentPadding = listContentPadding,
-                verticalArrangement = Arrangement.spacedBy(20.dp),
-                userScrollEnabled = settingsScrollEnabled,
-            ) {
-                item(key = "appearance") {
-                    SettingsExpandableSection(
-                        sectionKey = "appearance",
-                        materialSymbolName = "palette",
-                        title = stringResource(R.string.settings_section_appearance),
-                        collapsedSectionKeys = collapsedSettingsSectionKeys,
-                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                    ) {
-                        AppearanceSection(
-                            prefs = themePrefs,
-                            state = themeState,
-                            snackbarHostState = snackbarHostState,
-                        )
-                    }
-                }
-
-                item(key = "notifications") {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .pulsingSectionHighlightOutline(
-                                    active = notificationsHighlightActive,
-                                    outlineColor =
-                                        MaterialTheme.colorScheme.primary.copy(
-                                            alpha = notificationsHighlightAlpha,
-                                        ),
-                                ),
-                    ) {
-                        SettingsExpandableSection(
-                            sectionKey = "notifications",
-                            materialSymbolName = "notifications",
-                            title = stringResource(R.string.settings_notifications_section),
-                            collapsedSectionKeys = collapsedSettingsSectionKeys,
-                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                        ) {
-                            RemindersSection(
-                                reminderState = reminderState,
-                                reminderPrefs = reminderPrefs,
-                                quickCaptureState = quickCaptureState,
-                                quickCapturePrefs = quickCapturePrefs,
-                                noteRepository = noteRepository,
-                                notificationsGranted = notificationsGranted,
-                                notificationPermissionLauncher = notificationPermissionLauncher,
-                                permissionLinked = permissionLinked,
-                                canScheduleExactAlarms = canScheduleExactAlarms,
-                                isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
-                                scope = scope,
-                                highlightItemKey = activeHighlightItem,
-                                highlightItemRequestId = activeHighlightItemRequestId,
-                            )
-                        }
-                    } // notifications Column
-                }
-
-                item(key = "swipe") {
-                    SettingsExpandableSection(
-                        sectionKey = "swipe",
-                        materialSymbolName = "swipe_left",
-                        title = stringResource(R.string.settings_swipe_section),
-                        collapsedSectionKeys = collapsedSettingsSectionKeys,
-                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                    ) {
-                        GroupedListColumn {
-                            GroupedListItem(position = GroupPosition.ONLY) {
-                                SwipeGestureSettingsPanel(
-                                    currentMode = interactionState.swipeGestureMode,
-                                    onModeChange = { mode ->
-                                        scope.launch { interactionPrefs.setSwipeGestureMode(mode) }
-                                    },
-                                    startAction = interactionState.swipeStartToEnd,
-                                    endAction = interactionState.swipeEndToStart,
-                                    onStartActionChange = { action ->
-                                        scope.launch { interactionPrefs.setSwipeStartToEnd(action) }
-                                    },
-                                    onEndActionChange = { action ->
-                                        scope.launch { interactionPrefs.setSwipeEndToStart(action) }
-                                    },
-                                    startActions = interactionState.swipeStartToEndRevealActions,
-                                    endActions = interactionState.swipeEndToStartRevealActions,
-                                    onRevealActionsChange = { startActions, endActions ->
-                                        scope.launch {
-                                            interactionPrefs.setSwipeRevealActions(startActions, endActions)
-                                        }
-                                    },
+        if (viewOptionsState == null) {
+            Box(Modifier.fillMaxSize())
+        } else {
+            Box(Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = settingsListState,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .then(blurMod),
+                    contentPadding = listContentPadding,
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                    userScrollEnabled = settingsScrollEnabled,
+                ) {
+                    if (includeSettingsSection(SettingsSectionKey.Appearance)) {
+                        item(key = "appearance") {
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Appearance.routeKey,
+                                materialSymbolName = SettingsSectionKey.Appearance.iconName,
+                                title = stringResource(SettingsSectionKey.Appearance.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                            ) {
+                                AppearanceSection(
+                                    prefs = themePrefs,
+                                    state = themeState,
+                                    snackbarHostState = snackbarHostState,
                                 )
                             }
                         }
                     }
-                }
 
-                item(key = "security") {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .pulsingSectionHighlightOutline(
-                                    active = securityHighlightActive,
-                                    outlineColor =
-                                        MaterialTheme.colorScheme.primary.copy(
-                                            alpha = securityHighlightAlpha,
+                    if (includeSettingsSection(SettingsSectionKey.Notifications)) {
+                        item(key = "notifications") {
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .pulsingSectionHighlightOutline(
+                                            active = notificationsHighlightActive,
+                                            outlineColor =
+                                                MaterialTheme.colorScheme.primary.copy(
+                                                    alpha = notificationsHighlightAlpha,
+                                                ),
                                         ),
-                                ),
-                    ) {
-                        SettingsExpandableSection(
-                            sectionKey = "security",
-                            materialSymbolName = "security",
-                            title = stringResource(R.string.settings_section_security),
-                            collapsedSectionKeys = collapsedSettingsSectionKeys,
-                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                        ) {
-                            LockSection(
-                                lockState = lockState,
-                                lockPrefs = lockPrefs,
-                                biometricAvailable = biometricAvailable,
-                                deviceCredentialAvailable = deviceCredentialAvailable,
-                                snackbarHostState = snackbarHostState,
-                                scope = scope,
-                            )
-                        }
-                    } // security Column
-                }
-
-                item(key = "backup") {
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .pulsingSectionHighlightOutline(
-                                    active = backupHighlightActive,
-                                    outlineColor =
-                                        MaterialTheme.colorScheme.primary.copy(
-                                            alpha = backupHighlightAlpha,
-                                        ),
-                                ),
-                    ) {
-                        SettingsExpandableSection(
-                            sectionKey = "backup",
-                            materialSymbolName = "save",
-                            title = stringResource(R.string.settings_backup_section),
-                            collapsedSectionKeys = collapsedSettingsSectionKeys,
-                            onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                        ) {
-                            BackupSection(
-                                backupState = backupState,
-                                backupPrefs = backupPrefs,
-                                backupIo = backupIo,
-                                snackbarHostState = snackbarHostState,
-                                scope = scope,
-                                onPickLocalFolder = {
-                                    pendingBackupFolderTarget = BackupFolderTarget.Local
-                                    folderLauncher.launch(null)
-                                },
-                                onPickCloudFolder = {
-                                    cloudBackupDocumentLauncher.launch("remember_cloud_backup.zip")
-                                },
-                                onLaunchImportMerge = {
-                                    importMergeLauncher.launch(
-                                        arrayOf("application/zip", "application/json"),
-                                    )
-                                },
-                                onLaunchImportReplace = {
-                                    importReplaceLauncher.launch(
-                                        arrayOf("application/zip", "application/json"),
-                                    )
-                                },
-                            )
-                        }
-                    } // backup Column
-                }
-
-                item(key = "updates") {
-                    SettingsExpandableSection(
-                        sectionKey = "updates",
-                        materialSymbolName = "system_update",
-                        title = stringResource(R.string.settings_updates_section),
-                        collapsedSectionKeys = collapsedSettingsSectionKeys,
-                        onCollapsedSectionKeysChange = { collapsedSettingsSectionKeys = it },
-                    ) {
-                        GroupedListColumn {
-                            GroupedListItem(position = GroupPosition.FIRST) {
-                                UpdateCheckScheduleDropdown(
-                                    selected = updateState.updateCheckSchedule,
-                                    onSelect = { schedule ->
-                                        scope.launch {
-                                            updatePrefs.setUpdateCheckSchedule(schedule)
-                                            updateCheckWorkScheduler.syncFromPreferences()
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth(),
-                                )
-                            }
-                            if (BuildConfig.FLAVOR == "github") {
-                                GroupedListItem(position = GroupPosition.MIDDLE) {
-                                    UpdateSettingsToggleItem(
-                                        title = stringResource(R.string.settings_save_update_apk_to_downloads),
-                                        checked = updateState.saveUpdateApkToDownloads,
-                                        onCheckedChange = { enabled ->
-                                            scope.launch { updatePrefs.setSaveUpdateApkToDownloads(enabled) }
-                                        },
+                            ) {
+                                SettingsExpandableSection(
+                                    sectionKey = SettingsSectionKey.Notifications.routeKey,
+                                    materialSymbolName = SettingsSectionKey.Notifications.iconName,
+                                    title = stringResource(SettingsSectionKey.Notifications.titleRes),
+                                    collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                    onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                    showHeader = showSectionHeaders,
+                                ) {
+                                    RemindersSection(
+                                        reminderState = reminderState,
+                                        reminderPrefs = reminderPrefs,
+                                        quickCaptureState = quickCaptureState,
+                                        quickCapturePrefs = quickCapturePrefs,
+                                        noteRepository = noteRepository,
+                                        notificationsGranted = notificationsGranted,
+                                        notificationPermissionLauncher = notificationPermissionLauncher,
+                                        permissionLinked = permissionLinked,
+                                        canScheduleExactAlarms = canScheduleExactAlarms,
+                                        isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
+                                        scope = scope,
+                                        highlightItemKey = activeHighlightItem,
+                                        highlightItemRequestId = activeHighlightItemRequestId,
                                     )
                                 }
-                            }
-                            GroupedListItem(position = GroupPosition.MIDDLE) {
-                                UpdateSettingsToggleItem(
-                                    title = stringResource(R.string.settings_notify_new_updates),
-                                    checked = updateState.notifyOnNewUpdates,
-                                    onCheckedChange = { enabled ->
-                                        when {
-                                            !enabled -> {
-                                                pendingEnableUpdateNotificationsAfterPermission = false
-                                                scope.launch { updatePrefs.setNotifyOnNewUpdates(false) }
-                                            }
-                                            updateState.updateCheckSchedule == UpdateCheckSchedule.NEVER -> {
+                            } // notifications Column
+                        }
+                    }
+
+                    if (includeSettingsSection(SettingsSectionKey.Swipe)) {
+                        item(key = "swipe") {
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Swipe.routeKey,
+                                materialSymbolName = SettingsSectionKey.Swipe.iconName,
+                                title = stringResource(SettingsSectionKey.Swipe.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                            ) {
+                                GroupedListColumn {
+                                    GroupedListItem(position = GroupPosition.ONLY) {
+                                        SwipeGestureSettingsPanel(
+                                            currentMode = interactionState.swipeGestureMode,
+                                            onModeChange = { mode ->
+                                                scope.launch { interactionPrefs.setSwipeGestureMode(mode) }
+                                            },
+                                            startAction = interactionState.swipeStartToEnd,
+                                            endAction = interactionState.swipeEndToStart,
+                                            onStartActionChange = { action ->
+                                                scope.launch { interactionPrefs.setSwipeStartToEnd(action) }
+                                            },
+                                            onEndActionChange = { action ->
+                                                scope.launch { interactionPrefs.setSwipeEndToStart(action) }
+                                            },
+                                            startActions = interactionState.swipeStartToEndRevealActions,
+                                            endActions = interactionState.swipeEndToStartRevealActions,
+                                            onRevealActionsChange = { startActions, endActions ->
                                                 scope.launch {
-                                                    snackbarHostState.showSnackbar(
-                                                        resources.getString(R.string.settings_notify_updates_need_auto_check),
-                                                    )
+                                                    interactionPrefs.setSwipeRevealActions(startActions, endActions)
                                                 }
-                                            }
-                                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                                ContextCompat.checkSelfPermission(
-                                                    context,
-                                                    Manifest.permission.POST_NOTIFICATIONS,
-                                                ) != PackageManager.PERMISSION_GRANTED -> {
-                                                pendingEnableUpdateNotificationsAfterPermission = true
-                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                            }
-                                            !NotificationManagerCompat.from(context).areNotificationsEnabled() -> {
-                                                scope.launch {
-                                                    snackbarHostState.showSnackbar(
-                                                        resources.getString(R.string.settings_notify_updates_enable_notifications),
-                                                    )
-                                                }
-                                                context.startActivity(notificationsAppSettingsIntent(context))
-                                            }
-                                            else -> scope.launch { updatePrefs.setNotifyOnNewUpdates(true) }
-                                        }
-                                    },
-                                )
-                            }
-                            GroupedListItem(position = GroupPosition.LAST) {
-                                val availableUpdate = updateInfo
-                                Row(
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .tapSoundClickable {
-                                                beginUpdateCheck(true)
-                                            }.padding(horizontal = 16.dp, vertical = 10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    RememberMaterialRoundedSymbol(
-                                        name = "new_releases",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        weight = FontWeight.Medium,
-                                    )
-                                    Spacer(Modifier.width(16.dp))
-                                    Column(
-                                        modifier = Modifier.weight(1f),
-                                        verticalArrangement = Arrangement.spacedBy(2.dp),
-                                    ) {
-                                        Text(
-                                            text =
-                                                if (availableUpdate != null) {
-                                                    stringResource(
-                                                        R.string.settings_update_available_button,
-                                                        availableUpdate.versionName,
-                                                    )
-                                                } else {
-                                                    stringResource(R.string.settings_check_for_updates)
-                                                },
-                                            style = MaterialTheme.typography.bodyLarge,
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                        Text(
-                                            text =
-                                                stringResource(
-                                                    R.string.settings_update_current_version,
-                                                    BuildConfig.VERSION_NAME,
-                                                ),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            maxLines = 2,
-                                            overflow = TextOverflow.Ellipsis,
+                                            },
                                         )
                                     }
                                 }
                             }
                         }
                     }
-                }
 
-                if (devModeEnabled) {
-                    item(key = "dev_options_entry") {
-                        DevOptionsSettingsEntry(
-                            onClick = onOpenDevOptions,
-                        )
+                    if (includeSettingsSection(SettingsSectionKey.Security)) {
+                        item(key = "security") {
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .pulsingSectionHighlightOutline(
+                                            active = securityHighlightActive,
+                                            outlineColor =
+                                                MaterialTheme.colorScheme.primary.copy(
+                                                    alpha = securityHighlightAlpha,
+                                                ),
+                                        ),
+                            ) {
+                                SettingsExpandableSection(
+                                    sectionKey = SettingsSectionKey.Security.routeKey,
+                                    materialSymbolName = SettingsSectionKey.Security.iconName,
+                                    title = stringResource(SettingsSectionKey.Security.titleRes),
+                                    collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                    onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                    showHeader = showSectionHeaders,
+                                ) {
+                                    LockSection(
+                                        lockState = lockState,
+                                        lockPrefs = lockPrefs,
+                                        biometricAvailable = biometricAvailable,
+                                        deviceCredentialAvailable = deviceCredentialAvailable,
+                                        snackbarHostState = snackbarHostState,
+                                        scope = scope,
+                                    )
+                                }
+                            } // security Column
+                        }
+                    }
+
+                    if (includeSettingsSection(SettingsSectionKey.Backup)) {
+                        item(key = "backup") {
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .pulsingSectionHighlightOutline(
+                                            active = backupHighlightActive,
+                                            outlineColor =
+                                                MaterialTheme.colorScheme.primary.copy(
+                                                    alpha = backupHighlightAlpha,
+                                                ),
+                                        ),
+                            ) {
+                                SettingsExpandableSection(
+                                    sectionKey = SettingsSectionKey.Backup.routeKey,
+                                    materialSymbolName = SettingsSectionKey.Backup.iconName,
+                                    title = stringResource(SettingsSectionKey.Backup.titleRes),
+                                    collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                    onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                    showHeader = showSectionHeaders,
+                                ) {
+                                    BackupSection(
+                                        backupState = backupState,
+                                        backupPrefs = backupPrefs,
+                                        backupIo = backupIo,
+                                        snackbarHostState = snackbarHostState,
+                                        scope = scope,
+                                        onPickLocalFolder = {
+                                            pendingBackupFolderTarget = BackupFolderTarget.Local
+                                            folderLauncher.launch(null)
+                                        },
+                                        onPickCloudFolder = {
+                                            cloudBackupDocumentLauncher.launch("remember_cloud_backup.zip")
+                                        },
+                                        onLaunchImportMerge = {
+                                            importMergeLauncher.launch(
+                                                arrayOf("application/zip", "application/json"),
+                                            )
+                                        },
+                                        onLaunchImportReplace = {
+                                            importReplaceLauncher.launch(
+                                                arrayOf("application/zip", "application/json"),
+                                            )
+                                        },
+                                    )
+                                }
+                            } // backup Column
+                        }
+                    }
+
+                    if (includeSettingsSection(SettingsSectionKey.Updates)) {
+                        item(key = "updates") {
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Updates.routeKey,
+                                materialSymbolName = SettingsSectionKey.Updates.iconName,
+                                title = stringResource(SettingsSectionKey.Updates.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                            ) {
+                                GroupedListColumn {
+                                    GroupedListItem(position = GroupPosition.FIRST) {
+                                        UpdateCheckScheduleDropdown(
+                                            selected = updateState.updateCheckSchedule,
+                                            onSelect = { schedule ->
+                                                scope.launch {
+                                                    updatePrefs.setUpdateCheckSchedule(schedule)
+                                                    updateCheckWorkScheduler.syncFromPreferences()
+                                                }
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        )
+                                    }
+                                    if (BuildConfig.FLAVOR == "github") {
+                                        GroupedListItem(position = GroupPosition.MIDDLE) {
+                                            UpdateSettingsToggleItem(
+                                                title = stringResource(R.string.settings_save_update_apk_to_downloads),
+                                                checked = updateState.saveUpdateApkToDownloads,
+                                                onCheckedChange = { enabled ->
+                                                    scope.launch { updatePrefs.setSaveUpdateApkToDownloads(enabled) }
+                                                },
+                                            )
+                                        }
+                                    }
+                                    GroupedListItem(position = GroupPosition.MIDDLE) {
+                                        UpdateSettingsToggleItem(
+                                            title = stringResource(R.string.settings_notify_new_updates),
+                                            checked = updateState.notifyOnNewUpdates,
+                                            onCheckedChange = { enabled ->
+                                                when {
+                                                    !enabled -> {
+                                                        pendingEnableUpdateNotificationsAfterPermission = false
+                                                        scope.launch { updatePrefs.setNotifyOnNewUpdates(false) }
+                                                    }
+                                                    updateState.updateCheckSchedule == UpdateCheckSchedule.NEVER -> {
+                                                        scope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                resources.getString(R.string.settings_notify_updates_need_auto_check),
+                                                            )
+                                                        }
+                                                    }
+                                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                                        ContextCompat.checkSelfPermission(
+                                                            context,
+                                                            Manifest.permission.POST_NOTIFICATIONS,
+                                                        ) != PackageManager.PERMISSION_GRANTED -> {
+                                                        pendingEnableUpdateNotificationsAfterPermission = true
+                                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                    }
+                                                    !NotificationManagerCompat.from(context).areNotificationsEnabled() -> {
+                                                        scope.launch {
+                                                            snackbarHostState.showSnackbar(
+                                                                resources.getString(R.string.settings_notify_updates_enable_notifications),
+                                                            )
+                                                        }
+                                                        context.startActivity(notificationsAppSettingsIntent(context))
+                                                    }
+                                                    else -> scope.launch { updatePrefs.setNotifyOnNewUpdates(true) }
+                                                }
+                                            },
+                                        )
+                                    }
+                                    GroupedListItem(position = GroupPosition.LAST) {
+                                        val availableUpdate = updateInfo
+                                        Row(
+                                            modifier =
+                                                Modifier
+                                                    .fillMaxWidth()
+                                                    .tapSoundClickable {
+                                                        beginUpdateCheck(true)
+                                                    }.padding(horizontal = 16.dp, vertical = 10.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                        ) {
+                                            RememberMaterialRoundedSymbol(
+                                                name = "new_releases",
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                weight = FontWeight.Medium,
+                                            )
+                                            Spacer(Modifier.width(16.dp))
+                                            Column(
+                                                modifier = Modifier.weight(1f),
+                                                verticalArrangement = Arrangement.spacedBy(2.dp),
+                                            ) {
+                                                Text(
+                                                    text =
+                                                        if (availableUpdate != null) {
+                                                            stringResource(
+                                                                R.string.settings_update_available_button,
+                                                                availableUpdate.versionName,
+                                                            )
+                                                        } else {
+                                                            stringResource(R.string.settings_check_for_updates)
+                                                        },
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                )
+                                                Text(
+                                                    text =
+                                                        stringResource(
+                                                            R.string.settings_update_current_version,
+                                                            BuildConfig.VERSION_NAME,
+                                                        ),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    maxLines = 2,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (devModeEnabled && selectedSectionKey == null) {
+                        item(key = "dev_options_entry") {
+                            DevOptionsSettingsEntry(
+                                onClick = onOpenDevOptions,
+                            )
+                        }
+                    }
+
+                    if (includeSettingsSection(SettingsSectionKey.About)) {
+                        item(key = "about") {
+                            AboutSection(
+                                modifier =
+                                    if (devModeEnabled || selectedSectionKey != null) {
+                                        Modifier
+                                    } else {
+                                        Modifier.padding(top = 24.dp)
+                                    },
+                                onOpenIntro = onOpenIntro,
+                                devModeEnabled = devModeEnabled,
+                                onDevModeActivated = {
+                                    scope.launch { devModePrefs.setEnabled(true) }
+                                    onOpenDevOptions()
+                                },
+                                onLaunchPlayReview = { onFlowFinished ->
+                                    val hostActivity = context as? ComponentActivity
+                                    if (hostActivity != null) {
+                                        appReviewLauncher.tryLaunchInAppReview(hostActivity, onFlowFinished)
+                                    } else {
+                                        onFlowFinished()
+                                    }
+                                },
+                                showHeader = showAboutHeader,
+                                showHeaderTitle = showAboutHeaderTitle,
+                            )
+                        }
                     }
                 }
-
-                item(key = "about") {
-                    AboutSection(
+                if (showTopActions) {
+                    Row(
                         modifier =
-                            if (devModeEnabled) {
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .statusBarsPadding()
+                                .padding(top = 8.dp, end = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        val actionButtonSize = rememberResponsiveActionButtonSize()
+                        val actionIconSize = rememberResponsiveActionIconSize()
+                        val openHelpLabel = stringResource(R.string.settings_open_help_cd)
+                        RememberFilledTonalIconButton(
+                            onClick = onOpenHelp,
+                            modifier =
                                 Modifier
-                            } else {
-                                Modifier.padding(top = 24.dp)
+                                    .size(actionButtonSize)
+                                    .semantics {
+                                        contentDescription = openHelpLabel
+                                    },
+                            tooltipLabel = openHelpLabel,
+                        ) {
+                            Text(
+                                text = "?",
+                                style =
+                                    MaterialTheme.typography.titleLarge.copy(
+                                        fontWeight = FontWeight.Normal,
+                                        fontSize = actionIconSize.value.sp,
+                                        lineHeight = actionIconSize.value.sp,
+                                    ),
+                            )
+                        }
+                        val expandCollapseAllLabel =
+                            stringResource(
+                                if (allSettingsSectionsCollapsed) {
+                                    R.string.settings_expand_all_sections_cd
+                                } else {
+                                    R.string.settings_collapse_all_sections_cd
+                                },
+                            )
+                        RememberFilledTonalIconButton(
+                            onClick = {
+                                updateCollapsedSettingsSectionKeys(
+                                    if (allSettingsSectionsCollapsed) {
+                                        currentCollapsedSectionKeys - settingsExpandableSectionKeys
+                                    } else {
+                                        currentCollapsedSectionKeys + settingsExpandableSectionKeys
+                                    },
+                                )
                             },
-                        onOpenIntro = onOpenIntro,
-                        devModeEnabled = devModeEnabled,
-                        onDevModeActivated = {
-                            scope.launch { devModePrefs.setEnabled(true) }
-                            onOpenDevOptions()
-                        },
-                        onLaunchPlayReview = { onFlowFinished ->
-                            val hostActivity = context as? ComponentActivity
-                            if (hostActivity != null) {
-                                appReviewLauncher.tryLaunchInAppReview(hostActivity, onFlowFinished)
-                            } else {
-                                onFlowFinished()
-                            }
-                        },
-                    )
-                }
-            }
-            Row(
-                modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .statusBarsPadding()
-                        .padding(top = 8.dp, end = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                val actionButtonSize = rememberResponsiveActionButtonSize()
-                val actionIconSize = rememberResponsiveActionIconSize()
-                val openHelpLabel = stringResource(R.string.settings_open_help_cd)
-                RememberFilledTonalIconButton(
-                    onClick = onOpenHelp,
-                    modifier =
-                        Modifier
-                            .size(actionButtonSize)
-                            .semantics {
-                                contentDescription = openHelpLabel
-                            },
-                    tooltipLabel = openHelpLabel,
-                ) {
-                    Text(
-                        text = "?",
-                        style =
-                            MaterialTheme.typography.titleLarge.copy(
-                                fontWeight = FontWeight.Normal,
-                                fontSize = actionIconSize.value.sp,
-                                lineHeight = actionIconSize.value.sp,
-                            ),
-                    )
-                }
-                val expandCollapseAllLabel =
-                    stringResource(
-                        if (allSettingsSectionsCollapsed) {
-                            R.string.settings_expand_all_sections_cd
-                        } else {
-                            R.string.settings_collapse_all_sections_cd
-                        },
-                    )
-                RememberFilledTonalIconButton(
-                    onClick = {
-                        collapsedSettingsSectionKeys =
-                            if (allSettingsSectionsCollapsed) {
-                                collapsedSettingsSectionKeys - settingsExpandableSectionKeys
-                            } else {
-                                collapsedSettingsSectionKeys + settingsExpandableSectionKeys
-                            }
-                    },
-                    modifier =
-                        Modifier
-                            .size(actionButtonSize)
-                            .semantics {
-                                contentDescription = expandCollapseAllLabel
-                            },
-                    tooltipLabel = expandCollapseAllLabel,
-                ) {
-                    RememberMaterialRoundedSymbol(
-                        name = if (allSettingsSectionsCollapsed) "unfold_more" else "unfold_less",
-                        size = actionIconSize,
-                        weight = FontWeight.Medium,
-                    )
+                            modifier =
+                                Modifier
+                                    .size(actionButtonSize)
+                                    .semantics {
+                                        contentDescription = expandCollapseAllLabel
+                                    },
+                            tooltipLabel = expandCollapseAllLabel,
+                        ) {
+                            RememberMaterialRoundedSymbol(
+                                name = if (allSettingsSectionsCollapsed) "unfold_more" else "unfold_less",
+                                size = actionIconSize,
+                                weight = FontWeight.Medium,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1283,12 +1134,19 @@ fun SettingsRoute(
                         }
                     },
                 ) {
-                    Text(stringResource(R.string.settings_restore_go_ahead))
+                    // Restore replaces existing data, so keep this low-emphasis + error-colored.
+                    Text(
+                        text = stringResource(R.string.settings_restore_go_ahead),
+                        color = MaterialTheme.colorScheme.error,
+                    )
                 }
             },
             dismissButton = {
                 RememberTextButton(onClick = { pendingRestore = null }) {
-                    Text(stringResource(R.string.common_cancel))
+                    Text(
+                        text = stringResource(R.string.common_cancel),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             },
         )
