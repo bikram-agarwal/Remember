@@ -997,6 +997,7 @@ private fun compactRecurrenceLabel(rule: RecurrenceRule): String {
     val interval = rule.interval.coerceAtLeast(1)
     return if (interval == 1) {
         when (rule.unit) {
+            RecurrenceUnit.HOUR -> stringResource(R.string.reminder_recurrence_hourly)
             RecurrenceUnit.DAY -> stringResource(R.string.reminder_recurrence_daily)
             RecurrenceUnit.WEEK -> stringResource(R.string.reminder_recurrence_weekly)
             RecurrenceUnit.MONTH -> stringResource(R.string.reminder_recurrence_monthly)
@@ -1005,6 +1006,7 @@ private fun compactRecurrenceLabel(rule: RecurrenceRule): String {
     } else {
         pluralStringResource(
             when (rule.unit) {
+                RecurrenceUnit.HOUR -> R.plurals.reminder_recurrence_every_hours
                 RecurrenceUnit.DAY -> R.plurals.reminder_recurrence_every_days
                 RecurrenceUnit.WEEK -> R.plurals.reminder_recurrence_every_weeks
                 RecurrenceUnit.MONTH -> R.plurals.reminder_recurrence_every_months

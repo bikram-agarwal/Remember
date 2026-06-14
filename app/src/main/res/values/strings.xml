@@ -315,9 +315,7 @@
     <string name="home_bulk_trash_cd">Move selected notes to trash</string>
     <string name="home_bulk_mark_done_cd">Mark selected notes done</string>
     <string name="home_bulk_tag_cd">Tag selected notes</string>
-    <string name="two_pane_notes_empty_detail_title">Select a note</string>
-    <string name="two_pane_notes_empty_detail_body">Choose a note from the list or create a new one.</string>
-    <string name="two_pane_notes_selection_title">%1$d selected</string>
+    <string name="two_pane_notes_selection_title" tools:ignore="PluralsCandidate">%1$d selected</string>
 
     <!-- Snackbar messages shown after a bulk action completes. The single Undo button
          on the snackbar reverses the action by calling the inverse repository method. -->
@@ -438,8 +436,6 @@
 
     <!-- Reminders -->
     <string name="reminder_add_button">Add reminder</string>
-    <string name="reminder_count_format">%1$d of %2$d</string>
-    <string name="reminder_max_limit">Maximum of %1$d reminders</string>
     <string name="reminder_clear_all">Clear all</string>
     <string name="reminder_clear_all_confirm_title">Remove all reminders?</string>
     <string name="reminder_clear_all_confirm_body">All scheduled reminders for this note will be removed.</string>
@@ -464,14 +460,20 @@
     <string name="reminder_pick_end_date">Pick end date</string>
     <string name="reminder_repeat">Repeat</string>
     <string name="reminder_occurrences">occurrences</string>
+    <string name="reminder_unit_hour">Hour</string>
     <string name="reminder_unit_day">Day</string>
     <string name="reminder_unit_week">Week</string>
     <string name="reminder_unit_month">Month</string>
     <string name="reminder_unit_year">Year</string>
+    <string name="reminder_recurrence_hourly">Hourly</string>
     <string name="reminder_recurrence_daily">Daily</string>
     <string name="reminder_recurrence_weekly">Weekly</string>
     <string name="reminder_recurrence_monthly">Monthly</string>
     <string name="reminder_recurrence_yearly">Yearly</string>
+    <plurals name="reminder_recurrence_every_hours">
+        <item quantity="one">Every %1$d hour</item>
+        <item quantity="other">Every %1$d hours</item>
+    </plurals>
     <plurals name="reminder_recurrence_every_days">
         <item quantity="one">Every %1$d day</item>
         <item quantity="other">Every %1$d days</item>
@@ -1129,8 +1131,8 @@
     <string name="diagnostics_first_install_format">First install: %1$s</string>
     <string name="diagnostics_last_update_format">Last update: %1$s</string>
     <string name="diagnostics_installer_format">Installer: %1$s</string>
-    <string name="diagnostics_files_dir_space_format">Files dir allocatable: %1$d bytes</string>
-    <string name="diagnostics_cache_dir_space_format">Cache dir allocatable: %1$d bytes</string>
+    <string name="diagnostics_files_dir_space_format" tools:ignore="PluralsCandidate">Files dir allocatable: %1$d bytes</string>
+    <string name="diagnostics_cache_dir_space_format" tools:ignore="PluralsCandidate">Cache dir allocatable: %1$d bytes</string>
     <string name="diagnostics_external_storage_state_format">External storage state: %1$s</string>
     <string name="diagnostics_section_permissions_app_access">Permissions and app access</string>
     <string name="diagnostics_notifications_enabled_format">Notifications enabled: %1$s</string>

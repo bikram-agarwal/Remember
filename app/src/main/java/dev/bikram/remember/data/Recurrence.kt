@@ -14,7 +14,7 @@ import java.time.temporal.TemporalAdjusters
 import java.util.Calendar
 
 @Serializable
-enum class RecurrenceUnit { DAY, WEEK, MONTH, YEAR }
+enum class RecurrenceUnit { HOUR, DAY, WEEK, MONTH, YEAR }
 
 @Serializable
 enum class RecurrenceEndKind { NEVER, ON_DATE, AFTER_COUNT }
@@ -63,6 +63,7 @@ data class RecurrenceRule(
     fun nextAfter(afterMillis: Long): Long? {
         val cal = Calendar.getInstance().apply { timeInMillis = afterMillis }
         when (unit) {
+            RecurrenceUnit.HOUR -> cal.add(Calendar.HOUR_OF_DAY, interval)
             RecurrenceUnit.DAY -> cal.add(Calendar.DAY_OF_MONTH, interval)
             RecurrenceUnit.WEEK -> {
                 if (daysOfWeek.isEmpty()) {

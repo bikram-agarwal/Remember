@@ -384,9 +384,9 @@ private fun ReminderNotificationsBlockedBar(
     contentAlpha: Float,
     shadowAlpha: Float,
     onEnableClick: () -> Unit,
+    modifier: Modifier = Modifier,
     iconContainerSize: Dp = 44.dp,
     contentScale: Float = 1f,
-    modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
     AlertBarSurface(

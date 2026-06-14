@@ -14,6 +14,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.res.ResourcesCompat
@@ -79,6 +80,16 @@ import java.util.Calendar
  * Existing installed Remember widgets keep this receiver/provider and therefore upgrade
  * from the old mixed Starred + Reminder Summary surface into the richer daily view.
  */
+@Composable
+private fun Int.scaledSp(): TextUnit {
+    val context = LocalContext.current
+    val fontScale =
+        context.resources.configuration.fontScale
+            .coerceAtLeast(0.01f)
+    val cappedScale = fontScale.coerceAtMost(1.3f)
+    return (this * (cappedScale / fontScale)).sp
+}
+
 class NotesWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode =
         SizeMode.Responsive(
@@ -355,7 +366,7 @@ private fun WidgetHeader(
             style =
                 TextStyle(
                     color = GlanceTheme.colors.primary,
-                    fontSize = if (compact) 13.sp else 14.sp,
+                    fontSize = if (compact) 13.scaledSp() else 14.scaledSp(),
                     fontWeight = FontWeight.Medium,
                 ),
             modifier =
@@ -370,7 +381,7 @@ private fun WidgetHeader(
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 11.sp,
+                        fontSize = 11.scaledSp(),
                         fontWeight = FontWeight.Medium,
                     ),
             )
@@ -464,7 +475,7 @@ private fun QuickCaptureButton(
             style =
                 TextStyle(
                     color = GlanceTheme.colors.onPrimaryContainer,
-                    fontSize = 14.sp,
+                    fontSize = 14.scaledSp(),
                     fontWeight = FontWeight.Medium,
                 ),
         )
@@ -481,7 +492,7 @@ private fun SectionHeader(
         style =
             TextStyle(
                 color = if (strong) GlanceTheme.colors.error else GlanceTheme.colors.primary,
-                fontSize = 11.sp,
+                fontSize = 11.scaledSp(),
                 fontWeight = FontWeight.Medium,
             ),
         modifier = GlanceModifier.padding(vertical = 4.dp),
@@ -503,7 +514,7 @@ private fun InlineEmptyState(label: String) {
             style =
                 TextStyle(
                     color = GlanceTheme.colors.onSurfaceVariant,
-                    fontSize = 12.sp,
+                    fontSize = 12.scaledSp(),
                     fontWeight = FontWeight.Medium,
                 ),
         )
@@ -523,7 +534,7 @@ private fun AgendaEmptyState() {
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.primaryContainer,
-                        fontSize = 34.sp,
+                        fontSize = 34.scaledSp(),
                     ),
             )
             Spacer(GlanceModifier.height(6.dp))
@@ -532,7 +543,7 @@ private fun AgendaEmptyState() {
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 13.sp,
+                        fontSize = 13.scaledSp(),
                         fontWeight = FontWeight.Medium,
                     ),
             )
@@ -553,7 +564,7 @@ private fun StarredEmptyState() {
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.primaryContainer,
-                        fontSize = 34.sp,
+                        fontSize = 34.scaledSp(),
                     ),
             )
             Spacer(GlanceModifier.height(6.dp))
@@ -562,7 +573,7 @@ private fun StarredEmptyState() {
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 13.sp,
+                        fontSize = 13.scaledSp(),
                         fontWeight = FontWeight.Medium,
                     ),
             )
@@ -610,7 +621,7 @@ private fun ReminderCard(
                 style =
                     TextStyle(
                         color = if (overdue) GlanceTheme.colors.onErrorContainer else GlanceTheme.colors.onSurface,
-                        fontSize = if (compact) 13.sp else 14.sp,
+                        fontSize = if (compact) 13.scaledSp() else 14.scaledSp(),
                         fontWeight = FontWeight.Medium,
                     ),
             )
@@ -621,7 +632,7 @@ private fun ReminderCard(
                     style =
                         TextStyle(
                             color = if (overdue) GlanceTheme.colors.error else GlanceTheme.colors.primary,
-                            fontSize = 11.sp,
+                            fontSize = 11.scaledSp(),
                             fontWeight = FontWeight.Medium,
                         ),
                 )
@@ -634,7 +645,7 @@ private fun ReminderCard(
                     style =
                         TextStyle(
                             color = if (overdue) GlanceTheme.colors.onErrorContainer else GlanceTheme.colors.onSurfaceVariant,
-                            fontSize = 12.sp,
+                            fontSize = 12.scaledSp(),
                         ),
                 )
             }
@@ -689,7 +700,7 @@ private fun StarredCard(
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.onSurface,
-                        fontSize = if (compact) 13.sp else 14.sp,
+                        fontSize = if (compact) 13.scaledSp() else 14.scaledSp(),
                         fontWeight = FontWeight.Medium,
                     ),
             )
@@ -701,7 +712,7 @@ private fun StarredCard(
                     style =
                         TextStyle(
                             color = GlanceTheme.colors.onSurfaceVariant,
-                            fontSize = if (compact) 11.sp else 12.sp,
+                            fontSize = if (compact) 11.scaledSp() else 12.scaledSp(),
                         ),
                 )
             }
@@ -837,7 +848,7 @@ private fun NoteWidgetIcon(
                 style =
                     TextStyle(
                         color = tint,
-                        fontSize = 13.sp,
+                        fontSize = 13.scaledSp(),
                         fontWeight = FontWeight.Medium,
                     ),
             )
@@ -901,7 +912,7 @@ private fun MaterialSymbolWidgetImage(
             style =
                 TextStyle(
                     color = tint,
-                    fontSize = 13.sp,
+                    fontSize = 13.scaledSp(),
                     fontWeight = FontWeight.Medium,
                 ),
         )

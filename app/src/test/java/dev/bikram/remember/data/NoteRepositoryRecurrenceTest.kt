@@ -48,6 +48,43 @@ class NoteRepositoryRecurrenceTest {
         }
 
     @Test
+    fun `mark completed advances hourly recurring reminder`() =
+        runBlocking {
+            val reminderAt = calendarMillis(2026, Calendar.APRIL, 26, 8, 0)
+            val expectedNextReminder = calendarMillis(2026, Calendar.APRIL, 26, 11, 0)
+            val noteDao =
+                FakeNoteDao(
+                    NoteEntity(
+                        id = 1L,
+                        kind = NoteKind.NOTE,
+                        title = "Hourly task",
+                        body = "",
+                        colorIndex = 0,
+                        starred = false,
+                        trashed = false,
+                        createdAt = reminderAt,
+                        updatedAt = reminderAt,
+                        reminderAt = reminderAt,
+                        recurrence = RecurrenceRule(unit = RecurrenceUnit.HOUR, interval = 3),
+                    ),
+                )
+            val repository =
+                NoteRepository(
+                    noteDao = noteDao,
+                    itemDao = FakeChecklistItemDao(),
+                    attachmentDao = FakeAttachmentDao(),
+                    clock = { reminderAt + 1_000L },
+                )
+
+            repository.markCompleted(1L)
+
+            val updated = noteDao.stored.note
+            assertEquals(expectedNextReminder, updated.reminderAt)
+            assertNotNull(updated.recurrence)
+            assertNull(updated.completedAt)
+        }
+
+    @Test
     fun `mark completed stamps completedAt for one shot reminder`() =
         runBlocking {
             val reminderAt = calendarMillis(2026, Calendar.APRIL, 26, 8, 0)

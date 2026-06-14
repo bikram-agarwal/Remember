@@ -727,8 +727,8 @@ private fun PermissionStatusCard(
     actionText: String,
     actionEnabled: Boolean,
     primaryAction: Boolean,
-    compact: Boolean = false,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
     onAction: () -> Unit,
 ) {
     val scheme = MaterialTheme.colorScheme

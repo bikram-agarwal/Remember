@@ -173,22 +173,13 @@ object DiagnosticLog {
                 powerManager.isIgnoringBatteryOptimizations(context.packageName).toString(),
             ),
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-            appendLine(
-                context.getString(
-                    R.string.diagnostics_exact_alarms_allowed_format,
-                    alarmManager.canScheduleExactAlarms().toString(),
-                ),
-            )
-        } else {
-            appendLine(
-                context.getString(
-                    R.string.diagnostics_exact_alarms_allowed_format,
-                    context.getString(R.string.diagnostics_value_not_required),
-                ),
-            )
-        }
+        val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        appendLine(
+            context.getString(
+                R.string.diagnostics_exact_alarms_allowed_format,
+                alarmManager.canScheduleExactAlarms().toString(),
+            ),
+        )
         appendLine()
         appendNotificationChannels(context)
     }
