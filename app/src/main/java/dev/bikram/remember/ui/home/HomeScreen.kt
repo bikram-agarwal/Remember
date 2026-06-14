@@ -83,6 +83,7 @@ import dev.bikram.remember.data.NotesFilter
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.bulkActionSnackbarMessage
+import dev.bikram.remember.ui.common.noteMosaicColumnCount
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.NoteCard
 import dev.bikram.remember.ui.components.NoteCardUiModel
@@ -347,7 +348,6 @@ fun HomeScreen(
         }
     }
     val displayedItems = state.items
-    val useMosaicLayout = state.viewOptions.noteLayoutMode == NoteLayoutMode.MOSAIC
     val visibleDisplayedItems by
         remember(displayedItems, collapsedSectionKeys) {
             derivedStateOf {
@@ -594,9 +594,18 @@ fun HomeScreen(
             // landscape panes. If the content is taller it simply grows and the list
             // scrolls; nothing is ever clipped.
             val emptyStateMinHeight = (maxHeight - topInset - bottomPadding).coerceAtLeast(0.dp)
+            val mosaicColumnCount = noteMosaicColumnCount(maxWidth)
+            val effectiveNoteLayoutMode =
+                if (state.viewOptions.noteLayoutMode == NoteLayoutMode.MOSAIC && mosaicColumnCount > 1) {
+                    NoteLayoutMode.MOSAIC
+                } else {
+                    NoteLayoutMode.LIST
+                }
+            val useMosaicLayout = effectiveNoteLayoutMode == NoteLayoutMode.MOSAIC
+            val layoutToggleEnabled = mosaicColumnCount > 1
             if (useMosaicLayout) {
                 LazyVerticalStaggeredGrid(
-                    columns = StaggeredGridCells.Adaptive(180.dp),
+                    columns = StaggeredGridCells.Fixed(mosaicColumnCount),
                     state = mosaicGridState,
                     modifier =
                         Modifier
@@ -1030,21 +1039,22 @@ fun HomeScreen(
                 contentAlignment = Alignment.TopEnd,
             ) {
                 // In pane mode (showSelectionActionBar = false) the detail pane owns
-                // Select all / Cancel selection, so the top-bar swap stays out entirely.
+                // Select all / Cancel selection, so only selection chrome stays out.
                 if (!state.inSelectionMode) {
                     SearchableTopBarTitle(
                         searchOpen = searchOpen,
                         requestSearchFocus = searchShouldRequestFocus,
                         query = state.filter.text,
-                        noteLayoutMode = state.viewOptions.noteLayoutMode,
-                        showLayoutToggle = showSelectionActionBar,
+                        noteLayoutMode = effectiveNoteLayoutMode,
+                        showLayoutToggle = true,
+                        layoutToggleEnabled = layoutToggleEnabled,
                         onQueryChange = onQueryChange,
                         onSearchFocusRequested = { searchShouldRequestFocus = false },
                         onToggleLayout = {
                             onViewOptionsChange(
                                 state.viewOptions.copy(
                                     noteLayoutMode =
-                                        if (state.viewOptions.noteLayoutMode == NoteLayoutMode.LIST) {
+                                        if (effectiveNoteLayoutMode == NoteLayoutMode.LIST) {
                                             NoteLayoutMode.MOSAIC
                                         } else {
                                             NoteLayoutMode.LIST

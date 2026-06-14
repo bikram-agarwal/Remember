@@ -1,4 +1,4 @@
-## v1.1.0: Landscape / tablet layout, grid view, multi-reminders
+## v1.1.1: Landscape / tablet layout, grid view, multi-reminders
 
 ### ✨ New Features
 - **Landscape and tablet support.** The app now adapts to landscape and larger screens — notes, history, and settings can show a side-by-side list-and-detail view.
