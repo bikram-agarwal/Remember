@@ -76,15 +76,17 @@ class ReminderScheduler(
             val at = reminder.reminderAt
             if (at > now) {
                 schedule(note.id, index, at, note.importance)
-            } else if (note.completedAt == null && !note.trashed && !note.archived) {
-                ReminderReceiver.showNotification(
-                    context = context,
-                    note = note,
-                    items = items,
-                    reminderIndex = index,
-                    keepUntilDone = keepUntilDone,
-                )
             }
+        }
+        val indexToShow = latestDueReminderIndex(note, now)
+        if (indexToShow != null) {
+            ReminderReceiver.showNotification(
+                context = context,
+                note = note,
+                items = items,
+                reminderIndex = indexToShow,
+                keepUntilDone = keepUntilDone,
+            )
         }
     }
 
@@ -98,9 +100,7 @@ class ReminderScheduler(
     fun cancelNotification(noteId: Long) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(pendingRequestCodeForNote(noteId))
-        for (index in 0 until MAX_REMINDERS_PER_NOTE) {
-            notificationManager.cancel(pendingRequestCodeForNoteReminder(noteId, index))
-        }
+        cancelReminderSlotNotifications(context, noteId)
     }
 
     suspend fun refreshNotificationIfActive(
@@ -111,25 +111,28 @@ class ReminderScheduler(
         val activeNotificationIds = notificationManager.activeNotifications.map { notification -> notification.id }.toSet()
         val keepUntilDone = keepReminderNotificationsUntilDone()
         if (pendingRequestCodeForNote(note.id) in activeNotificationIds) {
-            notificationManager.cancel(pendingRequestCodeForNote(note.id))
             ReminderReceiver.showNotification(
                 context = context,
                 note = note,
                 items = items,
                 reminderIndex = 0,
                 keepUntilDone = keepUntilDone,
+                onlyAlertOnce = true,
             )
+            return
         }
-        for (index in 0 until MAX_REMINDERS_PER_NOTE) {
-            if (pendingRequestCodeForNoteReminder(note.id, index) in activeNotificationIds) {
-                ReminderReceiver.showNotification(
-                    context = context,
-                    note = note,
-                    items = items,
-                    reminderIndex = index,
-                    keepUntilDone = keepUntilDone,
-                )
-            }
+        val legacyReminderIndex =
+            (0 until MAX_REMINDERS_PER_NOTE)
+                .lastOrNull { index -> pendingRequestCodeForNoteReminder(note.id, index) in activeNotificationIds }
+        if (legacyReminderIndex != null) {
+            ReminderReceiver.showNotification(
+                context = context,
+                note = note,
+                items = items,
+                reminderIndex = legacyReminderIndex,
+                keepUntilDone = keepUntilDone,
+                onlyAlertOnce = true,
+            )
         }
     }
 
@@ -399,5 +402,33 @@ class ReminderScheduler(
             val salted = noteId xor (0x4B4DL shl 32) xor ((reminderIndex.toLong() + 1L) shl 44)
             return (salted xor (salted ushr 32)).toInt()
         }
+
+        fun cancelReminderSlotNotifications(
+            context: Context,
+            noteId: Long,
+        ) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            for (index in 0 until MAX_REMINDERS_PER_NOTE) {
+                notificationManager.cancel(pendingRequestCodeForNoteReminder(noteId, index))
+            }
+        }
     }
+}
+
+internal fun latestDueReminderIndex(
+    note: NoteEntity,
+    now: Long,
+): Int? {
+    if (note.trashed || note.archived || note.completedAt != null) return null
+
+    var dueReminderIndex: Int? = null
+    var dueReminderAt = Long.MIN_VALUE
+    note.getActiveReminders().forEachIndexed { index, reminder ->
+        val at = reminder.reminderAt
+        if (at <= now && at >= dueReminderAt) {
+            dueReminderIndex = index
+            dueReminderAt = at
+        }
+    }
+    return dueReminderIndex
 }

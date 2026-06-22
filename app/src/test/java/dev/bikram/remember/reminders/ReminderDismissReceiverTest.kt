@@ -3,13 +3,13 @@ package dev.bikram.remember.reminders
 import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteReminder
-import org.junit.Assert.assertFalse
-import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ReminderDismissReceiverTest {
     @Test
-    fun dismissedReminderUsesReminderIndexInsteadOfPrimaryReminder() {
+    fun dismissedReminderRepostsLatestDueReminder() {
         val now = 2_000L
         val note =
             note(
@@ -21,19 +21,33 @@ class ReminderDismissReceiverTest {
                     ),
             )
 
-        assertTrue(shouldRepostDismissedReminder(note, reminderIndex = 1, now = now))
-        assertFalse(shouldRepostDismissedReminder(note, reminderIndex = 0, now = now))
+        assertEquals(1, latestDueReminderIndex(note, now))
     }
 
     @Test
-    fun dismissedReminderDoesNotRepostMissingReminderIndex() {
+    fun dismissedReminderDoesNotRepostWhenNoReminderIsDue() {
+        val note =
+            note(
+                reminderAt = 3_000L,
+                reminders = listOf(NoteReminder(reminderAt = 3_000L)),
+            )
+
+        assertNull(latestDueReminderIndex(note, now = 2_000L))
+    }
+
+    @Test
+    fun dismissedReminderPrefersNewerDueReminderOverOlderDueReminder() {
         val note =
             note(
                 reminderAt = 1_000L,
-                reminders = listOf(NoteReminder(reminderAt = 1_000L)),
+                reminders =
+                    listOf(
+                        NoteReminder(reminderAt = 1_000L),
+                        NoteReminder(reminderAt = 1_500L),
+                    ),
             )
 
-        assertFalse(shouldRepostDismissedReminder(note, reminderIndex = 1, now = 2_000L))
+        assertEquals(1, latestDueReminderIndex(note, now = 2_000L))
     }
 
     private fun note(

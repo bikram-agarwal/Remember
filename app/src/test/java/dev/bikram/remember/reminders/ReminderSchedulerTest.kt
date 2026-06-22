@@ -6,7 +6,7 @@ import org.junit.Test
 
 class ReminderSchedulerTest {
     @Test
-    fun reminder_notification_ids_are_unique_per_reminder_index() {
+    fun reminder_alarm_request_codes_are_unique_per_reminder_index() {
         val noteId = 42L
         val legacyNoteId = ReminderScheduler.pendingRequestCodeForNote(noteId)
         val reminderIds =

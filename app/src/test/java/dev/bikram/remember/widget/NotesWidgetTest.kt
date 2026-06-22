@@ -18,4 +18,44 @@ class NotesWidgetTest {
         assertEquals("Buy milk", widgetPlainText("- [ ] Buy milk"))
         assertEquals("Quoted", widgetPlainText("> Quoted"))
     }
+
+    @Test
+    fun quick_capture_copy_stays_full_when_header_fits() {
+        val needsCondensedCopy =
+            quickCaptureNeedsCondensedCopy(
+                widgetWidthDp = 180f,
+                density = 1f,
+                fontScale = 1f,
+                title = "Remember",
+                trailingText = "Nothing due",
+            ) { text, _ ->
+                when (text) {
+                    "Remember" -> 80f
+                    "Nothing due" -> 50f
+                    else -> 0f
+                }
+            }
+
+        assertEquals(false, needsCondensedCopy)
+    }
+
+    @Test
+    fun quick_capture_copy_condenses_only_when_header_would_wrap() {
+        val needsCondensedCopy =
+            quickCaptureNeedsCondensedCopy(
+                widgetWidthDp = 180f,
+                density = 1f,
+                fontScale = 1f,
+                title = "Remember",
+                trailingText = "Nothing due",
+            ) { text, _ ->
+                when (text) {
+                    "Remember" -> 90f
+                    "Nothing due" -> 64f
+                    else -> 0f
+                }
+            }
+
+        assertEquals(true, needsCondensedCopy)
+    }
 }

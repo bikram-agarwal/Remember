@@ -1,10 +1,23 @@
+## v1.1.4: Hourly reminders, widget improvements
+
+### 🛠 Improved Features
+- **Open Remember from links.** The app now responds to `remember://` links, so deep-links work properly.
+- **Quick Capture widget reads better at small sizes.** On narrow widgets the header and buttons now use shorter labels so text no longer overflows or wraps.
+- **Tidier reminder notifications.** A note with multiple due reminders now shows a single notification instead of one per reminder.
+- **More detailed diagnostics report**, including display/font-scale info and a summary of your installed widgets — handy when reporting an issue.
+
+### 📦 Others
+- GitHub releases are now build-attested using GitHub Actions, for better supply chain security and your peace of mind.
+
+---
+
 ## v1.1.2: Hourly reminders, widget improvements
 
 ### ✨ New Features
-- **Hourly reminder** - New option to set hourly reminders for a note.
+- **Hourly reminders.** New option to set hourly reminders for a note.
 
 ### 🛠 Improved Features
-- **Widgets now caps font scaling.** If the device is using huge display / font size, the widget will now cap the font scaling to prevent text from overflowing the widget bounds.
+- **Widgets now cap font scaling.** If the device is using huge display / font size, the widget will now cap the font scaling to prevent text from overflowing the widget bounds.
 - **Reduced app size** by removing unnecessary app bundles, making the app lighter and more efficient.
 
 ---

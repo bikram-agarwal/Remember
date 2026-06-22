@@ -106,6 +106,7 @@ class ReminderReceiver : BroadcastReceiver() {
             items: List<ChecklistItemEntity> = emptyList(),
             reminderIndex: Int = 0,
             keepUntilDone: Boolean = false,
+            onlyAlertOnce: Boolean = false,
         ) {
             if (note.trashed) return
 
@@ -134,7 +135,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setDeleteIntent(dismissPendingIntent(context, note.id, reminderIndex).takeIf { keepUntilDone })
                     .setOngoing(true)
                     .setAutoCancel(false)
-                    .setOnlyAlertOnce(true)
+                    .setOnlyAlertOnce(onlyAlertOnce)
 
             val heroBitmap = if (note.visibility == Visibility.DEFAULT) decodeNotificationHeroBitmap(context, note) else null
             if (heroBitmap != null) {
@@ -184,9 +185,10 @@ class ReminderReceiver : BroadcastReceiver() {
             builder.addAction(actionButton(context, note.id, 1, snoozeAction, shareText))
             builder.addAction(actionButton(context, note.id, 2, markDoneAction, shareText))
 
+            ReminderScheduler.cancelReminderSlotNotifications(context, note.id)
             postNotificationIfAllowed(
                 context = context,
-                notificationId = ReminderScheduler.pendingRequestCodeForNoteReminder(note.id, reminderIndex),
+                notificationId = ReminderScheduler.pendingRequestCodeForNote(note.id),
                 notification = builder.build(),
                 source = "Reminder noteId=${note.id} reminderIndex=$reminderIndex",
             )
@@ -477,7 +479,6 @@ class ReminderReceiver : BroadcastReceiver() {
                 Intent(context, ReminderDismissReceiver::class.java).apply {
                     action = ReminderDismissReceiver.ACTION_DISMISSED
                     putExtra(ReminderDismissReceiver.EXTRA_NOTE_ID, noteId)
-                    putExtra(ReminderDismissReceiver.EXTRA_REMINDER_INDEX, reminderIndex)
                 }
             return PendingIntent.getBroadcast(
                 context,

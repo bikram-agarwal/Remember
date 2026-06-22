@@ -3,7 +3,10 @@ package dev.bikram.remember.diagnostics
 import android.Manifest
 import android.app.AlarmManager
 import android.app.NotificationManager
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
@@ -22,6 +25,9 @@ import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.UpdatePrefs
+import dev.bikram.remember.widget.NotesWidgetReceiver
+import dev.bikram.remember.widget.QuickCaptureWidgetReceiver
+import dev.bikram.remember.widget.StarredWidgetReceiver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -144,6 +150,7 @@ object DiagnosticLog {
         appendLine(context.getString(R.string.diagnostics_timezone_format, TimeZone.getDefault().id))
         appendLine(context.getString(R.string.diagnostics_uptime_format, SystemClock.uptimeMillis()))
         appendLine(context.getString(R.string.diagnostics_elapsed_realtime_format, SystemClock.elapsedRealtime()))
+        appendDisplaySnapshot(context)
         appendLine(context.getString(R.string.diagnostics_target_sdk_format, appInfo?.targetSdkVersion?.toString() ?: unknownValue(context)))
         appendLine(
             context.getString(
@@ -158,6 +165,7 @@ object DiagnosticLog {
             ),
         )
         appendLine(context.getString(R.string.diagnostics_installer_format, installerPackageName(context)))
+        appendLine(context.getString(R.string.diagnostics_launcher_package_format, launcherPackageName(context)))
         val filesDirAllocatableBytes = allocatableBytes(context, context.filesDir)
         appendLine(context.getString(R.string.diagnostics_files_dir_space_format, filesDirAllocatableBytes))
         val cacheDirAllocatableBytes = allocatableBytes(context, context.cacheDir)
@@ -182,6 +190,8 @@ object DiagnosticLog {
         )
         appendLine()
         appendNotificationChannels(context)
+        appendLine()
+        appendWidgetOptions(context)
     }
 
     private suspend fun loadPreferencesSnapshot(context: Context): PreferencesSnapshot? =
@@ -286,6 +296,66 @@ object DiagnosticLog {
         }
     }
 
+    private fun StringBuilder.appendDisplaySnapshot(context: Context) {
+        val configuration = context.resources.configuration
+        val displayMetrics = context.resources.displayMetrics
+        appendLine(context.getString(R.string.diagnostics_font_scale_format, configuration.fontScale))
+        appendLine(
+            context.getString(
+                R.string.diagnostics_screen_dp_format,
+                configuration.screenWidthDp,
+                configuration.screenHeightDp,
+                configuration.smallestScreenWidthDp,
+            ),
+        )
+        appendLine(context.getString(R.string.diagnostics_display_pixels_format, displayMetrics.widthPixels, displayMetrics.heightPixels))
+        appendLine(
+            context.getString(
+                R.string.diagnostics_display_density_format,
+                displayMetrics.density,
+                displayMetrics.density * configuration.fontScale,
+                displayMetrics.densityDpi,
+            ),
+        )
+    }
+
+    private fun StringBuilder.appendWidgetOptions(context: Context) {
+        val appWidgetManager = AppWidgetManager.getInstance(context)
+        val widgetProviders =
+            listOf(
+                R.string.widget_agenda_label to NotesWidgetReceiver::class.java,
+                R.string.widget_quick_capture_label to QuickCaptureWidgetReceiver::class.java,
+                R.string.widget_starred_label to StarredWidgetReceiver::class.java,
+            )
+        appendDiagnosticSection(context.getString(R.string.diagnostics_section_widget_options))
+        var widgetCount = 0
+        widgetProviders.forEach { (labelRes, receiverClass) ->
+            val widgetIds =
+                appWidgetManager.getAppWidgetIds(
+                    ComponentName(context, receiverClass),
+                )
+            widgetIds.forEach { widgetId ->
+                val options = appWidgetManager.getAppWidgetOptions(widgetId)
+                widgetCount++
+                appendLine(
+                    context.getString(
+                        R.string.diagnostics_widget_options_format,
+                        context.getString(labelRes),
+                        widgetId,
+                        options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH),
+                        options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT),
+                        options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH),
+                        options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT),
+                        options.getInt(AppWidgetManager.OPTION_APPWIDGET_HOST_CATEGORY),
+                    ),
+                )
+            }
+        }
+        if (widgetCount == 0) {
+            appendLine(context.getString(R.string.diagnostics_no_widgets_installed))
+        }
+    }
+
     private fun allocatableBytes(
         context: Context,
         directory: File,
@@ -311,6 +381,18 @@ object DiagnosticLog {
             context.packageManager
                 .getInstallSourceInfo(context.packageName)
                 .installingPackageName
+                .orEmpty()
+                .ifBlank { unknownValue(context) }
+        }.getOrDefault(unknownValue(context))
+
+    private fun launcherPackageName(context: Context): String =
+        runCatching {
+            context.packageManager
+                .resolveActivity(
+                    Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+                    PackageManager.MATCH_DEFAULT_ONLY,
+                )?.activityInfo
+                ?.packageName
                 .orEmpty()
                 .ifBlank { unknownValue(context) }
         }.getOrDefault(unknownValue(context))
