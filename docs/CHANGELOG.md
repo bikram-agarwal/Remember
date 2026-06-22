@@ -1,3 +1,13 @@
+## v1.1.3: Hourly reminders, widget improvements
+
+### 🛠 Improved Features
+- **Open Remember from links.** The app now responds to `remember://` links, so deep-links work properly.
+- **Quick Capture widget reads better at small sizes.** On narrow widgets the header and buttons now use shorter labels so text no longer overflows or wraps.
+- **Tidier reminder notifications.** A note with multiple due reminders now shows a single notification instead of one per reminder.
+- **More detailed diagnostics report**, including display/font-scale info and a summary of your installed widgets — handy when reporting an issue.
+
+---
+
 ## v1.1.2: Hourly reminders, widget improvements
 
 ### ✨ New Features
