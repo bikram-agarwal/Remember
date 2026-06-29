@@ -95,6 +95,7 @@ data class NoteAction(
 data class NoteReminder(
     val reminderAt: Long,
     val recurrence: RecurrenceRule? = null,
+    val originalReminderAt: Long? = null,
 )
 
 const val MAX_REMINDERS_PER_NOTE = 3

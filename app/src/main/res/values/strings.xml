@@ -633,6 +633,9 @@
     <string name="snooze_toast_today">Reminder set for %1$s today</string>
     <string name="snooze_toast_tomorrow">Reminder set for tomorrow at %1$s</string>
     <string name="snooze_toast_future">Reminder set for %1$s at %2$s</string>
+    <string name="snooze_indicator_today">Snoozed until %1$s today</string>
+    <string name="snooze_indicator_tomorrow">Snoozed until tomorrow at %1$s</string>
+    <string name="snooze_indicator_future">Snoozed until %1$s at %2$s</string>
     <string name="action_field_phone_number">Phone number</string>
     <string name="action_field_email_address">Email address</string>
     <string name="action_field_address">Address or place</string>

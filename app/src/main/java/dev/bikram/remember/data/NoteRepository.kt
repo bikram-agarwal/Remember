@@ -1220,7 +1220,7 @@ class NoteRepository(
                 if (reminder == soonest) {
                     val rule = reminder.recurrence?.sanitized()
                     if (rule != null) {
-                        val current = reminder.reminderAt
+                        val current = reminder.originalReminderAt ?: reminder.reminderAt
                         val consumedRule = rule.afterFire()
                         val stoppedByCount =
                             consumedRule.endKind == RecurrenceEndKind.AFTER_COUNT &&

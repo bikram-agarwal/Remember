@@ -46,10 +46,12 @@ import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
+import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.TagRepository
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
+import dev.bikram.remember.data.getActiveReminders
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.edit.CalendarPickerDialog
@@ -151,6 +153,26 @@ class SnoozeActivity : ComponentActivity() {
             val noteWithItems = noteRepository.get(noteId)
             if (noteWithItems != null) {
                 val note = noteWithItems.note
+                val activeReminders = note.getActiveReminders()
+                val soonest = activeReminders.minByOrNull { it.reminderAt }
+                val updatedReminders =
+                    if (soonest != null) {
+                        activeReminders.map { reminder ->
+                            if (reminder == soonest) {
+                                reminder.copy(
+                                    reminderAt = timeMillis,
+                                    originalReminderAt = reminder.originalReminderAt ?: reminder.reminderAt,
+                                )
+                            } else {
+                                reminder
+                            }
+                        }
+                    } else {
+                        listOf(
+                            dev.bikram.remember.data
+                                .NoteReminder(reminderAt = timeMillis, recurrence = note.recurrence),
+                        )
+                    }
                 val opts =
                     dev.bikram.remember.data.NoteOptions(
                         reminderAt = timeMillis,
@@ -163,6 +185,7 @@ class SnoozeActivity : ComponentActivity() {
                         actions = note.actions,
                         tags = note.tags,
                         recurrence = note.recurrence,
+                        reminders = updatedReminders,
                     )
                 if (note.kind == dev.bikram.remember.data.NoteKind.NOTE) {
                     noteRepository.updateNote(note.id, note.title, note.body, note.colorIndex, opts)

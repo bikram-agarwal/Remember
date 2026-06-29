@@ -233,6 +233,19 @@ fun OptionsPanel(
                                 permissionMissing = reminderPermissionMissing,
                             )
                         },
+                        trailingContent =
+                            if (reminders.any { it.originalReminderAt != null }) {
+                                {
+                                    RememberMaterialRoundedSymbol(
+                                        name = "snooze",
+                                        size = 19.dp,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        weight = FontWeight.Medium,
+                                    )
+                                }
+                            } else {
+                                null
+                            },
                     )
                     OptionCell(
                         symbolName = firstAction?.type?.materialSymbolName() ?: "bolt",
@@ -499,7 +512,7 @@ private fun ReminderOptionSummary(
         return
     }
     val soonest = reminders.minByOrNull { it.reminderAt } ?: return
-    val reminderAt = soonest.reminderAt
+    val reminderAt = soonest.originalReminderAt ?: soonest.reminderAt
     val recurrence = soonest.recurrence
     val summaryContext = LocalContext.current
     val datePart =
@@ -573,6 +586,7 @@ private fun OptionCell(
     iconTint: Color = MaterialTheme.colorScheme.primary,
     fixedHeight: Boolean = true,
     summaryContent: (@Composable () -> Unit)? = null,
+    trailingContent: (@Composable () -> Unit)? = null,
 ) {
     val tileModifier =
         if (fixedHeight) {
@@ -643,6 +657,10 @@ private fun OptionCell(
                         softWrap = false,
                     )
                 }
+            }
+            if (trailingContent != null) {
+                Spacer(Modifier.size(8.dp))
+                trailingContent()
             }
         }
     }

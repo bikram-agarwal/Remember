@@ -1,5 +1,7 @@
 package dev.bikram.remember.data
 
+import dev.bikram.remember.ui.edit.toDraft
+import dev.bikram.remember.ui.edit.toReminder
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
@@ -308,6 +310,119 @@ class NoteRepositoryRecurrenceTest {
 
             assertEquals(reminders.take(MAX_REMINDERS_PER_NOTE), noteDao.stored.note.reminders)
         }
+
+    @Test
+    fun `mark completed on a snoozed recurring reminder advances from original time`() =
+        runBlocking {
+            val originalReminderAt = calendarMillis(2026, Calendar.APRIL, 26, 9, 0)
+            val snoozedReminderAt = calendarMillis(2026, Calendar.APRIL, 26, 17, 0)
+            val expectedNextReminder = calendarMillis(2026, Calendar.APRIL, 27, 9, 0)
+            val noteDao =
+                FakeNoteDao(
+                    NoteEntity(
+                        id = 1L,
+                        kind = NoteKind.NOTE,
+                        title = "Daily task",
+                        body = "",
+                        colorIndex = 0,
+                        starred = false,
+                        trashed = false,
+                        createdAt = originalReminderAt,
+                        updatedAt = originalReminderAt,
+                        reminderAt = snoozedReminderAt,
+                        recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY),
+                        reminders =
+                            listOf(
+                                NoteReminder(
+                                    reminderAt = snoozedReminderAt,
+                                    recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY),
+                                    originalReminderAt = originalReminderAt,
+                                ),
+                            ),
+                    ),
+                )
+            val repository =
+                NoteRepository(
+                    noteDao = noteDao,
+                    itemDao = FakeChecklistItemDao(),
+                    attachmentDao = FakeAttachmentDao(),
+                    clock = { snoozedReminderAt + 1_000L },
+                )
+
+            repository.markCompleted(1L)
+
+            val updated = noteDao.stored.note
+            assertEquals(expectedNextReminder, updated.reminderAt)
+            assertNotNull(updated.recurrence)
+            assertNull(updated.completedAt)
+            val nextReminder = updated.reminders.firstOrNull()
+            assertNotNull(nextReminder)
+            assertNull(nextReminder?.originalReminderAt)
+            assertEquals(expectedNextReminder, nextReminder?.reminderAt)
+        }
+
+    @Test
+    fun `toDraft uses originalReminderAt for date and time fields when snoozed`() {
+        val originalTime = calendarMillis(2026, Calendar.APRIL, 26, 9, 0)
+        val snoozedTime = calendarMillis(2026, Calendar.APRIL, 26, 17, 0)
+        val recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY)
+        val reminder =
+            NoteReminder(
+                reminderAt = snoozedTime,
+                recurrence = recurrence,
+                originalReminderAt = originalTime,
+            )
+
+        val draft = reminder.toDraft()
+
+        val cal = Calendar.getInstance().apply { timeInMillis = originalTime }
+        assertEquals(cal.get(Calendar.HOUR_OF_DAY), draft.reminderHour)
+        assertEquals(cal.get(Calendar.MINUTE), draft.reminderMinute)
+        assertEquals(originalTime, draft.originalReminderAt)
+        assertEquals(snoozedTime, draft.snoozedUntil)
+        assertEquals(recurrence, draft.originalRecurrence)
+    }
+
+    @Test
+    fun `toReminder preserves snooze when picker schedule has not changed`() {
+        val originalTime = calendarMillis(2026, Calendar.APRIL, 26, 9, 0)
+        val snoozedTime = calendarMillis(2026, Calendar.APRIL, 26, 17, 0)
+        val recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY)
+        val reminder =
+            NoteReminder(
+                reminderAt = snoozedTime,
+                recurrence = recurrence,
+                originalReminderAt = originalTime,
+            )
+
+        val draft = reminder.toDraft()
+        val restored = draft.toReminder()
+
+        assertEquals(snoozedTime, restored.reminderAt)
+        assertEquals(originalTime, restored.originalReminderAt)
+        assertEquals(recurrence, restored.recurrence)
+    }
+
+    @Test
+    fun `toReminder cancels snooze when picker schedule has changed`() {
+        val originalTime = calendarMillis(2026, Calendar.APRIL, 26, 9, 0)
+        val snoozedTime = calendarMillis(2026, Calendar.APRIL, 26, 17, 0)
+        val recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY)
+        val reminder =
+            NoteReminder(
+                reminderAt = snoozedTime,
+                recurrence = recurrence,
+                originalReminderAt = originalTime,
+            )
+
+        val draft = reminder.toDraft().copy(reminderHour = 10, reminderMinute = 0)
+        val restored = draft.toReminder()
+
+        val expectedNewTime = calendarMillis(2026, Calendar.APRIL, 26, 10, 0)
+        assertEquals(expectedNewTime, restored.reminderAt)
+        assertNull(restored.originalReminderAt)
+        assertEquals(recurrence, restored.recurrence)
+    }
 
     private fun calendarMillis(
         year: Int,

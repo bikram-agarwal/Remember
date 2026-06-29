@@ -156,6 +156,9 @@ internal data class ReminderDraft(
     val dayOfMonthMenuOpen: Boolean = false,
     val nthOrdinalMenuOpen: Boolean = false,
     val nthWeekdayMenuOpen: Boolean = false,
+    val originalReminderAt: Long? = null,
+    val snoozedUntil: Long? = null,
+    val originalRecurrence: RecurrenceRule? = null,
 )
 
 internal val ReminderDraftSaver =
@@ -183,6 +186,9 @@ internal val ReminderDraftSaver =
                 draft.dayOfMonthMenuOpen,
                 draft.nthOrdinalMenuOpen,
                 draft.nthWeekdayMenuOpen,
+                draft.originalReminderAt,
+                draft.snoozedUntil,
+                RecurrenceRule.toJson(draft.originalRecurrence),
             )
         },
         restore = { list ->
@@ -208,6 +214,9 @@ internal val ReminderDraftSaver =
                 dayOfMonthMenuOpen = list[18] as Boolean,
                 nthOrdinalMenuOpen = list[19] as Boolean,
                 nthWeekdayMenuOpen = list[20] as Boolean,
+                originalReminderAt = list.getOrNull(21) as? Long,
+                snoozedUntil = list.getOrNull(22) as? Long,
+                originalRecurrence = RecurrenceRule.fromJson(list.getOrNull(23) as? String),
             )
         },
     )
@@ -246,14 +255,18 @@ private fun createBlankDraft(now: Long): ReminderDraft {
         endKind = RecurrenceEndKind.NEVER,
         endDate = null,
         endCountText = "10",
+        originalReminderAt = null,
+        snoozedUntil = null,
+        originalRecurrence = null,
     )
 }
 
-private fun NoteReminder.toDraft(): ReminderDraft {
-    val cal = Calendar.getInstance().apply { timeInMillis = reminderAt }
+internal fun NoteReminder.toDraft(): ReminderDraft {
+    val baseTime = originalReminderAt ?: reminderAt
+    val cal = Calendar.getInstance().apply { timeInMillis = baseTime }
     val rule = recurrence
     return ReminderDraft(
-        selectedDate = pickerDayMillisForLocalWallClock(reminderAt),
+        selectedDate = pickerDayMillisForLocalWallClock(baseTime),
         reminderDateExplicit = true,
         reminderHour = cal.get(Calendar.HOUR_OF_DAY),
         reminderMinute = cal.get(Calendar.MINUTE),
@@ -274,10 +287,13 @@ private fun NoteReminder.toDraft(): ReminderDraft {
         endKind = rule?.endKind ?: RecurrenceEndKind.NEVER,
         endDate = rule?.endDate,
         endCountText = (rule?.endCount ?: DEFAULT_END_COUNT).toString(),
+        originalReminderAt = originalReminderAt,
+        snoozedUntil = if (originalReminderAt != null) reminderAt else null,
+        originalRecurrence = if (originalReminderAt != null) recurrence else null,
     )
 }
 
-private fun ReminderDraft.toReminder(): NoteReminder {
+internal fun ReminderDraft.toReminder(): NoteReminder {
     val hour24 = if (reminderTimeExplicit) reminderHour else 9
     val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
     val selectedDay = Instant.ofEpochMilli(selectedDate).atZone(ZoneOffset.UTC).toLocalDate()
@@ -313,9 +329,27 @@ private fun ReminderDraft.toReminder(): NoteReminder {
                 endKind = endKind,
                 endDate = if (endKind == RecurrenceEndKind.ON_DATE) endDate else null,
                 endCount = if (endKind == RecurrenceEndKind.AFTER_COUNT) count else null,
-            )
+            ).sanitized()
         }
-    return NoteReminder(fireAt, rule)
+
+    val scheduleChanged =
+        originalReminderAt == null ||
+            fireAt != originalReminderAt ||
+            rule != originalRecurrence
+
+    return if (scheduleChanged) {
+        NoteReminder(
+            reminderAt = fireAt,
+            recurrence = rule,
+            originalReminderAt = null,
+        )
+    } else {
+        NoteReminder(
+            reminderAt = snoozedUntil ?: fireAt,
+            recurrence = rule,
+            originalReminderAt = originalReminderAt,
+        )
+    }
 }
 
 private fun getCompactRecurrenceLabel(
@@ -632,6 +666,11 @@ fun ReminderPickerSheet(
                                             },
                                             onClear = null,
                                         )
+
+                                        if (draft.snoozedUntil != null) {
+                                            Spacer(Modifier.height(8.dp))
+                                            SnoozeIndicator(snoozedUntil = draft.snoozedUntil)
+                                        }
 
                                         Spacer(Modifier.height(8.dp))
 
@@ -2082,4 +2121,84 @@ private fun repeatSummary(
                     }.orEmpty()
         }
     return listOf(every, detail, ending).filter { part -> part.isNotEmpty() }.joinToString(" ")
+}
+
+private sealed interface SnoozeType {
+    data class Today(
+        val time: String,
+    ) : SnoozeType
+
+    data class Tomorrow(
+        val time: String,
+    ) : SnoozeType
+
+    data class Future(
+        val date: String,
+        val time: String,
+    ) : SnoozeType
+}
+
+@Composable
+private fun SnoozeIndicator(snoozedUntil: Long) {
+    val context = LocalContext.current
+    val snoozeType =
+        remember(snoozedUntil, context) {
+            val zone = java.time.ZoneId.systemDefault()
+            val target = java.time.ZonedDateTime.ofInstant(java.time.Instant.ofEpochMilli(snoozedUntil), zone)
+            val now = java.time.ZonedDateTime.now(zone)
+            val timeFormatter = timeFormatterFor(context)
+            val timeStr = target.format(timeFormatter)
+            val targetDate = target.toLocalDate()
+            val today = now.toLocalDate()
+            when (targetDate) {
+                today -> SnoozeType.Today(timeStr)
+                today.plusDays(1) -> SnoozeType.Tomorrow(timeStr)
+                else -> {
+                    val dayPattern =
+                        java.time.format.DateTimeFormatter
+                            .ofPattern("EEE, MMM d", Locale.getDefault())
+                    SnoozeType.Future(target.format(dayPattern), timeStr)
+                }
+            }
+        }
+    val text =
+        when (snoozeType) {
+            is SnoozeType.Today -> stringResource(R.string.snooze_indicator_today, snoozeType.time)
+            is SnoozeType.Tomorrow -> stringResource(R.string.snooze_indicator_tomorrow, snoozeType.time)
+            is SnoozeType.Future -> stringResource(R.string.snooze_indicator_future, snoozeType.date, snoozeType.time)
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(start = 20.dp, top = 4.dp, bottom = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = "snooze",
+            size = 20.dp,
+            tint = MaterialTheme.colorScheme.primary,
+            weight = FontWeight.Medium,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Medium,
+        )
+    }
+}
+
+private fun timeFormatterFor(context: Context): java.time.format.DateTimeFormatter {
+    val pattern =
+        if (android.text.format.DateFormat
+                .is24HourFormat(context)
+        ) {
+            "HH:mm"
+        } else {
+            "h:mm a"
+        }
+    return java.time.format.DateTimeFormatter
+        .ofPattern(pattern, Locale.getDefault())
 }
