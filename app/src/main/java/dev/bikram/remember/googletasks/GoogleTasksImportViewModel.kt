@@ -8,6 +8,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.di.IoDispatcher
 import kotlinx.coroutines.CancellationException
@@ -75,6 +76,7 @@ class GoogleTasksImportViewModel
         }
 
         fun setImportMethod(method: ImportMethod) {
+            if (method == ImportMethod.GrantPermission && !BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED) return
             if (_state.value.selectedMethod == method) return
             cachedToken = null
             _state.update { current ->
@@ -103,6 +105,7 @@ class GoogleTasksImportViewModel
 
         /** User pressed "Connect Google account". Either silently fetches or launches the picker. */
         fun connect(forceAccountSelection: Boolean = false) {
+            if (!BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED) return
             viewModelScope.launch {
                 _state.update { it.copy(isFetching = true, error = null) }
                 when (val auth = auth.authorize(appContext, forceAccountSelection)) {
@@ -522,7 +525,12 @@ class GoogleTasksImportViewModel
 
 data class GoogleTasksImportUiState(
     val rememberedEmail: String? = null,
-    val selectedMethod: ImportMethod = ImportMethod.GrantPermission,
+    val selectedMethod: ImportMethod =
+        if (BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED) {
+            ImportMethod.GrantPermission
+        } else {
+            ImportMethod.ManualImport
+        },
     val accountEmail: String? = null,
     /**
      * True once authorize() has returned a Success. Decoupled from [accountEmail] because the

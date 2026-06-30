@@ -20,12 +20,15 @@ Repo: https://github.com/bikram-agarwal/Remember.git
 Builds:
   - versionName: 1.1.6
     versionCode: 116
-    commit: 121720f6441ea3501ea5cf647b0423239c95daa6
+    commit: 3308889c4df2826503ce3f8bee17a00a80550a01
     gradle:
       - fdroid
     output: app/build/outputs/apk/fdroid/release/app-fdroid-release-unsigned.apk
     binary: 
       https://github.com/bikram-agarwal/Remember/releases/download/v%v/remember-v%v-fdroid.apk
+    scandelete:
+      - app/google-tasks-gms.gradle.kts
+      - app/src/nonfdroid
 
 AllowedAPKSigningKeys: 6437e8be9451bd7d02215511d3e504a88c50be72b6dd05ac4b5b87f5a205b687
 

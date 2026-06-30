@@ -100,6 +100,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
@@ -352,7 +353,7 @@ fun GoogleTasksImportRoute(
             // a source is loaded, the same affordance lives inside the bottom sheet's source
             // chip - showing the pill at the top would invite users to silently nuke their
             // selection by tapping the other tab.
-            if (!state.isLoaded) {
+            if (!state.isLoaded && BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED) {
                 ImportMethodSelector(
                     selectedMethod = state.selectedMethod,
                     onChange = vm::setImportMethod,

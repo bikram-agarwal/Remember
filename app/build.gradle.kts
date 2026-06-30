@@ -134,6 +134,7 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
             buildConfigField("Boolean", "SHOW_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "true")
             buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
             buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
@@ -144,6 +145,7 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
             buildConfigField("Boolean", "SHOW_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "false")
             buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
             buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
@@ -153,6 +155,7 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
             buildConfigField("Boolean", "SHOW_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
+            buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "true")
             buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
             buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
@@ -183,11 +186,24 @@ extensions.configure<ApplicationExtension>("android") {
         getByName("androidTest") {
             assets.directories.add("$projectDir/schemas")
         }
+        getByName("github") {
+            java.directories.add("src/nonfdroid/java")
+            kotlin.directories.add("src/nonfdroid/java")
+        }
         getByName("fdroid") {
             java.directories.add("src/github/java")
             kotlin.directories.add("src/github/java")
         }
+        getByName("playstore") {
+            java.directories.add("src/nonfdroid/java")
+            kotlin.directories.add("src/nonfdroid/java")
+        }
     }
+}
+
+val googleTasksGmsDependencies = file("google-tasks-gms.gradle.kts")
+if (googleTasksGmsDependencies.isFile) {
+    apply(from = googleTasksGmsDependencies)
 }
 
 room {
@@ -272,12 +288,6 @@ dependencies {
     implementation(libs.coil.compose)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.documentfile)
-    // Google account picker + OAuth token mint for Google Tasks import.
-    // play-services-auth provides Identity Services (modern picker + Authorization API).
-    // androidx.credentials provides clearCredentialState() for explicit Disconnect cleanup.
-    implementation(libs.play.services.auth)
-    implementation(libs.androidx.credentials)
-    implementation(libs.androidx.credentials.play.services.auth)
     implementation(libs.androidx.profileinstaller)
     implementation(libs.androidx.splashscreen)
     debugImplementation(libs.androidx.ui.tooling)
