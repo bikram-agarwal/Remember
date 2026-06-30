@@ -1,8 +1,11 @@
-## v1.1.5: Snooze improvements
+## v1.1.6: Snooze improvements
 
 ### 🐛 Bug Fixes
 - **Preserve Recurring Schedules:** Snoozing a recurring reminder no longer overwrites its original baseline time with the snooze time.
 - **Snooze Status Visibility:** Added a dedicated indicator to the reminder row and sheet to show exactly when a snoozed alert is pending.
+
+### 📦 Others
+- First F-Droid version in release.
 
 ---
 

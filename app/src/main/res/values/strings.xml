@@ -7,6 +7,7 @@
     <string name="app_version_format">%1$s v%2$s</string>
     <string name="about_build_variant_format">%1$s, %2$s</string>
     <string name="build_flavor_github">GitHub</string>
+    <string name="build_flavor_fdroid">F-Droid</string>
     <string name="build_flavor_playstore">PlayStore</string>
     <string name="build_type_debug">Debug</string>
     <string name="build_type_dev_release">devRelease</string>
@@ -937,6 +938,7 @@
     <string name="settings_changelog_previous">Previous</string>
     <string name="settings_changelog_next">Next</string>
     <string name="settings_changelog_page_indicator">%1$d of %2$d</string>
+    <string name="settings_open_fdroid">Open F-Droid</string>
     <string name="settings_download_install">Download update (v%1$s)</string>
     <string name="settings_downloading">Downloading…</string>
     <string name="settings_downloading_percent">Downloading %1$d%%</string>
@@ -979,8 +981,8 @@
     <string name="settings_about_remember_privacy_url" translatable="false">https://bikram-agarwal.github.io/remember/privacy/</string>
     <string name="settings_about_remember_terms_url" translatable="false">https://bikram-agarwal.github.io/remember/terms/</string>
     <string name="settings_about_filepipe_play_store_url" translatable="false">https://play.google.com/store/apps/details?id=dev.bikram.filepipe</string>
-    <string name="settings_about_filepipe_github_url" translatable="false">https://github.com/bikram-agarwal/filepipe/releases/latest</string>
-    <string name="settings_about_obtainx_github_url" translatable="false">https://github.com/bikram-agarwal/ObtainX/releases/latest</string>
+    <string name="settings_about_filepipe_website_url" translatable="false">https://bikram-agarwal.github.io/filepipe</string>
+    <string name="settings_about_obtainx_website_url" translatable="false">https://bikram-agarwal.github.io/obtainx</string>
     <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
 
     <!-- Developer options -->

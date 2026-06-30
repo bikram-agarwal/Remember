@@ -8,6 +8,14 @@ You're clearing your notification shade — swiping away emails, messages, news 
 
 If a reminder notification gets swiped away without being marked Done, Remember brings it back. Not as nagging — just a quiet signal that something is still waiting. Mark it done and it's gone for good.
 
+## 📦 Downloads
+
+[<img src="app/src/main/res/drawable-nodpi/badge_playstore.png" alt="Get Remember on Play Store" height="80">](https://play.google.com/store/apps/details?id=dev.bikram.remember)
+[<img src="app/src/main/res/drawable-nodpi/badge_github.png" alt="Get Remember on GitHub" height="80">](https://github.com/bikram-agarwal/Remember/releases/latest)
+<!-- Coming soon. Placeholder code.
+[<img src="app/src/main/res/drawable-nodpi/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.remember)
+-->
+
 ## ✨ Features
 
 ### ⏰ Reminders that actually work
@@ -114,12 +122,22 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 </tr>
 </table>
 
----
+<table>
+<tr>
+<td width="50%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tablet_1_home.jpg" alt="Home Page: All notes, sorted the way you choose" width="450" /><br />
+</td>
+<td width="50%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tablet_2_actions.jpg" alt="Act on reminders directly from the notification" width="450" /><br />
+</td>
+</tr>
 
-## 📥 Download / links
-
-- [**Play Store**](https://play.google.com/store/apps/details?id=dev.bikram.remember)
-- [**GitHub**](https://github.com/bikram-agarwal/Remember/releases/latest) 
-
-- [Project site](https://bikram-agarwal.github.io/remember/)
-- [Privacy policy](https://bikram-agarwal.github.io/remember/privacy)
+<tr>
+<td width="50%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tablet_4_reminders.jpg" alt="Extensive flexibility in setting recurring reminders" width="450" /><br />
+</td>
+<td width="50%" align="center" valign="top">
+<img src="fastlane/metadata/android/en-US/images/phoneScreenshots/tablet_5_settings.jpg" alt="Extensive theming options. Make it your own." width="450" /><br />
+</td>
+</tr>
+</table>

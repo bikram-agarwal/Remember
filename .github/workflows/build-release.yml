@@ -1,10 +1,10 @@
 # Manual-only release build (workflow_dispatch). No push/tag triggers.
 #
 # - Git tag: creates v{versionName} from app/build.gradle.kts at the workflow commit (github.sha).
-# - Build target (workflow input build_target):
-#     - github: remember-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
-#     - playstore: remember-v{version}-playstore.aab (Play Store upload; playstore distribution flavor)
-#     - both: builds and uploads both artifacts
+# - Build toggles:
+#     - build_github: remember-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
+#     - build_fdroid: remember-v{version}-fdroid.apk   (F-Droid distribution flavor)
+#     - build_playstore: remember-v{version}-playstore.aab (Play Store upload; playstore distribution flavor)
 # - GitHub Release: always draft; publish from the Releases UI when ready.
 # - Run from any branch (e.g. main); the tagged commit is the commit that was built.
 #
@@ -21,15 +21,21 @@ name: Build and release
 on:
   workflow_dispatch:
     inputs:
-      build_target:
-        description: "Which release artifact(s) to build."
+      build_github:
+        description: "Build GitHub APK."
         required: true
-        default: both
-        type: choice
-        options:
-          - both
-          - github
-          - playstore
+        default: true
+        type: boolean
+      build_fdroid:
+        description: "Build F-Droid APK."
+        required: true
+        default: true
+        type: boolean
+      build_playstore:
+        description: "Build Play Store AAB."
+        required: true
+        default: true
+        type: boolean
       play_track:
         description: "Upload AAB + Play listing (needs PLAY_SERVICE_ACCOUNT_JSON_B64). internal / beta (open testing) / production, or none to skip."
         required: true
@@ -85,8 +91,12 @@ jobs:
       - name: Validate build target
         run: |
           set -euo pipefail
-          if [ "${{ inputs.play_track }}" != "none" ] && [ "${{ inputs.build_target }}" = "github" ]; then
-            echo "Play upload requires build_target=playstore or build_target=both."
+          if [ "${{ inputs.build_github }}" != "true" ] && [ "${{ inputs.build_fdroid }}" != "true" ] && [ "${{ inputs.build_playstore }}" != "true" ]; then
+            echo "Enable at least one build toggle."
+            exit 1
+          fi
+          if [ "${{ inputs.play_track }}" != "none" ] && [ "${{ inputs.build_playstore }}" != "true" ]; then
+            echo "Play upload requires build_playstore=true."
             exit 1
           fi
 
@@ -117,21 +127,17 @@ jobs:
       - name: Build selected release artifacts
         run: |
           set -euo pipefail
-          case "${{ inputs.build_target }}" in
-            github)
-              ./gradlew :app:assembleGithubRelease --no-configuration-cache
-              ;;
-            playstore)
-              ./gradlew :app:bundlePlaystoreRelease --no-configuration-cache
-              ;;
-            both)
-              ./gradlew :app:assembleGithubRelease :app:bundlePlaystoreRelease --no-configuration-cache
-              ;;
-            *)
-              echo "Unexpected build_target"
-              exit 1
-              ;;
-          esac
+          gradle_tasks=()
+          if [ "${{ inputs.build_github }}" = "true" ]; then
+            gradle_tasks+=(":app:assembleGithubRelease")
+          fi
+          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
+            gradle_tasks+=(":app:assembleFdroidRelease")
+          fi
+          if [ "${{ inputs.build_playstore }}" = "true" ]; then
+            gradle_tasks+=(":app:bundlePlaystoreRelease")
+          fi
+          ./gradlew "${gradle_tasks[@]}" --no-configuration-cache
 
       - name: Collect and rename release assets
         run: |
@@ -141,29 +147,35 @@ jobs:
           mkdir -p "$out"
 
           github_apk="app/build/outputs/apk/github/release/app-github-release.apk"
+          fdroid_apk="app/build/outputs/apk/fdroid/release/app-fdroid-release.apk"
           play_aab="app/build/outputs/bundle/playstoreRelease/app-playstore-release.aab"
 
-          case "${{ inputs.build_target }}" in
-            github|both)
-              if [ ! -f "$github_apk" ]; then
-                echo "Expected GitHub flavor APK not found: $github_apk"
-                find app/build/outputs/apk -name '*.apk' -print || true
-                exit 1
-              fi
-              cp "$github_apk" "$out/remember-v${version}-github.apk"
-              ;;
-          esac
+          if [ "${{ inputs.build_github }}" = "true" ]; then
+            if [ ! -f "$github_apk" ]; then
+              echo "Expected GitHub flavor APK not found: $github_apk"
+              find app/build/outputs/apk -name '*.apk' -print || true
+              exit 1
+            fi
+            cp "$github_apk" "$out/remember-v${version}-github.apk"
+          fi
 
-          case "${{ inputs.build_target }}" in
-            playstore|both)
-              if [ ! -f "$play_aab" ]; then
-                echo "Expected Play Store bundle not found: $play_aab"
-                find app/build/outputs/bundle -name '*.aab' -print || true
-                exit 1
-              fi
-              cp "$play_aab" "$out/remember-v${version}-playstore.aab"
-              ;;
-          esac
+          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
+            if [ ! -f "$fdroid_apk" ]; then
+              echo "Expected F-Droid flavor APK not found: $fdroid_apk"
+              find app/build/outputs/apk -name '*.apk' -print || true
+              exit 1
+            fi
+            cp "$fdroid_apk" "$out/remember-v${version}-fdroid.apk"
+          fi
+
+          if [ "${{ inputs.build_playstore }}" = "true" ]; then
+            if [ ! -f "$play_aab" ]; then
+              echo "Expected Play Store bundle not found: $play_aab"
+              find app/build/outputs/bundle -name '*.aab' -print || true
+              exit 1
+            fi
+            cp "$play_aab" "$out/remember-v${version}-playstore.aab"
+          fi
 
           ls -la "$out"
 

@@ -73,8 +73,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 115
-        versionName = "1.1.5"
+        versionCode = 116
+        versionName = "1.1.6"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -137,6 +137,16 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
             buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
+        create("fdroid") {
+            dimension = "distribution"
+            applicationIdSuffix = ".gh"
+            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
+            buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
+        }
         create("playstore") {
             dimension = "distribution"
             buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
@@ -158,9 +168,24 @@ extensions.configure<ApplicationExtension>("android") {
         buildConfig = true
     }
 
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
+    packaging {
+        jniLibs {
+            keepDebugSymbols += "**/libdatastore_shared_counter.so"
+        }
+    }
+
     sourceSets {
         getByName("androidTest") {
             assets.directories.add("$projectDir/schemas")
+        }
+        getByName("fdroid") {
+            java.directories.add("src/github/java")
+            kotlin.directories.add("src/github/java")
         }
     }
 }

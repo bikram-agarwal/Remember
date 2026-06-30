@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.settings
 
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -68,6 +69,23 @@ import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.pillShape
 import kotlinx.coroutines.launch
+
+private const val FILEPIPE_FDROID_PACKAGE_ID = "dev.bikram.filepipe.gh"
+private const val OBTAINX_FDROID_PACKAGE_ID = "dev.bikram.obtainx"
+
+private data class AboutAppRoute(
+    val packageId: String,
+    val portfolioUrl: String,
+    val playStoreUrl: String = "",
+) {
+    val copyUrl: String
+        get() =
+            when (BuildConfig.FLAVOR) {
+                "fdroid" -> "fdroid.app:$packageId"
+                "playstore" -> playStoreUrl.ifBlank { portfolioUrl }
+                else -> portfolioUrl
+            }
+}
 
 /**
  * Static "About" section. Includes the section header (no expand/collapse since the
@@ -197,9 +215,11 @@ private fun AboutSettingsBlock(
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
     val profileUrl = stringResource(R.string.about_author_github_profile_url)
+    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
     val buildFlavorLabel =
         when (BuildConfig.FLAVOR) {
             "github" -> stringResource(R.string.build_flavor_github)
+            "fdroid" -> stringResource(R.string.build_flavor_fdroid)
             "playstore" -> stringResource(R.string.build_flavor_playstore)
             else -> BuildConfig.FLAVOR
         }
@@ -377,7 +397,7 @@ private fun AboutSettingsBlock(
                         verticalArrangement = Arrangement.spacedBy(if (isSmallLandscape) 8.dp else 12.dp),
                         itemVerticalAlignment = Alignment.CenterVertically,
                     ) {
-                        if (BuildConfig.FLAVOR == "github") {
+                        if (useGithubLikeAboutLinks) {
                             Surface(
                                 shape = aboutPillShape,
                                 color = Color.Transparent,
@@ -570,15 +590,18 @@ private fun AboutOtherAppsAndLinks(
     copyAboutLink: (String) -> Unit,
     isSmallLandscape: Boolean,
 ) {
-    val filePipeStoreUrl =
-        stringResource(
-            if (BuildConfig.FLAVOR == "github") {
-                R.string.settings_about_filepipe_github_url
-            } else {
-                R.string.settings_about_filepipe_play_store_url
-            },
+    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
+    val filePipeRoute =
+        AboutAppRoute(
+            packageId = FILEPIPE_FDROID_PACKAGE_ID,
+            portfolioUrl = stringResource(R.string.settings_about_filepipe_website_url),
+            playStoreUrl = stringResource(R.string.settings_about_filepipe_play_store_url),
         )
-    val obtainXStoreUrl = stringResource(R.string.settings_about_obtainx_github_url)
+    val obtainXRoute =
+        AboutAppRoute(
+            packageId = OBTAINX_FDROID_PACKAGE_ID,
+            portfolioUrl = stringResource(R.string.settings_about_obtainx_website_url),
+        )
     val websiteUrl = stringResource(R.string.settings_about_remember_website_url)
     val privacyUrl = stringResource(R.string.settings_about_remember_privacy_url)
     val termsUrl = stringResource(R.string.settings_about_remember_terms_url)
@@ -595,19 +618,19 @@ private fun AboutOtherAppsAndLinks(
             iconResId = R.drawable.filepipe_logo,
             name = stringResource(R.string.settings_about_filepipe_name),
             tagline = stringResource(R.string.settings_about_filepipe_tagline),
-            url = filePipeStoreUrl,
+            route = filePipeRoute,
             accentColor = Color(0xFF5967D8),
             context = context,
             copyAboutLink = copyAboutLink,
             isSmallLandscape = isSmallLandscape,
         )
-        if (BuildConfig.FLAVOR == "github") {
+        if (useGithubLikeAboutLinks) {
             Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
             AboutAppStoreButton(
                 iconResId = R.drawable.obtainx_logo,
                 name = stringResource(R.string.settings_about_obtainx_name),
                 tagline = stringResource(R.string.settings_about_obtainx_tagline),
-                url = obtainXStoreUrl,
+                route = obtainXRoute,
                 accentColor = Color(0xFF7C55D9),
                 context = context,
                 copyAboutLink = copyAboutLink,
@@ -652,7 +675,7 @@ private fun AboutAppStoreButton(
     iconResId: Int,
     name: String,
     tagline: String,
-    url: String,
+    route: AboutAppRoute,
     accentColor: Color,
     context: Context,
     copyAboutLink: (String) -> Unit,
@@ -668,12 +691,8 @@ private fun AboutAppStoreButton(
                 .fillMaxWidth()
                 .clip(shape)
                 .tapSoundCombinedClickable(
-                    onClick = {
-                        runCatching {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-                        }
-                    },
-                    onLongClick = { copyAboutLink(url) },
+                    onClick = { openAboutAppRoute(context, route) },
+                    onLongClick = { copyAboutLink(route.copyUrl) },
                 ),
     ) {
         Row(
@@ -724,6 +743,32 @@ private fun AboutLinkSeparator() {
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
     )
+}
+
+private fun openAboutAppRoute(
+    context: Context,
+    route: AboutAppRoute,
+) {
+    when (BuildConfig.FLAVOR) {
+        "fdroid" -> {
+            val fdroidIntent =
+                Intent(Intent.ACTION_VIEW, "fdroid.app:${route.packageId}".toUri())
+            try {
+                context.startActivity(fdroidIntent)
+            } catch (_: ActivityNotFoundException) {
+                context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
+            }
+        }
+
+        "playstore" -> {
+            val targetUrl = route.playStoreUrl.ifBlank { route.portfolioUrl }
+            context.startActivity(Intent(Intent.ACTION_VIEW, targetUrl.toUri()))
+        }
+
+        else -> {
+            context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
+        }
+    }
 }
 
 @Composable

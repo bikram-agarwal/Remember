@@ -6,6 +6,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlarmManager
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -85,6 +86,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.EntryPointAccessors
@@ -516,7 +518,11 @@ fun SettingsRoute(
         updateVm.openSheetAndCheck()
     }
     val downloadUpdate = { availableUpdate: RememberUpdateInfo ->
-        updateVm.downloadOrInstall(availableUpdate, context as? ComponentActivity, playInAppUpdateLauncher)
+        if (BuildConfig.FLAVOR == "fdroid") {
+            openFdroidPackagePage(context)
+        } else {
+            updateVm.downloadOrInstall(availableUpdate, context as? ComponentActivity, playInAppUpdateLauncher)
+        }
     }
     LaunchedEffect(openSheetRequested) {
         if (openSheetRequested) {
@@ -636,6 +642,7 @@ fun SettingsRoute(
                 downloadProgress = downloadProgress,
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",
+                useFdroidUpdates = BuildConfig.FLAVOR == "fdroid",
                 usePlayInAppUpdates = BuildConfig.USE_PLAY_IN_APP_UPDATES,
                 onDownloadClick = downloadUpdate,
                 onSkipVersionClick = { updateInfo?.let { availableUpdate -> updateVm.skipVersion(availableUpdate) } },
@@ -1236,6 +1243,25 @@ private fun notificationsAppSettingsIntent(context: Context): Intent =
     Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
     }
+
+private fun openFdroidPackagePage(context: Context) {
+    val fdroidIntent =
+        Intent(Intent.ACTION_VIEW, "fdroid.app:${context.packageName}".toUri()).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    try {
+        context.startActivity(fdroidIntent)
+    } catch (_: ActivityNotFoundException) {
+        val webIntent =
+            Intent(
+                Intent.ACTION_VIEW,
+                "https://f-droid.org/packages/${context.packageName}/".toUri(),
+            ).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        context.startActivity(webIntent)
+    }
+}
 
 private val settingsSectionScrollIndex =
     mapOf(

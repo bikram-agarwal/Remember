@@ -75,6 +75,7 @@ internal fun UpdateCheckBottomSheetContent(
     downloadProgress: Float?,
     changelogState: ChangelogUiState,
     showGithubExtraUi: Boolean,
+    useFdroidUpdates: Boolean,
     usePlayInAppUpdates: Boolean,
     onDownloadClick: (RememberUpdateInfo) -> Unit,
     onSkipVersionClick: () -> Unit,
@@ -151,10 +152,18 @@ internal fun UpdateCheckBottomSheetContent(
                         ) {
                             Text(
                                 text =
-                                    if (usePlayInAppUpdates && availableUpdate.isPlayStoreUpdateInProgress) {
-                                        stringResource(R.string.settings_update_resume_play)
-                                    } else {
-                                        stringResource(R.string.settings_download_install, availableUpdate.versionName)
+                                    when {
+                                        useFdroidUpdates -> {
+                                            stringResource(R.string.settings_open_fdroid)
+                                        }
+
+                                        usePlayInAppUpdates && availableUpdate.isPlayStoreUpdateInProgress -> {
+                                            stringResource(R.string.settings_update_resume_play)
+                                        }
+
+                                        else -> {
+                                            stringResource(R.string.settings_download_install, availableUpdate.versionName)
+                                        }
                                     },
                                 maxLines = 1,
                             )

@@ -177,6 +177,9 @@ class RememberUpdateViewModel
             playInAppUpdateLauncher: ActivityResultLauncher<IntentSenderRequest>,
         ) {
             viewModelScope.launch {
+                if (BuildConfig.FLAVOR == "fdroid") {
+                    return@launch
+                }
                 if (BuildConfig.USE_PLAY_IN_APP_UPDATES && availableUpdate.downloadUrl.isBlank()) {
                     val started = activity != null && playInAppUpdateStarter.startUpdateIfPending(activity, playInAppUpdateLauncher)
                     if (started) {

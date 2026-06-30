@@ -9,17 +9,18 @@ import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 
 /**
- * Launches the system share chooser with the app's download link: the Play listing for
- * the playstore flavor, otherwise the latest GitHub release.
+ * Launches the system share chooser with the app's active distribution link.
  */
 @Composable
 fun rememberShareAppAction(): () -> Unit {
     val context = LocalContext.current
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
+    val portfolioUrl = stringResource(R.string.settings_about_remember_website_url)
     val shareUrl =
         when {
             BuildConfig.FLAVOR == "playstore" -> playStoreListingUrl
+            BuildConfig.FLAVOR == "fdroid" || BuildConfig.FLAVOR == "github" -> portfolioUrl
             githubRepoForSourceLink.isNotEmpty() -> "https://github.com/$githubRepoForSourceLink/releases/latest"
             else -> playStoreListingUrl
         }

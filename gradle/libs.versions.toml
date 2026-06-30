@@ -80,7 +80,7 @@ coil-network = { module = "io.coil-kt.coil3:coil-network-okhttp", version.ref = 
 detekt-sarif4k = { module = "io.github.detekt.sarif4k:sarif4k", version.ref = "sarif4k" }
 detekt-sarif4k-jvm = { module = "io.github.detekt.sarif4k:sarif4k-jvm", version.ref = "sarif4k" }
 documentfile = "androidx.documentfile:documentfile:1.1.0"
-errorprone-annotations = { module = "com.google.errorprone:error_prone_annotations", version = "2.36.0" }
+errorprone-annotations = "com.google.errorprone:error_prone_annotations:2.50.0"
 hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hilt" }
 hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hilt" }
 junit4 = { module = "junit:junit", version.ref = "junit4" }

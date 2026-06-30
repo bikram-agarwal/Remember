@@ -1,11 +1,20 @@
 package dev.bikram.remember.update
 
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.data.UpdatePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.longOrNull
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -44,6 +53,7 @@ private data class GithubAsset(
 class RememberUpdateChecker
     @Inject
     constructor(
+        @param:ApplicationContext private val context: Context,
         private val updatePrefs: UpdatePrefs,
     ) {
         private val json = Json { ignoreUnknownKeys = true }
@@ -53,6 +63,9 @@ class RememberUpdateChecker
             currentVersionName: String,
         ): RememberUpdateInfo? =
             withContext(Dispatchers.IO) {
+                if (BuildConfig.FLAVOR == "fdroid") {
+                    return@withContext checkFdroidForUpdate()
+                }
                 checkGithubReleaseForUpdateBlocking(repositoryName, currentVersionName)
             }
 
@@ -107,7 +120,58 @@ class RememberUpdateChecker
                 remoteApkFileName = apkAsset.name,
                 remoteApkAssetUpdatedAt = apkAsset.updatedAt,
             )
+
+        private fun checkFdroidForUpdate(): RememberUpdateInfo? =
+            runCatching {
+                val connection =
+                    URL("https://f-droid.org/api/v1/packages/${context.packageName}").openConnection() as HttpURLConnection
+                connection.instanceFollowRedirects = true
+                connection.connectTimeout = 15_000
+                connection.readTimeout = 20_000
+                connection.setRequestProperty("Accept", "application/json")
+                val responseText =
+                    try {
+                        connection.connect()
+                        if (connection.responseCode !in 200..299) {
+                            error("F-Droid returned HTTP ${connection.responseCode}")
+                        }
+                        connection.inputStream.bufferedReader().use { reader -> reader.readText() }
+                    } finally {
+                        connection.disconnect()
+                    }
+                val packageJson = json.parseToJsonElement(responseText).jsonObject
+                val packages =
+                    (packageJson["packages"] as? JsonArray)
+                        ?: (packageJson["versions"] as? JsonArray)
+                        ?: return@runCatching null
+                val latestPackage =
+                    packages
+                        .mapNotNull { element -> element as? JsonObject }
+                        .mapNotNull { element ->
+                            val versionCode = element.longOrNull("versionCode") ?: return@mapNotNull null
+                            val versionName = (element["versionName"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+                            FdroidPackageVersion(versionCode = versionCode, versionName = versionName)
+                        }.filter { version -> version.versionCode > BuildConfig.VERSION_CODE.toLong() }
+                        .maxByOrNull { version -> version.versionCode }
+                        ?: return@runCatching null
+
+                RememberUpdateInfo(
+                    versionName = latestPackage.versionName.ifBlank { latestPackage.versionCode.toString() },
+                    downloadUrl = "",
+                    releaseNotes = "",
+                )
+            }.getOrNull()
     }
+
+private data class FdroidPackageVersion(
+    val versionCode: Long,
+    val versionName: String,
+)
+
+private fun JsonObject.longOrNull(key: String): Long? {
+    val element = this[key] as? JsonPrimitive ?: return null
+    return element.longOrNull ?: element.contentOrNull?.toLongOrNull()
+}
 
 internal fun compareGithubVersionNames(
     left: String,

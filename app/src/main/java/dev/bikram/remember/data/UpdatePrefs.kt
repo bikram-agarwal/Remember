@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import dev.bikram.remember.BuildConfig
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -18,8 +19,15 @@ enum class UpdateCheckSchedule {
     NEVER,
 }
 
+fun defaultUpdateCheckSchedule(): UpdateCheckSchedule =
+    if (BuildConfig.FLAVOR == "fdroid") {
+        UpdateCheckSchedule.NEVER
+    } else {
+        UpdateCheckSchedule.AT_APP_START
+    }
+
 data class UpdatePreferencesState(
-    val updateCheckSchedule: UpdateCheckSchedule = UpdateCheckSchedule.AT_APP_START,
+    val updateCheckSchedule: UpdateCheckSchedule = defaultUpdateCheckSchedule(),
     val notifyOnNewUpdates: Boolean = false,
     val updateLastNotifiedDedupeKey: String = "",
     val saveUpdateApkToDownloads: Boolean = false,
@@ -57,7 +65,7 @@ class UpdatePrefs(
                 updateCheckSchedule =
                     prefs[Keys.UPDATE_CHECK_SCHEDULE]
                         ?.let { raw -> runCatching { UpdateCheckSchedule.valueOf(raw) }.getOrNull() }
-                        ?: UpdateCheckSchedule.AT_APP_START,
+                        ?: defaultUpdateCheckSchedule(),
                 notifyOnNewUpdates = prefs[Keys.NOTIFY_ON_NEW_UPDATES] ?: false,
                 updateLastNotifiedDedupeKey = prefs[Keys.UPDATE_LAST_NOTIFIED_DEDUPE_KEY].orEmpty(),
                 saveUpdateApkToDownloads = prefs[Keys.SAVE_UPDATE_APK_TO_DOWNLOADS] ?: false,
@@ -164,7 +172,7 @@ class UpdatePrefs(
         return JSONObject().apply {
             put(
                 Keys.UPDATE_CHECK_SCHEDULE.name,
-                prefs[Keys.UPDATE_CHECK_SCHEDULE] ?: UpdateCheckSchedule.AT_APP_START.name,
+                prefs[Keys.UPDATE_CHECK_SCHEDULE] ?: defaultUpdateCheckSchedule().name,
             )
             put(Keys.NOTIFY_ON_NEW_UPDATES.name, prefs[Keys.NOTIFY_ON_NEW_UPDATES] ?: false)
             put(Keys.SAVE_UPDATE_APK_TO_DOWNLOADS.name, prefs[Keys.SAVE_UPDATE_APK_TO_DOWNLOADS] ?: false)
