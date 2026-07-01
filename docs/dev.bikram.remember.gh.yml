@@ -1,10 +1,7 @@
 Categories:
   - Note
-  - Notification
-  - Schedule
   - Shopping List
   - Task
-  - Writing
 License: GPL-3.0-only
 AuthorName: Bikram Agarwal
 AuthorWebSite: https://bikram-agarwal.github.io
@@ -16,19 +13,16 @@ AutoName: Remember
 
 RepoType: git
 Repo: https://github.com/bikram-agarwal/Remember.git
+Binaries: 
+  https://github.com/bikram-agarwal/Remember/releases/download/v%v/remember-v%v-fdroid.apk
 
 Builds:
   - versionName: 1.1.6
     versionCode: 116
-    commit: 3308889c4df2826503ce3f8bee17a00a80550a01
+    commit: f5637168af71a0ca9d925e5bbe5dc88567764938
+    subdir: app
     gradle:
       - fdroid
-    output: app/build/outputs/apk/fdroid/release/app-fdroid-release-unsigned.apk
-    binary: 
-      https://github.com/bikram-agarwal/Remember/releases/download/v%v/remember-v%v-fdroid.apk
-    scandelete:
-      - app/google-tasks-gms.gradle.kts
-      - app/src/nonfdroid
 
 AllowedAPKSigningKeys: 6437e8be9451bd7d02215511d3e504a88c50be72b6dd05ac4b5b87f5a205b687
 

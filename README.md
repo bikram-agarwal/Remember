@@ -64,7 +64,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 
 - **App lock** with device credential unlock, and biometric authentication. No need to create a new PIN. 
 - **Note visibility levels:** Default (full notification), Private (hides notification body), or Secret (hides everything — no widget or notification content).
-- **No account required.** Notes are stored on-device. No Remember servers, no cloud sync unless you set it up yourself.
+- **No account required.** Your notes are stored entirely locally. Zero tracking, analytics, or automated background telemetry.
 
 ### 💾 Backup and import
 
@@ -141,3 +141,14 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 </td>
 </tr>
 </table>
+
+
+## ⚖️ License & Trademark Notice
+
+The source code of this project is licensed under the GNU General Public License v3.0 (see the [LICENSE](LICENSE) file). 
+
+However, the application names "Remember", "FilePipe", and "ObtainX", along with all original branding artwork, logos, and custom launcher icons, are the exclusive intellectual property and trademarks of the author. Redistribution or modification of the source code under the GPLv3 does not grant permission to use these brand assets in derivative works. All forks must be entirely rebranded.
+
+---
+
+Made with ❤️ by Bikram Agarwal

@@ -37,4 +37,4 @@ Export your notes and settings to a backup, optionally including attached media.
 Choose Material You wallpaper colors, hand-tuned color presets, your own custom colors, palette styles, gradient backgrounds, black OLED mode, cover images, and more. Theming is deep - the app can look and feel very different from any other notes app on your phone.
 
 <b>━━ 🔒 PRIVATE BY DEFAULT ━━</b>
-Your notes are stored on your device. There are no Remember servers, no account is required, and no data leaves your phone unless you export a backup yourself.
+Your notes are stored entirely locally. Zero tracking, analytics, or automated background telemetry. No data leaves your phone without your explicit action (such as optional update checks or manually exporting a backup).
