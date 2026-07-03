@@ -123,7 +123,7 @@ fun OnboardingPermissionsScreen(
     val scheme = MaterialTheme.colorScheme
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = scheme.background,
+        color = Color.Transparent,
     ) {
         val useTwoColumns = isSmallLandscape()
         Box(
