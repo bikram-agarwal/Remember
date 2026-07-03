@@ -36,22 +36,19 @@ class MarkdownVisualTransformationTest {
     @Test
     fun unmatchedAsteriskAtEndDoesNotCorruptSubsequentParsing() {
         val styler = testMarkdownStyler()
+
         val text = styler.markdownInlineAnnotatedString("*Bold**, *italic*")
-        // "*Bold**" -> opens with *, next close single * at index 5 is followed by *, so rejected.
-        // There is no other single closing *. So it falls back to plain text.
-        // wait, let's see how our parser handles "*Bold**, *italic*"
-        // At 0: starts with "*". Valid opening? Yes.
-        // It searches for closing single *:
-        // Index 5: rejected (followed by *).
-        // Index 6: rejected (preceded by *).
-        // Index 10: preceded by space, so rejected as closing.
-        // Index 17: preceded by "c", so accepted!
-        // So it treats "Bold**, *italic" as italicized, and renders "Bold**, *italic" with italic style.
-        // This is still balanced because the opening "*" at index 0 matched the closing "*" at index 17.
-        // Now let's check "*Bold**" by itself:
+        // The single "*" at index 9 (before "italic") and the one at index 16 (after) form their
+        // own self-contained, already-closed italic span, so neither is available to the outer
+        // "*" opened at index 0. That outer opener falls back to the only remaining candidate: the
+        // glued "**" at index 5-6, using just its first "*" and leaving the second as a literal.
+        // "italic" ends up correctly italicized on its own, separate match.
+        assertEquals("Bold*, italic", text.text)
+
+        // With no later closing "*" anywhere else in the string, the same glued fallback is all
+        // that's available: "Bold" is italicized and the trailing "*" is left as a literal.
         val textSingle = styler.markdownInlineAnnotatedString("*Bold**")
-        // Since there is no other closing asterisk, it should fall back to plain text and render as "*Bold**"
-        assertEquals("*Bold**", textSingle.text)
+        assertEquals("Bold*", textSingle.text)
     }
 
     @Test
@@ -71,6 +68,48 @@ class MarkdownVisualTransformationTest {
         assertEquals("bold", styler.markdownInlineAnnotatedString("*bold*").text)
         assertEquals("bold next", styler.markdownInlineAnnotatedString("*bold* next").text)
         assertEquals("code next", styler.markdownInlineAnnotatedString("`code` next").text)
+    }
+
+    @Test
+    fun nestedFormattingResolvesCorrectly() {
+        val styler = testMarkdownStyler()
+
+        val text = styler.markdownInlineAnnotatedString("**bold and *italic bold***")
+        assertEquals("bold and italic bold", text.text)
+
+        assertTrue(
+            text.spanStyles.any { spanRange ->
+                spanRange.start == 0 && spanRange.end == 20 && spanRange.item.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
+            },
+        )
+
+        assertTrue(
+            text.spanStyles.any { spanRange ->
+                spanRange.start == 9 && spanRange.end == 20 && spanRange.item.fontStyle == androidx.compose.ui.text.font.FontStyle.Italic
+            },
+        )
+    }
+
+    @Test
+    fun unclosedEmphasisDoesNotBleedToLaterSentences() {
+        val styler = testMarkdownStyler()
+
+        val text = styler.markdownInlineAnnotatedString("This is *italic. And now **bold**")
+        assertEquals("This is *italic. And now bold", text.text)
+
+        // The first '*' should not be treated as italic formatting since it is unclosed.
+        assertTrue(
+            text.spanStyles.none { spanRange ->
+                spanRange.item.fontStyle == androidx.compose.ui.text.font.FontStyle.Italic
+            },
+        )
+
+        // The "**bold**" section should still be properly styled as bold.
+        assertTrue(
+            text.spanStyles.any { spanRange ->
+                spanRange.start == 25 && spanRange.end == 29 && spanRange.item.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold
+            },
+        )
     }
 
     @Test
@@ -98,6 +137,60 @@ class MarkdownVisualTransformationTest {
         assertTrue(text.getLinkAnnotations(start = 0, end = text.length).isEmpty())
         assertTrue(text.spanStyles.any { spanRange -> spanRange.start == 0 && spanRange.end == 4 })
     }
+
+    @Test
+    fun largePlainTextPasteDoesNotDegradeToQuadraticTime() {
+        // Regression test for an ANR: close-marker searches (backtick/underline/strike/bold-
+        // italic/bold/italic) were computed unconditionally on every character before checking
+        // whether the character was even a plausible opening marker, turning a plain-text paste
+        // with no markdown syntax into an O(n^2) scan. 80k characters (roughly a 12k-word paste)
+        // should still complete in well under a second on a normal machine; the old O(n^2)
+        // behavior would take tens of seconds or more at this size.
+        val largePlainText = "The quick brown fox jumps over the lazy dog. ".repeat(2000)
+        val styler = testMarkdownStyler()
+
+        val liveEditDuration =
+            measureElapsedMillis {
+                MarkdownVisualTransformation(styler).filter(AnnotatedString(largePlainText))
+            }
+        val viewModeDuration =
+            measureElapsedMillis {
+                styler.markdownInlineAnnotatedString(largePlainText)
+            }
+
+        assertTrue("Live-preview transform took ${liveEditDuration}ms, expected well under 2000ms", liveEditDuration < 2000)
+        assertTrue("View-mode render took ${viewModeDuration}ms, expected well under 2000ms", viewModeDuration < 2000)
+    }
+
+    @Test
+    fun manyBoldSpansDoNotDegradeToQuadraticTime() {
+        // Regression test for a second ANR: indexOfMarkdownClosingMarker's nested-emphasis
+        // resolution rebuilt its opener stack from scratch (rescanning from the search's start
+        // index) for every asterisk-run candidate, which is O(n) per candidate. A note with many
+        // bold/italic spans — completely ordinary usage, not just a giant plain-text paste — could
+        // have many candidates, making the whole scan O(n^2). 2000 short bold spans should still
+        // complete in well under a second.
+        val manyBoldSpans = "word **bold** ".repeat(2000)
+        val styler = testMarkdownStyler()
+
+        val liveEditDuration =
+            measureElapsedMillis {
+                MarkdownVisualTransformation(styler).filter(AnnotatedString(manyBoldSpans))
+            }
+        val viewModeDuration =
+            measureElapsedMillis {
+                styler.markdownInlineAnnotatedString(manyBoldSpans)
+            }
+
+        assertTrue("Live-preview transform took ${liveEditDuration}ms, expected well under 2000ms", liveEditDuration < 2000)
+        assertTrue("View-mode render took ${viewModeDuration}ms, expected well under 2000ms", viewModeDuration < 2000)
+    }
+}
+
+private fun measureElapsedMillis(block: () -> Unit): Long {
+    val start = System.currentTimeMillis()
+    block()
+    return System.currentTimeMillis() - start
 }
 
 private fun testMarkdownStyler(): MarkdownStyler =

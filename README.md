@@ -11,10 +11,8 @@ If a reminder notification gets swiped away without being marked Done, Remember 
 ## 📦 Downloads
 
 [<img src="app/src/main/res/drawable-nodpi/badge_playstore.png" alt="Get Remember on Play Store" height="80">](https://play.google.com/store/apps/details?id=dev.bikram.remember)
+[<img src="app/src/main/res/drawable-nodpi/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.remember.gh)
 [<img src="app/src/main/res/drawable-nodpi/badge_github.png" alt="Get Remember on GitHub" height="80">](https://github.com/bikram-agarwal/Remember/releases/latest)
-<!-- Coming soon. Placeholder code.
-[<img src="app/src/main/res/drawable-nodpi/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.remember)
--->
 
 ## ✨ Features
 

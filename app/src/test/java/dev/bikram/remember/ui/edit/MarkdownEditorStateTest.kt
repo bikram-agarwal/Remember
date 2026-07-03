@@ -94,6 +94,56 @@ class MarkdownEditorStateTest {
     }
 
     @Test
+    fun boldToggledOffRightAfterTypedTextStepsOverExistingCloseMarkerInsteadOfInsertingNewOne() {
+        val state = MarkdownEditorState("New ")
+        state.toggleBold()
+        state.update(TextFieldValue("New **bold line**", selection = TextRange(15)))
+
+        state.toggleBold()
+
+        assertEquals("New **bold line**", state.markdown)
+        assertEquals(TextRange(17), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun boldToggledOffAfterTrailingSpaceRelocatesCloseMarkerBeforeTheSpace() {
+        val state = MarkdownEditorState("New ")
+        state.toggleBold()
+        state.update(TextFieldValue("New **bold line **", selection = TextRange(16)))
+
+        state.toggleBold()
+
+        assertEquals("New **bold line** ", state.markdown)
+        assertEquals(TextRange(18), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun boldToggledOffAfterTrailingSpaceThenMoreTypingProducesWellFormedMarkdown() {
+        val state = MarkdownEditorState("New ")
+        state.toggleBold()
+        state.update(TextFieldValue("New **bold line **", selection = TextRange(16)))
+        state.toggleBold()
+
+        state.update(TextFieldValue("New **bold line** stops", selection = TextRange(23)))
+
+        assertEquals("New **bold line** stops", state.markdown)
+    }
+
+    @Test
+    fun boldToggledOffThenEnterThenMoreTextDoesNotLeaveStrayMarkersOnEitherLine() {
+        val state = MarkdownEditorState("# highlights\nNew ")
+
+        state.toggleBold()
+        state.update(TextFieldValue("# highlights\nNew **bold line**", selection = TextRange(28)))
+        state.toggleBold()
+        state.update(TextFieldValue("# highlights\nNew **bold line** stops", selection = TextRange(36)))
+        state.update(TextFieldValue("# highlights\nNew **bold line** stops\n", selection = TextRange(37)))
+        state.update(TextFieldValue("# highlights\nNew **bold line** stops\nNext line", selection = TextRange(46)))
+
+        assertEquals("# highlights\nNew **bold line** stops\nNext line", state.markdown)
+    }
+
+    @Test
     fun emptyBoldAtSentenceStartRequestsCapitalizedKeyboard() {
         val state = MarkdownEditorState()
 
@@ -110,6 +160,28 @@ class MarkdownEditorStateTest {
         state.toggleBold()
 
         assertEquals(false, state.shouldCapitalizeNextInputInEmptyInlineWrapper)
+    }
+
+    @Test
+    fun typingInsideEmptyBoldAtSentenceStartCapitalizesFirstLetterWithoutKeyboardOptionsChanging() {
+        val state = MarkdownEditorState()
+        state.toggleBold()
+
+        state.update(TextFieldValue("**a**", selection = TextRange(3)))
+
+        assertEquals("**A**", state.markdown)
+        assertEquals(TextRange(3), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun typingInsideEmptyBoldAfterExistingWordDoesNotForceCapitalization() {
+        val state = MarkdownEditorState("hello ")
+        state.update(TextFieldValue("hello ", selection = TextRange(6)))
+        state.toggleBold()
+
+        state.update(TextFieldValue("hello **a**", selection = TextRange(9)))
+
+        assertEquals("hello **a**", state.markdown)
     }
 
     @Test
@@ -262,6 +334,19 @@ class MarkdownEditorStateTest {
 
         assertEquals("<u>test</u>", state.markdown)
         assertEquals(TextRange(3, 7), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun surroundSelectionAdjustsBoundariesToPreventInterleavedTags() {
+        // Selection includes closing "**" of bold tag but not opening "**"
+        // "**test**" selected as "test**" (indices 2 to 8)
+        val state = MarkdownEditorState("**test**")
+        state.update(TextFieldValue("**test**", selection = TextRange(2, 8)))
+
+        state.toggleUnderline()
+
+        assertEquals("**<u>test</u>**", state.markdown)
+        assertEquals(TextRange(5, 9), state.textFieldValue.selection)
     }
 
     @Test

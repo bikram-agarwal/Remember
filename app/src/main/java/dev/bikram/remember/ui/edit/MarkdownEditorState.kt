@@ -7,6 +7,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.bikram.remember.ui.common.indexOfMarkdownClosingMarker
+import dev.bikram.remember.ui.common.isValidOpening
 import kotlin.math.max
 import kotlin.math.min
 
@@ -140,17 +142,49 @@ internal class MarkdownEditorState(
         cleanUpEmptyMarkdownWrappers: Boolean = true,
     ) {
         val previousValue = textFieldValue
+        // Read before textFieldValue is reassigned below: reflects whether the cursor sat inside
+        // an empty wrapper/heading prefix at a sentence start *before* this keystroke landed.
+        val shouldCapitalizeNext = shouldCapitalizeNextInputInEmptyInlineWrapper
         val newlineAdjustedValue =
             value.withInlineWrapperEnterAdjusted(previousValue = previousValue)
         val updatedValue =
             newlineAdjustedValue.withListContinuationApplied(previousValue = previousValue)
-        textFieldValue =
+        val cleanedValue =
             if (cleanUpEmptyMarkdownWrappers && updatedValue == newlineAdjustedValue) {
                 updatedValue.withEmptyMarkdownWrapperRemoved(previousValue = previousValue)
             } else {
                 updatedValue
             }
+        textFieldValue =
+            cleanedValue.withAutoCapitalizedSingleCharacterInsertion(
+                previousValue = previousValue,
+                shouldCapitalize = shouldCapitalizeNext,
+            )
         selectionRevision++
+    }
+
+    // Compensates for keeping the IME's keyboardOptions.capitalization permanently fixed at
+    // Sentences (see MarkdownTextEditor): switching that value at runtime forces Compose to
+    // renegotiate the IME session, which is what caused the keyboard to visibly hide/reshow every
+    // time typing began inside an empty bold/italic/heading marker at a sentence start. Doing the
+    // capitalization ourselves, on the actual inserted character, avoids touching keyboardOptions
+    // at all.
+    private fun TextFieldValue.withAutoCapitalizedSingleCharacterInsertion(
+        previousValue: TextFieldValue,
+        shouldCapitalize: Boolean,
+    ): TextFieldValue {
+        if (!shouldCapitalize || !previousValue.selection.collapsed || !selection.collapsed) {
+            return this
+        }
+        val insertionIndex = previousValue.selection.start
+        if (text.length != previousValue.text.length + 1 || selection.start != insertionIndex + 1) {
+            return this
+        }
+        val insertedChar = text.getOrNull(insertionIndex) ?: return this
+        if (!insertedChar.isLowerCase()) {
+            return this
+        }
+        return copy(text = text.replaceRange(insertionIndex, insertionIndex + 1, insertedChar.uppercase()))
     }
 
     fun setMarkdown(
@@ -338,8 +372,11 @@ internal class MarkdownEditorState(
         close: String,
     ) {
         val selection = textFieldValue.selection
-        val start = selection.min.coerceIn(0, markdown.length)
-        val end = selection.max.coerceIn(start, markdown.length)
+        val rawStart = selection.min.coerceIn(0, markdown.length)
+        val rawEnd = selection.max.coerceIn(rawStart, markdown.length)
+        val adjustedRange = adjustSelectionBoundaries(rawStart, rawEnd)
+        val start = adjustedRange.start
+        val end = adjustedRange.end
         val externalWrapper = externalWrapperRange(start = start, end = end, open = open, close = close)
         if (externalWrapper != null) {
             val updatedText =
@@ -353,6 +390,28 @@ internal class MarkdownEditorState(
                 )
             selectionRevision++
             return
+        }
+
+        // Cursor sits right before this wrapper's own close marker (e.g. toggling Bold off right
+        // after typing the bolded text) — reuse the existing marker instead of inserting a
+        // redundant one, which would otherwise leave a broken run of markers behind. If the
+        // wrapped content ends in whitespace, relocate the marker to just before it: a close
+        // marker preceded by whitespace isn't recognized as a valid close by the renderer (see
+        // indexOfMarkdownClosingMarker), so leaving it there would silently fall back to raw text.
+        if (start == end && markdown.startsWith(close, start)) {
+            val lineStart = markdown.lineStartBefore(start)
+            val lineBeforeCursor = markdown.substring(lineStart, start)
+            if (lineBeforeCursor.contains(open)) {
+                val contentEnd = start - (lineBeforeCursor.length - lineBeforeCursor.trimEnd().length)
+                val updatedText =
+                    markdown.substring(0, contentEnd) +
+                        close +
+                        markdown.substring(contentEnd, start) +
+                        markdown.substring(start + close.length)
+                textFieldValue = TextFieldValue(updatedText, selection = TextRange(start + close.length))
+                selectionRevision++
+                return
+            }
         }
 
         val selectedText = markdown.substring(start, end)
@@ -1021,6 +1080,107 @@ internal class MarkdownEditorState(
         }
 
         return updatedText
+    }
+
+    private fun adjustSelectionBoundaries(
+        start: Int,
+        end: Int,
+    ): TextRange {
+        val spans = mutableListOf<MarkdownWrapperRange>()
+        collectFormatSpans(markdown, 0, markdown.length, spans)
+
+        var adjustedStart = start
+        var adjustedEnd = end
+
+        for (span in spans) {
+            val openInside = span.openStart >= adjustedStart && span.openEnd <= adjustedEnd
+            val closeInside = span.closeStart >= adjustedStart && span.closeEnd <= adjustedEnd
+
+            if (closeInside && !openInside) {
+                adjustedEnd = minOf(adjustedEnd, span.closeStart)
+            } else if (openInside && !closeInside) {
+                adjustedStart = maxOf(adjustedStart, span.openEnd)
+            }
+        }
+
+        return TextRange(adjustedStart, maxOf(adjustedStart, adjustedEnd))
+    }
+
+    private fun collectFormatSpans(
+        text: String,
+        startIndex: Int,
+        endIndex: Int,
+        spans: MutableList<MarkdownWrapperRange>,
+    ) {
+        var currentIndex = startIndex
+        while (currentIndex < endIndex) {
+            val linkMatch = MarkdownLinkRegex.find(text, currentIndex)
+            if (linkMatch != null && linkMatch.range.first == currentIndex && linkMatch.range.last < endIndex) {
+                currentIndex = linkMatch.range.last + 1
+                continue
+            }
+
+            if (text.startsWith("`", currentIndex) && text.isValidOpening(currentIndex, 1)) {
+                val close = text.indexOfMarkdownClosingMarker("`", currentIndex + 1)
+                if (close in (currentIndex + 1)..<endIndex) {
+                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 1, close, close + 1))
+                    currentIndex = close + 1
+                    continue
+                }
+            }
+
+            if (text.startsWith("<u>", currentIndex, ignoreCase = true)) {
+                val close = text.indexOf("</u>", currentIndex + 3, ignoreCase = true)
+                if (close in (currentIndex + 3)..<endIndex) {
+                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 3, close, close + 4))
+                    collectFormatSpans(text, currentIndex + 3, close, spans)
+                    currentIndex = close + 4
+                    continue
+                }
+            }
+
+            if (text.startsWith("~~", currentIndex) && text.isValidOpening(currentIndex, 2)) {
+                val close = text.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
+                if (close in (currentIndex + 2)..<endIndex) {
+                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 2, close, close + 2))
+                    collectFormatSpans(text, currentIndex + 2, close, spans)
+                    currentIndex = close + 2
+                    continue
+                }
+            }
+
+            if (text.startsWith("***", currentIndex) && text.isValidOpening(currentIndex, 3)) {
+                val close = text.indexOfMarkdownClosingMarker("***", currentIndex + 3)
+                if (close in (currentIndex + 3)..<endIndex) {
+                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 3, close, close + 3))
+                    collectFormatSpans(text, currentIndex + 3, close, spans)
+                    currentIndex = close + 3
+                    continue
+                }
+            }
+
+            if (text.startsWith("**", currentIndex) && text.isValidOpening(currentIndex, 2)) {
+                val close = text.indexOfMarkdownClosingMarker("**", currentIndex + 2)
+                if (close in (currentIndex + 2)..<endIndex) {
+                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 2, close, close + 2))
+                    collectFormatSpans(text, currentIndex + 2, close, spans)
+                    currentIndex = close + 2
+                    continue
+                }
+            }
+
+            if (text.startsWith("*", currentIndex) && text.isValidOpening(currentIndex, 1)) {
+                val close = text.indexOfMarkdownClosingMarker("*", currentIndex + 1)
+                if (close in (currentIndex + 1)..<endIndex) {
+                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 1, close, close + 1))
+                    collectFormatSpans(text, currentIndex + 1, close, spans)
+                    currentIndex = close + 1
+                    continue
+                }
+            }
+
+            currentIndex++
+        }
     }
 }
 
