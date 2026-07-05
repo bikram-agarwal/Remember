@@ -16,6 +16,7 @@ data class BackupPreferencesState(
     val autoExportOnChange: Boolean = false,
     val scheduledExportEnabled: Boolean = false,
     val includeMediaInBackup: Boolean = false,
+    val compressImages: Boolean = true,
 )
 
 private val Context.backupDataStore by preferencesDataStore(name = "backup_prefs")
@@ -29,6 +30,7 @@ class BackupPrefs(
         val AUTO_EXPORT_ON_CHANGE = booleanPreferencesKey("auto_export_on_change")
         val SCHEDULED_EXPORT = booleanPreferencesKey("scheduled_export_enabled")
         val INCLUDE_MEDIA = booleanPreferencesKey("include_media_in_backup")
+        val COMPRESS_IMAGES = booleanPreferencesKey("compress_images")
     }
 
     val state: Flow<BackupPreferencesState> =
@@ -39,6 +41,7 @@ class BackupPrefs(
                 autoExportOnChange = prefs[Keys.AUTO_EXPORT_ON_CHANGE] ?: false,
                 scheduledExportEnabled = prefs[Keys.SCHEDULED_EXPORT] ?: false,
                 includeMediaInBackup = prefs[Keys.INCLUDE_MEDIA] ?: false,
+                compressImages = prefs[Keys.COMPRESS_IMAGES] ?: true,
             )
         }
 
@@ -64,6 +67,10 @@ class BackupPrefs(
         context.backupDataStore.edit { it[Keys.INCLUDE_MEDIA] = enabled }
     }
 
+    suspend fun setCompressImages(enabled: Boolean) {
+        context.backupDataStore.edit { it[Keys.COMPRESS_IMAGES] = enabled }
+    }
+
     suspend fun exportForBackup(): JSONObject {
         val prefs = context.backupDataStore.data.first()
         return JSONObject().apply {
@@ -72,6 +79,7 @@ class BackupPrefs(
             put(Keys.AUTO_EXPORT_ON_CHANGE.name, prefs[Keys.AUTO_EXPORT_ON_CHANGE] ?: false)
             put(Keys.SCHEDULED_EXPORT.name, prefs[Keys.SCHEDULED_EXPORT] ?: false)
             put(Keys.INCLUDE_MEDIA.name, prefs[Keys.INCLUDE_MEDIA] ?: false)
+            put(Keys.COMPRESS_IMAGES.name, prefs[Keys.COMPRESS_IMAGES] ?: true)
         }
     }
 
@@ -96,6 +104,9 @@ class BackupPrefs(
             }
             if (json.has(Keys.INCLUDE_MEDIA.name) && !json.isNull(Keys.INCLUDE_MEDIA.name)) {
                 mutable[Keys.INCLUDE_MEDIA] = json.getBoolean(Keys.INCLUDE_MEDIA.name)
+            }
+            if (json.has(Keys.COMPRESS_IMAGES.name) && !json.isNull(Keys.COMPRESS_IMAGES.name)) {
+                mutable[Keys.COMPRESS_IMAGES] = json.getBoolean(Keys.COMPRESS_IMAGES.name)
             }
         }
     }

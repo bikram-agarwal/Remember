@@ -182,6 +182,22 @@ internal fun BackupSection(
         }
         GroupedListItem(position = GroupPosition.MIDDLE) {
             BackupFolderSettingsToggleItem(
+                title = stringResource(R.string.settings_compress_images),
+                subtitle = stringResource(R.string.settings_compress_images_hint),
+                infoTooltipText = stringResource(R.string.settings_compress_images_tooltip),
+                infoContentDescription = stringResource(R.string.settings_compress_images_info_cd),
+                checked = backupState.compressImages,
+                switchEnabled = true,
+                onDisabledInteraction = null,
+                onCheckedChange = { enabled ->
+                    scope.launch {
+                        backupPrefs.setCompressImages(enabled)
+                    }
+                },
+            )
+        }
+        GroupedListItem(position = GroupPosition.MIDDLE) {
+            BackupFolderSettingsToggleItem(
                 title = stringResource(R.string.settings_auto_export_on_change),
                 subtitle = stringResource(R.string.settings_auto_export_on_change_hint),
                 checked = backupState.autoExportOnChange,
