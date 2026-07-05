@@ -104,6 +104,7 @@ class MainActivity : FragmentActivity() {
         )
         handleIntent(intent)
         applicationScope.launch { themePrefs.migrateLegacyColorSourceIfNeeded() }
+        applicationScope.launch { openSettingsUpdatesIfAppWasUpdated() }
         setContent {
             val themeState by themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
@@ -187,6 +188,17 @@ class MainActivity : FragmentActivity() {
                 if (openId > 0L) pendingLaunch.value = LaunchAction.OpenNote(openId, exitOnBack)
             }
         }
+    }
+
+    /** First launch after an update (fresh installs are not announced): auto-opens the update sheet with the changelog. */
+    private suspend fun openSettingsUpdatesIfAppWasUpdated() {
+        val lastSeenVersion = updatePrefs.getLastSeenAppVersion()
+        val currentVersion = BuildConfig.VERSION_NAME
+        val wasUpdated = !lastSeenVersion.isNullOrBlank() && lastSeenVersion != currentVersion
+        if (wasUpdated && BuildConfig.SHOW_UPDATES) {
+            pendingLaunch.value = LaunchAction.OpenSettingsUpdates
+        }
+        updatePrefs.setLastSeenAppVersion(currentVersion)
     }
 }
 

@@ -54,6 +54,7 @@ class UpdatePrefs(
         val UPDATE_APK_DOWNLOADS_COPY_SUCCEEDED = booleanPreferencesKey("update_apk_downloads_copy_succeeded")
         val GITHUB_ACK_FINGERPRINT = stringPreferencesKey("github_last_acknowledged_release_fingerprint")
         val GITHUB_ACK_INSTALLED_VERSION = stringPreferencesKey("github_acknowledged_for_installed_version")
+        val LAST_SEEN_APP_VERSION = stringPreferencesKey("last_seen_app_version")
         val IN_APP_REVIEW_AUTO_NEVER_ASK_AGAIN = booleanPreferencesKey("in_app_review_auto_never_ask_again")
         val PLAY_AUTO_REVIEW_PROMPTED_FOR_LAST_UPDATE_TIME =
             longPreferencesKey("play_auto_review_prompted_for_last_update_time")
@@ -158,6 +159,15 @@ class UpdatePrefs(
         context.updateDataStore.edit { prefs ->
             prefs.remove(Keys.GITHUB_ACK_FINGERPRINT)
             prefs.remove(Keys.GITHUB_ACK_INSTALLED_VERSION)
+        }
+    }
+
+    /** Null means this install has never recorded a version, i.e. it's a fresh install. */
+    suspend fun getLastSeenAppVersion(): String? = context.updateDataStore.data.first()[Keys.LAST_SEEN_APP_VERSION]
+
+    suspend fun setLastSeenAppVersion(version: String) {
+        context.updateDataStore.edit { prefs ->
+            prefs[Keys.LAST_SEEN_APP_VERSION] = version
         }
     }
 
