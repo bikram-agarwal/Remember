@@ -380,15 +380,17 @@ abstract class BaseEditorViewModel(
         viewModelScope.launch {
             persistence.withLock {
                 val id = loadedId ?: persistNewDraftForAttachment()
-                val attachmentUri =
-                    appMediaStorage
-                        ?.copyAttachmentToPrivateStorage(
-                            noteId = id,
-                            sourceUri = uri,
-                            displayName = name,
-                            mimeType = mime,
-                        )?.uriString ?: uri.toString()
-                repository.addAttachment(id, attachmentUri, name, mime)
+                val copyResult =
+                    appMediaStorage?.copyAttachmentToPrivateStorage(
+                        noteId = id,
+                        sourceUri = uri,
+                        displayName = name,
+                        mimeType = mime,
+                    )
+                val attachmentUri = copyResult?.uriString ?: uri.toString()
+                val attachmentDisplayName = copyResult?.displayName ?: name
+                val attachmentMimeType = copyResult?.mimeType ?: mime
+                repository.addAttachment(id, attachmentUri, attachmentDisplayName, attachmentMimeType)
                 _attachments.value = repository.get(id)?.attachments ?: emptyList()
                 markDirty()
             }

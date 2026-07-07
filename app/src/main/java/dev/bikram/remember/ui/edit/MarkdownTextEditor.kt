@@ -57,6 +57,8 @@ import kotlin.math.roundToInt
 
 internal enum class MarkdownEditorDisplayMode { MarkdownCode, LivePreview }
 
+private const val LIVE_PREVIEW_DEBOUNCE_DELAY_MS = 250L
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun MarkdownTextEditor(
@@ -90,10 +92,24 @@ internal fun MarkdownTextEditor(
             }
         }
     val styler = rememberMarkdownStyler(editorTextStyle)
+
+    // For bodies at/above LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS, only refresh highlighting once
+    // typing has paused for LIVE_PREVIEW_DEBOUNCE_DELAY_MS, instead of re-parsing on every
+    // keystroke. Below the threshold this mirrors state.markdown immediately (no debounce).
+    var settledMarkdownForHighlighting by remember { mutableStateOf(state.markdown) }
+    LaunchedEffect(state.markdown) {
+        if (state.markdown.length < LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS) {
+            settledMarkdownForHighlighting = state.markdown
+        } else {
+            kotlinx.coroutines.delay(LIVE_PREVIEW_DEBOUNCE_DELAY_MS)
+            settledMarkdownForHighlighting = state.markdown
+        }
+    }
+
     val visualTransformation =
-        remember(displayMode, styler) {
+        remember(displayMode, styler, settledMarkdownForHighlighting) {
             if (displayMode == MarkdownEditorDisplayMode.LivePreview) {
-                MarkdownVisualTransformation(styler)
+                MarkdownVisualTransformation(styler, settledSource = settledMarkdownForHighlighting)
             } else {
                 VisualTransformation.None
             }
@@ -181,14 +197,14 @@ internal fun MarkdownTextEditor(
             },
             textStyle = editorTextStyle,
             visualTransformation = visualTransformation,
+            // capitalization is intentionally constant: switching it at runtime (it used to
+            // flip to Words while state.shouldCapitalizeNextInputInEmptyInlineWrapper was true)
+            // forces Compose to renegotiate the IME session, which visibly hid and reshowed the
+            // keyboard every time typing began inside an empty formatting marker at a sentence
+            // start. MarkdownEditorState.update() now capitalizes that first character itself.
             keyboardOptions =
                 KeyboardOptions(
-                    capitalization =
-                        if (state.shouldCapitalizeNextInputInEmptyInlineWrapper) {
-                            KeyboardCapitalization.Words
-                        } else {
-                            KeyboardCapitalization.Sentences
-                        },
+                    capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Default,
                 ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),

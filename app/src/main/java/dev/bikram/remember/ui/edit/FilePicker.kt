@@ -15,10 +15,18 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.FileProvider
 import dev.bikram.remember.R
+import dev.bikram.remember.data.AppMediaStorage
+import dev.bikram.remember.data.BackupPrefs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
 
@@ -40,13 +48,14 @@ fun rememberHeroImagePickThenCopy(
 ): HeroImagePickerController {
     val context = LocalContext.current
     val currentOnImageReady by rememberUpdatedState(onImageReady)
+    val scope = rememberCoroutineScope()
     val photoPickerLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.PickVisualMedia(),
         ) { picked: Uri? ->
             if (picked == null) return@rememberLauncherForActivityResult
             persistReadPermission(context, picked)
-            finalizeHeroImageToPrivateStorage(context, picked, currentOnImageReady)
+            finalizeHeroImageToPrivateStorage(context, picked, scope, currentOnImageReady)
         }
     val documentPickerLauncher =
         rememberLauncherForActivityResult(
@@ -54,7 +63,7 @@ fun rememberHeroImagePickThenCopy(
         ) { picked: Uri? ->
             if (picked == null) return@rememberLauncherForActivityResult
             persistReadPermission(context, picked)
-            finalizeHeroImageToPrivateStorage(context, picked, currentOnImageReady)
+            finalizeHeroImageToPrivateStorage(context, picked, scope, currentOnImageReady)
         }
     return remember(photoPickerLauncher, documentPickerLauncher) {
         HeroImagePickerController(
@@ -83,30 +92,46 @@ class HeroImagePickerController internal constructor(
 fun finalizeHeroImageToPrivateStorage(
     context: Context,
     sourceUri: Uri,
+    scope: CoroutineScope,
     onResult: (uriString: String, copiedPrivateFile: File?) -> Unit,
 ) {
     persistReadPermission(context, sourceUri)
     val heroesDir = File(context.filesDir, "note_heroes").apply { mkdirs() }
     val destFile = File(heroesDir, "cover_${System.currentTimeMillis()}.jpg")
-    val copyResult =
-        runCatching {
-            context.contentResolver.openInputStream(sourceUri)?.use { input ->
-                destFile.outputStream().use { output -> input.copyTo(output) }
-            } ?: throw IOException("openInputStream failed")
-        }
-    if (copyResult.isSuccess) {
-        onResult(
-            FileProvider
-                .getUriForFile(
-                    context,
-                    "${context.packageName}.fileprovider",
+    scope.launch(Dispatchers.IO) {
+        val compress = BackupPrefs(context).state.first().compressImages
+        val mimeType = context.contentResolver.getType(sourceUri)
+        val isImage = mimeType?.startsWith("image/") == true
+        val copyResult =
+            runCatching {
+                val compressed =
+                    if (compress && isImage) {
+                        AppMediaStorage.compressImage(context, sourceUri, destFile)
+                    } else {
+                        false
+                    }
+                if (!compressed) {
+                    context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                        destFile.outputStream().use { output -> input.copyTo(output) }
+                    } ?: throw IOException("openInputStream failed")
+                }
+            }
+        withContext(Dispatchers.Main) {
+            if (copyResult.isSuccess) {
+                onResult(
+                    FileProvider
+                        .getUriForFile(
+                            context,
+                            "${context.packageName}.fileprovider",
+                            destFile,
+                        ).toString(),
                     destFile,
-                ).toString(),
-            destFile,
-        )
-    } else {
-        runCatching { destFile.delete() }
-        onResult(sourceUri.toString(), null)
+                )
+            } else {
+                runCatching { destFile.delete() }
+                onResult(sourceUri.toString(), null)
+            }
+        }
     }
 }
 

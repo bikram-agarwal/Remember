@@ -1,3 +1,21 @@
+## v1.1.7: Image compression, markdown improvements
+
+### ✨ New Features
+- Added a "Compress images" setting (on by default)
+    - Downscales and compresses new photo attachments and cover photos. 
+    - Metadata like GPS location, camera details, and photo date/ratings is also removed from compressed images. 
+    - Existing photos and non-image files aren't affected,
+    - This can't be undone for a photo once it's been compressed. 
+    - Animated GIFs/WebPs are left untouched so they don't lose their animation, and a photo is only compressed if doing so actually makes it smaller.
+- On first launch after app update, the changelog sheet is automatically shown.
+
+### 🐛 Bug Fixes
+- Fixed the app freezing or lagging when pasting or typing a large amount of text into a note.
+- Improved markdown live preview and on-save render. 
+- The onboarding permissions screen background now blends with the app's theme instead of always showing a solid color.
+
+---
+
 ## v1.1.6: Snooze improvements
 
 ### 🐛 Bug Fixes

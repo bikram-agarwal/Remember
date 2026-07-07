@@ -616,10 +616,23 @@ private class MarkdownInlineInteractionBuilder(
         sourceSegment: String,
         segmentOffset: Int,
     ) {
+        // Regex.find(sourceSegment, currentIndex) rescans to the end of the segment on every
+        // fallback character, which is O(n^2) for long plain-text segments with no link syntax.
+        // Precompute matches once and consume them with a forward-only cursor instead.
+        val linkMatchIterator = MarkdownLinkRegex.findAll(sourceSegment).iterator()
+        var pendingLinkMatch = if (linkMatchIterator.hasNext()) linkMatchIterator.next() else null
+
+        fun linkMatchAt(index: Int): MatchResult? {
+            while (pendingLinkMatch != null && pendingLinkMatch!!.range.first < index) {
+                pendingLinkMatch = if (linkMatchIterator.hasNext()) linkMatchIterator.next() else null
+            }
+            return pendingLinkMatch?.takeIf { it.range.first == index }
+        }
+
         var currentIndex = 0
         while (currentIndex < sourceSegment.length) {
-            val linkMatch = MarkdownLinkRegex.find(sourceSegment, currentIndex)
-            if (linkMatch != null && linkMatch.range.first == currentIndex) {
+            val linkMatch = linkMatchAt(currentIndex)
+            if (linkMatch != null) {
                 val linkTextRange = linkMatch.groups[1]?.range
                 val visibleStart = sourceOffsets.size
                 if (linkTextRange != null) {
@@ -649,65 +662,81 @@ private class MarkdownInlineInteractionBuilder(
                 continue
             }
 
-            val inlineCodeClose = sourceSegment.indexOfMarkdownClosingMarker("`", currentIndex + 1)
-            if (sourceSegment.startsWith("`", currentIndex) && sourceSegment.isValidOpening(currentIndex, 1) && inlineCodeClose > currentIndex) {
-                appendPlainTextRange(
-                    rangeStart = currentIndex + 1,
-                    rangeEnd = inlineCodeClose,
-                    segmentOffset = segmentOffset,
-                )
-                currentIndex = inlineCodeClose + 1
-                continue
+            // Each close-marker search scans forward to the end of the segment when it finds no
+            // match. It must stay behind the cheap startsWith/isValidOpening checks — otherwise,
+            // for plain text with no markdown syntax, every character would trigger up to five
+            // full forward scans, making this whole pass O(n^2) instead of O(n).
+            if (sourceSegment.startsWith("`", currentIndex) && sourceSegment.isValidOpening(currentIndex, 1)) {
+                val inlineCodeClose = sourceSegment.indexOfMarkdownClosingMarker("`", currentIndex + 1)
+                if (inlineCodeClose > currentIndex) {
+                    appendPlainTextRange(
+                        rangeStart = currentIndex + 1,
+                        rangeEnd = inlineCodeClose,
+                        segmentOffset = segmentOffset,
+                    )
+                    currentIndex = inlineCodeClose + 1
+                    continue
+                }
             }
 
-            val underlineClose = sourceSegment.indexOf("</u>", currentIndex + 3, ignoreCase = true)
-            if (sourceSegment.startsWith("<u>", currentIndex, ignoreCase = true) && underlineClose > currentIndex) {
-                appendInlineMarkdown(
-                    sourceSegment = sourceSegment.substring(currentIndex + 3, underlineClose),
-                    segmentOffset = segmentOffset + currentIndex + 3,
-                )
-                currentIndex = underlineClose + 4
-                continue
+            if (sourceSegment.startsWith("<u>", currentIndex, ignoreCase = true)) {
+                val underlineClose = sourceSegment.indexOf("</u>", currentIndex + 3, ignoreCase = true)
+                if (underlineClose > currentIndex) {
+                    appendInlineMarkdown(
+                        sourceSegment = sourceSegment.substring(currentIndex + 3, underlineClose),
+                        segmentOffset = segmentOffset + currentIndex + 3,
+                    )
+                    currentIndex = underlineClose + 4
+                    continue
+                }
             }
 
-            val strikeClose = sourceSegment.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
-            if (sourceSegment.startsWith("~~", currentIndex) && sourceSegment.isValidOpening(currentIndex, 2) && strikeClose > currentIndex) {
-                appendInlineMarkdown(
-                    sourceSegment = sourceSegment.substring(currentIndex + 2, strikeClose),
-                    segmentOffset = segmentOffset + currentIndex + 2,
-                )
-                currentIndex = strikeClose + 2
-                continue
+            if (sourceSegment.startsWith("~~", currentIndex) && sourceSegment.isValidOpening(currentIndex, 2)) {
+                val strikeClose = sourceSegment.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
+                if (strikeClose > currentIndex) {
+                    appendInlineMarkdown(
+                        sourceSegment = sourceSegment.substring(currentIndex + 2, strikeClose),
+                        segmentOffset = segmentOffset + currentIndex + 2,
+                    )
+                    currentIndex = strikeClose + 2
+                    continue
+                }
             }
 
-            val boldItalicClose = sourceSegment.indexOfMarkdownClosingMarker("***", currentIndex + 3)
-            if (sourceSegment.startsWith("***", currentIndex) && sourceSegment.isValidOpening(currentIndex, 3) && boldItalicClose > currentIndex) {
-                appendInlineMarkdown(
-                    sourceSegment = sourceSegment.substring(currentIndex + 3, boldItalicClose),
-                    segmentOffset = segmentOffset + currentIndex + 3,
-                )
-                currentIndex = boldItalicClose + 3
-                continue
+            if (sourceSegment.startsWith("***", currentIndex) && sourceSegment.isValidOpening(currentIndex, 3)) {
+                val boldItalicClose = sourceSegment.indexOfMarkdownClosingMarker("***", currentIndex + 3)
+                if (boldItalicClose > currentIndex) {
+                    appendInlineMarkdown(
+                        sourceSegment = sourceSegment.substring(currentIndex + 3, boldItalicClose),
+                        segmentOffset = segmentOffset + currentIndex + 3,
+                    )
+                    currentIndex = boldItalicClose + 3
+                    continue
+                }
             }
 
-            val boldClose = sourceSegment.indexOfMarkdownClosingMarker("**", currentIndex + 2)
-            if (sourceSegment.startsWith("**", currentIndex) && sourceSegment.isValidOpening(currentIndex, 2) && boldClose > currentIndex) {
-                appendInlineMarkdown(
-                    sourceSegment = sourceSegment.substring(currentIndex + 2, boldClose),
-                    segmentOffset = segmentOffset + currentIndex + 2,
-                )
-                currentIndex = boldClose + 2
-                continue
+            if (sourceSegment.startsWith("**", currentIndex) && sourceSegment.isValidOpening(currentIndex, 2)) {
+                val boldClose = sourceSegment.indexOfMarkdownClosingMarker("**", currentIndex + 2)
+                if (boldClose > currentIndex) {
+                    appendInlineMarkdown(
+                        sourceSegment = sourceSegment.substring(currentIndex + 2, boldClose),
+                        segmentOffset = segmentOffset + currentIndex + 2,
+                    )
+                    currentIndex = boldClose + 2
+                    continue
+                }
             }
 
-            val italicClose = sourceSegment.indexOfMarkdownClosingMarker("*", currentIndex + 1)
-            if (sourceSegment.startsWith("*", currentIndex) && sourceSegment.isValidOpening(currentIndex, 1) && italicClose > currentIndex) {
-                appendInlineMarkdown(
-                    sourceSegment = sourceSegment.substring(currentIndex + 1, italicClose),
-                    segmentOffset = segmentOffset + currentIndex + 1,
-                )
-                currentIndex = italicClose + 1
-                continue
+            if (sourceSegment.startsWith("*", currentIndex) && sourceSegment.isValidOpening(currentIndex, 1)) {
+                val italicClose = sourceSegment.indexOfMarkdownClosingMarker("*", currentIndex + 1)
+                if (italicClose > currentIndex) {
+                    appendInlineMarkdown(
+                        sourceSegment = sourceSegment.substring(currentIndex + 1, italicClose),
+                        segmentOffset = segmentOffset + currentIndex + 1,
+                    )
+                    currentIndex = italicClose + 1
+                    continue
+                }
             }
 
             sourceOffsets.add(sourceOffsetAt(segmentOffset + currentIndex))
@@ -899,11 +928,3 @@ private fun String.withHttpScheme(): String =
     } else {
         "https://$this"
     }
-
-private fun String.isValidOpening(
-    index: Int,
-    markerLength: Int,
-): Boolean {
-    val nextChar = getOrNull(index + markerLength)
-    return nextChar != null && !nextChar.isWhitespace()
-}

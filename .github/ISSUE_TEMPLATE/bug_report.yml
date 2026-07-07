@@ -1,0 +1,85 @@
+name: Bug Report
+description: File a report for any bug you find in the app.
+title: "[BUG] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ### Prerequisites
+
+        Before submitting a bug report, please check that your issue is not part of an existing issue.
+
+        Please provide as much detail as possible to help me reproduce and troubleshoot the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "Describe the bug"
+      description: "A clear and concise description of what the bug is."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "Steps to reproduce"
+      description: "Steps to reproduce the behavior"
+      placeholder: |
+        1. Open the app
+        2. Navigate to...
+        3. Click on...
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "Expected behavior"
+      description: "A clear and concise description of what you expected to happen."
+      placeholder: "What should have happened instead?"
+    validations:
+      required: true
+
+  - type: textarea
+    id: device_info
+    attributes:
+      label: "Device information"
+      description: |
+        Please fill out the details below.
+        *Tip: Check display/font size at Android Settings -> Display -> Display size & text.*
+      value: |
+        - Device: 
+        - OS: 
+        - Display size & font size: 
+        - Remember version: 
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: "Remember logs"
+      description: |
+        Get the log file: Go to Remember settings, scroll to the bottom, tap the 🐞 bug icon at the top-right of the About section, and save that file.
+        Then attach that log file here by dragging and dropping it into this text box.
+        *Note: Bug reports without logs will be closed without further notice.*
+      placeholder: "Drag & drop or paste your log file here"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: "Checklist"
+      description: "Please confirm the following before submitting"
+      options:
+        - label: "I have searched for existing issues with this problem"
+          required: true
+        - label: "I am using the latest version of the app"
+          required: true
+        - label: "I have attached the Remember log file (retrieved from settings -> 🐞 bug icon)"
+          required: true
+        - label: "I have provided enough information to reproduce the issue"
+          required: true

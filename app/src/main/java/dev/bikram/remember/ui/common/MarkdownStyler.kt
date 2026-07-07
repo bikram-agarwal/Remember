@@ -198,10 +198,23 @@ internal class MarkdownStyler(
         source: String,
         includeLinkAnnotations: Boolean,
     ) {
+        // Regex.find(source, currentIndex) rescans to the end of the string on every fallback
+        // character, which is O(n^2) for long plain-text bodies with no link syntax. Precompute
+        // matches once and consume them with a forward-only cursor instead.
+        val linkMatchIterator = MarkdownLinkRegex.findAll(source).iterator()
+        var pendingLinkMatch = if (linkMatchIterator.hasNext()) linkMatchIterator.next() else null
+
+        fun linkMatchAt(index: Int): MatchResult? {
+            while (pendingLinkMatch != null && pendingLinkMatch!!.range.first < index) {
+                pendingLinkMatch = if (linkMatchIterator.hasNext()) linkMatchIterator.next() else null
+            }
+            return pendingLinkMatch?.takeIf { it.range.first == index }
+        }
+
         var currentIndex = 0
         while (currentIndex < source.length) {
-            val linkMatch = MarkdownLinkRegex.find(source, currentIndex)
-            if (linkMatch != null && linkMatch.range.first == currentIndex) {
+            val linkMatch = linkMatchAt(currentIndex)
+            if (linkMatch != null) {
                 val url = linkMatch.groupValues[2]
                 val appendLinkText = {
                     withStyle(linkSpanStyle) {
@@ -222,75 +235,91 @@ internal class MarkdownStyler(
                 continue
             }
 
-            val inlineCodeClose = source.indexOfMarkdownClosingMarker("`", currentIndex + 1)
-            if (source.startsWith("`", currentIndex) && source.isValidOpening(currentIndex, 1) && inlineCodeClose > currentIndex) {
-                withStyle(inlineCodeSpanStyle) {
-                    append(source.substring(currentIndex + 1, inlineCodeClose))
+            // Each close-marker search scans forward to the end of the string when it finds no
+            // match. It must stay behind the cheap startsWith/isValidOpening checks — otherwise,
+            // for plain text with no markdown syntax, every character would trigger up to five
+            // full forward scans, making this whole pass O(n^2) instead of O(n).
+            if (source.startsWith("`", currentIndex) && source.isValidOpening(currentIndex, 1)) {
+                val inlineCodeClose = source.indexOfMarkdownClosingMarker("`", currentIndex + 1)
+                if (inlineCodeClose > currentIndex) {
+                    withStyle(inlineCodeSpanStyle) {
+                        append(source.substring(currentIndex + 1, inlineCodeClose))
+                    }
+                    currentIndex = inlineCodeClose + 1
+                    continue
                 }
-                currentIndex = inlineCodeClose + 1
-                continue
             }
 
-            val underlineClose = source.indexOf("</u>", currentIndex + 3, ignoreCase = true)
-            if (source.startsWith("<u>", currentIndex, ignoreCase = true) && underlineClose > currentIndex) {
-                withStyle(underlineSpanStyle) {
-                    appendInlineMarkdown(
-                        source = source.substring(currentIndex + 3, underlineClose),
-                        includeLinkAnnotations = includeLinkAnnotations,
-                    )
-                }
-                currentIndex = underlineClose + 4
-                continue
-            }
-
-            val strikeClose = source.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
-            if (source.startsWith("~~", currentIndex) && source.isValidOpening(currentIndex, 2) && strikeClose > currentIndex) {
-                withStyle(strikethroughSpanStyle) {
-                    appendInlineMarkdown(
-                        source = source.substring(currentIndex + 2, strikeClose),
-                        includeLinkAnnotations = includeLinkAnnotations,
-                    )
-                }
-                currentIndex = strikeClose + 2
-                continue
-            }
-
-            val boldItalicClose = source.indexOfMarkdownClosingMarker("***", currentIndex + 3)
-            if (source.startsWith("***", currentIndex) && source.isValidOpening(currentIndex, 3) && boldItalicClose > currentIndex) {
-                withStyle(boldSpanStyle) {
-                    withStyle(italicSpanStyle) {
+            if (source.startsWith("<u>", currentIndex, ignoreCase = true)) {
+                val underlineClose = source.indexOf("</u>", currentIndex + 3, ignoreCase = true)
+                if (underlineClose > currentIndex) {
+                    withStyle(underlineSpanStyle) {
                         appendInlineMarkdown(
-                            source = source.substring(currentIndex + 3, boldItalicClose),
+                            source = source.substring(currentIndex + 3, underlineClose),
                             includeLinkAnnotations = includeLinkAnnotations,
                         )
                     }
+                    currentIndex = underlineClose + 4
+                    continue
                 }
-                currentIndex = boldItalicClose + 3
-                continue
             }
 
-            val boldClose = source.indexOfMarkdownClosingMarker("**", currentIndex + 2)
-            if (source.startsWith("**", currentIndex) && source.isValidOpening(currentIndex, 2) && boldClose > currentIndex) {
-                withStyle(boldSpanStyle) {
-                    appendInlineMarkdown(
-                        source = source.substring(currentIndex + 2, boldClose),
-                        includeLinkAnnotations = includeLinkAnnotations,
-                    )
+            if (source.startsWith("~~", currentIndex) && source.isValidOpening(currentIndex, 2)) {
+                val strikeClose = source.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
+                if (strikeClose > currentIndex) {
+                    withStyle(strikethroughSpanStyle) {
+                        appendInlineMarkdown(
+                            source = source.substring(currentIndex + 2, strikeClose),
+                            includeLinkAnnotations = includeLinkAnnotations,
+                        )
+                    }
+                    currentIndex = strikeClose + 2
+                    continue
                 }
-                currentIndex = boldClose + 2
-                continue
             }
 
-            val italicClose = source.indexOfMarkdownClosingMarker("*", currentIndex + 1)
-            if (source.startsWith("*", currentIndex) && source.isValidOpening(currentIndex, 1) && italicClose > currentIndex) {
-                withStyle(italicSpanStyle) {
-                    appendInlineMarkdown(
-                        source = source.substring(currentIndex + 1, italicClose),
-                        includeLinkAnnotations = includeLinkAnnotations,
-                    )
+            if (source.startsWith("***", currentIndex) && source.isValidOpening(currentIndex, 3)) {
+                val boldItalicClose = source.indexOfMarkdownClosingMarker("***", currentIndex + 3)
+                if (boldItalicClose > currentIndex) {
+                    withStyle(boldSpanStyle) {
+                        withStyle(italicSpanStyle) {
+                            appendInlineMarkdown(
+                                source = source.substring(currentIndex + 3, boldItalicClose),
+                                includeLinkAnnotations = includeLinkAnnotations,
+                            )
+                        }
+                    }
+                    currentIndex = boldItalicClose + 3
+                    continue
                 }
-                currentIndex = italicClose + 1
-                continue
+            }
+
+            if (source.startsWith("**", currentIndex) && source.isValidOpening(currentIndex, 2)) {
+                val boldClose = source.indexOfMarkdownClosingMarker("**", currentIndex + 2)
+                if (boldClose > currentIndex) {
+                    withStyle(boldSpanStyle) {
+                        appendInlineMarkdown(
+                            source = source.substring(currentIndex + 2, boldClose),
+                            includeLinkAnnotations = includeLinkAnnotations,
+                        )
+                    }
+                    currentIndex = boldClose + 2
+                    continue
+                }
+            }
+
+            if (source.startsWith("*", currentIndex) && source.isValidOpening(currentIndex, 1)) {
+                val italicClose = source.indexOfMarkdownClosingMarker("*", currentIndex + 1)
+                if (italicClose > currentIndex) {
+                    withStyle(italicSpanStyle) {
+                        appendInlineMarkdown(
+                            source = source.substring(currentIndex + 1, italicClose),
+                            includeLinkAnnotations = includeLinkAnnotations,
+                        )
+                    }
+                    currentIndex = italicClose + 1
+                    continue
+                }
             }
 
             append(source[currentIndex])
@@ -501,12 +530,4 @@ private fun String.withHttpScheme(): String {
         return this
     }
     return "https://$this"
-}
-
-private fun String.isValidOpening(
-    index: Int,
-    markerLength: Int,
-): Boolean {
-    val nextChar = getOrNull(index + markerLength)
-    return nextChar != null && !nextChar.isWhitespace()
 }

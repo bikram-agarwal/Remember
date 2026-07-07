@@ -39,6 +39,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -97,7 +99,6 @@ import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.nav.DEV_OPTIONS_SHARED_BOUNDS_KEY
@@ -1036,18 +1037,16 @@ private fun DevActionRow(
     onClick: () -> Unit,
     enabled: Boolean = true,
 ) {
-    androidx.compose.material3.ListItem(
-        headlineContent = {
-            Text(
-                label,
-                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
-            )
-        },
-        modifier = if (enabled) Modifier.tapSoundClickable(onClick = onClick) else Modifier,
-        colors =
-            androidx.compose.material3.ListItemDefaults
-                .colors(containerColor = Color.Transparent),
-    )
+    ListItem(
+        onClick = onClick,
+        enabled = enabled,
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    ) {
+        Text(
+            label,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+        )
+    }
 }
 
 private fun groupPositionFor(

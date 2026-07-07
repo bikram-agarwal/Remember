@@ -888,6 +888,10 @@
     <string name="settings_include_media_in_backup_hint">This significantly increases the backup file size</string>
     <string name="settings_include_media_in_backup_tooltip">When off, backups keep only links to images and attachments. Those files may not restore on another device.</string>
     <string name="settings_include_media_info_cd">Explain media backup</string>
+    <string name="settings_compress_images">Compress images</string>
+    <string name="settings_compress_images_hint">Downscale and compress images to save space</string>
+    <string name="settings_compress_images_tooltip">New image attachments and cover photos will be downscaled, compressed to JPEG, and stripped of metadata (like GPS location and tags) to save storage space. Existing media and non-image files are unaffected. Disabling this later cannot restore original uncompressed images.</string>
+    <string name="settings_compress_images_info_cd">Explain image compression</string>
     <string name="settings_auto_export_on_change">Auto-export on app exit</string>
     <string name="settings_auto_export_on_change_hint">Saves a full backup when you exit the app after making changes</string>
     <string name="settings_scheduled_export">Daily scheduled backup</string>
