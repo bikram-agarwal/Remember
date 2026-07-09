@@ -61,7 +61,7 @@ import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberBottomSheetState
+import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberTooltipState
@@ -120,6 +120,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberConfirmDialog
+import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
 import dev.bikram.remember.ui.components.RememberIconButton
@@ -451,20 +452,9 @@ fun ReminderPickerSheet(
     var showClearAllConfirmDialog by rememberSaveable { mutableStateOf(false) }
 
     val sheetState =
-        rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-            confirmValueChange =
-                remember {
-                    { sheetValue ->
-                        if (sheetValue == SheetValue.Hidden && currentHasChanges.value) {
-                            showUnsavedDialog = true
-                            false
-                        } else {
-                            true
-                        }
-                    }
-                },
+        rememberBottomSheetStateWithUnsavedChanges(
+            isDirty = hasChanges,
+            onShowDialog = { showUnsavedDialog = true }
         )
 
     val context = LocalContext.current
@@ -1008,17 +998,12 @@ fun ReminderPickerSheet(
         )
     }
     if (showUnsavedDialog) {
-        RememberConfirmDialog(
-            title = stringResource(R.string.reminder_editor_unsaved_title),
-            text = stringResource(R.string.reminder_editor_unsaved_body),
-            confirmLabel = stringResource(R.string.reminder_editor_unsaved_discard),
+        RememberUnsavedChangesDialog(
             onConfirm = {
                 showUnsavedDialog = false
                 onDismiss()
             },
             onDismiss = { showUnsavedDialog = false },
-            destructive = true,
-            dismissLabel = stringResource(R.string.reminder_editor_unsaved_keep_editing),
         )
     }
     if (showClearAllConfirmDialog) {

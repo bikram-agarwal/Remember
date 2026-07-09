@@ -71,7 +71,11 @@ import dev.bikram.remember.data.recycleNoteActionIconBitmap
 import dev.bikram.remember.data.toNoteActionIconDrawable
 import dev.bikram.remember.domain.formatTimeOfDay
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
+import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.runtime.rememberUpdatedState
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.TagChipFilled
@@ -882,6 +886,7 @@ private data class ChoiceOption<T>(
     val description: String,
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun BehaviorSheet(
     visibility: NoteVisibility,
@@ -891,11 +896,26 @@ private fun BehaviorSheet(
 ) {
     var draftVisibility by remember(visibility) { mutableStateOf(visibility) }
     var draftImportance by remember(importance) { mutableStateOf(importance) }
+    var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }
+
+    val hasChanges = draftVisibility != visibility || draftImportance != importance
+    val sheetState =
+        rememberBottomSheetStateWithUnsavedChanges(
+            isDirty = hasChanges,
+            onShowDialog = { showUnsavedDialog = true }
+        )
 
     AppBottomSheet(
         title = stringResource(R.string.options_behavior),
         subtitle = stringResource(R.string.options_behavior_subtitle),
-        onDismiss = onDismiss,
+        sheetState = sheetState,
+        onDismiss = {
+            if (hasChanges) {
+                showUnsavedDialog = true
+            } else {
+                onDismiss()
+            }
+        },
         actions = {
             RememberTextButton(onClick = onDismiss) {
                 Text(stringResource(R.string.common_cancel))
@@ -930,6 +950,16 @@ private fun BehaviorSheet(
                 onSelect = { draftImportance = it },
             )
         }
+    }
+
+    if (showUnsavedDialog) {
+        RememberUnsavedChangesDialog(
+            onConfirm = {
+                showUnsavedDialog = false
+                onDismiss()
+            },
+            onDismiss = { showUnsavedDialog = false },
+        )
     }
 }
 

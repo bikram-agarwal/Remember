@@ -445,10 +445,10 @@
     <string name="reminder_clear_all_confirm_body">All scheduled reminders for this note will be removed.</string>
     <string name="reminder_clear_all_confirm_action">Remove</string>
     <string name="reminder_header_index">Reminder %1$d</string>
-    <string name="reminder_editor_unsaved_title">Unsaved changes</string>
-    <string name="reminder_editor_unsaved_body">Reminder changes are not saved yet. Discard them?</string>
-    <string name="reminder_editor_unsaved_discard">Discard</string>
-    <string name="reminder_editor_unsaved_keep_editing">Keep editing</string>
+    <string name="common_unsaved_changes_title">Unsaved changes</string>
+    <string name="common_unsaved_changes_body">Unsaved changes will be lost. Discard them?</string>
+    <string name="common_unsaved_changes_discard">Discard</string>
+    <string name="common_unsaved_changes_keep_editing">Keep editing</string>
     <string name="reminder_set_title">Set reminder</string>
     <string name="reminder_exact_alarm_permission_prompt">Exact reminders require permission. Tap to enable in Settings.</string>
     <string name="reminder_notifications_required_title">Setting Reminders</string>
@@ -581,10 +581,7 @@
     <string name="tag_editor_edit_mode_cd">Edit tags</string>
     <string name="tag_editor_edit_mode_hint">Create new tag or tap a tag to change its name and color</string>
     <string name="tag_editor_assign_mode_hint">Tap a tag to change its state: (+) Assign, (x) Remove</string>
-    <string name="tag_editor_unsaved_title">Unsaved changes</string>
-    <string name="tag_editor_unsaved_body">Tag changes are not saved yet. Discard them?</string>
-    <string name="tag_editor_unsaved_discard">Discard</string>
-    <string name="tag_editor_unsaved_keep_editing">Keep editing</string>
+
 
     <!-- Note actions (sheet and editor) -->
     <string name="actions_sheet_subtitle">Add a quick action to the notification</string>

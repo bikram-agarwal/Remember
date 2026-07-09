@@ -49,7 +49,12 @@ import dev.bikram.remember.data.recycleNoteActionIconBitmap
 import dev.bikram.remember.data.toNoteActionIconData
 import dev.bikram.remember.data.toNoteActionIconDrawable
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
+import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberUpdatedState
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
@@ -79,6 +84,7 @@ private enum class ActionPickerScreen {
     PickShortcutProvider,
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActionPicker(
     current: List<NoteAction>,
@@ -89,7 +95,6 @@ fun ActionPicker(
     val packageManager = context.packageManager
     val resources = LocalResources.current
     val initialAction = remember(current) { current.firstOrNull() }
-    val hadInitialAction = initialAction != null
     var screen by remember(initialAction) {
         mutableStateOf(
             if (initialAction == null) {
@@ -115,6 +120,14 @@ fun ActionPicker(
         }
     }
 
+    var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }
+    val hasChanges = title != (initialAction?.title.orEmpty()) || details != (initialAction?.details.orEmpty()) || selectedType != initialAction?.type
+    val sheetState =
+        rememberBottomSheetStateWithUnsavedChanges(
+            isDirty = hasChanges,
+            onShowDialog = { showUnsavedDialog = true }
+        )
+
     val targetDisplayName =
         when (selectedType) {
             ActionType.OPEN_APP ->
@@ -138,9 +151,15 @@ fun ActionPicker(
                 ActionType.SEND_MESSAGE,
                 ActionType.SEND_EMAIL,
                 -> targetIcon
+                ActionType.GET_DIRECTIONS -> null
+                ActionType.OPEN_LINK -> null
                 ActionType.OPEN_APP -> targetIcon ?: appIcon(packageManager, details)
                 ActionType.OPEN_SHORTCUT -> targetIcon ?: savedShortcutIcon ?: shortcutFallbackIcon(packageManager, details)
-                else -> null
+                ActionType.COPY_TO_CLIPBOARD -> null
+                ActionType.SHARE_CONTENT -> null
+                ActionType.MARK_AS_DONE -> null
+                ActionType.SNOOZE -> null
+                null -> null
             }
         }
 
@@ -252,7 +271,14 @@ fun ActionPicker(
     AppBottomSheet(
         title = stringResource(R.string.options_actions),
         subtitle = if (screen == ActionPickerScreen.ChooseType) stringResource(R.string.actions_sheet_subtitle) else null,
-        onDismiss = onDismiss,
+        sheetState = sheetState,
+        onDismiss = {
+            if (hasChanges) {
+                showUnsavedDialog = true
+            } else {
+                onDismiss()
+            }
+        },
         scrollable = !pickingInSheet,
         actionsImePadding = screen == ActionPickerScreen.EditAction,
         actions = {
@@ -336,6 +362,16 @@ fun ActionPicker(
                     },
                 )
         }
+    }
+
+    if (showUnsavedDialog) {
+        RememberUnsavedChangesDialog(
+            onConfirm = {
+                showUnsavedDialog = false
+                onDismiss()
+            },
+            onDismiss = { showUnsavedDialog = false }
+        )
     }
 }
 

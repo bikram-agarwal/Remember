@@ -85,6 +85,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.colorHexFromHue
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberConfirmDialog
+import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.TagChipFilled
@@ -610,17 +611,12 @@ fun TagEditorSheet(
     }
 
     if (showUnsavedChangesDialog) {
-        RememberConfirmDialog(
-            title = stringResource(R.string.tag_editor_unsaved_title),
-            text = stringResource(R.string.tag_editor_unsaved_body),
-            confirmLabel = stringResource(R.string.tag_editor_unsaved_discard),
+        RememberUnsavedChangesDialog(
             onConfirm = {
                 showUnsavedChangesDialog = false
                 onDismiss()
             },
             onDismiss = { showUnsavedChangesDialog = false },
-            destructive = true,
-            dismissLabel = stringResource(R.string.tag_editor_unsaved_keep_editing),
         )
     }
 }
