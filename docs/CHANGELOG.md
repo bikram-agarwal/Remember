@@ -7,7 +7,7 @@
     - Existing photos and non-image files aren't affected,
     - This can't be undone for a photo once it's been compressed. 
     - Animated GIFs/WebPs are left untouched so they don't lose their animation, and a photo is only compressed if doing so actually makes it smaller.
-- On first launch after app update, the changelog sheet is automatically shown.
+- After the app updates, it now opens the changelog for you automatically.
 
 ### 🐛 Bug Fixes
 - Fixed the app freezing or lagging when pasting or typing a large amount of text into a note.

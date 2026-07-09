@@ -615,7 +615,7 @@ private fun AboutOtherAppsAndLinks(
         )
         Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
         AboutAppStoreButton(
-            iconResId = R.drawable.filepipe_logo,
+            iconResId = R.drawable.logo_filepipe,
             name = stringResource(R.string.settings_about_filepipe_name),
             tagline = stringResource(R.string.settings_about_filepipe_tagline),
             route = filePipeRoute,
@@ -627,7 +627,7 @@ private fun AboutOtherAppsAndLinks(
         if (useGithubLikeAboutLinks) {
             Spacer(Modifier.height(if (isSmallLandscape) 6.dp else 8.dp))
             AboutAppStoreButton(
-                iconResId = R.drawable.obtainx_logo,
+                iconResId = R.drawable.logo_obtainx,
                 name = stringResource(R.string.settings_about_obtainx_name),
                 tagline = stringResource(R.string.settings_about_obtainx_tagline),
                 route = obtainXRoute,

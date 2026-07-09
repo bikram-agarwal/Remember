@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Remember" parent="android:Theme.Material.NoActionBar" />
+    <style name="Theme.Remember" parent="android:Theme.Material.NoActionBar" >
+        <item name="android:forceDarkAllowed">false</item>
+    </style>
 
     <style name="Theme.Remember.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#D8F3E6</item>

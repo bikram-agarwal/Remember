@@ -43,6 +43,9 @@ import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
@@ -338,12 +341,14 @@ fun MainTabScaffold(
     }
 
     if (effectiveChromeVisible && useAdaptiveNavigationRail) {
-        NavigationSuiteScaffold(
-            layoutType = NavigationSuiteType.NavigationRail,
-            containerColor = Color.Transparent,
-            navigationSuiteItems = {
+        Row(modifier = Modifier.fillMaxSize()) {
+            NavigationRail(
+                containerColor = Color.Transparent,
+                windowInsets = WindowInsets.systemBars,
+                modifier = Modifier.padding(start = 24.dp),
+            ) {
                 MainTab.entries.forEach { tabItem ->
-                    item(
+                    NavigationRailItem(
                         selected = currentTab == tabItem,
                         onClick = {
                             closeNotesRevealRequest++
@@ -352,23 +357,24 @@ fun MainTabScaffold(
                         },
                         icon = {
                             RememberMaterialRoundedSymbol(
-                                name = tabItem.symbolName,
-                                weight = FontWeight.Medium,
-                                filled = currentTab == tabItem,
+                                  name = tabItem.symbolName,
+                                  weight = FontWeight.Medium,
+                                  filled = currentTab == tabItem,
                             )
                         },
                         label = {
                             Text(
-                                text = stringResource(tabItem.labelRes),
-                                style = MaterialTheme.typography.labelLargeEmphasized,
-                                fontWeight = FontWeight.Bold,
+                                  text = stringResource(tabItem.labelRes),
+                                  style = MaterialTheme.typography.labelLargeEmphasized,
+                                  fontWeight = FontWeight.Bold,
                             )
                         },
                     )
                 }
-            },
-        ) {
-            mainContent()
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                mainContent()
+            }
         }
     } else {
         mainContent()
