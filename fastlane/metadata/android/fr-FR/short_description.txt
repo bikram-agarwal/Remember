@@ -1,0 +1,1 @@
+Rappels persistants qui reviennent s'ils sont accidentellement ignorés

@@ -156,6 +156,7 @@ enum class SettingsSectionKey(
     Security("security", "security", R.string.settings_section_security),
     Backup("backup", "save", R.string.settings_backup_section),
     Updates("updates", "system_update", R.string.settings_updates_section),
+    Language("language", "translate", R.string.settings_language_section),
     About("about", "info", R.string.settings_section_about),
     DevOptions("dev_options", "developer_board", R.string.dev_options_title),
 }
@@ -1004,11 +1005,32 @@ fun SettingsRoute(
                         }
                     }
 
+                    if (includeSettingsSection(SettingsSectionKey.Language)) {
+                        item(key = "language") {
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Language.routeKey,
+                                materialSymbolName = SettingsSectionKey.Language.iconName,
+                                title = stringResource(SettingsSectionKey.Language.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                            ) {
+                                LanguageSection()
+                            }
+                        }
+                    }
+
                     if (devModeEnabled && selectedSectionKey == null) {
                         item(key = "dev_options_entry") {
                             DevOptionsSettingsEntry(
                                 onClick = onOpenDevOptions,
                             )
+                        }
+                    }
+
+                    if (includeSettingsSection(SettingsSectionKey.About)) {
+                        item(key = "language") {
+                            LanguageSection()
                         }
                     }
 

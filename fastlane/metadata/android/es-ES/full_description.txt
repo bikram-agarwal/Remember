@@ -1,0 +1,40 @@
+Remember se basa en una idea simple: si descartas un recordatorio sin terminar la tarea, vuelve. Ningún elemento importante desaparece solo porque accidentalmente deslizaste una notificación.
+
+Marca la nota como hecha y el recordatorio desaparece para siempre.
+
+<b>━━ 📌 RECORDATORIOS QUE PERSISTEN ━━</b>
+Mantén los recordatorios visibles hasta que estén realmente completados. Elige entre recordatorios normales, recordatorios de alta importancia con alertas emergentes, o una notificación resumen silenciosa que mantiene los elementos vencidos y próximos fijados en tu bandeja de notificaciones.
+
+<b>━━ 🔔 ACCIONES DE NOTIFICACIÓN ━━</b>
+Añade acciones útiles de un toque directamente a las notificaciones de recordatorio para que puedas actuar sin abrir la app:
+* Llamar, Mensajear o Enviar correo
+* Obtener indicaciones
+* Abrir un enlace, app o acceso directo
+* Copiar texto o Compartir contenido
+
+<b>━━ 💤 POSPONER CON PRESets NATURALES ━━</b>
+Pospón con presets amigables — pronto, hoy más tarde, esta noche y mañana por la mañana — sin buscar la hora exacta.
+
+<b>━━ 📅 PROGRAMAS RECURRENTES ━━</b>
+Crea recordatorios diarios, semanales, mensuales o anuales. Remember también soporta patrones estilo calendario más ricos como "el último viernes de cada mes", con fechas de fin opcionales o conteos de ocurrencias.
+
+<b>━━ 📝 NOTAS MARKDOWN Y LISTAS DE VERIFICACIÓN ━━</b>
+Escribe notas markdown ricas con títulos, negritas, cursivas, subrayados, enlaces y bloques de código. Crea listas de verificación anidadas para compras, listas de equipaje, pasos de proyecto o cualquier cosa que se beneficie de estructura.
+
+<b>━━ 🔍 ORGANIZA Y ENCUENTRA ━━</b>
+Usa etiquetas, estrellas, archivo, papelera, búsqueda de texto completo, filtros, ordenamiento y acciones masivas para mantener tus notas manejables.
+
+<b>━━ 📱 WIDGETS Y CAPTURA RÁPIDA ━━</b>
+Widgets en pantalla principal para recordatorios próximos, notas destacadas y captura rápida. Una notificación persistente puede mantener la creación de notas a un toque de distancia en todo momento.
+
+<b>━━ ☁️ IMPORTAR DESDE GOOGLE TASKS ━━</b>
+Transpórtate a Remember desde Google Tasks usando una cuenta conectada o un archivo de Google Takeout. La importación es de solo lectura; Remember no modifica ni elimina tus datos de Google Tasks.
+
+<b>━━ 💾 COPIA DE SEGURIDAD Y RESTAURACIÓN ━━</b>
+Exporta tus notas y configuraciones a una copia de seguridad, incluyendo opcionalmente los archivos multimedia adjuntos. Restaura al cambiar a un dispositivo nuevo, o importa una copia para fusionar notas en tu colección actual.
+
+<b>━━ 🎨 PERSONALÍZALO ━━</b>
+Elige colores Material You del fondo de pantalla, presets de color ajustados a mano, tus propios colores personalizados, estilos de paleta, fondos con degradado, modo negro OLED, imágenes de portada y más. La personalización es profunda — la app puede verse y sentirse muy diferente a cualquier otra app de notas en tu teléfono.
+
+<b>━━ 🔒 PRIVADO POR DEFECTO ━━</b>
+Tus notas se almacenan completamente de forma local. Cero rastreo, analíticas o telemetría automatizada en segundo plano. Ningún dato sale de tu teléfono sin tu acción explícita (como verificaciones opcionales de actualizaciones o exportar manualmente una copia de seguridad).

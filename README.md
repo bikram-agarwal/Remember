@@ -141,6 +141,21 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 </table>
 
 
+## 🌍 Languages
+
+Remember is available in the following languages:
+
+- **English** (default)
+- **Español** (Spanish)
+- **Français** (French)
+- **Deutsch** (German)
+- **Português** (Portuguese)
+- **Italiano** (Italian)
+
+The app automatically uses your system language if it's one of the above. You can also override it in **Settings → Language**. On Android 13+, per-app language preferences in system settings are also supported.
+
+Want to help translate Remember into your language? See [docs/TRANSLATIONS.md](docs/TRANSLATIONS.md) for guidelines.
+
 ## ⚖️ License & Trademark Notice
 
 The source code of this project is licensed under the GNU General Public License v3.0 (see the [LICENSE](LICENSE) file). 

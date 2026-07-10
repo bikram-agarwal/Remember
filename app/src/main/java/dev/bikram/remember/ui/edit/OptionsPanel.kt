@@ -550,7 +550,7 @@ private fun ReminderOptionSummary(
                 contentColor = greenText,
             ) {
                 Text(
-                    text = "+${reminders.size - 1} more",
+                    text = stringResource(R.string.options_reminders_more, reminders.size - 1),
                     style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),

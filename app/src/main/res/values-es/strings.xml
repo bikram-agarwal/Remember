@@ -1,0 +1,1187 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- App -->
+    <string name="app_name">Remember</string>
+    <string name="app_tagline">Notas, tareas, recordatorios – bien hechos</string>
+    <string name="app_version_format">%1$s v%2$s</string>
+    <string name="about_build_variant_format">%1$s, %2$s</string>
+    <string name="build_flavor_github">GitHub</string>
+    <string name="build_flavor_fdroid">F-Droid</string>
+    <string name="build_flavor_playstore">PlayStore</string>
+    <string name="build_type_debug">Debug</string>
+    <string name="build_type_dev_release">devRelease</string>
+    <string name="build_type_release">Release</string>
+    <string name="onboarding_byline">por Bikram Agarwal</string>
+    <string name="onboarding_lets_begin">Empecemos</string>
+
+    <!-- Onboarding permissions -->
+    <string name="onboarding_permissions_title">Mantén el control de todo</string>
+    <string name="onboarding_permissions_subtitle">Dos permisos rápidos para que los recordatorios aparezcan \njusto cuando los necesites</string>
+    <string name="onboarding_permissions_notifications_title">Notificaciones</string>
+    <string name="onboarding_permissions_notifications_body">Necesario para alertas de recordatorios, acciones de posponer y captura rápida</string>
+    <string name="onboarding_permissions_reliable_title">Mejorar la fiabilidad</string>
+    <string name="onboarding_permissions_reliable_body">Permite a Remember ignorar las optimizaciones de batería para que los recordatorios programados tengan menos probabilidades de retrasarse</string>
+    <string name="onboarding_permissions_status_recommended">Recomendado</string>
+    <string name="onboarding_permissions_status_optional">Opcional</string>
+    <string name="onboarding_permissions_enabled">Activado</string>
+    <string name="onboarding_permissions_enabled_status">✓ Activado</string>
+    <string name="onboarding_permissions_allow_notifications">Activar notificaciones</string>
+    <string name="onboarding_permissions_improve_reliability">Mejorar fiabilidad</string>
+    <string name="onboarding_permissions_change_anytime_footer">Puedes cambiar esto en cualquier momento en Ajustes</string>
+    <string name="onboarding_permissions_continue">Continuar</string>
+    <string name="onboarding_permissions_skip_for_now">Omitir por ahora</string>
+
+    <!-- Common labels -->
+    <string name="action_reset">Restablecer</string>
+    <string name="notification_created">Notificación creada</string>
+    <string name="notification_channel_reminders_low">Recordatorios (baja)</string>
+    <string name="notification_channel_reminders_low_desc">Recordatorios de notas silenciosos</string>
+    <string name="notification_channel_reminders_normal">Recordatorios (normal)</string>
+    <string name="notification_channel_reminders_normal_desc">Recordatorios de notas</string>
+    <string name="notification_channel_reminders_high">Recordatorios (alta)</string>
+    <string name="notification_channel_reminders_high_desc">Recordatorios de notas importantes</string>
+    <string name="notification_channel_reminder_summary">Resumen de recordatorios</string>
+    <string name="notification_channel_reminder_summary_desc">Resumen persistente silencioso de recordatorios</string>
+    <string name="common_cancel">Cancelar</string>
+    <string name="common_enable">Activar</string>
+    <string name="common_save">Guardar</string>
+    <string name="common_done">Hecho</string>
+    <string name="common_ok">Aceptar</string>
+    <string name="common_yes">Sí</string>
+    <string name="common_no">No</string>
+    <string name="common_add">Añadir</string>
+    <string name="common_remove">Eliminar</string>
+    <string name="common_download">Descargar</string>
+    <string name="common_clear">Limpiar</string>
+    <string name="common_back">Atrás</string>
+    <string name="common_move_to_trash">Mover a la papelera</string>
+    <string name="common_title">Título</string>
+    <string name="app_picker_nothing_available">Nada disponible</string>
+    <string name="edit_note_title_existing">Sin título</string>
+    <string name="edit_note_body_placeholder">Escribe tu nota…</string>
+    <string name="edit_note_empty_view_hint">Toca aquí para empezar a escribir</string>
+    <string name="edit_list_empty_view_title">Lista vacía</string>
+    <string name="edit_list_empty_view_hint">Toca aquí para empezar a escribir</string>
+    <string name="common_empty">Vacío</string>
+    <string name="common_empty_note">Nota vacía</string>
+    <string name="common_empty_list">Lista vacía</string>
+    <string name="common_none">Ninguno</string>
+    <string name="common_undo">Deshacer</string>
+    <string name="edit_note_title_new">Nota sin título</string>
+    <string name="edit_list_title_new">Lista sin título</string>
+
+    <!-- Toasts and transient feedback -->
+    <string name="toast_export_failed">Falló la exportación</string>
+    <plurals name="toast_exported_notes">
+        <item quantity="one">%1$d nota exportada</item>
+        <item quantity="other">%1$d notas exportadas</item>
+    </plurals>
+    <plurals name="toast_exported_to_destinations">
+        <item quantity="one">Copia de seguridad exportada a %1$d carpeta</item>
+        <item quantity="other">Copia de seguridad exportada a %1$d carpetas</item>
+    </plurals>
+    <plurals name="toast_imported_notes">
+        <item quantity="one">%1$d nota importada</item>
+        <item quantity="other">%1$d notas importadas</item>
+    </plurals>
+    <string name="toast_copied">Copiado</string>
+    <string name="changes_saved">Cambios guardados</string>
+    <string name="toast_about_link_copied">Enlace copiado</string>
+    <string name="clipboard_link_label">enlace</string>
+
+    <!-- Launcher shortcuts and widget -->
+    <string name="shortcut_new_note_short">Nota</string>
+    <string name="shortcut_new_note_long">Nueva nota</string>
+    <string name="shortcut_new_list_short">Lista</string>
+    <string name="shortcut_new_list_long">Nueva lista</string>
+    <string name="widget_agenda_label">Vencidas y próximas</string>
+    <string name="widget_quick_capture_label">Captura rápida</string>
+    <string name="widget_starred_label">Destacadas</string>
+    <string name="widget_agenda_description">Sigue los recordatorios vencidos y lo que se acerca en los próximos 7 días.</string>
+    <string name="widget_quick_capture_description">Crea una nueva nota o lista desde tu pantalla de inicio, con un pequeño estado de vencimiento hoy.</string>
+    <string name="widget_starred_description">Mantén las notas y listas destacadas cerca, incluso después de marcarlas como hechas.</string>
+    <string name="widget_header_title">Remember</string>
+
+    <!-- Lock and PIN -->
+    <string name="lock_title_unlock">Desbloquear Remember</string>
+    <string name="lock_enter_pin">Introduce tu PIN</string>
+    <string name="lock_use_device_unlock">Usa el método de desbloqueo de tu dispositivo</string>
+    <string name="lock_wrong_pin">PIN incorrecto</string>
+    <string name="pin_setup_title">Configurar PIN</string>
+    <string name="pin_setup_subtitle" tools:ignore="TypographyDashes">Elige un PIN de 4 a 6 dígitos para desbloquear Remember</string>
+    <string name="pin_label">PIN</string>
+    <string name="pin_confirm_label">Confirmar</string>
+
+    <!-- Main navigation and home -->
+    <string name="cd_close_search">Cerrar búsqueda</string>
+    <string name="cd_search">Buscar</string>
+    <string name="main_tab_notes">Notas</string>
+    <string name="main_tab_history">Historial</string>
+    <string name="main_tab_settings">Ajustes</string>
+    <string name="main_fab_close">Cerrar</string>
+    <string name="main_fab_create">Crear</string>
+    <string name="main_menu_share_app">Compartir app</string>
+    <string name="main_share_chooser_title">Compartir Remember</string>
+    <string name="about_share_text">¡Por fin encontré una app sólida para gestionar mis tareas y notas con una interfaz bonita y recordatorios infalibles! Échale un vistazo: %s</string>
+    <string name="main_empty_trash_title">¿Vaciar papelera?</string>
+    <string name="main_empty_trash_subtitle">Eliminar definitivamente todos los elementos en la papelera. Esta acción no se puede deshacer.</string>
+    <string name="main_move_archive_to_trash_title">¿Mover todos los elementos archivados a la papelera?</string>
+    <string name="main_move_archive_to_trash_subtitle">Los elementos en la papelera se eliminan definitivamente después de 30 días</string>
+    <string name="main_speed_dial_checklist">Lista de verificación</string>
+    <string name="main_speed_dial_note">Nota</string>
+    <string name="main_speed_dial_import">Importar</string>
+    <string name="home_no_notes_title">Aún no hay notas</string>
+    <string name="home_no_notes_subtitle">Crea una nota o una lista de verificación para empezar</string>
+    <string name="home_create_note">Crear nota</string>
+    <string name="home_create_list">Crear lista</string>
+
+    <!-- Filter and view options -->
+    <string name="filter_type_all">Todas</string>
+    <string name="filter_type_notes">Notas</string>
+    <string name="filter_type_lists">Listas</string>
+    <string name="filter_has_reminder">Tiene recordatorio</string>
+    <string name="filter_has_picture">Tiene imagen</string>
+    <string name="filter_has_attachment">Tiene archivo adjunto</string>
+    <string name="filter_starred">Destacadas</string>
+    <string name="filter_dropdown_type">Tipo: %1$s</string>
+    <string name="filter_dropdown_group">Agrupar: %1$s</string>
+    <string name="filter_dropdown_sort">Ordenar: %1$s</string>
+    <string name="filter_dropdown_tags">Etiquetas</string>
+    <string name="filter_dropdown_tags_one">Etiqueta: %1$s</string>
+    <string name="filter_dropdown_tags_count">Etiquetas: %1$d</string>
+    <string name="filter_dropdown_others">Otros</string>
+    <string name="filter_dropdown_others_count">Otros: %1$d</string>
+    <string name="view_options_sort_reminder_soonest">Recordatorio más próximo</string>
+    <string name="view_options_sort_reminder_latest">Recordatorio más lejano</string>
+    <string name="view_options_sort_modified_oldest">Modificado más antiguo</string>
+    <string name="view_options_sort_modified_newest">Modificado más reciente</string>
+    <string name="view_options_sort_created_oldest">Creado más antiguo</string>
+    <string name="view_options_sort_created_newest">Creado más reciente</string>
+    <string name="view_options_group_date">Fecha</string>
+    <string name="view_options_group_none">Ninguno</string>
+    <string name="view_options_group_tags">Etiquetas</string>
+    <string name="view_options_group_type">Tipo</string>
+    <string name="home_layout_switch_to_list_cd">Cambiar a diseño de lista</string>
+    <string name="home_layout_switch_to_mosaic_cd">Cambiar a diseño mosaico</string>
+    <string name="home_group_state_collapsed">Colapsado</string>
+    <string name="home_group_state_expanded">Expandido</string>
+
+    <!-- Note cards -->
+    <string name="notecard_starred_cd">Destacada</string>
+    <string name="notecard_reminder_cd">Tiene recordatorio</string>
+    <string name="notecard_recurring_cd">Se repite</string>
+    <string name="notecard_picture_cd">Tiene imagen</string>
+    <string name="notecard_attachment_cd">Tiene adjunto</string>
+    <string name="notecard_extra_tags">+%1$d</string>
+    <plurals name="notecard_extra_items">
+        <item quantity="one">+ %1$d más</item>
+        <item quantity="other">+ %1$d más</item>
+    </plurals>
+    <string name="notecard_cd_note">Nota: %1$s</string>
+    <string name="notecard_cd_list">Lista: %1$s</string>
+    <string name="notecard_cd_separator">. </string>
+    <string name="notecard_cd_tags">Etiquetas: %1$s</string>
+    <string name="notecard_cd_completed">Completada</string>
+    <string name="notecard_cd_selected">Seleccionada</string>
+    <string name="hero_framing_title">Posicionar portada</string>
+    <string name="viewer_cover_image_cd">Imagen de portada</string>
+    <string name="cover_zoom_in_cd">Acercar</string>
+    <string name="cover_zoom_out_cd">Alejar</string>
+    <string name="hero_image_picker_browse_with_app">Explorar con una app</string>
+    <string name="toast_saved_to_downloads">Guardado en Descargas</string>
+    <string name="toast_save_download_failed">No se pudo guardar el archivo</string>
+    <string name="toast_open_attachment_failed">Ninguna app puede abrir este archivo</string>
+
+    <!-- Note editor toolbar -->
+    <plurals name="checked_items_count">
+        <item quantity="one">%1$d elemento marcado</item>
+        <item quantity="other">%1$d elementos marcados</item>
+    </plurals>
+    <string name="edit_list_add_item">Añadir elemento</string>
+    <string name="edit_list_new_item_placeholder">Nuevo elemento</string>
+    <string name="edit_list_item_details_placeholder">Añadir detalles</string>
+    <string name="rt_text_to_display">Texto a mostrar</string>
+    <string name="rt_url_hint" tools:ignore="TypographyEllipsis">URL (p. ej. https://...)</string>
+    <string name="rt_h1">H1</string>
+    <string name="rt_h2">H2</string>
+    <string name="rt_h3">H3</string>
+    <string name="rt_h1_cd">Encabezado 1</string>
+    <string name="rt_h2_cd">Encabezado 2</string>
+    <string name="rt_h3_cd">Encabezado 3</string>
+    <string name="rt_add_link">Añadir enlace</string>
+    <string name="rt_edit_link">Editar enlace</string>
+    <string name="cd_redo">Rehacer</string>
+    <string name="cd_bold">Negrita</string>
+    <string name="cd_italic">Cursiva</string>
+    <string name="cd_underline">Subrayado</string>
+    <string name="cd_strikethrough">Tachado</string>
+    <string name="cd_bullet_list">Lista con viñetas</string>
+    <string name="cd_checklist">Lista de verificación</string>
+    <string name="cd_quote">Cita</string>
+    <string name="cd_inline_code">Código en línea</string>
+    <string name="cd_code_block">Bloque de código</string>
+    <string name="cd_numbered_list">Lista numerada</string>
+    <string name="cd_switch_to_live_preview">Cambiar a vista previa en vivo</string>
+    <string name="cd_switch_to_markdown_code">Cambiar a código Markdown</string>
+    <string name="cd_reorder_drag_handle">Reordenar</string>
+    <string name="edit_remove_picture_cd">Eliminar imagen</string>
+    <string name="edit_link_actions_title">Enlace</string>
+    <string name="edit_link_action_open">Abrir</string>
+    <string name="edit_link_action_copy">Copiar enlace</string>
+    <string name="edit_link_action_edit_text">Editar texto del enlace</string>
+    <string name="edit_link_action_share">Compartir</string>
+    <!-- Editor bottom bar and archived state -->
+    <string name="edit_bottom_bar_edit">Editar</string>
+    <string name="edit_bottom_bar_done">Hecho</string>
+    <string name="edit_bottom_bar_star">Destacar</string>
+    <string name="edit_bottom_bar_archive">Archivar</string>
+    <string name="edit_bottom_bar_notification">Notificación</string>
+    <string name="edit_bottom_bar_unarchive">Desarchivar</string>
+    <string name="edit_bottom_bar_trash">Papelera</string>
+    <string name="edit_bottom_bar_mark_done">Hecho</string>
+    <string name="edit_bottom_bar_mark_not_done">Reabrir</string>
+    <string name="edit_bottom_bar_delete_forever">Eliminar para siempre</string>
+    <string name="edit_bottom_bar_restore">Restaurar</string>
+    <string name="edit_archived_notice_title">Archivado</string>
+    <string name="edit_archived_notice_body">Desarchiva para realizar cambios</string>
+    <string name="edit_trashed_notice_title">En la papelera</string>
+    <string name="edit_trashed_notice_body">Restaure para realizar cambios</string>
+    <string name="edit_bottom_bar_archive_cd">Archivar</string>
+    <string name="edit_bottom_bar_unarchive_cd">Desarchivar</string>
+    <string name="edit_bottom_bar_delete_forever_cd">Eliminar para siempre</string>
+    <string name="edit_bottom_bar_restore_cd">Restaurar desde la papelera</string>
+    <string name="edit_save_cd">Guardar cambios</string>
+    <string name="edit_picture_framing_cd">Editar encuadre de la imagen</string>
+    <string name="edit_picture_reframe">Reencuadrar</string>
+    <string name="edit_picture_replace">Reemplazar</string>
+    <string name="edit_replace_picture_cd">Reemplazar imagen</string>
+    <string name="edit_delete_forever_dialog_title">¿Eliminar para siempre?</string>
+    <string name="edit_delete_forever_dialog_body">Esta nota se eliminará definitivamente y no se podrá recuperar</string>
+    <string name="edit_delete_forever_dialog_confirm">Eliminar</string>
+
+    <!-- History -->
+    <string name="history_section_archive">Archivo</string>
+    <string name="history_section_trash">Papelera</string>
+    <string name="history_archive_empty_title">No hay nada archivado</string>
+    <string name="history_archive_empty_subtitle">Las notas archivadas se mantienen buscables y nunca se eliminan automáticamente</string>
+    <string name="history_trash_empty_title">La papelera está vacía</string>
+    <string name="history_trash_empty_subtitle">Los elementos eliminados llegan aquí primero y permanecen 30 días</string>
+    <string name="history_trash_retention_notice">Los elementos en la papelera se eliminan definitivamente después de 30 días</string>
+    <string name="history_archive_move_to_trash_cd">Mover a la papelera</string>
+    <plurals name="history_days_left">
+        <item quantity="one">%1$d día restante</item>
+        <item quantity="other">%1$d días restantes</item>
+    </plurals>
+    <string name="history_expires_today">Vence hoy</string>
+
+    <!-- Home: full-text search + bulk select -->
+    <string name="home_search_placeholder">Buscar</string>
+    <string name="home_search_section_archive">Archivo</string>
+    <string name="home_search_section_trash">Papelera</string>
+    <string name="home_search_section_badge_archive">ARCHIVO</string>
+    <string name="home_search_section_badge_trash">PAPELERA</string>
+    <string name="section_expand_cd">Expandir sección %1$s</string>
+    <string name="section_collapse_cd">Contraer sección %1$s</string>
+    <string name="home_no_results_for">Sin resultados para \"%1$s\"</string>
+    <string name="home_no_results_hint">Prueba un término más corto o revisa tus filtros</string>
+    <string name="home_no_results_filters_title">Nada coincide con estos filtros</string>
+    <string name="home_no_results_filters_hint">Ajusta la búsqueda o los filtros</string>
+    <string name="home_nothing_here">No hay nada que mostrar aquí</string>
+    <string name="home_select_exit_cd">Salir de selección</string>
+    <string name="home_select_all">Seleccionar todo</string>
+    <string name="home_unselect_all">Deseleccionar todo</string>
+    <string name="home_section_overdue">Vencidas</string>
+    <string name="home_section_active">Activas</string>
+    <string name="home_section_done">Hechas</string>
+    <string name="home_section_today">Hoy</string>
+    <string name="home_section_upcoming">Próximas</string>
+    <string name="home_section_later">Más tarde</string>
+    <string name="home_section_no_date">Sin fecha</string>
+    <string name="home_section_notes">Notas</string>
+    <string name="home_section_lists">Listas</string>
+    <string name="home_section_untagged">Sin etiquetar</string>
+    <string name="home_bulk_trash">Mover a la papelera</string>
+    <string name="home_bulk_tag">Etiquetar / desetiquetar</string>
+    <string name="home_bulk_tag_sheet_title">Edición masiva de etiquetas</string>
+    <string name="home_bulk_tag_sheet_subtitle_intro">Toca para alternar:</string>
+    <string name="home_bulk_tag_sheet_subtitle_add">Añadir a todas,</string>
+    <string name="home_bulk_tag_sheet_subtitle_remove">Eliminar de todas; toca de nuevo para restablecer</string>
+    <string name="home_bulk_tag_apply">Aplicar</string>
+    <string name="home_bulk_tag_create_pill">+ Crear nueva etiqueta</string>
+    <string name="home_bulk_tag_create_pill_cd">Crear una nueva etiqueta</string>
+    <string name="home_bulk_tag_stage">Añadir</string>
+    <string name="home_bulk_tag_no_existing">Aún no hay etiquetas guardadas. Toca \"Crear nueva etiqueta\" para empezar.</string>
+    <string name="home_bulk_archive_cd">Archivar notas seleccionadas</string>
+    <string name="home_bulk_trash_cd">Mover notas seleccionadas a la papelera</string>
+    <string name="home_bulk_mark_done_cd">Marcar notas seleccionadas como hechas</string>
+    <string name="home_bulk_tag_cd">Etiquetar notas seleccionadas</string>
+    <string name="two_pane_notes_selection_title" tools:ignore="PluralsCandidate">%1$d seleccionadas</string>
+
+    <!-- Snackbar messages after bulk actions -->
+    <plurals name="bulk_action_archived">
+        <item quantity="one">%1$d archivada</item>
+        <item quantity="other">%1$d archivadas</item>
+    </plurals>
+    <plurals name="bulk_action_trashed">
+        <item quantity="one">%1$d movida a la papelera</item>
+        <item quantity="other">%1$d movidas a la papelera</item>
+    </plurals>
+    <plurals name="bulk_action_marked_done">
+        <item quantity="one">%1$d marcada como hecha</item>
+        <item quantity="other">%1$d marcadas como hechas</item>
+    </plurals>
+    <plurals name="bulk_action_restored">
+        <item quantity="one">%1$d restaurada</item>
+        <item quantity="other">%1$d restauradas</item>
+    </plurals>
+    <plurals name="bulk_action_unarchived">
+        <item quantity="one">%1$d de vuelta a Notas</item>
+        <item quantity="other">%1$d de vuelta a Notas</item>
+    </plurals>
+    <plurals name="bulk_action_moved_to_trash_from_archive">
+        <item quantity="one">%1$d movida a la papelera</item>
+        <item quantity="other">%1$d movidas a la papelera</item>
+    </plurals>
+    <plurals name="bulk_action_archived_from_trash">
+        <item quantity="one">%1$d archivada</item>
+        <item quantity="other">%1$d archivadas</item>
+    </plurals>
+    <string name="bulk_action_undo">Deshacer</string>
+
+    <!-- Confirmation sheet for bulk delete-forever -->
+    <string name="bulk_delete_forever_confirm_title">¿Eliminar para siempre?</string>
+    <string name="bulk_delete_forever_confirm_subtitle">Las notas seleccionadas se eliminarán de forma permanente. Esta acción no se puede deshacer.</string>
+
+    <!-- Quick capture persistent notification -->
+    <string name="quick_capture_channel_name">Captura rápida</string>
+    <string name="quick_capture_channel_description">Notificación persistente para crear notas rápidamente</string>
+    <string name="quick_capture_notification_title">Nueva nota</string>
+    <string name="quick_capture_notification_text">Toca para escribir una nueva nota</string>
+    <string name="settings_quick_capture_title">Notificación de captura rápida</string>
+    <string name="settings_quick_capture_subtitle">Acceso directo persistente para crear una nueva nota</string>
+
+    <!-- Widget additions -->
+    <string name="widget_section_overdue">Vencidas</string>
+    <string name="widget_section_upcoming">Próximas</string>
+    <string name="widget_starred_title">Destacadas</string>
+    <string name="widget_empty_nothing_overdue">Nada vencido</string>
+    <string name="widget_empty_nothing_upcoming">Nada en los próximos 7 días</string>
+    <string name="widget_empty_nothing_due">Nada pendiente</string>
+    <string name="widget_empty_no_due">Sin vencimiento</string>
+    <string name="widget_empty_watermark">🎉</string>
+    <string name="widget_empty_starred">Aquí no hay nadie</string>
+    <string name="widget_empty_starred_watermark">✨</string>
+    <string name="widget_refresh_cd">Actualizar widget</string>
+    <string name="widget_mark_done_cd">Marcar como hecha</string>
+    <string name="widget_new_note">Nueva nota</string>
+    <string name="widget_new_list">Nueva lista</string>
+    <string name="widget_create_new_note">Crear nueva nota</string>
+    <string name="widget_create_new_list">Crear nueva lista</string>
+    <plurals name="widget_status_due_today">
+        <item quantity="one">%1$d pendiente hoy</item>
+        <item quantity="other">%1$d pendientes hoy</item>
+    </plurals>
+    <plurals name="widget_status_overdue">
+        <item quantity="one">%1$d vencida</item>
+        <item quantity="other">%1$d vencidas</item>
+    </plurals>
+
+    <!-- Chips and tags on cards -->
+    <string name="remove_tag_cd">Eliminar %1$s</string>
+
+    <!-- Editor options row -->
+    <string name="options_icon_cd">Cambiar icono</string>
+    <string name="options_tags">Etiquetas</string>
+    <string name="options_reminder">Recordatorio</string>
+    <string name="options_actions">Acción de notificación</string>
+    <string name="options_importance">Importancia</string>
+    <string name="options_visibility">Visibilidad</string>
+    <string name="options_behavior">Comportamiento</string>
+    <string name="options_behavior_subtitle">Cómo aparece y se comporta la notificación de esta nota</string>
+    <string name="options_behavior_visibility_label">Visibilidad: %1$s</string>
+    <string name="options_behavior_importance_label">Importancia: %1$s</string>
+    <string name="options_picture">Imagen</string>
+    <string name="options_picture_none">Sin imagen</string>
+    <string name="options_picture_attached">Adjunta</string>
+    <string name="options_attachments">Archivos adjuntos</string>
+    <string name="options_created">Creada: %1$s</string>
+    <string name="options_updated">Actualizada: %1$s</string>
+    <string name="options_reminders_more">+%1$d más</string>
+    <plurals name="options_tags_more_count">
+        <item quantity="one">+%1$d más</item>
+        <item quantity="other">+%1$d más</item>
+    </plurals>
+    <plurals name="options_actions_count">
+        <item quantity="one">%1$d acción</item>
+        <item quantity="other">%1$d acciones</item>
+    </plurals>
+    <plurals name="options_attachments_file_count">
+        <item quantity="one">%1$d archivo</item>
+        <item quantity="other">%1$d archivos</item>
+    </plurals>
+
+    <!-- Importance -->
+    <string name="importance_low">Baja</string>
+    <string name="importance_low_description">Silenciosa. Sin icono en la barra de estado ni vibración.</string>
+    <string name="importance_default">Predeterminada</string>
+    <string name="importance_default_description">Sonido y vibración estándar.</string>
+    <string name="importance_high">Alta</string>
+    <string name="importance_high_description">Aparece en pantalla como alerta emergente. Se trata como alarma.</string>
+
+    <!-- Visibility -->
+    <string name="visibility_default">Predeterminada</string>
+    <string name="visibility_default_description">Mostrar título y contenido.</string>
+    <string name="visibility_private">Privada</string>
+    <string name="visibility_private_description">Mostrar título, ocultar contenido.</string>
+    <string name="visibility_secret">Secreta</string>
+    <string name="visibility_secret_description">Ocultar toda la información. No mostrar en widgets.</string>
+
+    <!-- Reminders -->
+    <string name="reminder_add_button">Añadir recordatorio</string>
+    <string name="reminder_clear_all">Eliminar todos</string>
+    <string name="reminder_clear_all_confirm_title">¿Eliminar todos los recordatorios?</string>
+    <string name="reminder_clear_all_confirm_body">Se eliminarán todos los recordatorios programados para esta nota.</string>
+    <string name="reminder_clear_all_confirm_action">Eliminar</string>
+    <string name="reminder_header_index">Recordatorio %1$d</string>
+    <string name="reminder_editor_unsaved_title">Cambios sin guardar</string>
+    <string name="reminder_editor_unsaved_body">Los cambios en el recordatorio aún no se han guardado. ¿Descartarlos?</string>
+    <string name="reminder_editor_unsaved_discard">Descartar</string>
+    <string name="reminder_editor_unsaved_keep_editing">Seguir editando</string>
+    <string name="reminder_set_title">Configurar recordatorio</string>
+    <string name="reminder_exact_alarm_permission_prompt">Los recordatorios exactos requieren permiso. Toca para activarlo en Ajustes.</string>
+    <string name="reminder_notifications_required_title">Configurar recordatorios</string>
+    <string name="reminder_notifications_required_body">Remember necesita permiso de notificaciones para alertarte cuando venza un recordatorio</string>
+    <string name="reminder_notifications_required_action">Activar notificaciones</string>
+    <string name="notification_permission_required_title">Publicar notificaciones</string>
+    <string name="notification_permission_required_body">Remember aún no tiene permiso para crear notificaciones</string>
+    <string name="reminder_date_picker_today">Hoy</string>
+    <string name="reminder_every_label">Cada</string>
+    <string name="reminder_on_day">El día %1$d</string>
+    <string name="reminder_ends_label">Termina</string>
+    <string name="reminder_never">Nunca</string>
+    <string name="reminder_pick_end_date">Elegir fecha de finalización</string>
+    <string name="reminder_repeat">Repetir</string>
+    <string name="reminder_occurrences">ocurrencias</string>
+    <string name="reminder_unit_hour">Hora</string>
+    <string name="reminder_unit_day">Día</string>
+    <string name="reminder_unit_week">Semana</string>
+    <string name="reminder_unit_month">Mes</string>
+    <string name="reminder_unit_year">Año</string>
+    <string name="reminder_recurrence_hourly">Cada hora</string>
+    <string name="reminder_recurrence_daily">Diario</string>
+    <string name="reminder_recurrence_weekly">Semanal</string>
+    <string name="reminder_recurrence_monthly">Mensual</string>
+    <string name="reminder_recurrence_yearly">Anual</string>
+    <plurals name="reminder_recurrence_every_hours">
+        <item quantity="one">Cada %1$d hora</item>
+        <item quantity="other">Cada %1$d horas</item>
+    </plurals>
+    <plurals name="reminder_recurrence_every_days">
+        <item quantity="one">Cada %1$d día</item>
+        <item quantity="other">Cada %1$d días</item>
+    </plurals>
+    <plurals name="reminder_recurrence_every_weeks">
+        <item quantity="one">Cada %1$d semana</item>
+        <item quantity="other">Cada %1$d semanas</item>
+    </plurals>
+    <plurals name="reminder_recurrence_every_months">
+        <item quantity="one">Cada %1$d mes</item>
+        <item quantity="other">Cada %1$d meses</item>
+    </plurals>
+    <plurals name="reminder_recurrence_every_years">
+        <item quantity="one">Cada %1$d año</item>
+        <item quantity="other">Cada %1$d años</item>
+    </plurals>
+    <string name="reminder_recurrence_on_weekdays">en %1$s</string>
+    <string name="reminder_recurrence_on_day">el día %1$d</string>
+    <string name="reminder_recurrence_on_ordinal_weekday">el %1$s %2$s</string>
+    <string name="reminder_recurrence_until">hasta %1$s</string>
+    <plurals name="reminder_recurrence_for_times">
+        <item quantity="one">durante %1$d vez</item>
+        <item quantity="other">durante %1$d veces</item>
+    </plurals>
+    <string name="reminder_ordinal_first">Primer</string>
+    <string name="reminder_ordinal_second">Segundo</string>
+    <string name="reminder_ordinal_third">Tercer</string>
+    <string name="reminder_ordinal_fourth">Cuarto</string>
+    <string name="reminder_ordinal_last">Último</string>
+    <string name="reminder_ordinal_first_lower">primer</string>
+    <string name="reminder_ordinal_second_lower">segundo</string>
+    <string name="reminder_ordinal_third_lower">tercer</string>
+    <string name="reminder_ordinal_fourth_lower">cuarto</string>
+    <string name="reminder_ordinal_last_lower">último</string>
+    <string name="reminder_weekday_sunday">Domingo</string>
+    <string name="reminder_weekday_monday">Lunes</string>
+    <string name="reminder_weekday_tuesday">Martes</string>
+    <string name="reminder_weekday_wednesday">Miércoles</string>
+    <string name="reminder_weekday_thursday">Jueves</string>
+    <string name="reminder_weekday_friday">Viernes</string>
+    <string name="reminder_weekday_saturday">Sábado</string>
+    <string name="reminder_weekday_sunday_short">Dom</string>
+    <string name="reminder_weekday_monday_short">Lun</string>
+    <string name="reminder_weekday_tuesday_short">Mar</string>
+    <string name="reminder_weekday_wednesday_short">Mié</string>
+    <string name="reminder_weekday_thursday_short">Jue</string>
+    <string name="reminder_weekday_friday_short">Vie</string>
+    <string name="reminder_weekday_saturday_short">Sáb</string>
+    <string name="reminder_weekday_sunday_narrow">D</string>
+    <string name="reminder_weekday_monday_narrow">L</string>
+    <string name="reminder_weekday_tuesday_narrow">M</string>
+    <string name="reminder_weekday_wednesday_narrow">X</string>
+    <string name="reminder_weekday_thursday_narrow">J</string>
+    <string name="reminder_weekday_friday_narrow">V</string>
+    <string name="reminder_weekday_saturday_narrow">S</string>
+    <string name="reminder_notification_fallback">Toca para abrir</string>
+    <string name="reminder_notification_all_items_checked">Todos los elementos marcados</string>
+    <string name="reminder_notification_hidden_title">Recordatorio</string>
+    <string name="reminder_notification_hidden_body">Toca para ver</string>
+    <string name="reminder_summary_title">Recordatorios</string>
+    <string name="main_reminder_notifications_disabled">Notificaciones desactivadas</string>
+    <plurals name="main_reminders_due_this_week">
+        <item quantity="one">%1$d recordatorio pendiente esta semana</item>
+        <item quantity="other">%1$d recordatorios pendientes esta semana</item>
+    </plurals>
+    <string name="main_alert_fab_label">Alertas</string>
+    <plurals name="reminder_summary_count">
+        <item quantity="one">%1$d vencido o próximo</item>
+        <item quantity="other">%1$d vencidos o próximos</item>
+    </plurals>
+    <plurals name="reminder_summary_more">
+        <item quantity="one">+%1$d más</item>
+        <item quantity="other">+%1$d más</item>
+    </plurals>
+    <string name="reminder_summary_line">%1$s - %2$s</string>
+    <string name="reminder_summary_due_today">Vence hoy</string>
+    <plurals name="reminder_summary_overdue_days">
+        <item quantity="one">Vencido %1$d día</item>
+        <item quantity="other">Vencido %1$d días</item>
+    </plurals>
+    <plurals name="reminder_summary_in_hours">
+        <item quantity="one">En %1$d hora</item>
+        <item quantity="other">En %1$d horas</item>
+    </plurals>
+    <plurals name="reminder_summary_in_days">
+        <item quantity="one">En %1$d día</item>
+        <item quantity="other">En %1$d días</item>
+    </plurals>
+
+    <!-- Tags editor -->
+    <string name="tag_editor_assigned_heading">Asignadas</string>
+    <string name="tag_editor_available_heading">Disponibles</string>
+    <string name="tag_editor_no_assigned_tags">No hay etiquetas asignadas</string>
+    <string name="tag_editor_no_available_tags">No hay etiquetas disponibles</string>
+    <string name="tag_editor_create_placeholder">Crear nueva etiqueta</string>
+    <string name="tag_editor_field_placeholder">Nombre de la etiqueta</string>
+    <string name="tag_editor_name_length_counter">%1$d/%2$d</string>
+    <string name="tag_editor_duplicate_existing">Ya existe una etiqueta con ese nombre</string>
+    <string name="tag_editor_reserved_name">Este nombre de etiqueta está reservado por la aplicación</string>
+    <string name="tag_editor_edit_mode_label">Modo edición</string>
+    <string name="tag_editor_edit_mode_cd">Editar etiquetas</string>
+    <string name="tag_editor_edit_mode_hint">Crea una nueva etiqueta o toca una existente para cambiar su nombre y color</string>
+    <string name="tag_editor_assign_mode_hint">Toca una etiqueta para cambiar su estado: (+) Asignar, (x) Eliminar</string>
+    <string name="tag_editor_unsaved_title">Cambios sin guardar</string>
+    <string name="tag_editor_unsaved_body">Los cambios en las etiquetas aún no se han guardado. ¿Descartarlos?</string>
+    <string name="tag_editor_unsaved_discard">Descartar</string>
+    <string name="tag_editor_unsaved_keep_editing">Seguir editando</string>
+
+    <!-- Note actions (sheet and editor) -->
+    <string name="actions_sheet_subtitle">Añadir una acción rápida a la notificación</string>
+    <string name="actions_contact_input_placeholder">Toca para elegir o escribir</string>
+    <string name="actions_pick_app">Elegir app</string>
+    <string name="actions_pick_app_shortcut">Elegir app para acceso directo</string>
+    <string name="actions_pick_shortcut">Elegir acceso directo</string>
+    <string name="actions_field_action_type">Tipo de acción</string>
+    <string name="actions_field_button_label">Etiqueta del botón</string>
+    <string name="actions_target_app">App</string>
+    <string name="actions_target_shortcut">Acceso directo</string>
+    <string name="actions_error_phone_number">Introduce un número de teléfono válido</string>
+    <string name="actions_error_email_address">Introduce una dirección de correo electrónico válida</string>
+    <string name="actions_open_app_title">Abrir %1$s</string>
+    <string name="actions_contact_title_format">%1$s %2$s</string>
+    <string name="action_contact_verb_call">Llamar</string>
+    <string name="action_contact_verb_message">Enviar mensaje</string>
+    <string name="action_contact_verb_email">Enviar correo</string>
+    <string name="action_type_call_number">Llamar a un número</string>
+    <string name="action_type_send_message">Enviar mensaje</string>
+    <string name="action_type_send_email">Enviar correo</string>
+    <string name="action_type_get_directions">Obtener direcciones</string>
+    <string name="action_type_open_link">Abrir enlace</string>
+    <string name="action_type_open_app">Abrir app</string>
+    <string name="action_type_open_shortcut">Abrir acceso directo</string>
+    <string name="action_type_copy_to_clipboard">Copiar al portapapeles</string>
+    <string name="action_type_share_content">Compartir contenido</string>
+    <string name="action_type_mark_as_done">Marcar como hecha</string>
+    <string name="action_type_snooze">Posponer</string>
+    <string name="action_field_snooze_blank">Posponer notificación</string>
+
+    <string name="snooze_activity_title">Posponer hasta</string>
+    <string name="snooze_activity_subtitle">Elige una hora</string>
+    <string name="snooze_activity_now_format">ahora • %1$s</string>
+    <string name="snooze_preset_soon">Pronto</string>
+    <string name="snooze_preset_later_today">Más tarde hoy</string>
+    <string name="snooze_preset_this_evening">Esta tarde/noche</string>
+    <string name="snooze_preset_late_tonight">Esta noche tarde</string>
+    <string name="snooze_preset_tomorrow_morning">Mañana por la mañana</string>
+    <string name="snooze_preset_tomorrow_afternoon">Mañana por la tarde</string>
+    <string name="snooze_preset_next_week">Próxima semana</string>
+    <string name="snooze_preset_pick_custom">Elegir una hora específica</string>
+    <string name="snooze_preset_pick_custom_subtitle">Selector de fecha y hora</string>
+    <string name="snooze_subtitle_in_minutes">en ~%1$d min</string>
+    <string name="snooze_subtitle_in_hours">en %1$dh</string>
+    <string name="snooze_subtitle_tonight">esta noche</string>
+    <string name="snooze_toast_today">Recordatorio configurado para hoy a las %1$s</string>
+    <string name="snooze_toast_tomorrow">Recordatorio configurado para mañana a las %1$s</string>
+    <string name="snooze_toast_future">Recordatorio configurado para %1$s a las %2$s</string>
+    <string name="snooze_indicator_today">Pospuesto hasta hoy a las %1$s</string>
+    <string name="snooze_indicator_tomorrow">Pospuesto hasta mañana a las %1$s</string>
+    <string name="snooze_indicator_future">Pospuesto hasta %1$s a las %2$s</string>
+    <string name="action_field_phone_number">Número de teléfono</string>
+    <string name="action_field_email_address">Dirección de correo</string>
+    <string name="action_field_address">Dirección o lugar</string>
+    <string name="action_field_url">URL</string>
+    <string name="action_field_package">Paquete</string>
+    <string name="action_field_shortcut">Acceso directo</string>
+    <string name="action_field_text_copy">Texto a copiar</string>
+    <string name="action_field_text_share">Texto a compartir</string>
+
+    <!-- Attachments and pickers -->
+    <string name="attachments_subtitle">Adjunta cualquier archivo — PDF, documentos, audio, vídeo</string>
+    <string name="attachments_add">Añadir adjunto</string>
+    <string name="attachments_delete_confirm_title">¿Eliminar definitivamente este adjunto?</string>
+    <string name="media_storage_stored_in_app">Almacenado en la app</string>
+    <string name="media_storage_linked_original">Original vinculado</string>
+    <string name="media_storage_linked_original_hint">El contenido vinculado puede dejar de funcionar si el archivo original se mueve, elimina o se pierde el permiso</string>
+    <string name="media_storage_status_cd">Estado de almacenamiento multimedia</string>
+    <string name="options_attachments_storage_summary">%1$s • %2$s, %3$s</string>
+    <plurals name="media_storage_stored_count">
+        <item quantity="one">%1$d almacenado</item>
+        <item quantity="other">%1$d almacenados</item>
+    </plurals>
+    <plurals name="media_storage_linked_count">
+        <item quantity="one">%1$d vinculado</item>
+        <item quantity="other">%1$d vinculados</item>
+    </plurals>
+    <string name="icon_picker_title">Elige un icono</string>
+    <string name="icon_picker_starred_selection_title">Elige favoritos</string>
+    <string name="icon_picker_search_hint">Buscar iconos y emojis</string>
+    <string name="icon_picker_starred">Favoritos</string>
+    <string name="icon_picker_add_starred_cd">Editar favoritos</string>
+    <string name="icon_picker_max_starred">Máximo 30 favoritos</string>
+    <string name="icon_picker_added_to_favorites">%1$s añadido a favoritos</string>
+    <string name="icon_picker_removed_from_favorites">%1$s eliminado de favoritos</string>
+    <string name="icon_picker_symbol_style_filled">Iconos rellenos</string>
+    <string name="icon_picker_symbol_style_outlined">Iconos con contorno</string>
+    <string name="icon_picker_results_heading">Coincidencias</string>
+    <string name="icon_picker_no_results">No hay iconos que coincidan con esa búsqueda</string>
+    <string name="icon_picker_tab_icons">Iconos</string>
+    <string name="icon_picker_tab_emojis">Emojis</string>
+    <string name="icon_picker_emoji_no_results">No hay emojis que coincidan con esa búsqueda</string>
+    <string name="icon_picker_emoji_category_smileys">Caritas</string>
+    <string name="icon_picker_emoji_category_animals">Animales</string>
+    <string name="icon_picker_emoji_category_food">Comida</string>
+    <string name="icon_picker_emoji_category_activity">Actividad</string>
+    <string name="icon_picker_emoji_category_travel">Viajes</string>
+    <string name="icon_picker_emoji_category_objects">Objetos</string>
+    <string name="icon_picker_emoji_category_symbols">Símbolos</string>
+    <string name="icon_picker_emoji_category_flags">Banderas</string>
+    <string name="reminder_time_picker_title">Configurar hora</string>
+    <string name="reminder_time_input_mode">Introducir hora con el teclado</string>
+    <string name="reminder_time_dial_mode">Elegir hora con el reloj</string>
+    <string name="reminder_pick_time">Configurar hora</string>
+    <string name="reminder_pick_date">Configurar fecha</string>
+    <string name="share_chooser_generic">Compartir</string>
+    <string name="action_receiver_run_error">No se pudo ejecutar la acción: %1$s</string>
+
+    <!-- Appearance (theme screen) -->
+    <string name="appearance_theme_system">Sistema</string>
+    <string name="appearance_theme_light">Claro</string>
+    <string name="appearance_theme_dark">Oscuro</string>
+    <string name="appearance_theme_black">Negro</string>
+    <string name="appearance_palette">Paleta</string>
+    <string name="appearance_preview_title_named">Vista previa · %1$s</string>
+    <string name="appearance_preview_customize">Personalizar</string>
+    <string name="color_source_material_you">Material You</string>
+    <string name="color_source_forest">Bosque</string>
+    <string name="color_source_ember">Ascua</string>
+    <string name="color_source_grove">Arboleda</string>
+    <string name="color_source_honey">Miel</string>
+    <string name="color_source_ocean">Océano</string>
+    <string name="color_source_iris">Iris</string>
+    <string name="color_source_dusk">Crepúsculo</string>
+    <string name="color_source_berry">Baya</string>
+    <string name="color_source_custom">Personalizado</string>
+    <string name="appearance_preview_label_lowest">más bajo</string>
+    <string name="appearance_preview_label_low">bajo</string>
+    <string name="appearance_preview_label_surface">superficie</string>
+    <string name="appearance_preview_label_base">base</string>
+    <string name="appearance_preview_label_high">alto</string>
+    <string name="appearance_preview_label_highest">más alto</string>
+    <string name="appearance_preview_label_primary">primario</string>
+    <string name="appearance_preview_label_secondary">secundario</string>
+    <string name="appearance_preview_label_tertiary">terciario</string>
+    <string name="appearance_gradient_title">Fondo degradado</string>
+    <string name="appearance_gradient_subtitle">Muestra un sutil degradado de acento detrás de la app</string>
+    <string name="appearance_black_theme_effect_disabled">No se puede cambiar en el tema Negro</string>
+    <string name="appearance_blur_title">Desenfoque progresivo</string>
+    <string name="appearance_blur_subtitle">Desenfoca el contenido en la parte inferior de la pantalla y otros lugares</string>
+    <string name="appearance_cover_title">Imagen de portada en tarjetas</string>
+    <string name="appearance_cover_subtitle">Usa la imagen de la nota como fondo atenuado de la tarjeta</string>
+    <string name="appearance_adaptive_note_themes_title">Temas adaptativos para notas</string>
+    <string name="appearance_adaptive_note_themes_subtitle">Usa el color de la imagen de portada para tintar la página de la nota</string>
+    <string name="appearance_shading_intensity_title">Sombreado de superficie</string>
+    <string name="appearance_shading_intensity_subtitle">Ajusta la intensidad con la que los colores del tema tiñen las superficies</string>
+    <string name="appearance_remove_custom_color_title">¿Eliminar color personalizado?</string>
+    <string name="appearance_remove_custom_color_message">Se eliminará de tus colores personalizados guardados</string>
+    <string name="appearance_add_custom_color_cd">Añadir color personalizado</string>
+    <string name="appearance_select_color">Seleccionar color primario</string>
+    <string name="appearance_select_color_secondary">Seleccionar color secundario</string>
+    <string name="appearance_select_color_tertiary">Seleccionar color terciario</string>
+
+    <!-- Palette style names -->
+    <string name="palette_style_tonal_spot">Tonal spot</string>
+    <string name="palette_style_neutral">Neutral</string>
+    <string name="palette_style_vibrant">Vibrante</string>
+    <string name="palette_style_expressive">Expresivo</string>
+    <string name="palette_style_rainbow">Arcoíris</string>
+    <string name="palette_style_fruit_salad">Macedonia</string>
+    <string name="palette_style_monochrome">Monocromo</string>
+    <string name="palette_style_fidelity">Fidelidad</string>
+    <string name="palette_style_content">Contenido</string>
+
+    <!-- Settings: shell and section titles -->
+    <string name="settings_expand_all_sections_cd">Expandir todas las secciones de ajustes</string>
+    <string name="settings_collapse_all_sections_cd">Contraer todas las secciones de ajustes</string>
+    <string name="settings_section_appearance">Apariencia</string>
+    <string name="settings_section_security">Seguridad</string>
+    <string name="settings_updates_section">Actualizaciones</string>
+    <string name="settings_language_section">Idioma</string>
+    <string name="settings_section_about">Acerca de</string>
+    <string name="settings_open_help_cd">Abrir ayuda</string>
+    <string name="settings_language">Idioma</string>
+    <string name="settings_language_desc">Elige el idioma de la app</string>
+    <string name="settings_language_system_default">Predeterminado del sistema</string>
+    <string name="help_title">Ayuda</string>
+    <string name="help_expand_all_cd">Expandir todo</string>
+    <string name="help_collapse_all_cd">Contraer todo</string>
+    <string name="help_search_placeholder">Buscar</string>
+    <string name="help_no_results">Sin resultados</string>
+
+    <!-- Settings: notifications, swipe -->
+    <string name="settings_notifications_section">Notificaciones</string>
+    <string name="settings_notifications">Notificaciones</string>
+    <string name="settings_notifications_desc">Recordatorios y alertas del sistema</string>
+    <string name="settings_keep_reminders_until_done">Mantener notificaciones de recordatorios hasta que se marquen como hechas</string>
+    <string name="settings_keep_reminders_until_done_desc">Alertas persistentes. Vuelve a publicar recordatorios hasta que se marquen como hechos.</string>
+    <string name="settings_reminder_summary_notification">Notificación de resumen de recordatorios</string>
+    <string name="settings_reminder_summary_notification_desc">Resumen silencioso de recordatorios vencidos y próximos</string>
+    <string name="settings_reliable_reminders">Recordatorios fiables</string>
+    <string name="settings_reliable_reminders_desc">Prioridad de temporización. Omite optimizaciones de batería para mayor precisión.</string>
+    <string name="settings_reliable_reminders_exact_desc">Activa los recordatorios en la hora exacta programada</string>
+    <string name="settings_run_in_background">Ejecutar en segundo plano</string>
+    <string name="settings_run_in_background_desc">Evita que el sistema ponga la app en reposo y retrase tus recordatorios</string>
+    <string name="settings_swipe_section">Gestos de deslizamiento</string>
+    <string name="settings_swipe_right_label">Deslizar a la derecha</string>
+    <string name="settings_swipe_left_label">Deslizar a la izquierda</string>
+    <string name="settings_swipe_reveal_title">Revelar</string>
+    <string name="settings_swipe_execute_title">Ejecutar</string>
+    <string name="settings_swipe_drag_hint">Cada deslizamiento revela tres acciones. Arrastra para reordenar.</string>
+    <string name="settings_swipe_tap_hint">Cada deslizamiento ejecuta una acción. Toca para cambiar la acción.</string>
+    <string name="settings_swipe_action_done_short">Hecho</string>
+    <string name="swipe_action_open">Editar</string>
+    <string name="swipe_action_duplicate">Duplicar</string>
+    <string name="swipe_action_toggle_star">Destacar</string>
+    <string name="swipe_action_unstar">Quitar destacado</string>
+    <string name="swipe_action_mark_done">Hecho</string>
+    <string name="swipe_action_mark_not_done">Reabrir</string>
+
+    <!-- Google Tasks import screen -->
+    <string name="google_tasks_import_tasks_title">Importar tareas</string>
+    <string name="google_tasks_import_method_grant_permission">Conectar Google</string>
+    <string name="google_tasks_import_method_manual_import">Importación manual</string>
+    <string name="google_tasks_import_intro_title">Conecta tus Tareas de Google</string>
+    <string name="google_tasks_import_intro_body">Conecta una cuenta de Google, elige las tareas que quieras y añádelas a Remember. Acceso de solo lectura, no se realizan cambios en Tareas de Google.</string>
+    <string name="google_tasks_import_takeout_title">Importar desde un archivo</string>
+    <string name="google_tasks_import_takeout_body">La forma más privada de mover tus datos. No requiere iniciar sesión. Solo selecciona el archivo de Takeout que descargaste de Google.</string>
+    <string name="google_tasks_import_takeout_step_1">1. Abre Google Takeout para Tareas, toca \"Siguiente paso\" y luego \"Crear exportación\"</string>
+    <string name="google_tasks_import_takeout_step_2">2. Revisa tu correo para el enlace de descarga. Descarga y extrae el archivo.</string>
+    <string name="google_tasks_import_takeout_step_3">3. Vuelve aquí y toca \"Elegir Tasks.json\"</string>
+    <string name="google_tasks_import_takeout_pick_json">Elegir Tasks.json</string>
+    <string name="google_tasks_import_takeout_open_takeout">Abrir Google Takeout</string>
+    <string name="google_tasks_import_takeout_collapse_summary" tools:ignore="PluralsCandidate">Se colapsaron %1$d instancias de tareas recurrentes en %2$d tareas</string>
+    <string name="google_tasks_import_pick_account">Elegir cuenta de Google</string>
+    <string name="google_tasks_import_pick_other_account">Usar otra cuenta</string>
+    <string name="google_tasks_import_continue_as">Continuar como %1$s</string>
+    <string name="google_tasks_import_switch_account">Cambiar cuenta</string>
+    <string name="google_tasks_import_signed_in_unknown_email">tu cuenta de Google</string>
+    <string name="google_tasks_import_loading">Cargando tus Tareas de Google…</string>
+    <string name="google_tasks_import_disconnecting">Desconectando cuenta de Google…</string>
+    <string name="google_tasks_import_empty_title">No hay tareas en %1$s</string>
+    <string name="google_tasks_import_empty_title_no_email">No hay tareas en tu cuenta de Google</string>
+    <string name="google_tasks_import_empty_body">Cuando añadas tareas en Tareas de Google aparecerán aquí</string>
+    <string name="google_tasks_import_due_label">Vence %1$s</string>
+    <string name="google_tasks_import_completed_chip">Completada</string>
+    <string name="google_tasks_import_already_imported_chip">Ya importada</string>
+    <string name="google_tasks_import_untitled_task">Tarea sin título</string>
+    <string name="google_tasks_import_run">Importar %1$d</string>
+    <string name="google_tasks_import_importing">Importando tareas…</string>
+    <string name="google_tasks_import_importing_progress" tools:ignore="PluralsCandidate">Importando %1$d / %2$d tareas</string>
+    <string name="google_tasks_import_mode_one_note_per_task">Una nota por tarea</string>
+    <string name="google_tasks_import_mode_group_by_list">Una nota por lista</string>
+    <string name="google_tasks_import_mode_list_as_checklist">Lista como lista de verificación</string>
+    <plurals name="google_tasks_import_done_snack">
+        <item quantity="one">%1$d tarea importada</item>
+        <item quantity="other">%1$d tareas importadas</item>
+    </plurals>
+    <string name="google_tasks_import_error_network">No se pudo acceder a Tareas de Google. Comprueba tu conexión e inténtalo de nuevo.</string>
+    <string name="google_tasks_import_error_consent">Se necesita consentimiento para importar Tareas de Google</string>
+    <string name="google_tasks_import_error_takeout_parse">No se pudo leer este archivo. Elige el archivo Tasks.json de Takeout de Google Tasks.</string>
+    <string name="google_tasks_import_error_auth_default">No se pudo iniciar sesión en Google. Prueba con otra cuenta.</string>
+    <string name="google_tasks_import_error_unknown_default">Algo salió mal al comunicarse con Tareas de Google</string>
+    <plurals name="google_tasks_import_search_hint">
+        <item quantity="one">Buscar %1$d tarea</item>
+        <item quantity="other">Buscar %1$d tareas</item>
+    </plurals>
+    <string name="google_tasks_import_skip_imported_pill">Omitir importadas</string>
+    <string name="google_tasks_import_overwrite_imported_pill">Sobrescribir importadas</string>
+    <string name="google_tasks_import_skip_imported_menu_label">Omitir ya importadas</string>
+    <string name="google_tasks_import_overwrite_imported_menu_label">Sobrescribir ya importadas</string>
+    <string name="google_tasks_import_hero_selected_of_total">seleccionadas de %1$d</string>
+    <string name="google_tasks_import_hero_caveat_compact">Las horas se establecen a las 9 AM, edita después de importar</string>
+    <string name="google_tasks_import_group_count_chip">%1$d / %2$d</string>
+    <string name="google_tasks_import_source_label">Origen</string>
+    <string name="google_tasks_import_source_google_subtitle" tools:ignore="PluralsCandidate">%1$d tareas · %2$d listas</string>
+    <string name="google_tasks_import_source_takeout_title">JSON de Takeout</string>
+    <string name="google_tasks_import_source_action_refresh">Actualizar desde Google</string>
+    <string name="google_tasks_import_source_action_switch_account">Cambiar cuenta de Google</string>
+    <string name="google_tasks_import_source_action_use_takeout">Usar JSON de Takeout</string>
+    <string name="google_tasks_import_source_action_connect_google">Conectar cuenta de Google</string>
+    <string name="google_tasks_import_source_action_disconnect">Desconectar</string>
+    <string name="google_tasks_import_source_action_cancel_takeout">Cancelar</string>
+    <plurals name="google_tasks_import_source_switch_confirm_title">
+        <item quantity="one">¿Descartar %1$d seleccionada?</item>
+        <item quantity="other">¿Descartar %1$d seleccionadas?</item>
+    </plurals>
+    <string name="google_tasks_import_source_switch_confirm_body">Ninguna de estas tareas se ha guardado en Remember todavía. ¿Cancelar y cambiar de origen?</string>
+    <string name="google_tasks_import_cancel_takeout_confirm_title">¿Cancelar importación?</string>
+    <string name="google_tasks_import_cancel_takeout_confirm_body">Ninguna de estas tareas se ha guardado en Remember todavía. ¿Cancelar y empezar de nuevo?</string>
+    <string name="google_tasks_import_leave_confirm_body">Ninguna de estas tareas se ha guardado en Remember todavía. ¿Salir de la importación?</string>
+    <string name="google_tasks_import_cancel_active_confirm_body">La importación aún está en ejecución. ¿Cancelar ahora? Las tareas ya guardadas permanecerán en Remember.</string>
+    <string name="google_tasks_import_cancel_active_confirm_action">Cancelar importación</string>
+    <string name="google_tasks_import_keep_importing">Seguir importando</string>
+    <string name="google_tasks_import_source_chip_expand_cd">Mostrar opciones de origen</string>
+    <string name="google_tasks_import_source_chip_collapse_cd">Ocultar opciones de origen</string>
+    <string name="google_tasks_import_group_collapse_cd">Contraer %1$s</string>
+    <string name="google_tasks_import_group_expand_cd">Expandir %1$s</string>
+    <string name="google_tasks_import_no_search_match">No hay coincidencias para \"%1$s\"</string>
+
+    <!-- Settings: backup and restore -->
+    <string name="settings_backup_section">Copia de seguridad y restauración</string>
+    <string name="filesystem_folder_picker_internal_storage">Almacenamiento interno</string>
+    <string name="settings_choose_local_backup_folder">Elegir carpeta local de copia de seguridad</string>
+    <string name="settings_choose_cloud_backup_file">Elegir archivo de copia de seguridad en la nube</string>
+    <string name="settings_local_backup_folder_hint">Carpeta para exportar copias de seguridad (notas, listas, ajustes)</string>
+    <string name="settings_cloud_backup_folder_hint">Archivo en la nube para exportar copias de seguridad (notas, listas, ajustes)</string>
+    <string name="settings_local_backup_folder_cleared">Carpeta local de copia de seguridad restablecida</string>
+    <string name="settings_cloud_backup_file_cleared">Archivo de copia de seguridad en la nube restablecido</string>
+    <string name="settings_export_select_folder_first">Primero selecciona una carpeta local o de nube para la copia de seguridad</string>
+    <string name="settings_include_media_in_backup">Incluir imágenes y archivos adjuntos</string>
+    <string name="settings_include_media_in_backup_hint">Esto aumenta significativamente el tamaño del archivo de copia de seguridad</string>
+    <string name="settings_include_media_in_backup_tooltip">Cuando está desactivado, la copia de seguridad solo guarda enlaces a imágenes y adjuntos. Es posible que esos archivos no se restauren en otro dispositivo.</string>
+    <string name="settings_include_media_info_cd">Explicar copia de seguridad de multimedia</string>
+    <string name="settings_compress_images">Comprimir imágenes</string>
+    <string name="settings_compress_images_hint">Redimensionar y comprimir imágenes para ahorrar espacio</string>
+    <string name="settings_compress_images_tooltip">Los nuevos archivos adjuntos de imagen y fotos de portada se redimensionarán, comprimirán a JPEG y se les eliminarán los metadatos (como ubicación GPS y etiquetas) para ahorrar espacio. Los archivos multimedia existentes y los que no sean imágenes no se verán afectados. Desactivar esto más tarde no puede restaurar las imágenes originales sin comprimir.</string>
+    <string name="settings_compress_images_info_cd">Explicar compresión de imágenes</string>
+    <string name="settings_auto_export_on_change">Exportación automática al salir de la app</string>
+    <string name="settings_auto_export_on_change_hint">Guarda una copia de seguridad completa al salir de la app después de realizar cambios</string>
+    <string name="settings_scheduled_export">Copia de seguridad programada diaria</string>
+    <string name="settings_scheduled_export_hint">Realiza una copia de seguridad automática una vez al día en las carpetas configuradas</string>
+    <string name="settings_import_rules">Importar copia de seguridad</string>
+    <string name="settings_export_now">Exportar copia de seguridad</string>
+    <string name="settings_restore_backup">Restaurar copia de seguridad</string>
+    <string name="settings_backup_help_icon_cd">Explicar importación y restauración</string>
+    <string name="settings_backup_help_title">Importar vs Restaurar</string>
+    <string name="settings_backup_help_body">Importar añade notas de una copia de seguridad a tu colección existente, lo que puede generar duplicados. Restaurar borra completamente todos los datos actuales antes de importar la copia de seguridad para garantizar un estado limpio.</string>
+    <string name="settings_restore_confirm_title">¿Reemplazar todas las notas?</string>
+    <string name="settings_restore_confirm_body">Esto eliminará permanentemente todas las notas y listas de la app y las reemplazará con la copia de seguridad. Esta acción no se puede deshacer.</string>
+    <string name="settings_restore_media_missing_warning">Esta copia de seguridad no incluye todos los archivos de imagen y adjuntos. Los archivos faltantes permanecerán como enlaces y es posible que no se abran después de la restauración.</string>
+    <string name="settings_restore_go_ahead">Reemplazar e importar</string>
+    <string name="cloud_provider_google_drive">Google Drive</string>
+    <string name="cloud_provider_onedrive">OneDrive</string>
+    <string name="cloud_provider_dropbox">Dropbox</string>
+    <string name="cloud_provider_box">Box</string>
+
+    <!-- Settings: security -->
+    <string name="settings_app_lock_title">Bloqueo de la app</string>
+    <string name="settings_app_lock_enabled">Usar desbloqueo del dispositivo para abrir Remember</string>
+    <string name="settings_app_lock_disabled">Usa el PIN, patrón, contraseña o datos biométricos de tu dispositivo</string>
+    <string name="settings_app_lock_no_device_lock">Configura primero un bloqueo de pantalla en el dispositivo</string>
+    <string name="settings_biometric_title">Desbloqueo biométrico</string>
+    <string name="settings_biometric_no_hardware">No hay datos biométricos registrados en el dispositivo</string>
+    <string name="settings_biometric_need_lock">Activa primero el bloqueo de la app</string>
+    <string name="settings_biometric_enabled">Activado</string>
+    <string name="settings_biometric_disabled">Desactivado</string>
+
+    <!-- Settings: updates -->
+    <string name="settings_check_for_updates">Buscar actualizaciones</string>
+    <string name="settings_update_check_frequency">Buscar actualizaciones automáticamente</string>
+    <string name="settings_update_schedule_app_start">Al inicio: cuando se abre la app</string>
+    <string name="settings_update_schedule_daily_21">Diario: todos los días a las 9 PM</string>
+    <string name="settings_update_schedule_monday_21">Semanal: todos los lunes a las 9 PM</string>
+    <string name="settings_update_schedule_never">Nunca</string>
+    <string name="settings_save_update_apk_to_downloads">Guardar APK de actualización en la carpeta Descargas</string>
+    <string name="settings_notify_new_updates">Recibir notificación de nuevas actualizaciones</string>
+    <string name="settings_notify_updates_need_auto_check">Activa \"Buscar actualizaciones automáticamente\" primero</string>
+    <string name="settings_notify_updates_enable_notifications">Permitir notificaciones de Remember</string>
+    <string name="settings_update_available_button">Actualización disponible - %1$s</string>
+    <string name="settings_update_available">v%1$s disponible</string>
+    <string name="settings_update_current_version">Versión actual: %1$s</string>
+    <string name="settings_up_to_date">Estás al día</string>
+    <string name="settings_update_skip_version">Omitir versión</string>
+    <string name="settings_changelog_load_failed">No se pudo cargar el registro de cambios</string>
+    <string name="settings_changelog_previous">Anterior</string>
+    <string name="settings_changelog_next">Siguiente</string>
+    <string name="settings_changelog_page_indicator">%1$d de %2$d</string>
+    <string name="settings_open_fdroid">Abrir F-Droid</string>
+    <string name="settings_download_install">Descargar actualización (v%1$s)</string>
+    <string name="settings_downloading">Descargando…</string>
+    <string name="settings_downloading_percent">Descargando %1$d%%</string>
+    <string name="settings_installing">Instalando…</string>
+    <string name="settings_update_check_failed">No se pudo comprobar si hay actualizaciones</string>
+    <string name="settings_update_download_failed">No se pudo descargar la actualización</string>
+    <string name="settings_play_in_app_update_failed">No se pudo iniciar la actualización. Prueba de nuevo en \"Buscar actualizaciones\".</string>
+    <string name="settings_play_in_app_update_canceled">La actualización fue cancelada. Puedes intentarlo de nuevo en Actualizaciones en Ajustes.</string>
+    <string name="settings_update_play_in_progress_body">Ya hay una actualización de Google Play en curso. Continúa para abrir Play y finalizar la descarga o instalación.</string>
+    <string name="settings_update_resume_play">Continuar actualización</string>
+    <string name="settings_update_apk_save_to_downloads_failed">La actualización se descargó, pero guardar una copia en Descargas falló</string>
+    <string name="notification_channel_updates_name">Actualizaciones de la app</string>
+    <string name="notification_channel_updates_description">Alertas cuando hay una nueva versión de la aplicación disponible</string>
+    <string name="notification_update_available_title">Actualización de la app disponible</string>
+    <string name="notification_update_available_text">La versión %1$s está lista para instalar</string>
+    <string name="update_bar_available_title">Actualización de la app disponible</string>
+    <string name="update_bar_available_action">Ver</string>
+    <string name="play_update_bar_downloading_title">Descargando actualización</string>
+    <string name="play_update_bar_downloading">de Play Store…</string>
+    <string name="play_update_bar_downloading_bytes">%1$s de %2$s</string>
+    <string name="play_update_bar_install_title">Nueva versión lista</string>
+    <string name="play_update_bar_install_subtitle">Reinicia para aplicar</string>
+    <string name="play_update_bar_install_action">Instalar y reiniciar</string>
+    <string name="settings_share_diagnostics">Compartir registro de diagnóstico</string>
+    <string name="settings_share_diagnostics_chooser">Compartir registro de diagnóstico</string>
+
+    <!-- Settings: about -->
+    <string name="settings_byline">Hecho con ❤️ por Bikram Agarwal</string>
+    <string name="settings_rate_on_play_store">Valorar en Play Store</string>
+    <string name="settings_star_on_github">Dar estrella en GitHub</string>
+    <string name="settings_about_other_apps">Más de Bikram</string>
+    <string name="settings_about_filepipe_name">FilePipe</string>
+    <string name="settings_about_filepipe_tagline">Organiza tus archivos automáticamente</string>
+    <string name="settings_about_obtainx_name">ObtainX</string>
+    <string name="settings_about_obtainx_tagline">Obtén actualizaciones de la app directamente desde la fuente</string>
+    <string name="settings_about_website">Sitio web</string>
+    <string name="settings_about_privacy_policy">Política de privacidad</string>
+    <string name="settings_about_terms">Términos</string>
+    <!-- Developer options -->
+    <string name="dev_options_title">Opciones de desarrollador</string>
+    <string name="dev_options_back_cd">Atrás</string>
+    <string name="dev_options_mode_subtitle">Desactiva para ocultar esta página en Ajustes</string>
+    <string name="dev_options_warning">Estas son herramientas de desarrollador, no funciones reales de la app. No uses esto a menos que sepas lo que haces. Algunas acciones cambian permanentemente el estado de la app.</string>
+    <plurals name="dev_options_taps_remaining">
+        <item quantity="one">%1$d toque más para activar opciones de desarrollador</item>
+        <item quantity="other">%1$d toques más para activar opciones de desarrollador</item>
+    </plurals>
+
+    <!-- Developer options: sections -->
+    <string name="dev_options_section_info">Información</string>
+    <string name="dev_options_section_overview">Resumen</string>
+    <string name="dev_options_section_permissions_storage">Permisos y almacenamiento</string>
+    <string name="dev_options_section_database">Base de datos</string>
+    <string name="dev_options_section_mock_operations">Operaciones simuladas</string>
+    <string name="dev_options_section_workers">Trabajadores y programación</string>
+    <string name="dev_options_section_settings">Ajustes</string>
+    <string name="dev_options_section_reset">Restablecer</string>
+    <string name="dev_options_section_diagnostics">Diagnóstico</string>
+
+    <!-- Developer options: data population -->
+    <string name="dev_options_create_mock_notes">Crear notas simuladas</string>
+    <string name="dev_options_mock_notes_already_exist">Ya existen — elimínalas primero</string>
+    <string name="dev_options_clear_mock_data">Eliminar notas simuladas</string>
+    <plurals name="dev_options_toast_mock_created">
+        <item quantity="one">%1$d nota simulada creada</item>
+        <item quantity="other">%1$d notas simuladas creadas</item>
+    </plurals>
+    <string name="dev_options_toast_mock_cleared">Notas simuladas eliminadas</string>
+
+    <!-- Developer options: notification testing -->
+    <string name="dev_options_notif_low">BAJA</string>
+    <string name="dev_options_notif_default">PREDETERMINADA</string>
+    <string name="dev_options_notif_high">ALTA</string>
+    <string name="dev_options_notif_big_picture">Imagen grande</string>
+    <string name="dev_options_notif_big_text">Texto grande</string>
+    <string name="dev_options_notif_summary">Resumen</string>
+    <string name="dev_options_notif_overdue">Vencida (mantener hasta que se complete)</string>
+    <string name="dev_options_toast_keep_until_done_enabled">\'Mantener recordatorios hasta que se completen\' habilitado temporalmente</string>
+    <string name="dev_options_notif_mock_update">Simular flujo de actualización</string>
+    <string name="dev_options_notif_mock_play">Simular flujo de actualización de PlayStore</string>
+
+    <!-- Developer options: settings rows -->
+    <string name="dev_options_open_app_details">Detalles de la app</string>
+    <string name="dev_options_open_notif_settings">Ajustes de notificaciones</string>
+    <string name="dev_options_open_alarm_settings">Ajustes de alarmas y recordatorios</string>
+    <string name="dev_options_open_battery_settings">Ajustes de optimización de batería</string>
+    <string name="dev_options_reset_skipped_update">Restablecer versión omitida</string>
+    <string name="dev_options_reset_first_launch">Restablecer marca de primer inicio</string>
+    <string name="dev_options_clear_update_dedupe">Limpiar deduplicación de notificaciones de actualización</string>
+    <string name="dev_options_delete_cached_update_apk">Eliminar APK de actualización en caché</string>
+    <string name="dev_options_toast_skipped_cleared">Versión omitida restablecida</string>
+    <string name="dev_options_toast_first_launch_reset">Marca de primer inicio restablecida</string>
+    <string name="dev_options_toast_update_dedupe_cleared">Deduplicación de notificaciones de actualización limpiada</string>
+    <string name="dev_options_toast_cached_update_apk_deleted">APK de actualización en caché eliminado</string>
+    <string name="dev_options_toast_no_cached_update_apk">No se encontró APK de actualización en caché</string>
+    <string name="dev_options_sync_backup_worker">Sincronizar trabajador de copia de seguridad programada</string>
+    <string name="dev_options_sync_update_worker">Sincronizar trabajador de comprobación de actualizaciones</string>
+    <string name="dev_options_sync_trash_worker">Sincronizar trabajador de limpieza de papelera</string>
+    <string name="dev_options_toast_workers_synced">Programación de trabajadores sincronizada</string>
+
+    <!-- Developer options: already unlocked -->
+    <string name="dev_options_already_unlocked">No es necesario. Las opciones de desarrollador ya están activadas.</string>
+
+    <!-- Developer options: database -->
+    <string name="dev_options_info_version">Versión</string>
+    <string name="dev_options_info_package">Paquete</string>
+    <string name="dev_options_info_variant">Variante</string>
+    <string name="dev_options_info_installer">Instalador</string>
+    <string name="dev_options_info_android">Android</string>
+    <string name="dev_options_info_device">Dispositivo</string>
+    <string name="dev_options_info_target_sdk">SDK objetivo</string>
+    <string name="dev_options_info_database">Base de datos</string>
+    <string name="dev_options_info_first_install">Primera instalación</string>
+    <string name="dev_options_info_last_update">Última actualización</string>
+    <string name="dev_options_info_notifications_enabled">Notificaciones activadas</string>
+    <string name="dev_options_info_exact_alarms">Acceso a alarmas exactas</string>
+    <string name="dev_options_info_battery_optimization">Optimización de batería</string>
+    <string name="dev_options_info_persisted_uri_grants">Concesiones URI persistentes</string>
+    <string name="dev_options_info_backup_destinations">Destinos de copia de seguridad</string>
+    <string name="dev_options_info_files_free_space">Espacio libre en archivos</string>
+    <string name="dev_options_info_cache_free_space">Espacio libre en caché</string>
+    <string name="dev_options_value_unknown">desconocido</string>
+    <string name="dev_options_value_ignored">ignorado</string>
+    <string name="dev_options_value_active">activo</string>
+    <string name="dev_options_db_stat_active_notes">Notas activas</string>
+    <string name="dev_options_db_stat_archived">Archivadas</string>
+    <string name="dev_options_db_stat_trash">Papelera</string>
+    <string name="dev_options_db_stat_file_size">Tamaño del archivo DB</string>
+    <string name="dev_options_db_stat_images_stored">Imágenes almacenadas</string>
+    <string name="dev_options_db_stat_images_linked">Imágenes vinculadas</string>
+    <string name="dev_options_db_stat_attachments_stored">Adjuntos almacenados</string>
+    <string name="dev_options_db_stat_attachments_linked">Adjuntos vinculados</string>
+
+    <!-- Developer options: diagnostic tools -->
+    <string name="dev_options_force_refresh">Forzar actualización de widgets</string>
+    <string name="dev_options_force_crash">Forzar cierre</string>
+    <string name="dev_options_copy_diagnostics">Copiar registros de diagnóstico</string>
+    <string name="dev_options_export_logs">Exportar registros de diagnóstico</string>
+    <string name="dev_options_clear_logs">Limpiar registros de diagnóstico</string>
+    <string name="dev_options_toast_refresh">Actualización forzada</string>
+    <string name="dev_options_toast_diagnostics_copied">Diagnóstico copiado al portapapeles</string>
+    <string name="dev_options_toast_logs_cleared">Registros de diagnóstico limpiados</string>
+    <string name="dev_options_export_logs_chooser">Exportar registro de diagnóstico</string>
+
+    <!-- Developer options: reset all -->
+    <string name="dev_options_reset_all">Restablecer todas las preferencias</string>
+    <string name="dev_options_reset_all_title">¿Restablecer todas las preferencias?</string>
+    <string name="dev_options_reset_all_message">Esto restablece todas las preferencias mostradas en la página de Ajustes y oculta nuevamente las Opciones de desarrollador.\n\nLas notas, listas y sus metadatos no se ven afectados.\n\nESTO NO ES UNA SIMULACIÓN. OCURRIRÁ REALMENTE, SIN POSIBILIDAD DE DESHACER.</string>
+    <string name="dev_options_reset_all_confirm">Restablecer</string>
+    <string name="dev_options_toast_reset_done">Todas las preferencias restablecidas</string>
+
+    <!-- Developer options: test notification content -->
+    <string name="dev_options_test_notif_body">Prueba de opciones de desarrollador — toca Posponer o Hecho para probar acciones.</string>
+    <string name="dev_options_test_notif_big_picture_body">Notificación con imagen destacada — toca Posponer o Hecho para probar acciones.</string>
+    <string name="dev_options_test_notif_overdue_body">Descarta esta notificación; debería reaparecer hasta que toques Hecho.</string>
+    <string name="dev_options_test_notif_summary_title">3 recordatorios vencidos</string>
+    <string name="dev_options_test_notif_summary_text">Comprar leche · Llamar al médico · Preparar viaje</string>
+    <string name="dev_options_test_notif_summary_line1">Comprar leche — vencido</string>
+    <string name="dev_options_test_notif_summary_line2">Llamar al médico — vencido</string>
+    <string name="dev_options_test_notif_summary_line3">Preparar viaje — hoy</string>
+
+    <!-- Diagnostics export: header, system snapshot, preferences snapshot -->
+    <string name="diagnostics_title">Diagnóstico de Remember</string>
+    <string name="diagnostics_generated_format">Generado: %1$s</string>
+    <string name="diagnostics_package_format">Paquete: %1$s</string>
+    <string name="diagnostics_version_format">Versión: %1$s (%2$d)</string>
+    <string name="diagnostics_flavor_format">Variante: %1$s</string>
+    <string name="diagnostics_build_type_format">Tipo de compilación: %1$s</string>
+    <string name="diagnostics_device_format">Dispositivo: %1$s %2$s</string>
+    <string name="diagnostics_android_format">Android: %1$s (SDK %2$d)</string>
+    <string name="diagnostics_section_environment">Entorno</string>
+    <string name="diagnostics_locale_format">Configuración regional: %1$s</string>
+    <string name="diagnostics_timezone_format">Zona horaria: %1$s</string>
+    <string name="diagnostics_uptime_format">Tiempo de actividad: %1$d ms</string>
+    <string name="diagnostics_elapsed_realtime_format">Tiempo real transcurrido: %1$d ms</string>
+    <string name="diagnostics_font_scale_format">Escala de fuente: %1$.2f</string>
+    <string name="diagnostics_screen_dp_format">Pantalla en dp: %1$d x %2$d, más pequeña=%3$d</string>
+    <string name="diagnostics_display_pixels_format">Píxeles de pantalla: %1$d x %2$d</string>
+    <string name="diagnostics_display_density_format">Densidad de pantalla: densidad=%1$.2f, densidadEscalada=%2$.2f, dpi=%3$d</string>
+    <string name="diagnostics_target_sdk_format">SDK objetivo: %1$s</string>
+    <string name="diagnostics_first_install_format">Primera instalación: %1$s</string>
+    <string name="diagnostics_last_update_format">Última actualización: %1$s</string>
+    <string name="diagnostics_installer_format">Instalador: %1$s</string>
+    <string name="diagnostics_launcher_package_format">Paquete del lanzador: %1$s</string>
+    <string name="diagnostics_files_dir_space_format" tools:ignore="PluralsCandidate">Espacio asignable en directorio de archivos: %1$d bytes</string>
+    <string name="diagnostics_cache_dir_space_format" tools:ignore="PluralsCandidate">Espacio asignable en directorio de caché: %1$d bytes</string>
+    <string name="diagnostics_external_storage_state_format">Estado del almacenamiento externo: %1$s</string>
+    <string name="diagnostics_section_permissions_app_access">Permisos y acceso a la app</string>
+    <string name="diagnostics_notifications_enabled_format">Notificaciones activadas: %1$s</string>
+    <string name="diagnostics_post_notifications_granted_format">POST_NOTIFICATIONS concedido: %1$s</string>
+    <string name="diagnostics_ignoring_battery_optimizations_format">Ignorando optimización de batería: %1$s</string>
+    <string name="diagnostics_exact_alarms_allowed_format">Alarmas exactas permitidas: %1$s</string>
+    <string name="diagnostics_section_settings">Ajustes de Remember</string>
+    <string name="diagnostics_settings_snapshot_unavailable">Instantánea de ajustes no disponible.</string>
+    <string name="diagnostics_theme_mode_format">Modo de tema: %1$s</string>
+    <string name="diagnostics_color_source_format">Fuente de color: %1$s</string>
+    <string name="diagnostics_palette_style_format">Estilo de paleta: %1$s</string>
+    <string name="diagnostics_saved_custom_seeds_format">Colores personalizados guardados: %1$d</string>
+    <string name="diagnostics_active_custom_seed_format">Conjunto de colores personalizados activo: %1$s</string>
+    <string name="diagnostics_gradient_background_format">Fondo degradado: %1$s</string>
+    <string name="diagnostics_surface_shading_format">Sombreado de superficie: %1$s</string>
+    <string name="diagnostics_hero_on_cards_format">Imágenes destacadas en tarjetas: %1$s</string>
+    <string name="diagnostics_adaptive_note_themes_format">Temas adaptativos de notas: %1$s</string>
+    <string name="diagnostics_blur_bars_format">Barras difuminadas: %1$s</string>
+    <string name="diagnostics_swipe_gesture_mode_format">Modo de gesto de deslizamiento: %1$s</string>
+    <string name="diagnostics_swipe_start_to_end_format">Deslizar de inicio a fin: %1$s</string>
+    <string name="diagnostics_swipe_end_to_start_format">Deslizar de fin a inicio: %1$s</string>
+    <string name="diagnostics_keep_reminders_until_done_format">Mantener recordatorios hasta completar: %1$s</string>
+    <string name="diagnostics_reminder_summary_enabled_format">Notificación de resumen de recordatorios: %1$s</string>
+    <string name="diagnostics_auto_export_on_change_format">Exportación automática al cambiar: %1$s</string>
+    <string name="diagnostics_scheduled_export_enabled_format">Exportación programada activada: %1$s</string>
+    <string name="diagnostics_include_media_in_backup_format">Incluir multimedia en copia de seguridad: %1$s</string>
+    <string name="diagnostics_local_backup_folder_format">Carpeta local de copia de seguridad: %1$s</string>
+    <string name="diagnostics_cloud_backup_folder_format">Carpeta de copia de seguridad en la nube: %1$s</string>
+    <string name="diagnostics_update_check_schedule_format">Programación de comprobación de actualizaciones: %1$s</string>
+    <string name="diagnostics_notify_new_updates_format">Notificar nuevas actualizaciones: %1$s</string>
+    <string name="diagnostics_save_apk_downloads_format">Guardar APK de actualización en Descargas: %1$s</string>
+    <string name="diagnostics_apk_downloads_copy_succeeded_format">Copia del APK en Descargas exitosa: %1$s</string>
+    <string name="diagnostics_in_app_review_never_ask_again_format">Revisión en la app \"no preguntar de nuevo\": %1$s</string>
+    <string name="diagnostics_quick_capture_enabled_format">Captura rápida activada: %1$s</string>
+    <string name="diagnostics_intro_seen_format">Introducción vista: %1$s</string>
+    <string name="diagnostics_app_lock_enabled_format">Bloqueo de app activado: %1$s</string>
+    <string name="diagnostics_app_lock_biometric_format">Bloqueo biométrico de app: %1$s</string>
+    <string name="diagnostics_app_lock_has_pin_format">PIN de bloqueo de app configurado: %1$s</string>
+    <string name="diagnostics_section_notification_channels">Canales de notificación</string>
+    <string name="diagnostics_no_channels_registered">No hay canales registrados.</string>
+    <string name="diagnostics_notification_channel_format">%1$s: importancia=%2$d, sonido=%3$s, vibración=%4$s, luces=%5$s, bypassDnd=%6$s, visibilidadBloqueo=%7$d</string>
+    <string name="diagnostics_section_widget_options">Opciones de widgets</string>
+    <string name="diagnostics_no_widgets_installed">No hay widgets instalados.</string>
+    <string name="diagnostics_widget_options_format">%1$s #%2$d: mín=%3$d x %4$d dp, máx=%5$d x %6$d dp, categoríaAnfitrión=%7$d</string>
+    <string name="diagnostics_section_app_log">Registro de la app</string>
+    <string name="diagnostics_no_app_log_entries">Aún no se han capturado entradas de registro de la app.\n</string>
+    <string name="diagnostics_uncaught_exception_format">Excepción no capturada en %1$s</string>
+    <string name="diagnostics_value_unknown">desconocido</string>
+    <string name="diagnostics_value_not_required">no requerido</string>
+    <string name="diagnostics_value_not_configured">no configurado</string>
+    <string name="diagnostics_value_configured_content_uri">configurado: URI de contenido</string>
+    <string name="diagnostics_value_configured_filesystem_path">configurado: ruta del sistema de archivos</string>
+    <string name="diagnostics_value_configured_reference_format">configurado: referencia %1$s</string>
+
+</resources>

@@ -1,0 +1,107 @@
+{
+  "lastBatchCompleted": 1,
+  "lastCheckpoint": "2026-07-10T13:57:25Z",
+  "planId": "PLAN-20260710-I18N-MULTI-LANGUAGE",
+  "tasks": [
+    {
+      "content": "Migrar hardcoded string en OptionsPanel.kt:553 a stringResource",
+      "id": "F1-T1",
+      "status": "completed"
+    },
+    {
+      "content": "Crear app/src/main/res/xml/locales_config.xml",
+      "id": "F3-T1",
+      "status": "completed"
+    },
+    {
+      "content": "Agregar android:localeConfig al AndroidManifest.xml",
+      "id": "F3-T2",
+      "status": "completed"
+    },
+    {
+      "content": "Agregar resourceConfigurations a build.gradle.kts",
+      "id": "F3-T3",
+      "status": "pending"
+    },
+    {
+      "content": "Crear values-es/strings.xml",
+      "id": "F2-T1",
+      "status": "pending"
+    },
+    {
+      "content": "Crear values-fr/strings.xml",
+      "id": "F2-T2",
+      "status": "pending"
+    },
+    {
+      "content": "Crear values-de/strings.xml",
+      "id": "F2-T3",
+      "status": "pending"
+    },
+    {
+      "content": "Crear values-pt/strings.xml",
+      "id": "F2-T4",
+      "status": "pending"
+    },
+    {
+      "content": "Crear values-it/strings.xml",
+      "id": "F2-T5",
+      "status": "pending"
+    },
+    {
+      "content": "Crear strings_icons.xml traducidos para es,fr,de,pt,it",
+      "id": "F2-T6",
+      "status": "pending"
+    },
+    {
+      "content": "Crear LanguageSettingsScreen.kt",
+      "id": "F4-T1",
+      "status": "pending"
+    },
+    {
+      "content": "Agregar strings de settings_language",
+      "id": "F4-T2",
+      "status": "pending"
+    },
+    {
+      "content": "Crear Fastlane metadata es-ES",
+      "id": "F5-T1",
+      "status": "pending"
+    },
+    {
+      "content": "Crear Fastlane metadata fr-FR",
+      "id": "F5-T2",
+      "status": "pending"
+    },
+    {
+      "content": "Crear Fastlane metadata de-DE",
+      "id": "F5-T3",
+      "status": "pending"
+    },
+    {
+      "content": "Crear Fastlane metadata pt-BR",
+      "id": "F5-T4",
+      "status": "pending"
+    },
+    {
+      "content": "Crear Fastlane metadata it-IT",
+      "id": "F5-T5",
+      "status": "pending"
+    },
+    {
+      "content": "Ejecutar lintRelease",
+      "id": "F6-T1",
+      "status": "pending"
+    },
+    {
+      "content": "Actualizar README.md",
+      "id": "F7-T1",
+      "status": "pending"
+    },
+    {
+      "content": "Crear docs/TRANSLATIONS.md",
+      "id": "F7-T2",
+      "status": "pending"
+    }
+  ]
+}

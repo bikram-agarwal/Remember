@@ -409,6 +409,7 @@
     <string name="options_attachments">Attachments</string>
     <string name="options_created">Created: %1$s</string>
     <string name="options_updated">Updated: %1$s</string>
+    <string name="options_reminders_more">+%1$d more</string>
     <plurals name="options_tags_more_count">
         <item quantity="one">+%1$d more</item>
         <item quantity="other">+%1$d more</item>
@@ -758,8 +759,12 @@
     <string name="settings_section_appearance">Appearance</string>
     <string name="settings_section_security">Security</string>
     <string name="settings_updates_section">Updates</string>
+    <string name="settings_language_section">Language</string>
     <string name="settings_section_about">About</string>
     <string name="settings_open_help_cd">Open help</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_language_desc">Choose the app language</string>
+    <string name="settings_language_system_default">System default</string>
     <string name="help_title">Help</string>
     <string name="help_expand_all_cd">Expand all</string>
     <string name="help_collapse_all_cd">Collapse all</string>

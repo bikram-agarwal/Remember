@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="icon_section_notes_writing">Notas e escrita</string>
+    <string name="icon_section_tasks_dates_priority">Tarefas, datas e prioridade</string>
+    <string name="icon_section_money_bills">Dinheiro e contas</string>
+    <string name="icon_section_home_chores">Casa e tarefas</string>
+    <string name="icon_section_travel_places">Viagens e lugares</string>
+    <string name="icon_section_food_drinks">Comida e bebidas</string>
+    <string name="icon_section_health_wellness_sports">Saúde, bem-estar e esportes</string>
+    <string name="icon_section_media_entertainment">Mídia e entretenimento</string>
+    <string name="icon_section_people_communication">Pessoas e comunicação</string>
+    <string name="icon_section_devices_tech">Dispositivos e tecnologia</string>
+    <string name="icon_section_weather_misc">Clima e diversos</string>
+    <string name="icon_picker_brand_separator">Marcas</string>
+    <string name="icon_section_brand_google">Google</string>
+    <string name="icon_section_brand_streaming">Streaming</string>
+    <string name="icon_section_brand_money">Dinheiro</string>
+    <string name="icon_section_brand_social">Social</string>
+    <string name="icon_section_brand_games">Jogos</string>
+    <string name="icon_section_brand_others">Outros</string>
+</resources>

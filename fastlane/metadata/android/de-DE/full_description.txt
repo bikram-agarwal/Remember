@@ -1,0 +1,40 @@
+Remember basiert auf einer einfachen Idee: Wenn du eine Erinnerung verwirfst, ohne die Aufgabe zu erledigen, kommt sie zurück. Kein wichtiges Element verschwindet nur, weil du versehentlich eine Benachrichtigung weggewischt hast.
+
+Markiere die Notiz als erledigt, und die Erinnerung ist für immer weg.
+
+<b>━━ 📌 ERINNERUNGEN, DIE HAFTEN ━━</b>
+Behalte Erinnerungen sichtbar, bis sie tatsächlich erledigt sind. Wähle aus normalen Erinnerungen, Erinnerungen mit hoher Wichtigkeit mit Heads-up-Alerts oder einer leisen Zusammenfassungsbenachrichtigung, die überfällige und anstehende Elemente in deinem Benachrichtigungsfeld angeheftet hält.
+
+<b>━━ 🔔 BENACHRICHTIGUNGSAKTIONEN ━━</b>
+Füge nützliche Ein-Tipp-Aktionen direkt zu Erinnerungsbenachrichtigungen hinzu, damit du handeln kannst, ohne die App zu öffnen:
+* Anrufen, Nachrichten oder E-Mail
+* Wegbeschreibung abrufen
+* Link, App oder Verknüpfung öffnen
+* Text kopieren oder Inhalte teilen
+
+<b>━━ 💤 NATÜRLICHES SCHLUMMERN ━━</b>
+Schlummern mit benutzerfreundlichen Voreinstellungen — bald, heute später, heute Abend und morgen früh — ohne die richtige Zeit suchen zu müssen.
+
+<b>━━ 📅 WIEDERKEHRENDE ZEITPLÄNE ━━</b>
+Erstelle tägliche, wöchentliche, monatliche oder jährliche Erinnerungen. Remember unterstützt auch reichhaltigere Kalendermuster wie „jeden letzten Freitag im Monat", mit optionalen Enddaten oder Anzahlen.
+
+<b>━━ 📝 MARKDOWN-NOTIZEN UND CHECKLISTEN ━━</b>
+Schreibe umfangreiche Markdown-Notizen mit Überschriften, Fett, Kursiv, Unterstrichen, Links und Codeblöcken. Erstelle verschachtelte Checklisten für Einkäufe, Packlisten, Projektschritte oder alles, was von Struktur profitiert.
+
+<b>━━ 🔍 ORGANISIEREN UND FINDEN ━━</b>
+Verwende Tags, Sterne, Archiv, Papierkorb, Volltextsuche, Filter, Sortierung und Massenaktionen, um deine Notizen übersichtlich zu halten.
+
+<b>━━ 📱 WIDGETS UND SCHNELLERFASSUNG ━━</b>
+Startbildschirm-Widgets für anstehende Erinnerungen, markierte Notizen und Schnellerfassung. Eine dauerhafte Benachrichtigung kann die Notizerstellung jederzeit einen Tipp entfernt halten.
+
+<b>━━ ☁️ IMPORT VON GOOGLE TASKS ━━</b>
+Wechsle zu Remember von Google Tasks mit einem verbundenen Konto oder einer Google Takeout-Datei. Der Import ist schreibgeschützt; Remember ändert oder löscht deine Google Tasks-Daten nicht.
+
+<b>━━ 💾 SICHERUNG UND WIEDERHERSTELLUNG ━━</b>
+Exportiere deine Notizen und Einstellungen in ein Backup, optional mit angehängten Medien. Stelle beim Wechsel zu einem neuen Gerät wieder her, oder importiere ein Backup, um Notizen in deine aktuelle Sammlung zusammenzuführen.
+
+<b>━━ 🎨 MACH ES ZU DEINEM ━━</b>
+Wähle Material You Hintergrundfarben, handabgestimmte Farbvoreinstellungen, eigene benutzerdefinierte Farben, Palettenstile, Verlaufshintergründe, schwarzen OLED-Modus, Coverbilder und mehr. Die Anpassung ist tiefgehend — die App kann sehr anders aussehen und sich anfühlen als jede andere Notiz-App auf deinem Telefon.
+
+<b>━━ 🔒 STANDARDMÄSSIG PRIVAT ━━</b>
+Deine Notizen werden vollständig lokal gespeichert. Kein Tracking, keine Analysen, keine automatisierte Hintergrund-Telemetrie. Keine Daten verlassen dein Telefon ohne deine ausdrückliche Aktion (wie optionale Update-Prüfungen oder manuelles Exportieren eines Backups).

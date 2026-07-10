@@ -77,6 +77,7 @@ extensions.configure<ApplicationExtension>("android") {
         versionName = "1.1.7"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+        resourceConfigurations += listOf("en", "es", "fr", "de", "pt", "it")
     }
 
     signingConfigs {
