@@ -133,7 +133,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setVisibility(notificationVisibility(note))
                     .setContentIntent(openNotePendingIntent(context, note.id))
                     .setDeleteIntent(dismissPendingIntent(context, note.id, reminderIndex).takeIf { keepUntilDone })
-                    .setOngoing(true)
+                    .setOngoing(false)
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(onlyAlertOnce)
 

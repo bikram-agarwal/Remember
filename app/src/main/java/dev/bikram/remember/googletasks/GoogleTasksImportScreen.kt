@@ -375,8 +375,7 @@ fun GoogleTasksImportRoute(
                     .padding(
                         top = if (twoPane) 0.dp else padding.calculateTopPadding(),
                         bottom = if (twoPane) 0.dp else padding.calculateBottomPadding(),
-                    )
-                    .wrapContentWidth(Alignment.CenterHorizontally)
+                    ).wrapContentWidth(Alignment.CenterHorizontally)
                     .widthIn(max = if (twoPane) 900.dp else 720.dp),
         ) {
             if (twoPane) {

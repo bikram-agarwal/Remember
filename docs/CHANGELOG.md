@@ -1,3 +1,18 @@
+### v1.1.8: Quick Tiles, Wearable notifications
+
+## ✨ New Features
+- **Quick Settings tiles** — add "New note" and "New list" tiles to your Quick Settings panel to jump straight into creating one.
+- **Notifications to wearables** — Reminder notifications can now be mirrored to connected watches/wearables too.
+
+## 🛠 Improved Features
+- Long **checklist items** now wrap onto multiple lines instead of being cut off at one line.
+- **Big text / large display sizes** are handled far better across the app: settings backup buttons, note timestamps, and the update/notification banners now reflow or resize instead of overlapping or being cut off.
+- **Reminder date & time pickers** now fit properly in landscape and at large text sizes.
+- **Bottom sheets** are more compact in landscape, and while you're typing the title and buttons step out of the way so the keyboard no longer covers the field.
+- An **"unsaved changes" prompt** now guards your edits before discarding — across reminders, tags, bulk tagging, notification actions, and note behavior.
+
+---
+
 ## v1.1.7: Image compression, markdown improvements
 
 ### ✨ New Features

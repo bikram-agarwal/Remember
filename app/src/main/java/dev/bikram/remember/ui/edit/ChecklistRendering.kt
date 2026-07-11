@@ -310,7 +310,6 @@ internal fun ChecklistRow(
                                 },
                             textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
                         ),
-                    singleLine = true,
                     keyboardOptions =
                         androidx.compose.foundation.text.KeyboardOptions(
                             capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
