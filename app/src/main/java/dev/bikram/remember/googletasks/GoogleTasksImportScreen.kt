@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -48,7 +49,6 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -60,9 +60,8 @@ import androidx.compose.material3.SplitButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.WavyProgressIndicatorDefaults
-import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -78,7 +77,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalResources
@@ -104,6 +102,7 @@ import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
+import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberCheckbox
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
@@ -115,7 +114,7 @@ import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
-import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import dev.bikram.remember.ui.theme.transparentTopAppBarColors
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
 import java.time.ZoneId
@@ -153,9 +152,6 @@ fun GoogleTasksImportRoute(
     val effect by vm.effects.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     val uriHandler = LocalUriHandler.current
-    val reducedMotion = LocalReducedMotion.current
-    val methodPanelSpatialSpec =
-        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -263,16 +259,28 @@ fun GoogleTasksImportRoute(
         snackbarHostState.currentSnackbarData?.dismiss()
     }
 
-    val topBarState = rememberTopAppBarState()
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(topBarState)
-
+    val connectEnabled = BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED
+    // Two-pane master/detail during the SETUP phase on wide landscape windows: method choices in
+    // a left rail, the selected method's detail filling the right pane. Reverts to a single
+    // full-width column once tasks are loaded (the list needs the width) or while disconnecting.
+    // In two-pane the Scaffold top app bar is HIDDEN and back + title move into the rail, so an
+    // empty bar doesn't push the detail pane down. Otherwise a plain compact TopAppBar (never the
+    // tall LargeTopAppBar, which wasted a big header band on entry).
+    val twoPane = !state.isLoaded && !state.isDisconnecting && connectEnabled && isLandscape()
+    // Captured HERE, outside the Scaffold — a Scaffold consumes the systemBars insets for its
+    // content subtree, so WindowInsets.systemBars / systemBarsPadding() read as 0 inside it. In
+    // two-pane there's no top app bar to supply the inset, so we apply these real values to the
+    // content ourselves (edge-to-edge: the transparent bars still show the gradient behind).
+    val systemBarInsets = WindowInsets.systemBars.asPaddingValues()
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        topBar = {
-            LargeTopAppBar(
-                colors = transparentLargeTopAppBarColors(),
+        topBar = topBar@{
+            // Hidden in two-pane: back + title render inside the rail instead (see below), so the
+            // detail pane starts at the top with no empty bar above it.
+            if (twoPane) return@topBar
+            TopAppBar(
+                colors = transparentTopAppBarColors(),
                 navigationIcon = {
                     Box(
                         modifier =
@@ -324,7 +332,6 @@ fun GoogleTasksImportRoute(
                         }
                     }
                 },
-                scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
@@ -339,98 +346,135 @@ fun GoogleTasksImportRoute(
                 ),
             )
         }
+        val detailPanel: @Composable (Modifier) -> Unit = { detailModifier ->
+            ImportMethodDetail(
+                selectedMethod = state.selectedMethod,
+                isFetching = state.isFetching,
+                connected = state.connected,
+                isEmpty = state.isEmpty,
+                rememberedEmail = state.rememberedEmail,
+                accountEmail = state.accountEmail,
+                onOpenTakeout = { uriHandler.openUri(GOOGLE_TAKEOUT_URL) },
+                onPickJson = pickJsonLauncher,
+                onConnect = vm::connect,
+                onSwitchAccount = vm::switchAccount,
+                modifier = detailModifier,
+            )
+        }
         Column(
             // Cap the content width on wide windows (landscape/tablet) so the method
-            // pill, panels, and task list don't stretch edge-to-edge.
+            // pill, panels, and task list don't stretch edge-to-edge. The two-pane layout
+            // gets a wider cap so the rail + detail have room to breathe.
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .padding(top = padding.calculateTopPadding(), bottom = padding.calculateBottomPadding())
+                    // In two-pane the Scaffold top app bar is hidden, so it no longer supplies the
+                    // status-bar inset — the two-pane Row applies systemBarsPadding() itself
+                    // (edge-to-edge: the gradient still draws behind the bars). Single-pane keeps
+                    // the Scaffold padding, where the visible top app bar consumes the top inset.
+                    .padding(
+                        top = if (twoPane) 0.dp else padding.calculateTopPadding(),
+                        bottom = if (twoPane) 0.dp else padding.calculateBottomPadding(),
+                    )
                     .wrapContentWidth(Alignment.CenterHorizontally)
-                    .widthIn(max = 720.dp),
+                    .widthIn(max = if (twoPane) 900.dp else 720.dp),
         ) {
-            // The Connect Google / Manual import segmented pill is a SETUP-time choice. Once
-            // a source is loaded, the same affordance lives inside the bottom sheet's source
-            // chip - showing the pill at the top would invite users to silently nuke their
-            // selection by tapping the other tab.
-            if (!state.isLoaded && BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED) {
-                ImportMethodSelector(
-                    selectedMethod = state.selectedMethod,
-                    onChange = vm::setImportMethod,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                )
-            }
-            Box(modifier = Modifier.weight(1f)) {
-                when {
-                    state.isDisconnecting ->
-                        LoadingPanel(messageRes = R.string.google_tasks_import_disconnecting)
-                    state.isLoaded ->
-                        LoadedPanel(
-                            state = state,
-                            onSearchQueryChange = vm::setSearchQuery,
-                            onImportModeChange = vm::setImportMode,
-                            onOverwriteChange = vm::setOverwriteAlreadyImported,
-                            onTaskToggle = vm::toggleSelection,
-                            onGroupToggleSelectAll = vm::toggleSelectAllInList,
-                            onGroupToggleCollapse = vm::toggleListCollapse,
-                            onRefresh = vm::refreshFromGoogle,
-                            onSwitchAccount = vm::switchAccount,
-                            onSwitchToTakeout = {
-                                vm.setImportMethod(ImportMethod.ManualImport)
-                                pickJsonLauncher()
-                            },
-                            onSwitchToGoogle = {
-                                vm.setImportMethod(ImportMethod.GrantPermission)
-                                vm.connect()
-                            },
-                            onDisconnect = vm::disconnect,
-                            onCancelTakeout = vm::cancelTakeoutImport,
-                            onImport = vm::runImport,
-                            onImportingDone = {
-                                vm.dismissImportOutcome()
-                                onBack()
-                            },
-                        )
-                    else ->
-                        AnimatedContent(
-                            targetState = state.selectedMethod,
-                            modifier = Modifier.fillMaxSize(),
-                            transitionSpec = {
-                                if (reducedMotion) {
-                                    EnterTransition.None togetherWith ExitTransition.None
-                                } else {
-                                    val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                                    slideInHorizontally(animationSpec = methodPanelSpatialSpec) { width ->
-                                        direction * width
-                                    } togetherWith
-                                        slideOutHorizontally(animationSpec = methodPanelSpatialSpec) { width ->
-                                            -direction * width
-                                        }
-                                }.using(SizeTransform(clip = true))
-                            },
-                            label = "googleTasksImportMethodPanel",
-                        ) { selectedMethod ->
-                            when {
-                                selectedMethod == ImportMethod.ManualImport && state.isFetching -> LoadingPanel()
-                                selectedMethod == ImportMethod.ManualImport ->
-                                    TakeoutImportPanel(
-                                        onOpenTakeout = { uriHandler.openUri(GOOGLE_TAKEOUT_URL) },
-                                        onPickJson = pickJsonLauncher,
-                                    )
-                                !state.connected && !state.isFetching ->
-                                    SignedOutPanel(
-                                        rememberedEmail = state.rememberedEmail,
-                                        onConnect = vm::connect,
-                                        onSwitchAccount = vm::switchAccount,
-                                    )
-                                state.isFetching -> LoadingPanel()
-                                state.isEmpty ->
-                                    EmptyPanel(
-                                        accountEmail = state.accountEmail.orEmpty(),
-                                        onSwitchAccount = vm::switchAccount,
-                                    )
+            if (twoPane) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            // Edge-to-edge: keep content clear of the status/nav bars (the empty
+                            // topBar no longer does this for us; insets captured above the Scaffold
+                            // because it consumes them) while the gradient draws behind.
+                            .padding(systemBarInsets)
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.width(240.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        // The Scaffold top app bar is hidden in two-pane; back + title live here
+                        // at the top of the rail so the detail pane isn't pushed down by a bar.
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier =
+                                    Modifier
+                                        .size(40.dp)
+                                        .clip(MaterialTheme.shapes.extraExtraLarge)
+                                        .tapSoundClickable(onClick = requestBack),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "arrow_back",
+                                    size = 24.dp,
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    weight = FontWeight.Medium,
+                                )
                             }
+                            Spacer(Modifier.width(4.dp))
+                            Text(
+                                text = stringResource(R.string.google_tasks_import_tasks_title),
+                                style = MaterialTheme.typography.titleLarge,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
+                        ImportMethodRail(
+                            selectedMethod = state.selectedMethod,
+                            onChange = vm::setImportMethod,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
+                    detailPanel(Modifier.weight(1f))
+                }
+            } else {
+                // The Connect Google / Manual import segmented pill is a SETUP-time choice. Once
+                // a source is loaded, the same affordance lives inside the bottom sheet's source
+                // chip - showing the pill at the top would invite users to silently nuke their
+                // selection by tapping the other tab.
+                if (!state.isLoaded && connectEnabled) {
+                    ImportMethodSelector(
+                        selectedMethod = state.selectedMethod,
+                        onChange = vm::setImportMethod,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
+                Box(modifier = Modifier.weight(1f)) {
+                    when {
+                        state.isDisconnecting ->
+                            LoadingPanel(messageRes = R.string.google_tasks_import_disconnecting)
+                        state.isLoaded ->
+                            LoadedPanel(
+                                state = state,
+                                onSearchQueryChange = vm::setSearchQuery,
+                                onImportModeChange = vm::setImportMode,
+                                onOverwriteChange = vm::setOverwriteAlreadyImported,
+                                onTaskToggle = vm::toggleSelection,
+                                onGroupToggleSelectAll = vm::toggleSelectAllInList,
+                                onGroupToggleCollapse = vm::toggleListCollapse,
+                                onRefresh = vm::refreshFromGoogle,
+                                onSwitchAccount = vm::switchAccount,
+                                onSwitchToTakeout = {
+                                    vm.setImportMethod(ImportMethod.ManualImport)
+                                    pickJsonLauncher()
+                                },
+                                onSwitchToGoogle = {
+                                    vm.setImportMethod(ImportMethod.GrantPermission)
+                                    vm.connect()
+                                },
+                                onDisconnect = vm::disconnect,
+                                onCancelTakeout = vm::cancelTakeoutImport,
+                                onImport = vm::runImport,
+                                onImportingDone = {
+                                    vm.dismissImportOutcome()
+                                    onBack()
+                                },
+                            )
+                        else -> detailPanel(Modifier)
+                    }
                 }
             }
         }
@@ -573,6 +617,138 @@ private fun importMethodLabelRes(method: ImportMethod): Int =
         ImportMethod.ManualImport -> R.string.google_tasks_import_method_manual_import
     }
 
+private fun importMethodIconName(method: ImportMethod): String =
+    when (method) {
+        ImportMethod.GrantPermission -> "cloud"
+        ImportMethod.ManualImport -> "download"
+    }
+
+/**
+ * Vertical method rail for the two-pane (landscape) setup layout: each import method is a
+ * full-width selectable card, the selected one tinted with the primary container. This is the
+ * "master" list; [ImportMethodDetail] is the "detail" pane driven by the same selection.
+ */
+@Composable
+private fun ImportMethodRail(
+    selectedMethod: ImportMethod,
+    onChange: (ImportMethod) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        ImportMethod.entries.forEach { method ->
+            val selected = method == selectedMethod
+            Surface(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .semantics { role = Role.RadioButton },
+                shape = MaterialTheme.shapes.large,
+                color =
+                    if (selected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.surfaceContainerHighest
+                    },
+                contentColor =
+                    if (selected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    },
+            ) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .tapSoundClickable { onChange(method) }
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = importMethodIconName(method),
+                        size = 22.dp,
+                        weight = FontWeight.Medium,
+                    )
+                    Text(
+                        text = stringResource(importMethodLabelRes(method)),
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The "detail" pane: the panel for the currently-selected import method. Extracted from
+ * [GoogleTasksImportRoute] so both the single-column and two-pane (landscape) layouts render
+ * exactly the same method panels with the same horizontal-slide transition between methods.
+ */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ImportMethodDetail(
+    selectedMethod: ImportMethod,
+    isFetching: Boolean,
+    connected: Boolean,
+    isEmpty: Boolean,
+    rememberedEmail: String?,
+    accountEmail: String?,
+    onOpenTakeout: () -> Unit,
+    onPickJson: () -> Unit,
+    onConnect: () -> Unit,
+    onSwitchAccount: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val reducedMotion = LocalReducedMotion.current
+    val methodPanelSpatialSpec =
+        reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+    AnimatedContent(
+        targetState = selectedMethod,
+        modifier = modifier.fillMaxSize(),
+        transitionSpec = {
+            if (reducedMotion) {
+                EnterTransition.None togetherWith ExitTransition.None
+            } else {
+                val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                slideInHorizontally(animationSpec = methodPanelSpatialSpec) { width ->
+                    direction * width
+                } togetherWith
+                    slideOutHorizontally(animationSpec = methodPanelSpatialSpec) { width ->
+                        -direction * width
+                    }
+            }.using(SizeTransform(clip = true))
+        },
+        label = "googleTasksImportMethodPanel",
+    ) { method ->
+        when {
+            method == ImportMethod.ManualImport && isFetching -> LoadingPanel()
+            method == ImportMethod.ManualImport ->
+                TakeoutImportPanel(
+                    onOpenTakeout = onOpenTakeout,
+                    onPickJson = onPickJson,
+                )
+            !connected && !isFetching ->
+                SignedOutPanel(
+                    rememberedEmail = rememberedEmail,
+                    onConnect = onConnect,
+                    onSwitchAccount = onSwitchAccount,
+                )
+            isFetching -> LoadingPanel()
+            isEmpty ->
+                EmptyPanel(
+                    accountEmail = accountEmail.orEmpty(),
+                    onSwitchAccount = onSwitchAccount,
+                )
+        }
+    }
+}
+
 @Composable
 private fun SignedOutPanel(
     rememberedEmail: String?,
@@ -586,7 +762,9 @@ private fun SignedOutPanel(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.Center,
+        // Landscape/short windows top-align so a too-tall panel scrolls from the top instead of
+        // centering and clipping the title/buttons; portrait has the room, so it stays centered.
+        verticalArrangement = if (isLandscape()) Arrangement.Top else Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         GoogleTasksLogoMark(modifier = Modifier.size(56.dp))
@@ -643,7 +821,9 @@ private fun TakeoutImportPanel(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.Center,
+        // Landscape/short windows top-align so a too-tall panel scrolls from the top instead of
+        // centering and clipping the title/buttons; portrait has the room, so it stays centered.
+        verticalArrangement = if (isLandscape()) Arrangement.Top else Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         RememberMaterialRoundedSymbol(
@@ -733,7 +913,7 @@ private fun EmptyPanel(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
                 .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
+        verticalArrangement = if (isLandscape()) Arrangement.Top else Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         RememberMaterialRoundedSymbol(

@@ -13,6 +13,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +24,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -33,6 +35,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,6 +51,7 @@ import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -71,13 +75,13 @@ import dev.bikram.remember.data.recycleNoteActionIconBitmap
 import dev.bikram.remember.data.toNoteActionIconDrawable
 import dev.bikram.remember.domain.formatTimeOfDay
 import dev.bikram.remember.ui.common.AppBottomSheet
-import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
-import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.runtime.rememberUpdatedState
+import dev.bikram.remember.ui.common.ResponsiveActionLayout
+import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
+import dev.bikram.remember.ui.common.responsiveActionLayout
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
@@ -297,13 +301,11 @@ fun OptionsPanel(
                 }
                 if (createdAt != null && createdAt > 0L) {
                     Spacer(Modifier.height(6.dp))
-                    Row(
+                    BoxWithConstraints(
                         modifier =
                             Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 2.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         val createdFormatted =
                             remember(createdAt, context) {
@@ -313,22 +315,8 @@ fun OptionsPanel(
                                     .format(createdDate) + " " +
                                     formatTimeOfDay(context, createdAt)
                             }
-                        Text(
-                            text = stringResource(R.string.options_created, createdFormatted),
-                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                        )
+                        val createdLabel = stringResource(R.string.options_created, createdFormatted)
                         if (updatedAt != null && updatedAt > 0L) {
-                            Text(
-                                text = "·",
-                                style =
-                                    MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                    ),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
-                                modifier = Modifier.padding(horizontal = 6.dp),
-                            )
                             val updatedFormatted =
                                 remember(updatedAt, context) {
                                     val updatedDate = Date(updatedAt)
@@ -337,10 +325,22 @@ fun OptionsPanel(
                                         .format(updatedDate) + " " +
                                         formatTimeOfDay(context, updatedAt)
                                 }
-                            Text(
-                                text = stringResource(R.string.options_updated, updatedFormatted),
-                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                            val updatedLabel = stringResource(R.string.options_updated, updatedFormatted)
+                            val stacked =
+                                responsiveActionLayout(
+                                    availableWidth = maxWidth,
+                                    effectiveFontScale = LocalDensity.current.fontScale,
+                                    itemCount = 2,
+                                ) == ResponsiveActionLayout.STACKED
+                            TimestampFooter(
+                                createdLabel = createdLabel,
+                                updatedLabel = updatedLabel,
+                                stacked = stacked,
+                            )
+                        } else {
+                            TimestampText(
+                                text = createdLabel,
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     }
@@ -364,6 +364,65 @@ fun OptionsPanel(
             onDismiss = { behaviorOpen = false },
         )
     }
+}
+
+@Composable
+private fun TimestampFooter(
+    createdLabel: String,
+    updatedLabel: String,
+    stacked: Boolean,
+) {
+    if (stacked) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            TimestampText(text = createdLabel, modifier = Modifier.fillMaxWidth())
+            TimestampText(text = updatedLabel, modifier = Modifier.fillMaxWidth())
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TimestampText(
+                text = createdLabel,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+            Text(
+                text = "·",
+                style =
+                    MaterialTheme.typography.labelSmall.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                    ),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+                modifier = Modifier.padding(horizontal = 6.dp),
+            )
+            TimestampText(
+                text = updatedLabel,
+                modifier = Modifier.weight(1f, fill = false),
+            )
+        }
+    }
+}
+
+@Composable
+private fun TimestampText(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        modifier = modifier,
+    )
 }
 
 @Composable
@@ -588,7 +647,7 @@ private fun OptionCell(
     onLongClick: (() -> Unit)? = null,
     onLongClickLabel: String? = null,
     iconTint: Color = MaterialTheme.colorScheme.primary,
-    fixedHeight: Boolean = true,
+    fixedHeight: Boolean = false,
     summaryContent: (@Composable () -> Unit)? = null,
     trailingContent: (@Composable () -> Unit)? = null,
 ) {
@@ -635,10 +694,7 @@ private fun OptionCell(
             )
             Spacer(Modifier.size(8.dp))
             Column(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center,
             ) {
                 Text(
@@ -902,7 +958,7 @@ private fun BehaviorSheet(
     val sheetState =
         rememberBottomSheetStateWithUnsavedChanges(
             isDirty = hasChanges,
-            onShowDialog = { showUnsavedDialog = true }
+            onShowDialog = { showUnsavedDialog = true },
         )
 
     AppBottomSheet(

@@ -152,13 +152,13 @@ However, the application names "Remember", "FilePipe", and "ObtainX", along with
 <table>
   <tr>
     <td width="50%" align="center">
-      <a href="https://bikram-agarwal.github.io/filepipe/">
+      <a href="https://github.com/bikram-agarwal/FilePipe">
         <img src="docs/assets/feature_filepipe.jpg" alt="FilePipe feature graphic" width="100%">
       <b>FilePipe</b></a>
       <p>Your files, your rules. Automatically sort and move media with smart rules.</p>
     </td>
     <td width="50%" align="center">
-      <a href="https://bikram-agarwal.github.io/obtainx/">
+      <a href="https://github.com/bikram-agarwal/ObtainX">
         <img src="docs/assets/feature_obtainx.jpg" alt="ObtainX feature graphic" width="100%">
       <b>ObtainX</b></a>
       <p>A supercharged Obtainium: get Android app updates straight from the source.</p>

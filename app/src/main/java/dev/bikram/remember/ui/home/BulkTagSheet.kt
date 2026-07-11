@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,12 +59,11 @@ import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.ui.common.AppBottomSheet
-import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
-import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import androidx.compose.runtime.rememberUpdatedState
+import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.components.parseHexColor
 import dev.bikram.remember.ui.components.tagColor
 import dev.bikram.remember.ui.edit.CompactOutlinedField
@@ -246,7 +246,7 @@ internal fun BulkTagSheet(
     val sheetState =
         rememberBottomSheetStateWithUnsavedChanges(
             isDirty = isDirty,
-            onShowDialog = { showUnsavedDialog = true }
+            onShowDialog = { showUnsavedDialog = true },
         )
 
     fun commitHexEditing(): String {
@@ -453,7 +453,7 @@ internal fun BulkTagSheet(
                 showUnsavedDialog = false
                 onDismiss()
             },
-            onDismiss = { showUnsavedDialog = false }
+            onDismiss = { showUnsavedDialog = false },
         )
     }
 }

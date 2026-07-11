@@ -53,6 +53,10 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.isSmallLandscape
@@ -101,6 +105,26 @@ fun rememberResponsiveActionIconSize(
             else -> defaultSize
         }
     return targetSize
+}
+
+@Composable
+fun RememberActionLabel(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = androidx.compose.material3.LocalTextStyle.current,
+    fontWeight: FontWeight? = null,
+    textAlign: TextAlign? = null,
+) {
+    Text(
+        text = text,
+        modifier = modifier,
+        style = style,
+        fontWeight = fontWeight,
+        textAlign = textAlign,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 @Composable

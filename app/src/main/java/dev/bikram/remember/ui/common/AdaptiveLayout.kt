@@ -21,6 +21,37 @@ import androidx.compose.ui.unit.dp
 /** Below this many dp of usable height in landscape, screens switch to space-saving layouts. */
 const val SMALL_LANDSCAPE_HEIGHT_DP = 480
 
+enum class ResponsiveActionLayout {
+    HORIZONTAL,
+    STACKED,
+}
+
+fun responsiveTextScaleForWidth(availableWidth: Dp): Float =
+    when {
+        availableWidth < 320.dp -> 0.84f
+        availableWidth < 360.dp -> 0.88f
+        availableWidth < 430.dp -> 0.93f
+        else -> 1f
+    }
+
+fun responsiveActionLayout(
+    availableWidth: Dp,
+    effectiveFontScale: Float,
+    itemCount: Int,
+): ResponsiveActionLayout =
+    if (
+        itemCount > 1 &&
+        (
+            availableWidth < 360.dp ||
+                (availableWidth < 430.dp && effectiveFontScale > 1.10f) ||
+                (availableWidth < 520.dp && effectiveFontScale > 1.15f)
+        )
+    ) {
+        ResponsiveActionLayout.STACKED
+    } else {
+        ResponsiveActionLayout.HORIZONTAL
+    }
+
 internal fun noteMosaicColumnCount(availableWidth: Dp): Int =
     when {
         availableWidth < 340.dp -> 1

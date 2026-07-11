@@ -58,6 +58,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -539,7 +540,7 @@ fun FullScreenHeroImageOverlay(
                         Modifier
                             .align(Alignment.BottomCenter)
                             .navigationBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 18.dp),
+                            .padding(horizontal = 8.dp, vertical = 18.dp),
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -555,7 +556,7 @@ fun FullScreenHeroImageOverlay(
                             }
                         },
                     )
-                    Spacer(Modifier.width(16.dp))
+                    Spacer(Modifier.width(8.dp))
                     PhotoOverlayCircleButton(
                         iconName = "zoom_out",
                         contentDescriptionModifier = zoomOutSemantics,
@@ -601,7 +602,7 @@ fun FullScreenHeroImageOverlay(
                         buttonSize = 40.dp,
                         iconSize = 22.dp,
                     )
-                    Spacer(Modifier.width(16.dp))
+                    Spacer(Modifier.width(8.dp))
                     PhotoOverlayActionPill(
                         label = stringResource(R.string.common_save),
                         iconName = "check",
@@ -718,7 +719,7 @@ private fun PhotoOverlayActionPill(
                 ),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 11.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 11.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -733,6 +734,9 @@ private fun PhotoOverlayActionPill(
                 style = MaterialTheme.typography.titleSmall,
                 color = content,
                 fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                softWrap = false,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
