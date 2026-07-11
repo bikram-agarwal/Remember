@@ -38,19 +38,14 @@ fun responsiveActionLayout(
     availableWidth: Dp,
     effectiveFontScale: Float,
     itemCount: Int,
-): ResponsiveActionLayout =
-    if (
-        itemCount > 1 &&
-        (
-            availableWidth < 360.dp ||
-                (availableWidth < 430.dp && effectiveFontScale > 1.10f) ||
-                (availableWidth < 520.dp && effectiveFontScale > 1.15f)
-        )
-    ) {
-        ResponsiveActionLayout.STACKED
-    } else {
-        ResponsiveActionLayout.HORIZONTAL
-    }
+): ResponsiveActionLayout {
+    if (itemCount <= 1) return ResponsiveActionLayout.HORIZONTAL
+    val tooNarrowForRow =
+        availableWidth < 360.dp ||
+            (availableWidth < 430.dp && effectiveFontScale > 1.10f) ||
+            (availableWidth < 520.dp && effectiveFontScale > 1.15f)
+    return if (tooNarrowForRow) ResponsiveActionLayout.STACKED else ResponsiveActionLayout.HORIZONTAL
+}
 
 internal fun noteMosaicColumnCount(availableWidth: Dp): Int =
     when {

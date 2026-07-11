@@ -3,11 +3,14 @@ package dev.bikram.remember.ui.theme
 import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.toColorInt
 import com.materialkolor.PaletteStyle
+import com.materialkolor.dynamiccolor.ColorSpec
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
 
 /** Primary seed for DEFAULT and fallback seed for invalid custom / unavailable Material You. */
 internal val DefaultSeed = Color(0xFF16A34A)
+
+internal val RememberColorSpecVersion = ColorSpec.SpecVersion.SPEC_2025
 
 /**
  * Hand-tuned primary/secondary/tertiary triplets. The primary seed drives surfaces,
