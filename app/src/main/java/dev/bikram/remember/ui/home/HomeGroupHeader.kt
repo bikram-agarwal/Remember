@@ -112,6 +112,11 @@ internal fun GroupHeader(
         animationSpec = colorSpec,
         label = "home_group_chevron_container_color",
     )
+    val safeHeaderCorner = headerCorner.coerceAtLeast(0.dp)
+    val safeHorizontalPadding = horizontalPadding.coerceAtLeast(0.dp)
+    val safeVerticalPadding = verticalPadding.coerceAtLeast(0.dp)
+    val safeTitleStartPadding = titleStartPadding.coerceAtLeast(0.dp)
+
     val outerSpacing =
         modifier
             .fillMaxWidth()
@@ -120,16 +125,16 @@ internal fun GroupHeader(
         (
             if (collapsible && onToggle != null) {
                 outerSpacing
-                    .clip(RoundedCornerShape(headerCorner))
+                    .clip(RoundedCornerShape(28.dp))
                     .background(headerColor)
                     .clickable(
                         interactionSource = headerInteractionSource,
                         indication = LocalIndication.current,
                     ) {
                         onToggle()
-                    }.padding(horizontal = horizontalPadding, vertical = verticalPadding)
+                    }.padding(horizontal = safeHorizontalPadding, vertical = safeVerticalPadding)
             } else {
-                outerSpacing.padding(horizontal = horizontalPadding, vertical = verticalPadding)
+                outerSpacing.padding(horizontal = safeHorizontalPadding, vertical = safeVerticalPadding)
             }
         ).semantics {
             heading()
@@ -168,7 +173,7 @@ internal fun GroupHeader(
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(start = titleStartPadding),
+            modifier = Modifier.padding(start = safeTitleStartPadding),
         )
         if (count != null) {
             Text(

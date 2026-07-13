@@ -157,26 +157,30 @@ internal fun ChecklistRow(
     LaunchedEffect(item.text) {
         if (item.text != titleFieldValue.text) {
             val selection = titleFieldValue.selection
-            titleFieldValue = TextFieldValue(
-                text = item.text,
-                selection = TextRange(
-                    start = selection.start.coerceIn(0, item.text.length),
-                    end = selection.end.coerceIn(0, item.text.length)
+            titleFieldValue =
+                TextFieldValue(
+                    text = item.text,
+                    selection =
+                        TextRange(
+                            start = selection.start.coerceIn(0, item.text.length),
+                            end = selection.end.coerceIn(0, item.text.length),
+                        ),
                 )
-            )
         }
     }
 
     LaunchedEffect(item.details) {
         if (item.details != detailsFieldValue.text) {
             val selection = detailsFieldValue.selection
-            detailsFieldValue = TextFieldValue(
-                text = item.details,
-                selection = TextRange(
-                    start = selection.start.coerceIn(0, item.details.length),
-                    end = selection.end.coerceIn(0, item.details.length)
+            detailsFieldValue =
+                TextFieldValue(
+                    text = item.details,
+                    selection =
+                        TextRange(
+                            start = selection.start.coerceIn(0, item.details.length),
+                            end = selection.end.coerceIn(0, item.details.length),
+                        ),
                 )
-            )
         }
     }
 

@@ -1,4 +1,4 @@
-## v1.1.8: Quick Tiles, Wearable notifications
+## v1.1.9: Quick Tiles, Wearable notifications
 
 ### ✨ New Features
 - **Quick Settings tiles** — add "New note" and "New list" tiles to your Quick Settings panel to jump straight into creating one.
@@ -13,6 +13,7 @@
 
 ### 🐛 Bug Fixes
 - Fixed a bug where editing any item in checklist would make the cursor jump to the end of line. 
+- Fixed a bug where collapsing and expanding sections in Notes tab was crashing the app. 
 
 ---
 
