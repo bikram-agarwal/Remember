@@ -5,11 +5,13 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
@@ -24,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -32,6 +35,9 @@ import dev.bikram.remember.backup.RememberBackupWork
 import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.BackupPreferencesState
 import dev.bikram.remember.data.BackupPrefs
+import dev.bikram.remember.ui.common.ResponsiveActionLayout
+import dev.bikram.remember.ui.common.responsiveActionLayout
+import dev.bikram.remember.ui.components.RememberActionLabel
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
@@ -249,54 +255,114 @@ internal fun BackupSection(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    RememberOutlinedButton(
-                        onClick = onLaunchImportMerge,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.settings_import_rules))
-                    }
-                    RememberOutlinedButton(
-                        onClick = {
-                            if (exportFolderReady) {
-                                scope.launch {
-                                    val backupDestinations =
-                                        listOf(
-                                            backupState.exportFolderUri,
-                                            backupState.cloudExportFolderUri,
-                                        ).filter { it.isNotBlank() }
-                                    val exportOutcome = backupIo.exportToTreeFolders(backupDestinations)
-                                    val message =
-                                        exportOutcome.fold(
-                                            onSuccess = { fileNames ->
-                                                resources.getQuantityString(
-                                                    R.plurals.toast_exported_to_destinations,
-                                                    fileNames.size,
-                                                    fileNames.size,
-                                                )
-                                            },
-                                            onFailure = {
-                                                resources.getString(R.string.toast_export_failed)
-                                            },
-                                        )
-                                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                                }
-                            } else {
-                                scope.launch {
-                                    snackbarHostState.showSnackbar(
-                                        message = resources.getString(R.string.settings_export_select_folder_first),
-                                        duration = SnackbarDuration.Short,
-                                    )
-                                }
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    val stacked =
+                        responsiveActionLayout(
+                            availableWidth = maxWidth,
+                            effectiveFontScale = LocalDensity.current.fontScale,
+                            itemCount = 2,
+                        ) == ResponsiveActionLayout.STACKED
+                    if (stacked) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            RememberOutlinedButton(
+                                onClick = onLaunchImportMerge,
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                RememberActionLabel(stringResource(R.string.settings_import_rules))
                             }
-                        },
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        Text(stringResource(R.string.settings_export_now))
+                            RememberOutlinedButton(
+                                onClick = {
+                                    if (exportFolderReady) {
+                                        scope.launch {
+                                            val backupDestinations =
+                                                listOf(
+                                                    backupState.exportFolderUri,
+                                                    backupState.cloudExportFolderUri,
+                                                ).filter { it.isNotBlank() }
+                                            val exportOutcome = backupIo.exportToTreeFolders(backupDestinations)
+                                            val message =
+                                                exportOutcome.fold(
+                                                    onSuccess = { fileNames ->
+                                                        resources.getQuantityString(
+                                                            R.plurals.toast_exported_to_destinations,
+                                                            fileNames.size,
+                                                            fileNames.size,
+                                                        )
+                                                    },
+                                                    onFailure = {
+                                                        resources.getString(R.string.toast_export_failed)
+                                                    },
+                                                )
+                                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = resources.getString(R.string.settings_export_select_folder_first),
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                RememberActionLabel(stringResource(R.string.settings_export_now))
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RememberOutlinedButton(
+                                onClick = onLaunchImportMerge,
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                RememberActionLabel(stringResource(R.string.settings_import_rules))
+                            }
+                            RememberOutlinedButton(
+                                onClick = {
+                                    if (exportFolderReady) {
+                                        scope.launch {
+                                            val backupDestinations =
+                                                listOf(
+                                                    backupState.exportFolderUri,
+                                                    backupState.cloudExportFolderUri,
+                                                ).filter { it.isNotBlank() }
+                                            val exportOutcome = backupIo.exportToTreeFolders(backupDestinations)
+                                            val message =
+                                                exportOutcome.fold(
+                                                    onSuccess = { fileNames ->
+                                                        resources.getQuantityString(
+                                                            R.plurals.toast_exported_to_destinations,
+                                                            fileNames.size,
+                                                            fileNames.size,
+                                                        )
+                                                    },
+                                                    onFailure = {
+                                                        resources.getString(R.string.toast_export_failed)
+                                                    },
+                                                )
+                                            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                        }
+                                    } else {
+                                        scope.launch {
+                                            snackbarHostState.showSnackbar(
+                                                message = resources.getString(R.string.settings_export_select_folder_first),
+                                                duration = SnackbarDuration.Short,
+                                            )
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.weight(1f),
+                            ) {
+                                RememberActionLabel(stringResource(R.string.settings_export_now))
+                            }
+                        }
                     }
                 }
                 val restoreShape = ButtonDefaults.outlinedShape
@@ -306,24 +372,28 @@ internal fun BackupSection(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(40.dp)
+                            // heightIn (not a fixed height) lets the button grow to fit the label
+                            // on large-font devices instead of vertically clipping it.
+                            .heightIn(min = 40.dp)
                             .clip(restoreShape)
                             .border(BorderStroke(1.dp, restoreOutline), restoreShape),
                 ) {
+                    // The label is the height driver; the click layer matches the final size.
+                    RememberActionLabel(
+                        text = stringResource(R.string.settings_restore_backup),
+                        style = MaterialTheme.typography.labelLarge.copy(color = restoreLabelColor),
+                        modifier =
+                            Modifier
+                                .align(Alignment.Center)
+                                // Keep the centered label clear of the trailing 40.dp info icon.
+                                .padding(horizontal = 40.dp, vertical = 6.dp),
+                    )
                     Box(
                         modifier =
                             Modifier
-                                .fillMaxWidth()
-                                .fillMaxHeight()
+                                .matchParentSize()
                                 .tapSoundClickable(onClick = onLaunchImportReplace),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            text = stringResource(R.string.settings_restore_backup),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = restoreLabelColor,
-                        )
-                    }
+                    )
                     Box(
                         modifier =
                             Modifier

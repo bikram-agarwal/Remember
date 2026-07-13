@@ -84,6 +84,7 @@ private fun rememberCuratedColorScheme(
         tertiary = tripletOverrides?.tertiary,
         style = style,
         isAmoled = black,
+        specVersion = RememberColorSpecVersion,
     )
 }
 
@@ -106,6 +107,7 @@ private fun rememberSeededColorScheme(
         isDark = darkTheme,
         style = themeState.paletteStyle.toLib(),
         isAmoled = black,
+        specVersion = RememberColorSpecVersion,
     )
 }
 

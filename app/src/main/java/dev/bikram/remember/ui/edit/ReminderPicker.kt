@@ -1,6 +1,7 @@
 @file:Suppress("ConfigurationScreenWidthHeight")
 
 package dev.bikram.remember.ui.edit
+
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.AlarmManager
@@ -27,13 +28,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -44,7 +48,6 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -61,11 +64,11 @@ import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberBottomSheetState
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -90,6 +93,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -97,6 +101,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -118,12 +124,14 @@ import dev.bikram.remember.domain.formatTimeOfDay
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isLandscape
+import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import java.time.Instant
@@ -451,20 +459,9 @@ fun ReminderPickerSheet(
     var showClearAllConfirmDialog by rememberSaveable { mutableStateOf(false) }
 
     val sheetState =
-        rememberBottomSheetState(
-            initialValue = SheetValue.Hidden,
-            enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded),
-            confirmValueChange =
-                remember {
-                    { sheetValue ->
-                        if (sheetValue == SheetValue.Hidden && currentHasChanges.value) {
-                            showUnsavedDialog = true
-                            false
-                        } else {
-                            true
-                        }
-                    }
-                },
+        rememberBottomSheetStateWithUnsavedChanges(
+            isDirty = hasChanges,
+            onShowDialog = { showUnsavedDialog = true },
         )
 
     val context = LocalContext.current
@@ -908,9 +905,10 @@ fun ReminderPickerSheet(
             Spacer(Modifier.height(12.dp))
         }
 
-        Row(
+        FlowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             RememberFilledTonalButton(
                 enabled = drafts.any { it.reminderDateExplicit },
@@ -1008,17 +1006,12 @@ fun ReminderPickerSheet(
         )
     }
     if (showUnsavedDialog) {
-        RememberConfirmDialog(
-            title = stringResource(R.string.reminder_editor_unsaved_title),
-            text = stringResource(R.string.reminder_editor_unsaved_body),
-            confirmLabel = stringResource(R.string.reminder_editor_unsaved_discard),
+        RememberUnsavedChangesDialog(
             onConfirm = {
                 showUnsavedDialog = false
                 onDismiss()
             },
             onDismiss = { showUnsavedDialog = false },
-            destructive = true,
-            dismissLabel = stringResource(R.string.reminder_editor_unsaved_keep_editing),
         )
     }
     if (showClearAllConfirmDialog) {
@@ -1151,6 +1144,21 @@ internal enum class MonthlyKind { BY_DAY, BY_WEEKDAY }
 // the picker and as a sanity floor when the user submits an empty / unparseable field.
 // Pre-fill / fallback occurrence count for AFTER_COUNT mode. Used both when first opening
 private const val DEFAULT_END_COUNT = 10
+private const val CALENDAR_PICKER_MIN_WIDTH_DENSITY_SCALE = 0.82f
+private const val CALENDAR_PICKER_MIN_HEIGHT_DENSITY_SCALE = 0.74f
+private val CALENDAR_PICKER_WIDTH = 360.dp
+private val CALENDAR_PICKER_HEIGHT = 520.dp
+private val CALENDAR_DIALOG_MARGIN = 8.dp
+private val CALENDAR_ACTION_AREA_HEIGHT = 68.dp
+private val CALENDAR_LANDSCAPE_ACTION_WIDTH = 144.dp
+private val CALENDAR_LANDSCAPE_ACTION_GAP = 8.dp
+private val CALENDAR_PICKER_WIDTH_RESERVE = 16.dp
+private const val TIME_PICKER_MIN_DENSITY_SCALE = 0.74f
+private val TIME_PICKER_HEIGHT = 420.dp
+private val TIME_PICKER_ACTION_AREA_HEIGHT = 92.dp
+private val TIME_PICKER_LANDSCAPE_ACTION_WIDTH = 144.dp
+private val TIME_PICKER_LANDSCAPE_ACTION_GAP = 8.dp
+private val TIME_PICKER_DIALOG_MARGIN = 8.dp
 
 @Composable
 private fun formatReminderTimePill(
@@ -1181,7 +1189,9 @@ internal fun CalendarPickerDialog(
     onDismiss: () -> Unit,
 ) {
     val state = rememberDatePickerState(initialSelectedDateMillis = initial)
-    val datePickerContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+    // Slightly darker card (surfaceContainer) so the selected-day marker and grid read clearly,
+    // matching the time picker's darker container.
+    val datePickerContainerColor = MaterialTheme.colorScheme.surfaceContainer
     LaunchedEffect(state.displayedMonthMillis) {
         val carriedSelection =
             selectedDateMillisInDisplayedMonth(
@@ -1193,6 +1203,10 @@ internal fun CalendarPickerDialog(
         }
     }
 
+    // Capture the app-capped density BEFORE opening the Dialog. A Dialog opens its own window
+    // that resets LocalDensity to the raw OS density/fontScale, so reading it inside would
+    // bypass the app-wide font cap and size the picker off the uncapped OS font.
+    val baseDensity = LocalDensity.current
     Dialog(
         onDismissRequest = onDismiss,
         properties =
@@ -1201,87 +1215,220 @@ internal fun CalendarPickerDialog(
                 decorFitsSystemWindows = false,
             ),
     ) {
-        // By wrapping the content in a full-screen box, we force the Android Dialog Window to
-        // be full-screen. This means that when the DatePicker switches modes and changes its
-        // content height, we use pure Compose `animateContentSize` on the inner Surface.
-        // If we didn't do this, the Android WindowManager would try to resize the dialog window
-        // mid-animation, causing severe (2-3 seconds) stuttering on many devices.
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDismiss,
-                    ),
-            contentAlignment = Alignment.Center,
-        ) {
-            Surface(
-                shape = MaterialTheme.shapes.extraLarge,
-                color = datePickerContainerColor,
-                tonalElevation = 0.dp,
+        // Re-provide the app-capped density inside the Dialog window (see note above), so the
+        // header/mode-toggle that sit outside the picker's own density scope stay capped too.
+        val cappedDensity = baseDensity
+        CompositionLocalProvider(LocalDensity provides cappedDensity) {
+            // By wrapping the content in a full-screen box, we force the Android Dialog Window to
+            // be full-screen. This means that when the DatePicker switches modes and changes its
+            // content height, we use pure Compose `animateContentSize` on the inner Surface.
+            // If we didn't do this, the Android WindowManager would try to resize the dialog window
+            // mid-animation, causing severe (2-3 seconds) stuttering on many devices.
+            BoxWithConstraints(
                 modifier =
                     Modifier
-                        .widthIn(min = 328.dp, max = 400.dp)
-                        .wrapContentHeight()
-                        .animateContentSize(
-                            animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec()),
-                        ).padding(horizontal = 16.dp)
+                        .fillMaxSize()
                         .clickable(
-                            // Catch clicks on the surface so they don't leak to the dismiss background
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = {},
+                            onClick = onDismiss,
                         ),
+                contentAlignment = Alignment.Center,
             ) {
-                MaterialTheme(
-                    typography =
-                        MaterialTheme.typography.copy(
-                            displayLarge = MaterialTheme.typography.headlineMedium,
-                            headlineLarge = MaterialTheme.typography.headlineMedium,
-                        ),
-                ) {
-                    Column(
-                        modifier = Modifier.padding(bottom = 12.dp),
-                    ) {
-                        DatePicker(
-                            state = state,
-                            title = null,
-                            showModeToggle = true,
-                            modifier = Modifier.padding(top = 16.dp),
-                            colors =
-                                DatePickerDefaults.colors(
-                                    containerColor = datePickerContainerColor,
-                                    dividerColor = Color.Transparent,
-                                ),
-                        )
-                        Row(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            RememberTextButton(
-                                onClick = {
-                                    val today = pickerDayMillisForLocalWallClock(System.currentTimeMillis())
-                                    state.selectedDateMillis = today
-                                    state.displayedMonthMillis = today
-                                    state.displayMode = DisplayMode.Picker
+                val landscape = isLandscape()
+                val dialogWidthLimit = if (landscape) 640.dp else 432.dp
+                val dialogMaxWidth = minOf(maxWidth - CALENDAR_DIALOG_MARGIN * 2, dialogWidthLimit)
+                val dialogMaxHeight = (maxHeight - CALENDAR_DIALOG_MARGIN * 2).coerceAtLeast(0.dp)
+                val pickerMaxWidth =
+                    if (landscape) {
+                        (
+                            dialogMaxWidth -
+                                CALENDAR_LANDSCAPE_ACTION_WIDTH -
+                                CALENDAR_LANDSCAPE_ACTION_GAP
+                        ).coerceAtLeast(0.dp)
+                    } else {
+                        dialogMaxWidth
+                    }
+                val widthDensityScale =
+                    if (pickerMaxWidth < CALENDAR_PICKER_WIDTH + CALENDAR_PICKER_WIDTH_RESERVE) {
+                        ((pickerMaxWidth - CALENDAR_PICKER_WIDTH_RESERVE) / CALENDAR_PICKER_WIDTH)
+                            .coerceIn(CALENDAR_PICKER_MIN_WIDTH_DENSITY_SCALE, 1f)
+                    } else {
+                        1f
+                    }
+                val requiredCalendarHeight =
+                    if (landscape) {
+                        CALENDAR_PICKER_HEIGHT
+                    } else {
+                        CALENDAR_PICKER_HEIGHT + CALENDAR_ACTION_AREA_HEIGHT
+                    }
+                val availableCalendarHeight =
+                    if (landscape) {
+                        dialogMaxHeight
+                    } else {
+                        dialogMaxHeight - CALENDAR_ACTION_AREA_HEIGHT
+                    }
+                val heightDensityScale =
+                    if (dialogMaxHeight < requiredCalendarHeight) {
+                        (availableCalendarHeight / CALENDAR_PICKER_HEIGHT)
+                            .coerceIn(CALENDAR_PICKER_MIN_HEIGHT_DENSITY_SCALE, 1f)
+                    } else {
+                        1f
+                    }
+                val pickerDensityScale = minOf(widthDensityScale, heightDensityScale)
+                val compactCalendar = pickerDensityScale < 1f
+                val pickerDensity =
+                    remember(cappedDensity, pickerDensityScale) {
+                        Density(
+                            density = cappedDensity.density * pickerDensityScale,
+                            fontScale =
+                                if (compactCalendar) {
+                                    cappedDensity.fontScale.coerceAtMost(0.90f)
+                                } else {
+                                    cappedDensity.fontScale
                                 },
+                        )
+                    }
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = datePickerContainerColor,
+                    tonalElevation = 0.dp,
+                    modifier =
+                        Modifier
+                            .padding(CALENDAR_DIALOG_MARGIN)
+                            .widthIn(max = dialogWidthLimit)
+                            .fillMaxWidth()
+                            .heightIn(max = dialogMaxHeight)
+                            .animateContentSize(
+                                animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec()),
+                            ).clickable(
+                                // Catch clicks on the surface so they don't leak to the dismiss background
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {},
+                            ),
+                ) {
+                    MaterialTheme(
+                        typography =
+                            MaterialTheme.typography.copy(
+                                displayLarge = MaterialTheme.typography.headlineMedium,
+                                headlineLarge = MaterialTheme.typography.headlineMedium,
+                            ),
+                    ) {
+                        if (landscape) {
+                            // Only the calendar grid is compacted to fit; Today/Cancel/OK stay at
+                            // the app font scale (the ambient cappedDensity) so their labels don't
+                            // render tiny next to the grid.
+                            Row(
+                                modifier = Modifier.padding(end = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(stringResource(R.string.reminder_date_picker_today))
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .weight(1f)
+                                            .padding(top = 16.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CompositionLocalProvider(LocalDensity provides pickerDensity) {
+                                        DatePicker(
+                                            state = state,
+                                            title = null,
+                                            showModeToggle = true,
+                                            modifier = Modifier.width(CALENDAR_PICKER_WIDTH),
+                                            colors =
+                                                DatePickerDefaults.colors(
+                                                    containerColor = datePickerContainerColor,
+                                                    dividerColor = Color.Transparent,
+                                                ),
+                                        )
+                                    }
+                                }
+                                Spacer(Modifier.width(CALENDAR_LANDSCAPE_ACTION_GAP))
+                                Column(
+                                    modifier = Modifier.width(CALENDAR_LANDSCAPE_ACTION_WIDTH),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                                ) {
+                                    RememberTextButton(
+                                        onClick = {
+                                            val today = pickerDayMillisForLocalWallClock(System.currentTimeMillis())
+                                            state.selectedDateMillis = today
+                                            state.displayedMonthMillis = today
+                                            state.displayMode = DisplayMode.Picker
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(stringResource(R.string.reminder_date_picker_today))
+                                    }
+                                    RememberTextButton(
+                                        onClick = onDismiss,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(stringResource(R.string.common_cancel))
+                                    }
+                                    RememberTextButton(
+                                        onClick = { state.selectedDateMillis?.let(onConfirm) },
+                                        enabled = state.selectedDateMillis != null,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(stringResource(R.string.common_ok))
+                                    }
+                                }
                             }
-                            Spacer(Modifier.weight(1f))
-                            RememberTextButton(onClick = onDismiss) {
-                                Text(stringResource(R.string.common_cancel))
-                            }
-                            RememberTextButton(
-                                onClick = { state.selectedDateMillis?.let(onConfirm) },
-                                enabled = state.selectedDateMillis != null,
+                        } else {
+                            Column(
+                                modifier = Modifier.padding(bottom = 12.dp),
                             ) {
-                                Text(stringResource(R.string.common_ok))
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 16.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CompositionLocalProvider(LocalDensity provides pickerDensity) {
+                                        DatePicker(
+                                            state = state,
+                                            title = null,
+                                            showModeToggle = true,
+                                            modifier = Modifier.width(CALENDAR_PICKER_WIDTH),
+                                            colors =
+                                                DatePickerDefaults.colors(
+                                                    containerColor = datePickerContainerColor,
+                                                    dividerColor = Color.Transparent,
+                                                ),
+                                        )
+                                    }
+                                }
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(min = 48.dp)
+                                            .padding(horizontal = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    RememberTextButton(
+                                        onClick = {
+                                            val today = pickerDayMillisForLocalWallClock(System.currentTimeMillis())
+                                            state.selectedDateMillis = today
+                                            state.displayedMonthMillis = today
+                                            state.displayMode = DisplayMode.Picker
+                                        },
+                                    ) {
+                                        Text(stringResource(R.string.reminder_date_picker_today))
+                                    }
+                                    Spacer(Modifier.weight(1f))
+                                    RememberTextButton(onClick = onDismiss) {
+                                        Text(stringResource(R.string.common_cancel))
+                                    }
+                                    RememberTextButton(
+                                        onClick = { state.selectedDateMillis?.let(onConfirm) },
+                                        enabled = state.selectedDateMillis != null,
+                                    ) {
+                                        Text(stringResource(R.string.common_ok))
+                                    }
+                                }
                             }
                         }
                     }
@@ -1300,102 +1447,251 @@ internal fun ReminderTimePickerDialog(
     onConfirm: (hour: Int, minute: Int) -> Unit,
 ) {
     var showDial by remember { mutableStateOf(true) }
+    // Capture the app-capped density BEFORE opening the Dialog. A Dialog opens its own window
+    // that resets LocalDensity to the raw OS density/fontScale, so reading it inside would
+    // bypass the app-wide font cap and size the picker off the uncapped OS font.
+    val baseDensity = LocalDensity.current
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false),
+        properties =
+            DialogProperties(
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false,
+            ),
     ) {
-        key(initialHour, initialMinute) {
-            val pickerContext = LocalContext.current
-            val timePickerState =
-                rememberTimePickerState(
-                    initialHour = initialHour,
-                    initialMinute = initialMinute,
-                    is24Hour = DateFormat.is24HourFormat(pickerContext),
-                )
-            Surface(
-                shape = MaterialTheme.shapes.extraLarge,
-                color = MaterialTheme.colorScheme.surfaceContainerLowest,
-                modifier =
-                    Modifier
-                        .widthIn(max = if (isLandscape()) 560.dp else 400.dp)
-                        .padding(16.dp),
-            ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Text(
-                        text = stringResource(R.string.reminder_time_picker_title),
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp),
+        BoxWithConstraints(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onDismiss,
+                    ),
+            contentAlignment = Alignment.Center,
+        ) {
+            val landscape = isLandscape()
+            val dialogMaxHeight = (maxHeight - TIME_PICKER_DIALOG_MARGIN * 2).coerceAtLeast(0.dp)
+            val requiredTimeHeight =
+                if (landscape) {
+                    TIME_PICKER_HEIGHT
+                } else {
+                    TIME_PICKER_HEIGHT + TIME_PICKER_ACTION_AREA_HEIGHT
+                }
+            val availableTimeHeight =
+                if (landscape) {
+                    dialogMaxHeight
+                } else {
+                    dialogMaxHeight - TIME_PICKER_ACTION_AREA_HEIGHT
+                }
+            val pickerDensityScale =
+                if (dialogMaxHeight < requiredTimeHeight) {
+                    (availableTimeHeight / TIME_PICKER_HEIGHT)
+                        .coerceIn(TIME_PICKER_MIN_DENSITY_SCALE, 1f)
+                } else {
+                    1f
+                }
+            val pickerDensity =
+                remember(baseDensity, pickerDensityScale) {
+                    Density(
+                        density = baseDensity.density * pickerDensityScale,
+                        // When compact (short landscape), cap font so the fixed-size picker fits;
+                        // otherwise use the full app font scale so picker text stays close to the
+                        // rest of the app instead of rendering conspicuously tiny. Same rule as
+                        // CalendarPickerDialog and FilePipe's ScheduleTimePickerDialog.
+                        fontScale =
+                            if (pickerDensityScale < 1f) {
+                                baseDensity.fontScale.coerceAtMost(0.90f)
+                            } else {
+                                baseDensity.fontScale
+                            },
                     )
-                    // Use surfaceContainerHigh for the dial so it sits visibly above the
-                    // surfaceContainerLowest dialog surface, even when Material You's
-                    // tonal-surface roles compress close together.
-                    val pickerColors =
-                        TimePickerDefaults.colors(
-                            clockDialColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                        )
-                    if (showDial) {
-                        TimePicker(state = timePickerState, colors = pickerColors)
-                    } else {
-                        TimeInput(state = timePickerState, colors = pickerColors)
-                    }
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(52.dp)
-                                .padding(top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        val timeInputModeLabel = stringResource(R.string.reminder_time_input_mode)
-                        val timeDialModeLabel = stringResource(R.string.reminder_time_dial_mode)
-                        TooltipBox(
-                            positionProvider =
-                                TooltipDefaults.rememberTooltipPositionProvider(
-                                    TooltipAnchorPosition.Above,
-                                ),
-                            tooltip = {
-                                PlainTooltip {
-                                    Text(
-                                        text =
-                                            if (showDial) {
-                                                timeInputModeLabel
-                                            } else {
-                                                timeDialModeLabel
-                                            },
-                                    )
-                                }
-                            },
-                            state = rememberTooltipState(),
-                        ) {
-                            RememberIconButton(
-                                onClick = { showDial = !showDial },
+                }
+            key(initialHour, initialMinute) {
+                val pickerContext = LocalContext.current
+                val timePickerState =
+                    rememberTimePickerState(
+                        initialHour = initialHour,
+                        initialMinute = initialMinute,
+                        is24Hour = DateFormat.is24HourFormat(pickerContext),
+                    )
+                val pickerColors =
+                    TimePickerDefaults.colors(
+                        // Dial stays surfaceContainerHigh so it contrasts against the darker
+                        // surfaceContainer card below.
+                        clockDialColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    )
+                Surface(
+                    shape = MaterialTheme.shapes.extraLarge,
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    modifier =
+                        Modifier
+                            .padding(TIME_PICKER_DIALOG_MARGIN)
+                            .widthIn(max = if (landscape) 640.dp else 432.dp)
+                            .fillMaxWidth()
+                            .heightIn(
+                                min = if (landscape) dialogMaxHeight else 0.dp,
+                                max = dialogMaxHeight,
+                            ).clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {},
+                            ),
+                ) {
+                    // Ambient app-capped density for the action buttons; only the dial itself is
+                    // wrapped in the compact pickerDensity so it fits. This keeps the buttons at a
+                    // readable app-scale size instead of shrinking them with the dial.
+                    CompositionLocalProvider(LocalDensity provides baseDensity) {
+                        if (landscape) {
+                            Row(
+                                modifier = Modifier.padding(end = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                RememberMaterialRoundedSymbol(
-                                    name = if (showDial) "keyboard" else "schedule",
-                                    weight = FontWeight.Medium,
+                                Box(
                                     modifier =
-                                        Modifier.semantics {
-                                            contentDescription = if (showDial) timeInputModeLabel else timeDialModeLabel
+                                        Modifier
+                                            .weight(1f)
+                                            .padding(vertical = 12.dp),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CompositionLocalProvider(LocalDensity provides pickerDensity) {
+                                        if (showDial) {
+                                            TimePicker(state = timePickerState, colors = pickerColors)
+                                        } else {
+                                            TimeInput(state = timePickerState, colors = pickerColors)
+                                        }
+                                    }
+                                }
+                                Spacer(Modifier.width(TIME_PICKER_LANDSCAPE_ACTION_GAP))
+                                Column(
+                                    modifier = Modifier.width(TIME_PICKER_LANDSCAPE_ACTION_WIDTH),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                                ) {
+                                    val timeInputModeLabel = stringResource(R.string.reminder_time_input_mode)
+                                    val timeDialModeLabel = stringResource(R.string.reminder_time_dial_mode)
+                                    TooltipBox(
+                                        positionProvider =
+                                            TooltipDefaults.rememberTooltipPositionProvider(
+                                                TooltipAnchorPosition.Above,
+                                            ),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                Text(
+                                                    text =
+                                                        if (showDial) {
+                                                            timeInputModeLabel
+                                                        } else {
+                                                            timeDialModeLabel
+                                                        },
+                                                )
+                                            }
                                         },
-                                )
+                                        state = rememberTooltipState(),
+                                    ) {
+                                        RememberIconButton(
+                                            onClick = { showDial = !showDial },
+                                        ) {
+                                            RememberMaterialRoundedSymbol(
+                                                name = if (showDial) "keyboard" else "schedule",
+                                                weight = FontWeight.Medium,
+                                                modifier =
+                                                    Modifier.semantics {
+                                                        contentDescription = if (showDial) timeInputModeLabel else timeDialModeLabel
+                                                    },
+                                            )
+                                        }
+                                    }
+                                    RememberTextButton(
+                                        onClick = onDismiss,
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(stringResource(R.string.common_cancel))
+                                    }
+                                    RememberTextButton(
+                                        onClick = {
+                                            onConfirm(timePickerState.hour, timePickerState.minute)
+                                        },
+                                        modifier = Modifier.fillMaxWidth(),
+                                    ) {
+                                        Text(stringResource(R.string.common_save))
+                                    }
+                                }
                             }
-                        }
-                        Spacer(Modifier.weight(1f))
-                        RememberTextButton(onClick = onDismiss) {
-                            Text(stringResource(R.string.common_cancel))
-                        }
-                        RememberTextButton(
-                            onClick = {
-                                onConfirm(timePickerState.hour, timePickerState.minute)
-                            },
-                        ) {
-                            Text(stringResource(R.string.common_save))
+                        } else {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 20.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .weight(1f, fill = false)
+                                            .fillMaxWidth(),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    CompositionLocalProvider(LocalDensity provides pickerDensity) {
+                                        if (showDial) {
+                                            TimePicker(state = timePickerState, colors = pickerColors)
+                                        } else {
+                                            TimeInput(state = timePickerState, colors = pickerColors)
+                                        }
+                                    }
+                                }
+                                Row(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    val timeInputModeLabel = stringResource(R.string.reminder_time_input_mode)
+                                    val timeDialModeLabel = stringResource(R.string.reminder_time_dial_mode)
+                                    TooltipBox(
+                                        positionProvider =
+                                            TooltipDefaults.rememberTooltipPositionProvider(
+                                                TooltipAnchorPosition.Above,
+                                            ),
+                                        tooltip = {
+                                            PlainTooltip {
+                                                Text(
+                                                    text =
+                                                        if (showDial) {
+                                                            timeInputModeLabel
+                                                        } else {
+                                                            timeDialModeLabel
+                                                        },
+                                                )
+                                            }
+                                        },
+                                        state = rememberTooltipState(),
+                                    ) {
+                                        RememberIconButton(
+                                            onClick = { showDial = !showDial },
+                                        ) {
+                                            RememberMaterialRoundedSymbol(
+                                                name = if (showDial) "keyboard" else "schedule",
+                                                weight = FontWeight.Medium,
+                                                modifier =
+                                                    Modifier.semantics {
+                                                        contentDescription = if (showDial) timeInputModeLabel else timeDialModeLabel
+                                                    },
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.weight(1f))
+                                    RememberTextButton(onClick = onDismiss) {
+                                        Text(stringResource(R.string.common_cancel))
+                                    }
+                                    RememberTextButton(
+                                        onClick = {
+                                            onConfirm(timePickerState.hour, timePickerState.minute)
+                                        },
+                                    ) {
+                                        Text(stringResource(R.string.common_save))
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1412,6 +1708,8 @@ private fun PillRow(
     onClick: () -> Unit,
     onClear: (() -> Unit)? = null,
     enabled: Boolean = true,
+    compact: Boolean = false,
+    singleLineLabel: Boolean = false,
 ) {
     val scheme = MaterialTheme.colorScheme
     val iconColor =
@@ -1430,7 +1728,7 @@ private fun PillRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(PillHeight)
+                .heightIn(min = PillHeight)
                 .clip(MaterialTheme.shapes.large)
                 .background(
                     // Use full-opacity primaryContainer for the activated state so the pill
@@ -1449,7 +1747,10 @@ private fun PillRow(
                     } else {
                         modifier
                     }
-                }.padding(start = 20.dp, end = 8.dp),
+                }.padding(
+                    start = if (compact) 14.dp else 20.dp,
+                    end = if (compact) 4.dp else 8.dp,
+                ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RememberMaterialRoundedSymbol(
@@ -1458,25 +1759,30 @@ private fun PillRow(
             tint = iconColor,
             weight = FontWeight.Medium,
         )
-        Spacer(Modifier.width(16.dp))
+        Spacer(Modifier.width(if (compact) 10.dp else 16.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.bodyLarge,
             color = labelColor,
             modifier = Modifier.weight(1f),
+            maxLines = if (singleLineLabel) 1 else Int.MAX_VALUE,
+            softWrap = !singleLineLabel,
+            overflow = if (singleLineLabel) TextOverflow.Ellipsis else TextOverflow.Clip,
         )
         // Reserve the trailing slot so rows with and without Clear match height/width.
-        Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
-            if (onClear != null) {
-                val cdClear = stringResource(R.string.common_clear)
-                RememberIconButton(onClick = onClear, modifier = Modifier.size(36.dp)) {
-                    RememberMaterialRoundedSymbol(
-                        name = "close",
-                        size = 18.dp,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        weight = FontWeight.Medium,
-                        modifier = Modifier.semantics { contentDescription = cdClear },
-                    )
+        if (onClear != null || !compact) {
+            Box(modifier = Modifier.size(36.dp), contentAlignment = Alignment.Center) {
+                if (onClear != null) {
+                    val cdClear = stringResource(R.string.common_clear)
+                    RememberIconButton(onClick = onClear, modifier = Modifier.size(36.dp)) {
+                        RememberMaterialRoundedSymbol(
+                            name = "close",
+                            size = 18.dp,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            weight = FontWeight.Medium,
+                            modifier = Modifier.semantics { contentDescription = cdClear },
+                        )
+                    }
                 }
             }
         }
@@ -1536,10 +1842,10 @@ private fun RepeatConfig(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(RepeatRowHeight),
+                        .heightIn(min = RepeatRowHeight),
             ) {
                 Box(
-                    modifier = Modifier.width(RepeatLeadingPad),
+                    modifier = Modifier.widthIn(min = RepeatLeadingPad),
                     contentAlignment = Alignment.CenterStart,
                 ) {
                     Text(
@@ -1558,7 +1864,7 @@ private fun RepeatConfig(
                     modifier =
                         Modifier
                             .weight(1f)
-                            .height(RepeatRowHeight),
+                            .heightIn(min = RepeatRowHeight),
                     value = unitLabel(unit),
                     expanded = unitMenuOpen,
                     onExpandedChange = onUnitMenuOpen,
@@ -1596,7 +1902,7 @@ private fun RepeatConfig(
                             modifier =
                                 Modifier
                                     .fillMaxWidth()
-                                    .height(RepeatRowHeight),
+                                    .heightIn(min = RepeatRowHeight),
                             value = stringResource(R.string.reminder_on_day, dayOfMonth),
                             expanded = dayOfMonthMenuOpen,
                             onExpandedChange = {
@@ -1627,7 +1933,7 @@ private fun RepeatConfig(
                                 modifier =
                                     Modifier
                                         .weight(1f)
-                                        .height(RepeatRowHeight),
+                                        .heightIn(min = RepeatRowHeight),
                                 value = ordinalLabel(nthOrdinal),
                                 expanded = nthOrdinalMenuOpen,
                                 onExpandedChange = {
@@ -1651,7 +1957,7 @@ private fun RepeatConfig(
                                 modifier =
                                     Modifier
                                         .weight(1f)
-                                        .height(RepeatRowHeight),
+                                        .heightIn(min = RepeatRowHeight),
                                 value =
                                     if (isSmallScreenPortrait) {
                                         weekdayShort(nthWeekday)
@@ -1712,6 +2018,8 @@ private fun RepeatConfig(
                     onClick = {
                         onOpenEndDatePicker()
                     },
+                    compact = true,
+                    singleLineLabel = true,
                 )
             }
             RadioOption(
@@ -1722,7 +2030,7 @@ private fun RepeatConfig(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(RepeatRowHeight),
+                            .heightIn(min = RepeatRowHeight),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
@@ -1775,7 +2083,7 @@ private fun CompactDigitField(
         modifier =
             modifier
                 .width(fieldWidth)
-                .height(RepeatRowHeight)
+                .heightIn(min = RepeatRowHeight)
                 .clip(outlineShape)
                 .border(
                     width = 1.dp,
@@ -1822,7 +2130,7 @@ private fun SheetDropdown(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(RepeatRowHeight)
+                    .heightIn(min = RepeatRowHeight)
                     .clip(MaterialTheme.shapes.medium)
                     .border(
                         width = 1.dp,

@@ -147,11 +147,37 @@ internal fun ChecklistRow(
     val haptic = LocalHapticFeedback.current
     var detailsExpanded by rememberSaveable(item.localId) { mutableStateOf(false) }
 
-    var titleFieldValue by remember(item.text) {
+    var titleFieldValue by remember(item.localId) {
         mutableStateOf(TextFieldValue(text = item.text, selection = TextRange(item.text.length)))
     }
-    var detailsFieldValue by remember(item.details) {
+    var detailsFieldValue by remember(item.localId) {
         mutableStateOf(TextFieldValue(text = item.details, selection = TextRange(item.details.length)))
+    }
+
+    LaunchedEffect(item.text) {
+        if (item.text != titleFieldValue.text) {
+            val selection = titleFieldValue.selection
+            titleFieldValue = TextFieldValue(
+                text = item.text,
+                selection = TextRange(
+                    start = selection.start.coerceIn(0, item.text.length),
+                    end = selection.end.coerceIn(0, item.text.length)
+                )
+            )
+        }
+    }
+
+    LaunchedEffect(item.details) {
+        if (item.details != detailsFieldValue.text) {
+            val selection = detailsFieldValue.selection
+            detailsFieldValue = TextFieldValue(
+                text = item.details,
+                selection = TextRange(
+                    start = selection.start.coerceIn(0, item.details.length),
+                    end = selection.end.coerceIn(0, item.details.length)
+                )
+            )
+        }
     }
 
     LaunchedEffect(isEditMode, initialTitleSelection) {
@@ -310,7 +336,6 @@ internal fun ChecklistRow(
                                 },
                             textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
                         ),
-                    singleLine = true,
                     keyboardOptions =
                         androidx.compose.foundation.text.KeyboardOptions(
                             capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,

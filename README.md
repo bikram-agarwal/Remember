@@ -1,6 +1,6 @@
 # Remember
 
-<img alt="Remember: Notes, tasks, reminders - done right." src="./fastlane/metadata/android/en-US/images/featureGraphic.jpg" />
+<img alt="Remember: Notes, tasks, reminders - done right." src="fastlane/metadata/android/en-US/images/featureGraphic.jpg" />
 
 **Never lose an important reminder to an accidental swipe.**
 
@@ -10,9 +10,9 @@ If a reminder notification gets swiped away without being marked Done, Remember 
 
 ## 📦 Downloads
 
-[<img src="app/src/main/res/drawable-nodpi/badge_playstore.png" alt="Get Remember on Play Store" height="80">](https://play.google.com/store/apps/details?id=dev.bikram.remember)
-[<img src="app/src/main/res/drawable-nodpi/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.remember.gh)
-[<img src="app/src/main/res/drawable-nodpi/badge_github.png" alt="Get Remember on GitHub" height="80">](https://github.com/bikram-agarwal/Remember/releases/latest)
+[<img src="docs/assets/badge_playstore.png" alt="Get Remember on Play Store" height="80">](https://play.google.com/store/apps/details?id=dev.bikram.remember)
+[<img src="docs/assets/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.remember.gh)
+[<img src="docs/assets/badge_github.png" alt="Get Remember on GitHub" height="80">](https://github.com/bikram-agarwal/Remember/releases/latest)
 
 ## ✨ Features
 
@@ -146,6 +146,25 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 The source code of this project is licensed under the GNU General Public License v3.0 (see the [LICENSE](LICENSE) file). 
 
 However, the application names "Remember", "FilePipe", and "ObtainX", along with all original branding artwork, logos, and custom launcher icons, are the exclusive intellectual property and trademarks of the author. Redistribution or modification of the source code under the GPLv3 does not grant permission to use these brand assets in derivative works. All forks must be entirely rebranded.
+
+## ➕ More Apps
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="https://github.com/bikram-agarwal/FilePipe">
+        <img src="docs/assets/feature_filepipe.jpg" alt="FilePipe feature graphic" width="100%">
+      <b>FilePipe</b></a>
+      <p>Your files, your rules. Automatically sort and move media with smart rules.</p>
+    </td>
+    <td width="50%" align="center">
+      <a href="https://github.com/bikram-agarwal/ObtainX">
+        <img src="docs/assets/feature_obtainx.jpg" alt="ObtainX feature graphic" width="100%">
+      <b>ObtainX</b></a>
+      <p>A supercharged Obtainium: get Android app updates straight from the source.</p>
+    </td>
+  </tr>
+</table>
 
 ---
 

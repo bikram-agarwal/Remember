@@ -23,6 +23,7 @@ import dev.bikram.remember.ui.theme.AppShapes
 import dev.bikram.remember.ui.theme.AppTypography
 import dev.bikram.remember.ui.theme.LocalIsDark
 import dev.bikram.remember.ui.theme.LocalThemeState
+import dev.bikram.remember.ui.theme.RememberColorSpecVersion
 import dev.bikram.remember.ui.theme.boostContainersForSeedThemes
 import dev.bikram.remember.ui.theme.boostOutlineForVisibility
 import dev.bikram.remember.ui.theme.tintSurfacesTowardPrimary
@@ -81,6 +82,7 @@ fun rememberImageDerivedColorScheme(imageColors: ImageDerivedColors?): ImageDeri
             isDark = darkTheme,
             style = themeState.paletteStyle.toLib(),
             isAmoled = black,
+            specVersion = RememberColorSpecVersion,
         )
     return remember(generated, darkTheme, black, themeState.shadingIntensity) {
         val base = if (black) generated.toOled() else generated

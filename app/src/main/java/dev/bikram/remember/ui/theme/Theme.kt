@@ -36,9 +36,14 @@ import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
 import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemeState
+import dev.bikram.remember.ui.common.responsiveTextScaleForWidth
 
 private const val MAX_APP_DISPLAY_SCALE = 1.15f
-private const val MAX_APP_FONT_SCALE = 1.3f
+
+// Modest cap so text on extreme OS font settings stays large enough to honor the user's
+// choice, but not so large that sheets/lists balloon far past the (necessarily shrunk)
+// date/time pickers. Kept in parity with FilePipe.
+private const val MAX_APP_FONT_SCALE = 1.10f
 
 val LocalIsDark = staticCompositionLocalOf { false }
 
@@ -70,7 +75,13 @@ fun RememberTheme(
     val reducedMotion = rememberSystemReducedMotionEnabled(context)
     val baseDensity = LocalDensity.current
     val stableDensity = DisplayMetrics.DENSITY_DEVICE_STABLE.toFloat() / DisplayMetrics.DENSITY_DEFAULT
-    val responsiveTextScale = responsiveTextScaleForScreenWidth()
+    val responsiveTextScale =
+        with(baseDensity) {
+            responsiveTextScaleForWidth(
+                LocalWindowInfo.current.containerSize.width
+                    .toDp(),
+            )
+        }
     val responsiveDensity =
         remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale, stableDensity) {
             Density(
@@ -133,22 +144,6 @@ fun RememberTheme(
                 content()
             }
         }
-    }
-}
-
-@Composable
-private fun responsiveTextScaleForScreenWidth(): Float {
-    val screenWidthDp =
-        with(LocalDensity.current) {
-            LocalWindowInfo.current.containerSize.width
-                .toDp()
-                .value
-        }
-    return when {
-        screenWidthDp < 320 -> 0.84f
-        screenWidthDp < 360 -> 0.88f
-        screenWidthDp < 430 -> 0.93f
-        else -> 1f
     }
 }
 

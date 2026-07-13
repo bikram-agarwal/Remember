@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <style name="Theme.Remember" parent="android:Theme.Material.NoActionBar">
+        <item name="android:forceDarkAllowed">false</item>
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+
     <style name="Theme.Remember.Starting" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">#0B1F16</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>

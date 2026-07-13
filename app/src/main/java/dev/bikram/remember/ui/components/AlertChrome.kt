@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -59,7 +60,9 @@ import androidx.compose.ui.unit.isSpecified
 import androidx.graphics.shapes.Morph
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.ResponsiveActionLayout
 import dev.bikram.remember.ui.common.isSmallLandscape
+import dev.bikram.remember.ui.common.responsiveActionLayout
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlin.math.roundToInt
@@ -394,71 +397,108 @@ private fun ReminderNotificationsBlockedBar(
         shadowAlpha = shadowAlpha,
         modifier = modifier,
     ) {
-        val rowMinHeight = 64.dp * contentScale
-        val rowStartPadding = 14.dp * contentScale
-        val rowEndPadding = 10.dp * contentScale
-        val rowVerticalPadding = 8.dp * contentScale
-        val rowSpacing = 12.dp * contentScale
-        val symbolSize = 28.dp * contentScale
-        val buttonHorizontalPadding = 18.dp * contentScale
-        val buttonVerticalPadding = 8.dp * contentScale
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = rowMinHeight)
-                    .padding(
-                        start = rowStartPadding,
-                        end = rowEndPadding,
-                        top = rowVerticalPadding,
-                        bottom = rowVerticalPadding,
-                    ),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(rowSpacing),
-        ) {
-            Surface(
-                modifier = Modifier.size(iconContainerSize),
-                shape = CircleShape,
-                color = scheme.error,
-                contentColor = scheme.onError,
-            ) {
-                Box(contentAlignment = Alignment.Center) {
-                    RememberMaterialRoundedSymbol(
-                        name = "notifications_off",
-                        size = symbolSize,
-                        weight = FontWeight.Medium,
-                        tint = scheme.onError,
+        BoxWithConstraints {
+            val stackedAction =
+                responsiveActionLayout(
+                    availableWidth = maxWidth,
+                    effectiveFontScale = LocalDensity.current.fontScale,
+                    itemCount = 2,
+                ) == ResponsiveActionLayout.STACKED
+            val rowMinHeight = 64.dp * contentScale
+            val rowStartPadding = 14.dp * contentScale
+            val rowEndPadding = 10.dp * contentScale
+            val rowVerticalPadding = 8.dp * contentScale
+            val rowSpacing = 12.dp * contentScale
+            val symbolSize = 28.dp * contentScale
+            val buttonHorizontalPadding = 18.dp * contentScale
+            val buttonVerticalPadding = 8.dp * contentScale
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = rowMinHeight)
+                            .padding(
+                                start = rowStartPadding,
+                                end = rowEndPadding,
+                                top = rowVerticalPadding,
+                                bottom = rowVerticalPadding,
+                            ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(rowSpacing),
+                ) {
+                    Surface(
+                        modifier = Modifier.size(iconContainerSize),
+                        shape = CircleShape,
+                        color = scheme.error,
+                        contentColor = scheme.onError,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            RememberMaterialRoundedSymbol(
+                                name = "notifications_off",
+                                size = symbolSize,
+                                weight = FontWeight.Medium,
+                                tint = scheme.onError,
+                            )
+                        }
+                    }
+                    AlertBarText(
+                        title = stringResource(R.string.main_reminder_notifications_disabled),
+                        body =
+                            pluralStringResource(
+                                R.plurals.main_reminders_due_this_week,
+                                reminderCount,
+                                reminderCount,
+                            ),
+                        modifier = Modifier.weight(1f),
+                        contentScale = contentScale,
                     )
+                    if (!stackedAction) {
+                        RememberButton(
+                            onClick = onEnableClick,
+                            contentPadding =
+                                PaddingValues(
+                                    horizontal = buttonHorizontalPadding,
+                                    vertical = buttonVerticalPadding,
+                                ),
+                            colors =
+                                ButtonDefaults.buttonColors(
+                                    containerColor = scheme.primary,
+                                    contentColor = scheme.onPrimary,
+                                ),
+                        ) {
+                            RememberActionLabel(stringResource(R.string.common_enable))
+                        }
+                    }
                 }
-            }
-            AlertBarText(
-                title = stringResource(R.string.main_reminder_notifications_disabled),
-                body =
-                    pluralStringResource(
-                        R.plurals.main_reminders_due_this_week,
-                        reminderCount,
-                        reminderCount,
-                    ),
-                modifier = Modifier.weight(1f),
-                contentScale = contentScale,
-            )
-            RememberButton(
-                onClick = onEnableClick,
-                contentPadding =
-                    PaddingValues(
-                        horizontal = buttonHorizontalPadding,
-                        vertical = buttonVerticalPadding,
-                    ),
-                colors =
-                    ButtonDefaults.buttonColors(
-                        containerColor = scheme.primary,
-                        contentColor = scheme.onPrimary,
-                    ),
-            ) {
-                Text(
-                    text = stringResource(R.string.common_enable),
-                    maxLines = 1,
-                )
+                if (stackedAction) {
+                    // Flow the action onto its own line BELOW the text (indented past the icon),
+                    // matching UpdateFloatingBar. A BottomEnd Box overlay collided with the text
+                    // row on large-font devices.
+                    RememberButton(
+                        onClick = onEnableClick,
+                        modifier =
+                            Modifier
+                                .align(Alignment.End)
+                                .padding(
+                                    start = rowStartPadding + iconContainerSize + rowSpacing,
+                                    end = rowEndPadding,
+                                    bottom = rowVerticalPadding,
+                                ),
+                        contentPadding =
+                            PaddingValues(
+                                horizontal = buttonHorizontalPadding,
+                                vertical = buttonVerticalPadding,
+                            ),
+                        colors =
+                            ButtonDefaults.buttonColors(
+                                containerColor = scheme.primary,
+                                contentColor = scheme.onPrimary,
+                            ),
+                    ) {
+                        RememberActionLabel(stringResource(R.string.common_enable))
+                    }
+                }
             }
         }
     }

@@ -34,6 +34,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,8 +60,10 @@ import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.components.parseHexColor
 import dev.bikram.remember.ui.components.tagColor
 import dev.bikram.remember.ui.edit.CompactOutlinedField
@@ -238,6 +241,13 @@ internal fun BulkTagSheet(
     val canStageNewTag = trimmedDraft.isNotBlank() && !draftIsDuplicate && !RememberReservedTags.isSuggestionReserved(trimmedDraft)
 
     val hasPending = pendingActions.addTags.isNotEmpty() || pendingActions.removeTags.isNotEmpty()
+    var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }
+    val isDirty = hasPending || trimmedDraft.isNotBlank()
+    val sheetState =
+        rememberBottomSheetStateWithUnsavedChanges(
+            isDirty = isDirty,
+            onShowDialog = { showUnsavedDialog = true },
+        )
 
     fun commitHexEditing(): String {
         val draftHex =
@@ -281,7 +291,14 @@ internal fun BulkTagSheet(
     AppBottomSheet(
         title = stringResource(R.string.home_bulk_tag_sheet_title),
         subtitleContent = { BulkTagSheetSubtitle() },
-        onDismiss = onDismiss,
+        sheetState = sheetState,
+        onDismiss = {
+            if (isDirty) {
+                showUnsavedDialog = true
+            } else {
+                onDismiss()
+            }
+        },
         actionsImePadding = true,
         actions = {
             RememberTextButton(onClick = onDismiss) {
@@ -428,6 +445,16 @@ internal fun BulkTagSheet(
 
             Spacer(Modifier.height(8.dp))
         }
+    }
+
+    if (showUnsavedDialog) {
+        RememberUnsavedChangesDialog(
+            onConfirm = {
+                showUnsavedDialog = false
+                onDismiss()
+            },
+            onDismiss = { showUnsavedDialog = false },
+        )
     }
 }
 

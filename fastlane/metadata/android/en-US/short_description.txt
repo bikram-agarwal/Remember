@@ -1,1 +1,1 @@
-Persistent recurring reminders that return if accidentally dismissed
+Notes, tasks, and reminders that keep coming back until they are done.

@@ -21,6 +21,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -46,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,10 +64,13 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -88,6 +93,8 @@ fun OnboardingPermissionsScreen(
     onContinue: () -> Unit,
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
+    var bottomActionsHeight by remember { mutableStateOf(140.dp) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val powerManager =
         remember {
@@ -125,340 +132,369 @@ fun OnboardingPermissionsScreen(
         modifier = Modifier.fillMaxSize(),
         color = Color.Transparent,
     ) {
-        val useTwoColumns = isSmallLandscape()
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize(),
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize(),
         ) {
-            if (useTwoColumns) {
-                Row(
+            val screenHeight = maxHeight
+            val baseDensity = LocalDensity.current
+            val baselineHeight = 980.dp
+            val responsiveScale =
+                if (maxWidth < 600.dp) {
+                    minOf(
+                        1f,
+                        maxWidth / 390.dp,
+                        maxHeight / baselineHeight,
+                    ).coerceAtLeast(0.76f)
+                } else {
+                    1f
+                }
+            val responsiveDensity =
+                remember(baseDensity, responsiveScale) {
+                    Density(
+                        density = baseDensity.density * responsiveScale,
+                        fontScale = baseDensity.fontScale,
+                    )
+                }
+
+            CompositionLocalProvider(LocalDensity provides responsiveDensity) {
+                val useTwoColumns = isSmallLandscape()
+                Box(
                     modifier =
                         Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                            .fillMaxSize(),
                 ) {
-                    // Left column: graphics, title, subtitle, verified footer
-                    Column(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        PermissionsHeroIllustration(
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth()
-                                    .height(250.dp),
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            text = stringResource(R.string.onboarding_permissions_title),
-                            style = MaterialTheme.typography.headlineMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = scheme.onSurface,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = stringResource(R.string.onboarding_permissions_subtitle),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = scheme.onSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center,
-                        )
-                        Spacer(Modifier.height(8.dp))
+                    if (useTwoColumns) {
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                        ) {
-                            RememberMaterialRoundedSymbol(
-                                name = "verified_user",
-                                size = 14.dp,
-                                tint = scheme.onSurfaceVariant,
-                            )
-                            Spacer(Modifier.width(6.dp))
-                            Text(
-                                text = stringResource(R.string.onboarding_permissions_change_anytime_footer),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = scheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-
-                    // Right column: the two permissions cards and the button at the bottom
-                    Column(
-                        modifier =
-                            Modifier
-                                .weight(1.2f)
-                                .fillMaxHeight()
-                                .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
-                    ) {
-                        Spacer(Modifier.height(12.dp))
-                        PermissionStatusCard(
-                            granted = notificationsGranted,
-                            title = stringResource(R.string.onboarding_permissions_notifications_title),
-                            body = stringResource(R.string.onboarding_permissions_notifications_body),
-                            iconName = "notifications",
-                            statusText = stringResource(R.string.onboarding_permissions_status_recommended),
-                            actionText =
-                                if (notificationsGranted) {
-                                    stringResource(R.string.onboarding_permissions_enabled)
-                                } else {
-                                    stringResource(R.string.onboarding_permissions_allow_notifications)
-                                },
-                            actionEnabled = !notificationsGranted,
-                            primaryAction = true,
-                            compact = true,
-                            onAction = {
-                                when {
-                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                        ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.POST_NOTIFICATIONS,
-                                        ) != PackageManager.PERMISSION_GRANTED ->
-                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
-                                        context.startActivity(notificationSettingsIntent(context))
-                                    else ->
-                                        notificationsGranted = true
-                                }
-                            },
-                        )
-                        PermissionStatusCard(
-                            granted = ignoringBatteryOptimizations,
-                            title = stringResource(R.string.onboarding_permissions_reliable_title),
-                            body = stringResource(R.string.onboarding_permissions_reliable_body),
-                            iconName = "timer",
-                            statusText = stringResource(R.string.onboarding_permissions_status_optional),
-                            actionText =
-                                if (ignoringBatteryOptimizations) {
-                                    stringResource(R.string.onboarding_permissions_enabled)
-                                } else {
-                                    stringResource(R.string.onboarding_permissions_improve_reliability)
-                                },
-                            actionEnabled = !ignoringBatteryOptimizations,
-                            primaryAction = false,
-                            compact = true,
-                            onAction = {
-                                runCatching {
-                                    context.startActivity(batteryOptimizationIntent(context))
-                                }.onFailure {
-                                    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                                }
-                            },
-                        )
-
-                        val bottomCtaShape = MaterialTheme.shapes.extraExtraLarge
-                        val bottomCtaPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
-                        if (notificationsGranted) {
-                            RememberButton(
-                                onClick = onContinue,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = bottomCtaShape,
-                                contentPadding = bottomCtaPadding,
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.onboarding_permissions_continue),
-                                    modifier = Modifier.weight(1f),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.SemiBold,
-                                    textAlign = TextAlign.Center,
-                                )
-                                RememberMaterialRoundedSymbol(
-                                    name = "arrow_forward",
-                                    tint = MaterialTheme.colorScheme.onPrimary,
-                                )
-                            }
-                        } else {
-                            RememberTextButton(
-                                onClick = onContinue,
-                                modifier = Modifier.fillMaxWidth(),
-                                colors = ButtonDefaults.textButtonColors(contentColor = scheme.onSurfaceVariant),
-                                contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.onboarding_permissions_skip_for_now),
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    textAlign = TextAlign.Center,
-                                )
-                            }
-                        }
-                    }
-                }
-            } else {
-                Column(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(horizontal = 26.dp)
-                            .padding(top = 12.dp, bottom = 8.dp),
-                ) {
-                    Column(
-                        modifier =
-                            Modifier
-                                .weight(1f)
-                                .fillMaxWidth()
-                                .verticalScroll(rememberScrollState()),
-                    ) {
-                        Spacer(Modifier.statusBarsPadding())
-                        PermissionsHeroIllustration(
                             modifier =
                                 Modifier
-                                    .fillMaxWidth()
-                                    .height(250.dp),
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = stringResource(R.string.onboarding_permissions_title),
-                            style = MaterialTheme.typography.headlineLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = scheme.onSurface,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        Text(
-                            text = stringResource(R.string.onboarding_permissions_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = scheme.onSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth(0.88f),
-                        )
-                        Spacer(Modifier.height(22.dp))
-                        PermissionStatusCard(
-                            granted = notificationsGranted,
-                            title = stringResource(R.string.onboarding_permissions_notifications_title),
-                            body = stringResource(R.string.onboarding_permissions_notifications_body),
-                            iconName = "notifications",
-                            statusText = stringResource(R.string.onboarding_permissions_status_recommended),
-                            actionText =
-                                if (notificationsGranted) {
-                                    stringResource(R.string.onboarding_permissions_enabled)
-                                } else {
-                                    stringResource(R.string.onboarding_permissions_allow_notifications)
-                                },
-                            actionEnabled = !notificationsGranted,
-                            primaryAction = true,
-                            onAction = {
-                                when {
-                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                        ContextCompat.checkSelfPermission(
-                                            context,
-                                            Manifest.permission.POST_NOTIFICATIONS,
-                                        ) != PackageManager.PERMISSION_GRANTED ->
-                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                    !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
-                                        context.startActivity(notificationSettingsIntent(context))
-                                    else ->
-                                        notificationsGranted = true
-                                }
-                            },
-                        )
-                        Spacer(Modifier.height(10.dp))
-                        PermissionStatusCard(
-                            granted = ignoringBatteryOptimizations,
-                            title = stringResource(R.string.onboarding_permissions_reliable_title),
-                            body = stringResource(R.string.onboarding_permissions_reliable_body),
-                            iconName = "timer",
-                            statusText = stringResource(R.string.onboarding_permissions_status_optional),
-                            actionText =
-                                if (ignoringBatteryOptimizations) {
-                                    stringResource(R.string.onboarding_permissions_enabled)
-                                } else {
-                                    stringResource(R.string.onboarding_permissions_improve_reliability)
-                                },
-                            actionEnabled = !ignoringBatteryOptimizations,
-                            primaryAction = false,
-                            modifier =
-                                Modifier
-                                    .fillMaxWidth(0.98f)
-                                    .align(Alignment.CenterHorizontally),
-                            onAction = {
-                                runCatching {
-                                    context.startActivity(batteryOptimizationIntent(context))
-                                }.onFailure {
-                                    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                                }
-                            },
-                        )
-                        Spacer(Modifier.height(140.dp))
-                    }
-                }
-
-                val bottomCtaShape = MaterialTheme.shapes.extraExtraLarge
-                val bottomCtaPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
-                Column(
-                    modifier =
-                        Modifier
-                            .align(Alignment.BottomCenter)
-                            .fillMaxWidth()
-                            .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Row(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                    ) {
-                        RememberMaterialRoundedSymbol(
-                            name = "verified_user",
-                            size = 18.dp,
-                            tint = scheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.onboarding_permissions_change_anytime_footer),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = scheme.onSurfaceVariant,
-                        )
-                    }
-                    Spacer(Modifier.height(16.dp))
-
-                    if (notificationsGranted) {
-                        RememberButton(
-                            onClick = onContinue,
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = bottomCtaShape,
-                            contentPadding = bottomCtaPadding,
+                                    .fillMaxSize()
+                                    .padding(horizontal = 24.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(24.dp),
                         ) {
-                            Text(
-                                text = stringResource(R.string.onboarding_permissions_continue),
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                textAlign = TextAlign.Center,
-                            )
-                            RememberMaterialRoundedSymbol(
-                                name = "arrow_forward",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                            )
+                            // Left column: graphics, title, subtitle, verified footer
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxHeight()
+                                        .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                PermissionsHeroIllustration(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(250.dp),
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.onboarding_permissions_title),
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = scheme.onSurface,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center,
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = stringResource(R.string.onboarding_permissions_subtitle),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = scheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center,
+                                )
+                                Spacer(Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
+                                ) {
+                                    RememberMaterialRoundedSymbol(
+                                        name = "verified_user",
+                                        size = 14.dp,
+                                        tint = scheme.onSurfaceVariant,
+                                    )
+                                    Spacer(Modifier.width(6.dp))
+                                    Text(
+                                        text = stringResource(R.string.onboarding_permissions_change_anytime_footer),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = scheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+
+                            // Right column: the two permissions cards and the button at the bottom
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .weight(1.2f)
+                                        .fillMaxHeight()
+                                        .verticalScroll(rememberScrollState()),
+                                verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+                            ) {
+                                Spacer(Modifier.height(12.dp))
+                                PermissionStatusCard(
+                                    granted = notificationsGranted,
+                                    title = stringResource(R.string.onboarding_permissions_notifications_title),
+                                    body = stringResource(R.string.onboarding_permissions_notifications_body),
+                                    iconName = "notifications",
+                                    statusText = stringResource(R.string.onboarding_permissions_status_recommended),
+                                    actionText =
+                                        if (notificationsGranted) {
+                                            stringResource(R.string.onboarding_permissions_enabled)
+                                        } else {
+                                            stringResource(R.string.onboarding_permissions_allow_notifications)
+                                        },
+                                    actionEnabled = !notificationsGranted,
+                                    primaryAction = true,
+                                    compact = true,
+                                    onAction = {
+                                        when {
+                                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                                ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.POST_NOTIFICATIONS,
+                                                ) != PackageManager.PERMISSION_GRANTED ->
+                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
+                                                context.startActivity(notificationSettingsIntent(context))
+                                            else ->
+                                                notificationsGranted = true
+                                        }
+                                    },
+                                )
+                                PermissionStatusCard(
+                                    granted = ignoringBatteryOptimizations,
+                                    title = stringResource(R.string.onboarding_permissions_reliable_title),
+                                    body = stringResource(R.string.onboarding_permissions_reliable_body),
+                                    iconName = "timer",
+                                    statusText = stringResource(R.string.onboarding_permissions_status_optional),
+                                    actionText =
+                                        if (ignoringBatteryOptimizations) {
+                                            stringResource(R.string.onboarding_permissions_enabled)
+                                        } else {
+                                            stringResource(R.string.onboarding_permissions_improve_reliability)
+                                        },
+                                    actionEnabled = !ignoringBatteryOptimizations,
+                                    primaryAction = false,
+                                    compact = true,
+                                    onAction = {
+                                        runCatching {
+                                            context.startActivity(batteryOptimizationIntent(context))
+                                        }.onFailure {
+                                            context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                        }
+                                    },
+                                )
+
+                                val bottomCtaShape = MaterialTheme.shapes.extraExtraLarge
+                                val bottomCtaPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+                                if (notificationsGranted) {
+                                    RememberButton(
+                                        onClick = onContinue,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = bottomCtaShape,
+                                        contentPadding = bottomCtaPadding,
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.onboarding_permissions_continue),
+                                            modifier = Modifier.weight(1f),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            textAlign = TextAlign.Center,
+                                        )
+                                        RememberMaterialRoundedSymbol(
+                                            name = "arrow_forward",
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                        )
+                                    }
+                                } else {
+                                    RememberTextButton(
+                                        onClick = onContinue,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        colors = ButtonDefaults.textButtonColors(contentColor = scheme.onSurfaceVariant),
+                                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 10.dp),
+                                    ) {
+                                        Text(
+                                            text = stringResource(R.string.onboarding_permissions_skip_for_now),
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Medium,
+                                            textAlign = TextAlign.Center,
+                                        )
+                                    }
+                                }
+                            }
                         }
                     } else {
-                        RememberTextButton(
-                            onClick = onContinue,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors =
-                                ButtonDefaults.textButtonColors(
-                                    contentColor = scheme.onSurfaceVariant,
-                                ),
-                            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                        Column(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .padding(horizontal = 26.dp)
+                                    .padding(top = 12.dp, bottom = 8.dp),
                         ) {
-                            Text(
-                                text = stringResource(R.string.onboarding_permissions_skip_for_now),
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium,
-                                textAlign = TextAlign.Center,
-                            )
+                            Column(
+                                modifier =
+                                    Modifier
+                                        .weight(1f)
+                                        .fillMaxWidth()
+                                        .verticalScroll(rememberScrollState()),
+                            ) {
+                                Spacer(Modifier.statusBarsPadding())
+                                PermissionsHeroIllustration(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(250.dp),
+                                )
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    text = stringResource(R.string.onboarding_permissions_title),
+                                    style = MaterialTheme.typography.headlineLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = scheme.onSurface,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                Text(
+                                    text = stringResource(R.string.onboarding_permissions_subtitle),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = scheme.onSurfaceVariant,
+                                    modifier = Modifier.fillMaxWidth(0.88f),
+                                )
+                                Spacer(Modifier.height(22.dp))
+                                PermissionStatusCard(
+                                    granted = notificationsGranted,
+                                    title = stringResource(R.string.onboarding_permissions_notifications_title),
+                                    body = stringResource(R.string.onboarding_permissions_notifications_body),
+                                    iconName = "notifications",
+                                    statusText = stringResource(R.string.onboarding_permissions_status_recommended),
+                                    actionText =
+                                        if (notificationsGranted) {
+                                            stringResource(R.string.onboarding_permissions_enabled)
+                                        } else {
+                                            stringResource(R.string.onboarding_permissions_allow_notifications)
+                                        },
+                                    actionEnabled = !notificationsGranted,
+                                    primaryAction = true,
+                                    onAction = {
+                                        when {
+                                            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                                ContextCompat.checkSelfPermission(
+                                                    context,
+                                                    Manifest.permission.POST_NOTIFICATIONS,
+                                                ) != PackageManager.PERMISSION_GRANTED ->
+                                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            !NotificationManagerCompat.from(context).areNotificationsEnabled() ->
+                                                context.startActivity(notificationSettingsIntent(context))
+                                            else ->
+                                                notificationsGranted = true
+                                        }
+                                    },
+                                )
+                                Spacer(Modifier.height(10.dp))
+                                PermissionStatusCard(
+                                    granted = ignoringBatteryOptimizations,
+                                    title = stringResource(R.string.onboarding_permissions_reliable_title),
+                                    body = stringResource(R.string.onboarding_permissions_reliable_body),
+                                    iconName = "timer",
+                                    statusText = stringResource(R.string.onboarding_permissions_status_optional),
+                                    actionText =
+                                        if (ignoringBatteryOptimizations) {
+                                            stringResource(R.string.onboarding_permissions_enabled)
+                                        } else {
+                                            stringResource(R.string.onboarding_permissions_improve_reliability)
+                                        },
+                                    actionEnabled = !ignoringBatteryOptimizations,
+                                    primaryAction = false,
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth(0.98f)
+                                            .align(Alignment.CenterHorizontally),
+                                    onAction = {
+                                        runCatching {
+                                            context.startActivity(batteryOptimizationIntent(context))
+                                        }.onFailure {
+                                            context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                                        }
+                                    },
+                                )
+                                Spacer(Modifier.height(bottomActionsHeight + 24.dp))
+                            }
+                        }
+
+                        val bottomCtaShape = MaterialTheme.shapes.extraExtraLarge
+                        val bottomCtaPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
+                        Column(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .onGloballyPositioned { coordinates ->
+                                        bottomActionsHeight = with(responsiveDensity) { coordinates.size.height.toDp() }
+                                    }.padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Row(
+                                modifier =
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "verified_user",
+                                    size = 18.dp,
+                                    tint = scheme.onSurfaceVariant,
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = stringResource(R.string.onboarding_permissions_change_anytime_footer),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = scheme.onSurfaceVariant,
+                                )
+                            }
+                            Spacer(Modifier.height(16.dp))
+
+                            if (notificationsGranted) {
+                                RememberButton(
+                                    onClick = onContinue,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = bottomCtaShape,
+                                    contentPadding = bottomCtaPadding,
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.onboarding_permissions_continue),
+                                        modifier = Modifier.weight(1f),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                    RememberMaterialRoundedSymbol(
+                                        name = "arrow_forward",
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                    )
+                                }
+                            } else {
+                                RememberTextButton(
+                                    onClick = onContinue,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors =
+                                        ButtonDefaults.textButtonColors(
+                                            contentColor = scheme.onSurfaceVariant,
+                                        ),
+                                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
+                                ) {
+                                    Text(
+                                        text = stringResource(R.string.onboarding_permissions_skip_for_now),
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        textAlign = TextAlign.Center,
+                                    )
+                                }
+                            }
                         }
                     }
                 }

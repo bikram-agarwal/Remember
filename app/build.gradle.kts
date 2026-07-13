@@ -73,10 +73,14 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 117
-        versionName = "1.1.7"
+        versionCode = 118
+        versionName = "1.1.8"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+    }
+
+    androidResources {
+        localeFilters += setOf("en")
     }
 
     signingConfigs {

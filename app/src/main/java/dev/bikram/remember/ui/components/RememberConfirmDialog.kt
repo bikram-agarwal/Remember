@@ -52,3 +52,21 @@ fun RememberConfirmDialog(
         },
     )
 }
+
+@Composable
+fun RememberUnsavedChangesDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    RememberConfirmDialog(
+        title = stringResource(R.string.common_unsaved_changes_title),
+        text = stringResource(R.string.common_unsaved_changes_body),
+        confirmLabel = stringResource(R.string.common_unsaved_changes_discard),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+        destructive = true,
+        dismissLabel = stringResource(R.string.common_unsaved_changes_keep_editing),
+        modifier = modifier,
+    )
+}

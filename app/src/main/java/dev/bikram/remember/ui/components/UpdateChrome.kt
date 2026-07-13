@@ -3,6 +3,7 @@ package dev.bikram.remember.ui.components
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -17,17 +18,19 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.ResponsiveActionLayout
+import dev.bikram.remember.ui.common.responsiveActionLayout
 
 sealed interface UpdateChromeState {
     data object Hidden : UpdateChromeState
@@ -103,108 +106,172 @@ fun UpdateFloatingBar(
         val buttonHorizontalPadding = 18.dp * contentScale
         val buttonVerticalPadding = 8.dp * contentScale
         val progressHeight = 8.dp * contentScale
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = rowMinHeight)
-                        .padding(
-                            start = rowStartPadding,
-                            end = rowEndPadding,
-                            top = rowVerticalPadding,
-                            bottom = rowVerticalPadding,
-                        ),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(rowSpacing),
-            ) {
-                Surface(
-                    modifier = Modifier.size(iconContainerSize),
-                    shape = CircleShape,
-                    color = scheme.primaryContainer,
-                    contentColor = scheme.onPrimaryContainer,
+        BoxWithConstraints {
+            val stackedAction =
+                responsiveActionLayout(
+                    availableWidth = maxWidth,
+                    effectiveFontScale = LocalDensity.current.fontScale,
+                    itemCount = 2,
+                ) == ResponsiveActionLayout.STACKED
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = rowMinHeight)
+                            .padding(
+                                start = rowStartPadding,
+                                end = rowEndPadding,
+                                top = rowVerticalPadding,
+                                bottom = rowVerticalPadding,
+                            ),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(rowSpacing),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        RememberMaterialRoundedSymbol(
-                            name = if (state == UpdateChromeState.ReadyToInstall) "download_done" else "download",
-                            size = symbolSize,
-                            weight = FontWeight.Medium,
-                            tint = scheme.onPrimaryContainer,
-                        )
-                    }
-                }
-                AlertBarText(
-                    title = title,
-                    body = body,
-                    modifier = Modifier.weight(1f),
-                    contentScale = contentScale,
-                )
-
-                when (state) {
-                    UpdateChromeState.Available -> {
-                        RememberButton(
-                            onClick = onCheckClick,
-                            contentPadding =
-                                PaddingValues(
-                                    horizontal = buttonHorizontalPadding,
-                                    vertical = buttonVerticalPadding,
-                                ),
-                            colors =
-                                ButtonDefaults.buttonColors(
-                                    containerColor = scheme.primary,
-                                    contentColor = scheme.onPrimary,
-                                ),
-                        ) {
-                            Text(stringResource(R.string.update_bar_available_action))
-                        }
-                    }
-                    is UpdateChromeState.Downloading -> Unit
-                    UpdateChromeState.ReadyToInstall ->
-                        RememberButton(
-                            onClick = onInstallClick,
-                            contentPadding =
-                                PaddingValues(
-                                    horizontal = buttonHorizontalPadding,
-                                    vertical = buttonVerticalPadding,
-                                ),
-                            colors =
-                                ButtonDefaults.buttonColors(
-                                    containerColor = scheme.primary,
-                                    contentColor = scheme.onPrimary,
-                                ),
-                        ) {
-                            Text(
-                                text = stringResource(R.string.play_update_bar_install_action),
-                                maxLines = 1,
+                    Surface(
+                        modifier = Modifier.size(iconContainerSize),
+                        shape = CircleShape,
+                        color = scheme.primaryContainer,
+                        contentColor = scheme.onPrimaryContainer,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            RememberMaterialRoundedSymbol(
+                                name = if (state == UpdateChromeState.ReadyToInstall) "download_done" else "download",
+                                size = symbolSize,
+                                weight = FontWeight.Medium,
+                                tint = scheme.onPrimaryContainer,
                             )
                         }
-                    UpdateChromeState.Hidden -> Unit
-                }
-            }
+                    }
+                    AlertBarText(
+                        title = title,
+                        body = body,
+                        modifier = Modifier.weight(1f),
+                        contentScale = contentScale,
+                    )
 
-            if (state is UpdateChromeState.Downloading) {
-                if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
-                    LinearWavyProgressIndicator(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(progressHeight),
-                        color = scheme.primary,
-                        trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
-                    )
-                } else {
-                    val fraction =
-                        (state.bytesDownloaded.toFloat() / state.totalBytesToDownload.toFloat())
-                            .coerceIn(0f, 1f)
-                    LinearWavyProgressIndicator(
-                        progress = { fraction },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(progressHeight),
-                        color = scheme.primary,
-                        trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
-                    )
+                    if (!stackedAction) {
+                        when (state) {
+                            UpdateChromeState.Available -> {
+                                RememberButton(
+                                    onClick = onCheckClick,
+                                    contentPadding =
+                                        PaddingValues(
+                                            horizontal = buttonHorizontalPadding,
+                                            vertical = buttonVerticalPadding,
+                                        ),
+                                    colors =
+                                        ButtonDefaults.buttonColors(
+                                            containerColor = scheme.primary,
+                                            contentColor = scheme.onPrimary,
+                                        ),
+                                ) {
+                                    RememberActionLabel(stringResource(R.string.update_bar_available_action))
+                                }
+                            }
+                            is UpdateChromeState.Downloading -> Unit
+                            UpdateChromeState.ReadyToInstall ->
+                                RememberButton(
+                                    onClick = onInstallClick,
+                                    contentPadding =
+                                        PaddingValues(
+                                            horizontal = buttonHorizontalPadding,
+                                            vertical = buttonVerticalPadding,
+                                        ),
+                                    colors =
+                                        ButtonDefaults.buttonColors(
+                                            containerColor = scheme.primary,
+                                            contentColor = scheme.onPrimary,
+                                        ),
+                                ) {
+                                    RememberActionLabel(stringResource(R.string.play_update_bar_install_action))
+                                }
+                            UpdateChromeState.Hidden -> Unit
+                        }
+                    }
+                }
+
+                if (stackedAction) {
+                    when (state) {
+                        UpdateChromeState.Available -> {
+                            RememberButton(
+                                onClick = onCheckClick,
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.End)
+                                        .padding(
+                                            start = rowStartPadding + iconContainerSize + rowSpacing,
+                                            end = rowEndPadding,
+                                            bottom = rowVerticalPadding,
+                                        ),
+                                contentPadding =
+                                    PaddingValues(
+                                        horizontal = buttonHorizontalPadding,
+                                        vertical = buttonVerticalPadding,
+                                    ),
+                                colors =
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = scheme.primary,
+                                        contentColor = scheme.onPrimary,
+                                    ),
+                            ) {
+                                RememberActionLabel(stringResource(R.string.update_bar_available_action))
+                            }
+                        }
+                        is UpdateChromeState.Downloading -> Unit
+                        UpdateChromeState.ReadyToInstall -> {
+                            RememberButton(
+                                onClick = onInstallClick,
+                                modifier =
+                                    Modifier
+                                        .align(Alignment.End)
+                                        .padding(
+                                            start = rowStartPadding + iconContainerSize + rowSpacing,
+                                            end = rowEndPadding,
+                                            bottom = rowVerticalPadding,
+                                        ),
+                                contentPadding =
+                                    PaddingValues(
+                                        horizontal = buttonHorizontalPadding,
+                                        vertical = buttonVerticalPadding,
+                                    ),
+                                colors =
+                                    ButtonDefaults.buttonColors(
+                                        containerColor = scheme.primary,
+                                        contentColor = scheme.onPrimary,
+                                    ),
+                            ) {
+                                RememberActionLabel(stringResource(R.string.play_update_bar_install_action))
+                            }
+                        }
+                        UpdateChromeState.Hidden -> Unit
+                    }
+                }
+
+                if (state is UpdateChromeState.Downloading) {
+                    if (state.indeterminateProgress || state.totalBytesToDownload <= 0L) {
+                        LinearWavyProgressIndicator(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(progressHeight),
+                            color = scheme.primary,
+                            trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
+                        )
+                    } else {
+                        val fraction =
+                            (state.bytesDownloaded.toFloat() / state.totalBytesToDownload.toFloat())
+                                .coerceIn(0f, 1f)
+                        LinearWavyProgressIndicator(
+                            progress = { fraction },
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .height(progressHeight),
+                            color = scheme.primary,
+                            trackColor = scheme.primaryContainer.copy(alpha = 0.28f),
+                        )
+                    }
                 }
             }
         }

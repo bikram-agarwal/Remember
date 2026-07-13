@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -41,6 +43,8 @@ import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialShapes
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleFloatingActionButton
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
@@ -338,12 +342,14 @@ fun MainTabScaffold(
     }
 
     if (effectiveChromeVisible && useAdaptiveNavigationRail) {
-        NavigationSuiteScaffold(
-            layoutType = NavigationSuiteType.NavigationRail,
-            containerColor = Color.Transparent,
-            navigationSuiteItems = {
+        Row(modifier = Modifier.fillMaxSize()) {
+            NavigationRail(
+                containerColor = Color.Transparent,
+                windowInsets = WindowInsets.systemBars,
+                modifier = Modifier.padding(start = 24.dp),
+            ) {
                 MainTab.entries.forEach { tabItem ->
-                    item(
+                    NavigationRailItem(
                         selected = currentTab == tabItem,
                         onClick = {
                             closeNotesRevealRequest++
@@ -366,9 +372,10 @@ fun MainTabScaffold(
                         },
                     )
                 }
-            },
-        ) {
-            mainContent()
+            }
+            Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
+                mainContent()
+            }
         }
     } else {
         mainContent()

@@ -8,14 +8,15 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -25,6 +26,8 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,9 +53,11 @@ import dev.bikram.remember.data.toNoteActionIconData
 import dev.bikram.remember.data.toNoteActionIconDrawable
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 
 private const val LEGACY_CONTACT_MANUAL_ENTRY_EXTRA = "__remember_manual_contact_entry__"
@@ -79,6 +84,7 @@ private enum class ActionPickerScreen {
     PickShortcutProvider,
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ActionPicker(
     current: List<NoteAction>,
@@ -89,7 +95,6 @@ fun ActionPicker(
     val packageManager = context.packageManager
     val resources = LocalResources.current
     val initialAction = remember(current) { current.firstOrNull() }
-    val hadInitialAction = initialAction != null
     var screen by remember(initialAction) {
         mutableStateOf(
             if (initialAction == null) {
@@ -115,6 +120,14 @@ fun ActionPicker(
         }
     }
 
+    var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }
+    val hasChanges = title != (initialAction?.title.orEmpty()) || details != (initialAction?.details.orEmpty()) || selectedType != initialAction?.type
+    val sheetState =
+        rememberBottomSheetStateWithUnsavedChanges(
+            isDirty = hasChanges,
+            onShowDialog = { showUnsavedDialog = true },
+        )
+
     val targetDisplayName =
         when (selectedType) {
             ActionType.OPEN_APP ->
@@ -138,9 +151,15 @@ fun ActionPicker(
                 ActionType.SEND_MESSAGE,
                 ActionType.SEND_EMAIL,
                 -> targetIcon
+                ActionType.GET_DIRECTIONS -> null
+                ActionType.OPEN_LINK -> null
                 ActionType.OPEN_APP -> targetIcon ?: appIcon(packageManager, details)
                 ActionType.OPEN_SHORTCUT -> targetIcon ?: savedShortcutIcon ?: shortcutFallbackIcon(packageManager, details)
-                else -> null
+                ActionType.COPY_TO_CLIPBOARD -> null
+                ActionType.SHARE_CONTENT -> null
+                ActionType.MARK_AS_DONE -> null
+                ActionType.SNOOZE -> null
+                null -> null
             }
         }
 
@@ -252,23 +271,46 @@ fun ActionPicker(
     AppBottomSheet(
         title = stringResource(R.string.options_actions),
         subtitle = if (screen == ActionPickerScreen.ChooseType) stringResource(R.string.actions_sheet_subtitle) else null,
-        onDismiss = onDismiss,
-        scrollable = !pickingInSheet,
-        actionsImePadding = screen == ActionPickerScreen.EditAction,
-        actions = {
-            RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
-            if (screen == ActionPickerScreen.EditAction && selectedType != null) {
-                RememberTextButton(onClick = ::resetAction) { Text(stringResource(R.string.action_reset)) }
-            }
-            if (screen == ActionPickerScreen.EditAction) {
-                RememberButton(
-                    enabled = saveEnabled,
-                    onClick = { onConfirm(actionToSave()?.let { listOf(it) } ?: emptyList()) },
-                ) {
-                    Text(stringResource(R.string.common_save))
-                }
+        sheetState = sheetState,
+        onDismiss = {
+            if (hasChanges) {
+                showUnsavedDialog = true
+            } else {
+                onDismiss()
             }
         },
+        scrollable = !pickingInSheet,
+        // The type-chooser is a plain tappable list; drop the body's vertical padding (each row
+        // already carries its own) so more options are visible at once, especially in landscape.
+        contentPadding =
+            if (screen == ActionPickerScreen.ChooseType) {
+                PaddingValues(horizontal = 12.dp, vertical = 0.dp)
+            } else {
+                PaddingValues(horizontal = 20.dp, vertical = 8.dp)
+            },
+        actionsImePadding = screen == ActionPickerScreen.EditAction,
+        // No action bar on the plain type-list screen: a lone Cancel button wastes a whole row
+        // (especially in landscape) and is redundant — the sheet dismisses via the drag handle,
+        // scrim tap, or back gesture. Later screens keep Cancel/Reset/Save.
+        actions =
+            if (screen == ActionPickerScreen.ChooseType) {
+                null
+            } else {
+                {
+                    RememberTextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+                    if (screen == ActionPickerScreen.EditAction && selectedType != null) {
+                        RememberTextButton(onClick = ::resetAction) { Text(stringResource(R.string.action_reset)) }
+                    }
+                    if (screen == ActionPickerScreen.EditAction) {
+                        RememberButton(
+                            enabled = saveEnabled,
+                            onClick = { onConfirm(actionToSave()?.let { listOf(it) } ?: emptyList()) },
+                        ) {
+                            Text(stringResource(R.string.common_save))
+                        }
+                    }
+                }
+            },
     ) {
         when (screen) {
             ActionPickerScreen.ChooseType ->
@@ -337,6 +379,16 @@ fun ActionPicker(
                 )
         }
     }
+
+    if (showUnsavedDialog) {
+        RememberUnsavedChangesDialog(
+            onConfirm = {
+                showUnsavedDialog = false
+                onDismiss()
+            },
+            onDismiss = { showUnsavedDialog = false },
+        )
+    }
 }
 
 @Composable
@@ -344,11 +396,7 @@ private fun ActionTypeChooser(
     onPick: (ActionType) -> Unit,
 ) {
     Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .heightIn(min = 120.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+        modifier = Modifier.fillMaxWidth(),
     ) {
         ActionType.entries
             .filter { it != ActionType.MARK_AS_DONE && it != ActionType.SNOOZE }
@@ -358,7 +406,7 @@ private fun ActionTypeChooser(
                         Modifier
                             .fillMaxWidth()
                             .tapSoundClickable { onPick(type) }
-                            .padding(horizontal = 8.dp, vertical = 12.dp),
+                            .padding(horizontal = 8.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     RememberMaterialRoundedSymbol(

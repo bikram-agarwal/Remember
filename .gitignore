@@ -5,6 +5,7 @@
 build/
 localdocs/
 *.lnk
+app/src/main/assets/HELP.md
 
 # Fastlane generated output (store metadata lives in fastlane/metadata and is committed)
 fastlane/report.xml
