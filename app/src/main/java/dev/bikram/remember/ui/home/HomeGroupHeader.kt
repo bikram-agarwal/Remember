@@ -125,8 +125,10 @@ internal fun GroupHeader(
         (
             if (collapsible && onToggle != null) {
                 outerSpacing
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(headerColor)
+                    .background(
+                        color = headerColor,
+                        shape = RoundedCornerShape(safeHeaderCorner),
+                    ).clip(MaterialTheme.shapes.extraLargeIncreased)
                     .clickable(
                         interactionSource = headerInteractionSource,
                         indication = LocalIndication.current,
