@@ -104,6 +104,7 @@ class MainActivity : FragmentActivity() {
         )
         handleIntent(intent)
         applicationScope.launch { themePrefs.migrateLegacyColorSourceIfNeeded() }
+        applicationScope.launch { themePrefs.migrateLegacyBlackThemeIfNeeded() }
         applicationScope.launch { openSettingsUpdatesIfAppWasUpdated() }
         setContent {
             val themeState by themePrefs.state.collectAsStateWithLifecycle(

@@ -7,6 +7,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -97,6 +98,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
 import dev.bikram.remember.data.ThemeMode
+import dev.bikram.remember.data.migrated
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.normalizeCustomSeed
@@ -138,15 +140,23 @@ fun AppearanceSection(
     val scope = rememberCoroutineScope()
     var customColorPickerOpen by rememberSaveable { mutableStateOf(false) }
     var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
-    val blackThemeEffectsDisabled = state.themeMode == ThemeMode.BLACK
-    val blackThemeEffectsDisabledMessage = stringResource(R.string.appearance_black_theme_effect_disabled)
+    val systemDark = isSystemInDarkTheme()
+    val blackThemeActive = state.blackThemeActive(systemDark)
+    val blackThemeSurfaceSettingDisabledMessage =
+        stringResource(R.string.appearance_black_theme_effect_disabled)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         GroupedListColumn {
             GroupedListItem(position = GroupPosition.FIRST) {
-                AppearanceStudioControls(
+                AppearanceThemeControls(
                     state = state,
                     onThemeModeChange = { mode -> scope.launch { prefs.setThemeMode(mode) } },
+                    onUseBlackThemeChange = { enabled -> scope.launch { prefs.setUseBlackTheme(enabled) } },
+                )
+            }
+            GroupedListItem(position = GroupPosition.MIDDLE) {
+                AppearanceAccentStudioControls(
+                    state = state,
                     onSelectPreset = { source -> scope.launch { prefs.setColorSource(source) } },
                     onSelectCustomHex = { hex -> scope.launch { prefs.setActiveCustomSeed(hex) } },
                     onCustomHexLongPress = { hex -> pendingDelete = hex },
@@ -158,7 +168,7 @@ fun AppearanceSection(
                 )
             }
             GroupedListItem(position = GroupPosition.MIDDLE) {
-                val enabled = !blackThemeEffectsDisabled
+                val enabled = !blackThemeActive
                 Column(
                     modifier =
                         Modifier
@@ -166,7 +176,7 @@ fun AppearanceSection(
                             .tapSoundClickable(enabled = !enabled) {
                                 scope.launch {
                                     snackbarHostState.currentSnackbarData?.dismiss()
-                                    snackbarHostState.showSnackbar(blackThemeEffectsDisabledMessage)
+                                    snackbarHostState.showSnackbar(blackThemeSurfaceSettingDisabledMessage)
                                 }
                             }.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -194,7 +204,7 @@ fun AppearanceSection(
                         )
                     }
                     ShadingIntensitySlider(
-                        intensity = state.shadingIntensity,
+                        intensity = state.effectiveShadingIntensity(blackThemeActive),
                         enabled = enabled,
                         onValueChange = { intensity ->
                             scope.launch {
@@ -208,12 +218,12 @@ fun AppearanceSection(
                 AppearanceSettingsToggleItem(
                     title = stringResource(R.string.appearance_gradient_title),
                     subtitle = stringResource(R.string.appearance_gradient_subtitle),
-                    checked = state.useGradient && !blackThemeEffectsDisabled,
-                    enabled = !blackThemeEffectsDisabled,
+                    checked = state.effectiveUseGradient(blackThemeActive),
+                    enabled = !blackThemeActive,
                     onDisabledClick = {
                         scope.launch {
                             snackbarHostState.currentSnackbarData?.dismiss()
-                            snackbarHostState.showSnackbar(blackThemeEffectsDisabledMessage)
+                            snackbarHostState.showSnackbar(blackThemeSurfaceSettingDisabledMessage)
                         }
                     },
                     onCheckedChange = { scope.launch { prefs.setUseGradient(it) } },
@@ -223,14 +233,7 @@ fun AppearanceSection(
                 AppearanceSettingsToggleItem(
                     title = stringResource(R.string.appearance_adaptive_note_themes_title),
                     subtitle = stringResource(R.string.appearance_adaptive_note_themes_subtitle),
-                    checked = state.adaptiveNoteThemes && !blackThemeEffectsDisabled,
-                    enabled = !blackThemeEffectsDisabled,
-                    onDisabledClick = {
-                        scope.launch {
-                            snackbarHostState.currentSnackbarData?.dismiss()
-                            snackbarHostState.showSnackbar(blackThemeEffectsDisabledMessage)
-                        }
-                    },
+                    checked = state.adaptiveNoteThemes,
                     onCheckedChange = { scope.launch { prefs.setAdaptiveNoteThemes(it) } },
                 )
             }
@@ -386,9 +389,57 @@ private fun CustomFontSettingsRow(
 }
 
 @Composable
-private fun AppearanceStudioControls(
+private fun AppearanceThemeControls(
     state: ThemeState,
     onThemeModeChange: (ThemeMode) -> Unit,
+    onUseBlackThemeChange: (Boolean) -> Unit,
+) {
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val compact = maxWidth < 340.dp
+        val showBlackThemeToggle = state.themeMode != ThemeMode.LIGHT
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        start = if (compact) 10.dp else 16.dp,
+                        top = 14.dp,
+                        end = if (compact) 10.dp else 16.dp,
+                        bottom = if (showBlackThemeToggle) 4.dp else 14.dp,
+                    ),
+            verticalArrangement = Arrangement.spacedBy(if (showBlackThemeToggle) 4.dp else 0.dp),
+        ) {
+            ThemeModeSegmentedRow(
+                selected = state.themeMode,
+                onSelect = onThemeModeChange,
+            )
+            if (showBlackThemeToggle) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .tapSoundClickable { onUseBlackThemeChange(!state.useBlackTheme) },
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.appearance_use_black_theme),
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f),
+                    )
+                    SettingsToggleSwitch(
+                        checked = state.useBlackTheme,
+                        enabled = true,
+                        onCheckedChange = onUseBlackThemeChange,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AppearanceAccentStudioControls(
+    state: ThemeState,
     onSelectPreset: (ColorSource) -> Unit,
     onSelectCustomHex: (String) -> Unit,
     onCustomHexLongPress: (String) -> Unit,
@@ -416,10 +467,6 @@ private fun AppearanceStudioControls(
                     .padding(horizontal = if (compact) 10.dp else 16.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(if (compact) 12.dp else 14.dp),
         ) {
-            ThemeModeSegmentedRow(
-                selected = state.themeMode,
-                onSelect = onThemeModeChange,
-            )
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -544,7 +591,7 @@ private fun ThemeModeSegmentedRow(
                 customItem(
                     buttonGroupContent = {
                         RememberToggleButton(
-                            checked = selected == mode,
+                            checked = selected.migrated() == mode,
                             onCheckedChange = { checked ->
                                 if (checked) onSelect(mode)
                             },
@@ -1021,7 +1068,6 @@ private val themePickerOrder =
         ThemeMode.SYSTEM,
         ThemeMode.LIGHT,
         ThemeMode.DARK,
-        ThemeMode.BLACK,
     )
 
 @Composable
@@ -1030,19 +1076,19 @@ private fun themeModeLabel(
     compact: Boolean,
 ): String {
     if (compact) {
-        return when (mode) {
+        return when (mode.migrated()) {
             ThemeMode.SYSTEM -> "Sys"
             ThemeMode.LIGHT -> "Light"
             ThemeMode.DARK -> "Dark"
-            ThemeMode.BLACK -> "Black"
+            ThemeMode.BLACK -> "Dark"
         }
     }
     return stringResource(
-        when (mode) {
+        when (mode.migrated()) {
             ThemeMode.SYSTEM -> R.string.appearance_theme_system
             ThemeMode.LIGHT -> R.string.appearance_theme_light
             ThemeMode.DARK -> R.string.appearance_theme_dark
-            ThemeMode.BLACK -> R.string.appearance_theme_black
+            ThemeMode.BLACK -> R.string.appearance_theme_dark
         },
     )
 }

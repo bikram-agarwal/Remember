@@ -18,7 +18,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.get
 import androidx.core.net.toUri
 import com.materialkolor.rememberDynamicColorScheme
-import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.ui.theme.AppShapes
 import dev.bikram.remember.ui.theme.AppTypography
 import dev.bikram.remember.ui.theme.LocalIsDark
@@ -75,20 +74,21 @@ fun rememberImageDerivedColorScheme(imageColors: ImageDerivedColors?): ImageDeri
     val seed = imageColors?.seedColor ?: return null
     val darkTheme = LocalIsDark.current
     val themeState = LocalThemeState.current
-    val black = themeState.themeMode == ThemeMode.BLACK
+    val blackThemeActive = themeState.blackThemeActive(darkTheme)
     val generated =
         rememberDynamicColorScheme(
             seedColor = seed,
             isDark = darkTheme,
             style = themeState.paletteStyle.toLib(),
-            isAmoled = black,
+            isAmoled = blackThemeActive,
             specVersion = RememberColorSpecVersion,
         )
-    return remember(generated, darkTheme, black, themeState.shadingIntensity) {
-        val base = if (black) generated.toOled() else generated
+    val effectiveShading = themeState.effectiveShadingIntensity(blackThemeActive)
+    return remember(generated, darkTheme, blackThemeActive, effectiveShading) {
+        val base = if (blackThemeActive) generated.toOled() else generated
         val shaded =
-            if (!black) {
-                base.tintSurfacesTowardPrimary(darkTheme, themeState.shadingIntensity)
+            if (!blackThemeActive) {
+                base.tintSurfacesTowardPrimary(darkTheme, effectiveShading)
             } else {
                 base
             }
