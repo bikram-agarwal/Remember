@@ -46,9 +46,10 @@ internal fun rememberResolvedColorScheme(
             else -> rememberSeededColorScheme(spec, themeState, darkTheme, black)
         }
     val oledAdjusted = if (black) base.toOled() else base
+    val effectiveShading = themeState.effectiveShadingIntensity(black)
     val tinted =
         if (!black) {
-            oledAdjusted.tintSurfacesTowardPrimary(darkTheme, themeState.shadingIntensity)
+            oledAdjusted.tintSurfacesTowardPrimary(darkTheme, effectiveShading)
         } else {
             oledAdjusted
         }

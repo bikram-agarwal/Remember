@@ -12,7 +12,21 @@ import dev.bikram.remember.ui.theme.CustomFontStorage
 import org.json.JSONArray
 import org.json.JSONObject
 
-enum class ThemeMode { SYSTEM, LIGHT, DARK, BLACK }
+enum class ThemeMode {
+    SYSTEM,
+    LIGHT,
+    DARK,
+
+    /** Legacy: migrated to [DARK] + [ThemeState.useBlackTheme]. */
+    @Deprecated("Use DARK with useBlackTheme")
+    BLACK,
+}
+
+fun ThemeMode.migrated(): ThemeMode =
+    when (this) {
+        ThemeMode.BLACK -> ThemeMode.DARK
+        else -> this
+    }
 
 enum class ColorSource {
     DEFAULT,
@@ -116,6 +130,7 @@ private fun ShadingIntensity.toFactor(): Float =
 
 data class ThemeState(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
+    val useBlackTheme: Boolean = false,
     val colorSource: ColorSource = ColorSource.MATERIAL_YOU,
     val paletteStyle: PaletteStyleOpt = PaletteStyleOpt.TONAL_SPOT,
     val customSeeds: List<String> = emptyList(),
@@ -130,6 +145,18 @@ data class ThemeState(
 ) {
     val useEnhancedShading: Boolean
         get() = shadingIntensity > 0.0f
+
+    /** ObtainX parity: pure black only while the app is effectively on a dark theme. */
+    fun blackThemeActive(isDarkTheme: Boolean): Boolean {
+        if (!useBlackTheme || themeMode == ThemeMode.LIGHT) return false
+        return themeMode == ThemeMode.DARK || (themeMode == ThemeMode.SYSTEM && isDarkTheme)
+    }
+
+    fun effectiveShadingIntensity(blackThemeActive: Boolean): Float =
+        if (blackThemeActive) DEFAULT_SHADING_INTENSITY else shadingIntensity
+
+    fun effectiveUseGradient(blackThemeActive: Boolean): Boolean =
+        if (blackThemeActive) false else useGradient
 }
 
 class ThemePrefs(
@@ -137,6 +164,7 @@ class ThemePrefs(
 ) {
     private object Keys {
         val THEME_MODE = stringPreferencesKey("theme_mode")
+        val USE_BLACK_THEME = booleanPreferencesKey("use_black_theme")
         val COLOR_SOURCE = stringPreferencesKey("color_source")
         val PALETTE_STYLE = stringPreferencesKey("palette_style")
         val CUSTOM_SEEDS = stringPreferencesKey("custom_seeds")
@@ -157,10 +185,13 @@ class ThemePrefs(
 
     val state: Flow<ThemeState> =
         context.themePrefsDataStore.data.map { p ->
+            val storedThemeMode =
+                runCatching { ThemeMode.valueOf(p[Keys.THEME_MODE] ?: "") }
+                    .getOrDefault(ThemeMode.SYSTEM)
+            val legacyBlackTheme = storedThemeMode == ThemeMode.BLACK
             ThemeState(
-                themeMode =
-                    runCatching { ThemeMode.valueOf(p[Keys.THEME_MODE] ?: "") }
-                        .getOrDefault(ThemeMode.SYSTEM),
+                themeMode = storedThemeMode.migrated(),
+                useBlackTheme = (p[Keys.USE_BLACK_THEME] ?: false) || legacyBlackTheme,
                 colorSource =
                     runCatching { ColorSource.valueOf(p[Keys.COLOR_SOURCE] ?: "") }
                         .getOrDefault(ColorSource.MATERIAL_YOU)
@@ -187,7 +218,22 @@ class ThemePrefs(
         }
 
     suspend fun setThemeMode(mode: ThemeMode) {
-        context.themePrefsDataStore.edit { it[Keys.THEME_MODE] = mode.name }
+        context.themePrefsDataStore.edit { it[Keys.THEME_MODE] = mode.migrated().name }
+    }
+
+    suspend fun setUseBlackTheme(value: Boolean) {
+        context.themePrefsDataStore.edit { it[Keys.USE_BLACK_THEME] = value }
+    }
+
+    /**
+     * Rewrite legacy theme_mode BLACK to DARK + use_black_theme in DataStore.
+     */
+    suspend fun migrateLegacyBlackThemeIfNeeded() {
+        context.themePrefsDataStore.edit { prefs ->
+            if (prefs[Keys.THEME_MODE] != ThemeMode.BLACK.name) return@edit
+            prefs[Keys.THEME_MODE] = ThemeMode.DARK.name
+            prefs[Keys.USE_BLACK_THEME] = true
+        }
     }
 
     /**
@@ -334,7 +380,18 @@ class ThemePrefs(
     suspend fun exportForBackup(): JSONObject {
         val prefs = context.themePrefsDataStore.data.first()
         return JSONObject().apply {
-            put(Keys.THEME_MODE.name, prefs[Keys.THEME_MODE].orEmpty())
+            val storedThemeMode = prefs[Keys.THEME_MODE].orEmpty()
+            val exportBlackTheme =
+                (prefs[Keys.USE_BLACK_THEME] ?: false) || storedThemeMode == ThemeMode.BLACK.name
+            put(
+                Keys.THEME_MODE.name,
+                if (storedThemeMode == ThemeMode.BLACK.name) {
+                    ThemeMode.DARK.name
+                } else {
+                    storedThemeMode
+                },
+            )
+            put(Keys.USE_BLACK_THEME.name, exportBlackTheme)
             put(Keys.COLOR_SOURCE.name, prefs[Keys.COLOR_SOURCE].orEmpty())
             put(Keys.PALETTE_STYLE.name, prefs[Keys.PALETTE_STYLE].orEmpty())
             put(Keys.CUSTOM_SEEDS.name, prefs[Keys.CUSTOM_SEEDS].orEmpty())
@@ -372,10 +429,6 @@ class ThemePrefs(
                 }
             }
 
-            val themeMode =
-                stringOrNull(Keys.THEME_MODE.name)?.let { raw ->
-                    runCatching { ThemeMode.valueOf(raw) }.getOrNull()
-                }
             val colorSource =
                 stringOrNull(Keys.COLOR_SOURCE.name)?.let { raw ->
                     runCatching { ColorSource.valueOf(raw) }.getOrNull()?.migrated()
@@ -396,7 +449,25 @@ class ThemePrefs(
                     customSeeds
                 }
 
-            themeMode?.let { mutable[Keys.THEME_MODE] = it.name }
+            val themeMode =
+                stringOrNull(Keys.THEME_MODE.name)?.let { raw ->
+                    runCatching { ThemeMode.valueOf(raw) }.getOrNull()
+                }
+            when (themeMode) {
+                ThemeMode.BLACK -> {
+                    mutable[Keys.THEME_MODE] = ThemeMode.DARK.name
+                    mutable[Keys.USE_BLACK_THEME] = true
+                }
+
+                null -> Unit
+
+                else -> {
+                    mutable[Keys.THEME_MODE] = themeMode.name
+                    booleanOrNull(Keys.USE_BLACK_THEME.name)?.let { value ->
+                        mutable[Keys.USE_BLACK_THEME] = value
+                    }
+                }
+            }
             if (colorSource != ColorSource.CUSTOM || activeCustomSeed != null) {
                 colorSource?.let { mutable[Keys.COLOR_SOURCE] = it.name }
             }

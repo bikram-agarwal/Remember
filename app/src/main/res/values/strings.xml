@@ -696,6 +696,7 @@
     <string name="appearance_theme_system">System</string>
     <string name="appearance_theme_light">Light</string>
     <string name="appearance_theme_dark">Dark</string>
+    <string name="appearance_use_black_theme">Use pure black dark theme</string>
     <string name="appearance_theme_black">Black</string>
     <string name="appearance_palette">Palette</string>
     <string name="appearance_preview_title_named">Preview · %1$s</string>
@@ -722,7 +723,7 @@
     <string name="appearance_preview_sample_text" translatable="false">Aa</string>
     <string name="appearance_gradient_title">Gradient background</string>
     <string name="appearance_gradient_subtitle">Show a subtle accent gradient behind the app</string>
-    <string name="appearance_black_theme_effect_disabled">Can\'t change this in Black theme</string>
+    <string name="appearance_black_theme_effect_disabled">Can not enable in black theme</string>
     <string name="appearance_blur_title">Progressive blur</string>
     <string name="appearance_blur_subtitle">Frosted glass blur effect at places</string>
     <string name="appearance_custom_font_title">Font in use</string>

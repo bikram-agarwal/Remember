@@ -68,8 +68,8 @@ fun RememberTheme(
             ThemeMode.DARK -> true
             ThemeMode.BLACK -> true
         }
-    val black = themeState.themeMode == ThemeMode.BLACK
-    val effectiveUseGradient = themeState.useGradient && !black
+    val blackThemeActive = themeState.blackThemeActive(darkTheme)
+    val effectiveUseGradient = themeState.effectiveUseGradient(blackThemeActive)
 
     val context = LocalContext.current
     val reducedMotion = rememberSystemReducedMotionEnabled(context)
@@ -103,7 +103,7 @@ fun RememberTheme(
             context = context,
             themeState = themeState,
             darkTheme = darkTheme,
-            black = black,
+            black = blackThemeActive,
         )
 
     val view = LocalView.current
