@@ -724,7 +724,14 @@
     <string name="appearance_gradient_subtitle">Show a subtle accent gradient behind the app</string>
     <string name="appearance_black_theme_effect_disabled">Can\'t change this in Black theme</string>
     <string name="appearance_blur_title">Progressive blur</string>
-    <string name="appearance_blur_subtitle">Blur content at bottom of screen &amp; other places</string>
+    <string name="appearance_blur_subtitle">Frosted glass blur effect at places</string>
+    <string name="appearance_custom_font_title">Font in use</string>
+    <string name="appearance_custom_font_default">Default system font</string>
+    <string name="appearance_custom_font_choose">Import font</string>
+    <string name="appearance_custom_font_choose_explanation">Select a custom font file (.ttf or .otf) from your storage to apply to the user interface.</string>
+    <string name="appearance_custom_font_success">Custom font applied successfully.</string>
+    <string name="appearance_custom_font_reset_success">Reverted to default system font.</string>
+    <string name="appearance_custom_font_error_invalid">Failed to load: invalid or corrupted font file.</string>
     <string name="appearance_cover_title">Cover image on cards</string>
     <string name="appearance_cover_subtitle">Use the note picture as a faded background of the card</string>
     <string name="appearance_adaptive_note_themes_title">Adaptive note themes</string>

@@ -1,5 +1,8 @@
 package dev.bikram.remember.ui.settings
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
@@ -98,8 +101,8 @@ import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.normalizeCustomSeed
 import dev.bikram.remember.data.normalizeHex
-import dev.bikram.remember.ui.common.HueColorSlider
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.HueColorSlider
 import dev.bikram.remember.ui.common.colorHexFromHue
 import dev.bikram.remember.ui.common.hueFromHexColor
 import dev.bikram.remember.ui.components.RememberConfirmDialog
@@ -110,13 +113,17 @@ import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.theme.CustomFontStorage
 import dev.bikram.remember.ui.theme.colorSourceSpecFor
 import dev.bikram.remember.ui.theme.contrastingTextColor
 import dev.bikram.remember.ui.theme.generateTripletForSeed
 import dev.bikram.remember.ui.theme.parseCustomTriplet
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import kotlin.math.roundToInt
 import android.graphics.Color as AndroidColor
@@ -161,8 +168,8 @@ fun AppearanceSection(
                                     snackbarHostState.currentSnackbarData?.dismiss()
                                     snackbarHostState.showSnackbar(blackThemeEffectsDisabledMessage)
                                 }
-                            }.padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                            }.padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
@@ -235,13 +242,20 @@ fun AppearanceSection(
                     onCheckedChange = { scope.launch { prefs.setHeroOnCards(it) } },
                 )
             }
-            GroupedListItem(position = GroupPosition.LAST) {
+            GroupedListItem(position = GroupPosition.MIDDLE) {
                 AppearanceSettingsToggleItem(
                     title = stringResource(R.string.appearance_blur_title),
                     subtitle = stringResource(R.string.appearance_blur_subtitle),
                     checked = state.blurBars,
                     leadingMaterialSymbolName = "blur_on",
                     onCheckedChange = { scope.launch { prefs.setBlurBars(it) } },
+                )
+            }
+            GroupedListItem(position = GroupPosition.LAST) {
+                CustomFontSettingsRow(
+                    prefs = prefs,
+                    state = state,
+                    snackbarHostState = snackbarHostState,
                 )
             }
         }
@@ -259,6 +273,115 @@ fun AppearanceSection(
             onDismiss = { pendingDelete = null },
             destructive = true,
         )
+    }
+}
+
+@Composable
+private fun CustomFontSettingsRow(
+    prefs: ThemePrefs,
+    state: ThemeState,
+    snackbarHostState: SnackbarHostState,
+) {
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    var showImportDialog by rememberSaveable { mutableStateOf(false) }
+    val fontPickerLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            scope.launch {
+                val result =
+                    withContext(Dispatchers.IO) {
+                        CustomFontStorage.importFromUri(context, uri)
+                    }
+                when (result) {
+                    is CustomFontStorage.ImportResult.Success -> {
+                        prefs.setCustomFont(result.path, result.displayName)
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        snackbarHostState.showSnackbar(
+                            context.getString(R.string.appearance_custom_font_success),
+                        )
+                    }
+
+                    CustomFontStorage.ImportResult.InvalidFont -> {
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        snackbarHostState.showSnackbar(
+                            context.getString(R.string.appearance_custom_font_error_invalid),
+                        )
+                    }
+                }
+            }
+        }
+
+    if (showImportDialog) {
+        RememberConfirmDialog(
+            title = stringResource(R.string.appearance_custom_font_choose),
+            text = stringResource(R.string.appearance_custom_font_choose_explanation),
+            confirmLabel = stringResource(R.string.appearance_custom_font_choose),
+            onConfirm = {
+                showImportDialog = false
+                fontPickerLauncher.launch(arrayOf("font/ttf", "font/otf", "application/x-font-ttf", "application/x-font-otf"))
+            },
+            onDismiss = { showImportDialog = false },
+        )
+    }
+
+    val hasCustomFont = state.customFontPath.isNotBlank()
+    val subtitleText =
+        if (hasCustomFont) {
+            state.customFontName.ifBlank { state.customFontPath.substringAfterLast('/') }
+        } else {
+            stringResource(R.string.appearance_custom_font_default)
+        }
+
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .tapSoundClickable { showImportDialog = true }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = "font_download",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                text = stringResource(R.string.appearance_custom_font_title),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                text = subtitleText,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (hasCustomFont) {
+            Spacer(Modifier.width(8.dp))
+            RememberFilledTonalIconButton(
+                onClick = {
+                    scope.launch {
+                        prefs.clearCustomFont()
+                        snackbarHostState.currentSnackbarData?.dismiss()
+                        snackbarHostState.showSnackbar(
+                            context.getString(R.string.appearance_custom_font_reset_success),
+                        )
+                    }
+                },
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name = "close",
+                )
+            }
+        }
     }
 }
 
@@ -299,7 +422,7 @@ private fun AppearanceStudioControls(
             )
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -361,18 +484,23 @@ private fun AppearanceStudioControls(
                     }
                 }
             }
-            HorizontalDivider(
-                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
-            )
-            ThemePreviewPanel(
-                colorSource = state.colorSource,
-                isInteractive = state.colorSource == ColorSource.CUSTOM,
-                selectedTarget = editingTarget,
-                onTargetSelect = { target ->
-                    editingTarget = target
-                    onCustomColorPickerOpenChange(true)
-                },
-            )
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(0.dp),
+            ) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.18f),
+                )
+                ThemePreviewPanel(
+                    colorSource = state.colorSource,
+                    isInteractive = state.colorSource == ColorSource.CUSTOM,
+                    selectedTarget = editingTarget,
+                    onTargetSelect = { target ->
+                        editingTarget = target
+                        onCustomColorPickerOpenChange(true)
+                    },
+                )
+            }
         }
     }
 }
