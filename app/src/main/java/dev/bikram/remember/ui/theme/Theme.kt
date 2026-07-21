@@ -1,5 +1,3 @@
-@file:Suppress("DEPRECATION")
-
 package dev.bikram.remember.ui.theme
 
 import android.app.WallpaperColors
@@ -34,8 +32,8 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
-import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemeState
+import dev.bikram.remember.data.effectiveDarkTheme
 import dev.bikram.remember.ui.common.responsiveTextScaleForWidth
 
 private const val MAX_APP_DISPLAY_SCALE = 1.15f
@@ -61,13 +59,7 @@ fun RememberTheme(
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
-    val darkTheme =
-        when (themeState.themeMode) {
-            ThemeMode.SYSTEM -> systemDark
-            ThemeMode.LIGHT -> false
-            ThemeMode.DARK -> true
-            ThemeMode.BLACK -> true
-        }
+    val darkTheme = themeState.themeMode.effectiveDarkTheme(systemDark)
     val blackThemeActive = themeState.blackThemeActive(darkTheme)
     val effectiveUseGradient = themeState.effectiveUseGradient(blackThemeActive)
 

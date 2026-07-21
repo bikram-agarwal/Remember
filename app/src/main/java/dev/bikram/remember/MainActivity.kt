@@ -34,11 +34,11 @@ import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.data.OnboardingState
 import dev.bikram.remember.data.TagRepository
-import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.UpdatePreferencesState
 import dev.bikram.remember.data.UpdatePrefs
+import dev.bikram.remember.data.effectiveDarkTheme
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.ui.InAppRatingAutoPromptHost
@@ -111,13 +111,7 @@ class MainActivity : FragmentActivity() {
                 initialValue = ThemeState(),
             )
             val systemDark = isSystemInDarkTheme()
-            val darkTheme =
-                when (themeState.themeMode) {
-                    ThemeMode.SYSTEM -> systemDark
-                    ThemeMode.LIGHT -> false
-                    ThemeMode.DARK -> true
-                    ThemeMode.BLACK -> true
-                }
+            val darkTheme = themeState.themeMode.effectiveDarkTheme(systemDark)
             SideEffect {
                 enableEdgeToEdge(
                     statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },

@@ -1,13 +1,12 @@
 package dev.bikram.remember.ui.settings
 
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -15,6 +14,7 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsDraggedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -72,6 +72,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -98,13 +99,13 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
 import dev.bikram.remember.data.ThemeMode
-import dev.bikram.remember.data.migrated
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
+import dev.bikram.remember.data.migrated
 import dev.bikram.remember.data.normalizeCustomSeed
 import dev.bikram.remember.data.normalizeHex
-import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.HueColorSlider
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.colorHexFromHue
 import dev.bikram.remember.ui.common.hueFromHexColor
 import dev.bikram.remember.ui.components.RememberConfirmDialog
@@ -121,7 +122,6 @@ import dev.bikram.remember.ui.theme.contrastingTextColor
 import dev.bikram.remember.ui.theme.generateTripletForSeed
 import dev.bikram.remember.ui.theme.parseCustomTriplet
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
-import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -287,6 +287,9 @@ private fun CustomFontSettingsRow(
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val customFontSuccessMessage = stringResource(R.string.appearance_custom_font_success)
+    val customFontInvalidMessage = stringResource(R.string.appearance_custom_font_error_invalid)
+    val customFontResetSuccessMessage = stringResource(R.string.appearance_custom_font_reset_success)
     var showImportDialog by rememberSaveable { mutableStateOf(false) }
     val fontPickerLauncher =
         rememberLauncherForActivityResult(
@@ -302,16 +305,12 @@ private fun CustomFontSettingsRow(
                     is CustomFontStorage.ImportResult.Success -> {
                         prefs.setCustomFont(result.path, result.displayName)
                         snackbarHostState.currentSnackbarData?.dismiss()
-                        snackbarHostState.showSnackbar(
-                            context.getString(R.string.appearance_custom_font_success),
-                        )
+                        snackbarHostState.showSnackbar(customFontSuccessMessage)
                     }
 
                     CustomFontStorage.ImportResult.InvalidFont -> {
                         snackbarHostState.currentSnackbarData?.dismiss()
-                        snackbarHostState.showSnackbar(
-                            context.getString(R.string.appearance_custom_font_error_invalid),
-                        )
+                        snackbarHostState.showSnackbar(customFontInvalidMessage)
                     }
                 }
             }
@@ -374,9 +373,7 @@ private fun CustomFontSettingsRow(
                     scope.launch {
                         prefs.clearCustomFont()
                         snackbarHostState.currentSnackbarData?.dismiss()
-                        snackbarHostState.showSnackbar(
-                            context.getString(R.string.appearance_custom_font_reset_success),
-                        )
+                        snackbarHostState.showSnackbar(customFontResetSuccessMessage)
                     }
                 },
             ) {
@@ -1076,19 +1073,17 @@ private fun themeModeLabel(
     compact: Boolean,
 ): String {
     if (compact) {
-        return when (mode.migrated()) {
-            ThemeMode.SYSTEM -> "Sys"
-            ThemeMode.LIGHT -> "Light"
-            ThemeMode.DARK -> "Dark"
-            ThemeMode.BLACK -> "Dark"
+        return when (mode.name) {
+            ThemeMode.SYSTEM.name -> "Sys"
+            ThemeMode.LIGHT.name -> "Light"
+            else -> "Dark"
         }
     }
     return stringResource(
-        when (mode.migrated()) {
-            ThemeMode.SYSTEM -> R.string.appearance_theme_system
-            ThemeMode.LIGHT -> R.string.appearance_theme_light
-            ThemeMode.DARK -> R.string.appearance_theme_dark
-            ThemeMode.BLACK -> R.string.appearance_theme_dark
+        when (mode.name) {
+            ThemeMode.SYSTEM.name -> R.string.appearance_theme_system
+            ThemeMode.LIGHT.name -> R.string.appearance_theme_light
+            else -> R.string.appearance_theme_dark
         },
     )
 }
