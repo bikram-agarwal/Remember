@@ -5,10 +5,10 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import dev.bikram.remember.ui.theme.CustomFontStorage
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
-import dev.bikram.remember.ui.theme.CustomFontStorage
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -17,15 +17,37 @@ enum class ThemeMode {
     LIGHT,
     DARK,
 
-    /** Legacy: migrated to [DARK] + [ThemeState.useBlackTheme]. */
+    /** Legacy: migrated to [DARK] + [ThemeState.useBlackTheme]. Kept so [valueOf] can parse old backups. */
     @Deprecated("Use DARK with useBlackTheme")
     BLACK,
 }
 
+/** Stored theme_mode value from versions that used a fourth "Black" segment in the picker. */
+const val LEGACY_BLACK_THEME_MODE_NAME = "BLACK"
+
+fun isLegacyBlackThemeModeName(raw: String?): Boolean = raw == LEGACY_BLACK_THEME_MODE_NAME
+
 fun ThemeMode.migrated(): ThemeMode =
-    when (this) {
-        ThemeMode.BLACK -> ThemeMode.DARK
-        else -> this
+    if (name == LEGACY_BLACK_THEME_MODE_NAME) {
+        ThemeMode.DARK
+    } else {
+        this
+    }
+
+/** Whether [themeMode] resolves to a dark UI, given current system appearance. */
+fun ThemeMode.effectiveDarkTheme(systemDark: Boolean): Boolean =
+    when (name) {
+        ThemeMode.LIGHT.name -> false
+        ThemeMode.DARK.name, LEGACY_BLACK_THEME_MODE_NAME -> true
+        else -> systemDark
+    }
+
+/** Whether pure-black OLED styling may apply for this mode while the UI is dark. */
+fun ThemeMode.blackThemeEligible(isDarkTheme: Boolean): Boolean =
+    when (name) {
+        ThemeMode.LIGHT.name -> false
+        ThemeMode.DARK.name, LEGACY_BLACK_THEME_MODE_NAME -> true
+        else -> isDarkTheme
     }
 
 enum class ColorSource {
@@ -147,16 +169,11 @@ data class ThemeState(
         get() = shadingIntensity > 0.0f
 
     /** ObtainX parity: pure black only while the app is effectively on a dark theme. */
-    fun blackThemeActive(isDarkTheme: Boolean): Boolean {
-        if (!useBlackTheme || themeMode == ThemeMode.LIGHT) return false
-        return themeMode == ThemeMode.DARK || (themeMode == ThemeMode.SYSTEM && isDarkTheme)
-    }
+    fun blackThemeActive(isDarkTheme: Boolean): Boolean = useBlackTheme && themeMode.blackThemeEligible(isDarkTheme)
 
-    fun effectiveShadingIntensity(blackThemeActive: Boolean): Float =
-        if (blackThemeActive) DEFAULT_SHADING_INTENSITY else shadingIntensity
+    fun effectiveShadingIntensity(blackThemeActive: Boolean): Float = if (blackThemeActive) DEFAULT_SHADING_INTENSITY else shadingIntensity
 
-    fun effectiveUseGradient(blackThemeActive: Boolean): Boolean =
-        if (blackThemeActive) false else useGradient
+    fun effectiveUseGradient(blackThemeActive: Boolean): Boolean = if (blackThemeActive) false else useGradient
 }
 
 class ThemePrefs(
@@ -185,10 +202,11 @@ class ThemePrefs(
 
     val state: Flow<ThemeState> =
         context.themePrefsDataStore.data.map { p ->
+            val storedThemeModeRaw = p[Keys.THEME_MODE].orEmpty()
             val storedThemeMode =
-                runCatching { ThemeMode.valueOf(p[Keys.THEME_MODE] ?: "") }
+                runCatching { ThemeMode.valueOf(storedThemeModeRaw) }
                     .getOrDefault(ThemeMode.SYSTEM)
-            val legacyBlackTheme = storedThemeMode == ThemeMode.BLACK
+            val legacyBlackTheme = isLegacyBlackThemeModeName(storedThemeModeRaw)
             ThemeState(
                 themeMode = storedThemeMode.migrated(),
                 useBlackTheme = (p[Keys.USE_BLACK_THEME] ?: false) || legacyBlackTheme,
@@ -230,7 +248,7 @@ class ThemePrefs(
      */
     suspend fun migrateLegacyBlackThemeIfNeeded() {
         context.themePrefsDataStore.edit { prefs ->
-            if (prefs[Keys.THEME_MODE] != ThemeMode.BLACK.name) return@edit
+            if (!isLegacyBlackThemeModeName(prefs[Keys.THEME_MODE])) return@edit
             prefs[Keys.THEME_MODE] = ThemeMode.DARK.name
             prefs[Keys.USE_BLACK_THEME] = true
         }
@@ -382,10 +400,10 @@ class ThemePrefs(
         return JSONObject().apply {
             val storedThemeMode = prefs[Keys.THEME_MODE].orEmpty()
             val exportBlackTheme =
-                (prefs[Keys.USE_BLACK_THEME] ?: false) || storedThemeMode == ThemeMode.BLACK.name
+                (prefs[Keys.USE_BLACK_THEME] ?: false) || isLegacyBlackThemeModeName(storedThemeMode)
             put(
                 Keys.THEME_MODE.name,
-                if (storedThemeMode == ThemeMode.BLACK.name) {
+                if (isLegacyBlackThemeModeName(storedThemeMode)) {
                     ThemeMode.DARK.name
                 } else {
                     storedThemeMode
@@ -449,22 +467,20 @@ class ThemePrefs(
                     customSeeds
                 }
 
-            val themeMode =
-                stringOrNull(Keys.THEME_MODE.name)?.let { raw ->
-                    runCatching { ThemeMode.valueOf(raw) }.getOrNull()
-                }
-            when (themeMode) {
-                ThemeMode.BLACK -> {
+            val themeModeRaw = stringOrNull(Keys.THEME_MODE.name)
+            when {
+                isLegacyBlackThemeModeName(themeModeRaw) -> {
                     mutable[Keys.THEME_MODE] = ThemeMode.DARK.name
                     mutable[Keys.USE_BLACK_THEME] = true
                 }
 
-                null -> Unit
-
-                else -> {
-                    mutable[Keys.THEME_MODE] = themeMode.name
-                    booleanOrNull(Keys.USE_BLACK_THEME.name)?.let { value ->
-                        mutable[Keys.USE_BLACK_THEME] = value
+                themeModeRaw != null -> {
+                    val themeMode = runCatching { ThemeMode.valueOf(themeModeRaw) }.getOrNull()
+                    if (themeMode != null) {
+                        mutable[Keys.THEME_MODE] = themeMode.migrated().name
+                        booleanOrNull(Keys.USE_BLACK_THEME.name)?.let { value ->
+                            mutable[Keys.USE_BLACK_THEME] = value
+                        }
                     }
                 }
             }

@@ -697,7 +697,6 @@
     <string name="appearance_theme_light">Light</string>
     <string name="appearance_theme_dark">Dark</string>
     <string name="appearance_use_black_theme">Use pure black dark theme</string>
-    <string name="appearance_theme_black">Black</string>
     <string name="appearance_palette">Palette</string>
     <string name="appearance_preview_title_named">Preview · %1$s</string>
     <string name="appearance_preview_customize">Customize</string>

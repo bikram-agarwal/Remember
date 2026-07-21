@@ -1,3 +1,13 @@
+## v1.2.0: Custom fonts, AMOLED toggle
+
+### ✨ New Features
+- Import your own font (`.ttf` or `.otf`) from Settings → Appearance and use it across the whole app.
+
+### 🛠 Improved Features
+- Pure black (OLED) is now a separate toggle under System or Dark, instead of a fourth theme mode in the picker.
+
+---
+
 ## v1.1.9: Quick Tiles, Wearable notifications
 
 ### ✨ New Features

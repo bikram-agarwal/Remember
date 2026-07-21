@@ -9,8 +9,7 @@ val AppTypography = Typography()
 private val MaterialDefaultTypography = Typography()
 
 /** Material default type scale with a user-supplied font (ObtainX parity). */
-fun customFontTypography(fontFamily: FontFamily): Typography =
-    MaterialDefaultTypography.withFontFamilyOnly(fontFamily)
+fun customFontTypography(fontFamily: FontFamily): Typography = MaterialDefaultTypography.withFontFamilyOnly(fontFamily)
 
 /**
  * ObtainX parity: swap only [fontFamily] on each role, keep sizes/line heights from [this].
@@ -50,5 +49,4 @@ fun Typography.withFontFamilyOnly(fontFamily: FontFamily): Typography =
         labelSmallEmphasized = labelSmallEmphasized.withFontFamilyOnly(fontFamily),
     )
 
-private fun TextStyle.withFontFamilyOnly(fontFamily: FontFamily): TextStyle =
-    copy(fontFamily = fontFamily)
+private fun TextStyle.withFontFamilyOnly(fontFamily: FontFamily): TextStyle = copy(fontFamily = fontFamily)

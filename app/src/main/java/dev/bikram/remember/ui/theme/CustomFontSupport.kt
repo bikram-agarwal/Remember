@@ -82,9 +82,10 @@ internal object CustomFontStorage {
             // applies FontVariation.Settings(weight) and drives the wght axis instead of
             // faux-bolding a single Normal instance.
             FontFamily(
-                *customFontWeightStops.map { weight ->
-                    Font(fontFile, weight)
-                }.toTypedArray(),
+                *customFontWeightStops
+                    .map { weight ->
+                        Font(fontFile, weight)
+                    }.toTypedArray(),
             )
         }.getOrNull()
     }
@@ -106,7 +107,11 @@ internal object CustomFontStorage {
         context: Context,
         uri: Uri,
     ): String {
-        val mimeType = context.contentResolver.getType(uri)?.lowercase().orEmpty()
+        val mimeType =
+            context.contentResolver
+                .getType(uri)
+                ?.lowercase()
+                .orEmpty()
         when {
             mimeType.contains("otf") -> return "otf"
             mimeType.contains("ttf") -> return "ttf"
@@ -156,7 +161,8 @@ internal fun readFontDisplayName(bytes: ByteArray): String? {
                 )
             if (tag == "name") {
                 nameTableOffset =
-                    ByteBuffer.wrap(bytes, recordOffset + 8, 4)
+                    ByteBuffer
+                        .wrap(bytes, recordOffset + 8, 4)
                         .order(ByteOrder.BIG_ENDIAN)
                         .int
                 break
