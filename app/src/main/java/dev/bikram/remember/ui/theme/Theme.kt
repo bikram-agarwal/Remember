@@ -73,6 +73,14 @@ fun RememberTheme(
 
     val context = LocalContext.current
     val reducedMotion = rememberSystemReducedMotionEnabled(context)
+    val customFontFamily =
+        remember(themeState.customFontPath) {
+            CustomFontStorage.loadFontFamily(themeState.customFontPath)
+        }
+    val typography =
+        remember(customFontFamily) {
+            customFontFamily?.let { customFontTypography(it) } ?: AppTypography
+        }
     val baseDensity = LocalDensity.current
     val stableDensity = DisplayMetrics.DENSITY_DEVICE_STABLE.toFloat() / DisplayMetrics.DENSITY_DEFAULT
     val responsiveTextScale =
@@ -125,7 +133,7 @@ fun RememberTheme(
             colorScheme = targetColorScheme,
             motionScheme = MotionScheme.expressive(),
             shapes = AppShapes,
-            typography = AppTypography,
+            typography = typography,
         ) {
             Box(
                 modifier = Modifier.fillMaxSize(),

@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import dev.bikram.remember.ui.theme.CustomFontStorage
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -124,6 +125,8 @@ data class ThemeState(
     val heroOnCards: Boolean = true,
     val adaptiveNoteThemes: Boolean = true,
     val blurBars: Boolean = true,
+    val customFontPath: String = "",
+    val customFontName: String = "",
 ) {
     val useEnhancedShading: Boolean
         get() = shadingIntensity > 0.0f
@@ -148,6 +151,8 @@ class ThemePrefs(
         val HERO_ON_CARDS = booleanPreferencesKey("hero_on_cards")
         val ADAPTIVE_NOTE_THEMES = booleanPreferencesKey("adaptive_note_themes")
         val BLUR_BARS = booleanPreferencesKey("blur_bars")
+        val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
+        val CUSTOM_FONT_NAME = stringPreferencesKey("custom_font_name")
     }
 
     val state: Flow<ThemeState> =
@@ -176,6 +181,8 @@ class ThemePrefs(
                 heroOnCards = p[Keys.HERO_ON_CARDS] ?: true,
                 adaptiveNoteThemes = p[Keys.ADAPTIVE_NOTE_THEMES] ?: true,
                 blurBars = p[Keys.BLUR_BARS] ?: true,
+                customFontPath = p[Keys.CUSTOM_FONT_PATH].orEmpty(),
+                customFontName = p[Keys.CUSTOM_FONT_NAME].orEmpty(),
             )
         }
 
@@ -280,6 +287,24 @@ class ThemePrefs(
         context.themePrefsDataStore.edit { it[Keys.BLUR_BARS] = value }
     }
 
+    suspend fun setCustomFont(
+        path: String,
+        displayName: String,
+    ) {
+        context.themePrefsDataStore.edit { prefs ->
+            prefs[Keys.CUSTOM_FONT_PATH] = path
+            prefs[Keys.CUSTOM_FONT_NAME] = displayName
+        }
+    }
+
+    suspend fun clearCustomFont() {
+        CustomFontStorage.deleteStoredFontFiles(context)
+        context.themePrefsDataStore.edit { prefs ->
+            prefs.remove(Keys.CUSTOM_FONT_PATH)
+            prefs.remove(Keys.CUSTOM_FONT_NAME)
+        }
+    }
+
     private fun decodeSeeds(value: String): List<String> {
         val normalizedSeeds = decodeNormalizedSeeds(value)
         return normalizedSeeds ?: emptyList()
@@ -319,6 +344,8 @@ class ThemePrefs(
             put(Keys.HERO_ON_CARDS.name, prefs[Keys.HERO_ON_CARDS] ?: true)
             put(Keys.ADAPTIVE_NOTE_THEMES.name, prefs[Keys.ADAPTIVE_NOTE_THEMES] ?: true)
             put(Keys.BLUR_BARS.name, prefs[Keys.BLUR_BARS] ?: true)
+            put(Keys.CUSTOM_FONT_PATH.name, prefs[Keys.CUSTOM_FONT_PATH].orEmpty())
+            put(Keys.CUSTOM_FONT_NAME.name, prefs[Keys.CUSTOM_FONT_NAME].orEmpty())
         }
     }
 
@@ -397,6 +424,20 @@ class ThemePrefs(
             }
             booleanOrNull(Keys.BLUR_BARS.name)?.let { value ->
                 mutable[Keys.BLUR_BARS] = value
+            }
+
+            val restoredFontPath = stringOrNull(Keys.CUSTOM_FONT_PATH.name).orEmpty().trim()
+            if (restoredFontPath.isNotBlank() && java.io.File(restoredFontPath).isFile) {
+                mutable[Keys.CUSTOM_FONT_PATH] = restoredFontPath
+                val restoredFontName = stringOrNull(Keys.CUSTOM_FONT_NAME.name).orEmpty().trim()
+                if (restoredFontName.isNotBlank()) {
+                    mutable[Keys.CUSTOM_FONT_NAME] = restoredFontName
+                } else {
+                    mutable.remove(Keys.CUSTOM_FONT_NAME)
+                }
+            } else {
+                mutable.remove(Keys.CUSTOM_FONT_PATH)
+                mutable.remove(Keys.CUSTOM_FONT_NAME)
             }
         }
     }
