@@ -128,6 +128,26 @@ object ChecklistEditor {
         )
     }
 
+    fun checkAll(items: List<EditableItem>): ChecklistEditResult {
+        if (items.all { it.checked }) {
+            return ChecklistEditResult(items = items, changed = false)
+        }
+        return ChecklistEditResult(
+            items = items.map { item -> if (item.checked) item else item.copy(checked = true) },
+            changed = true,
+        )
+    }
+
+    fun uncheckAll(items: List<EditableItem>): ChecklistEditResult {
+        if (items.none { it.checked }) {
+            return ChecklistEditResult(items = items, changed = false)
+        }
+        return ChecklistEditResult(
+            items = items.map { item -> if (!item.checked) item else item.copy(checked = false) },
+            changed = true,
+        )
+    }
+
     /**
      * Reorders within a filtered active or completed list by assigning a midpoint sort order.
      */

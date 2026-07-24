@@ -199,6 +199,8 @@
         <item quantity="other">%1$d Checked items</item>
     </plurals>
     <string name="edit_list_add_item">Add item</string>
+    <string name="checklist_action_check_all">Check all</string>
+    <string name="checklist_action_uncheck_all">Uncheck all</string>
     <string name="edit_list_new_item_placeholder">New item</string>
     <string name="edit_list_item_details_placeholder">Add details</string>
     <string name="rt_text_to_display">Text to display</string>

@@ -30,6 +30,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuItemColors
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
@@ -694,9 +695,14 @@ fun RememberSwitch(
     modifier: Modifier = Modifier,
     thumbContent: @Composable (() -> Unit)? = null,
     enabled: Boolean = true,
+    // The checked thumb is painted with onPrimary, so the check has to be drawn in primary to read
+    // against it. Material's own default pairs an onPrimary thumb with an onPrimaryContainer icon,
+    // which only contrasts under the 2021 color spec; the app generates its scheme with the 2025
+    // spec, where onPrimaryContainer is itself dark in dark mode - leaving a near-black check on a
+    // near-black thumb. Keep in parity with FilePipe's FilePipeSwitch.
     colors: androidx.compose.material3.SwitchColors =
         androidx.compose.material3.SwitchDefaults
-            .colors(),
+            .colors(checkedIconColor = MaterialTheme.colorScheme.primary),
     interactionSource: MutableInteractionSource? = null,
 ) {
     androidx.compose.material3.Switch(

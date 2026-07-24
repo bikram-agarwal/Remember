@@ -14,6 +14,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -24,8 +26,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
@@ -38,7 +43,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
+import dev.bikram.remember.R
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
 private val MarkdownChecklistContinuationLineRegex = Regex("""^\s{4,}(.+)$""")
@@ -63,6 +71,8 @@ internal fun MarkdownText(
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
     onChecklistToggle: ((lineIndex: Int, checked: Boolean) -> Unit)? = null,
+    onChecklistCheckAll: (() -> Unit)? = null,
+    onChecklistUncheckAll: (() -> Unit)? = null,
     onTextTap: ((MarkdownTextTap) -> Unit)? = null,
     onTextLongPress: ((MarkdownTextTap) -> Unit)? = null,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)? = null,
@@ -178,6 +188,8 @@ internal fun MarkdownText(
                     styler = styler,
                     includeLinkAnnotations = includeLinkAnnotations,
                     onChecklistToggle = onChecklistToggle,
+                    onChecklistCheckAll = onChecklistCheckAll,
+                    onChecklistUncheckAll = onChecklistUncheckAll,
                     onTextTap = onTextTap,
                     onTextLongPress = onTextLongPress,
                     onLinkClick = onLinkClick,
@@ -213,6 +225,8 @@ private fun MarkdownLine(
     styler: MarkdownStyler,
     includeLinkAnnotations: Boolean,
     onChecklistToggle: ((lineIndex: Int, checked: Boolean) -> Unit)?,
+    onChecklistCheckAll: (() -> Unit)? = null,
+    onChecklistUncheckAll: (() -> Unit)? = null,
     onTextTap: ((MarkdownTextTap) -> Unit)?,
     onTextLongPress: ((MarkdownTextTap) -> Unit)?,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)?,
@@ -244,24 +258,77 @@ private fun MarkdownLine(
     if (checklistMatch != null) {
         val checked = checklistMatch.groupValues[2].equals("x", ignoreCase = true)
         val checkboxSize = markdownChecklistCheckboxSize(style, LocalDensity.current)
+        val hasLongPressAction = onChecklistCheckAll != null || onChecklistUncheckAll != null
+        var showMenu by remember { mutableStateOf(false) }
+        val haptic = LocalHapticFeedback.current
         Row(
             modifier = Modifier.padding(start = styler.listStartPadding(checklistMatch.groupValues[1], baseIndent = 0.dp)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RememberMaterialRoundedSymbol(
-                name = if (checked) "check_box" else "check_box_outline_blank",
-                size = checkboxSize,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
-                modifier =
-                    if (onChecklistToggle != null) {
-                        Modifier.tapSoundClickable(role = Role.Checkbox) {
-                            onChecklistToggle(lineIndex, !checked)
-                        }
-                    } else {
-                        Modifier
-                    },
-            )
+            Box {
+                RememberMaterialRoundedSymbol(
+                    name = if (checked) "check_box" else "check_box_outline_blank",
+                    size = checkboxSize,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    weight = FontWeight.Medium,
+                    modifier =
+                        if (onChecklistToggle != null) {
+                            if (hasLongPressAction) {
+                                Modifier.tapSoundCombinedClickable(
+                                    role = Role.Checkbox,
+                                    onClick = { onChecklistToggle(lineIndex, !checked) },
+                                    onLongClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        showMenu = true
+                                    },
+                                )
+                            } else {
+                                Modifier.tapSoundClickable(role = Role.Checkbox) {
+                                    onChecklistToggle(lineIndex, !checked)
+                                }
+                            }
+                        } else {
+                            Modifier
+                        },
+                )
+                if (hasLongPressAction) {
+                    DropdownMenu(
+                        expanded = showMenu,
+                        onDismissRequest = { showMenu = false },
+                        shape = RoundedCornerShape(16.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        RememberDropdownMenuItem(
+                            text = { Text(stringResource(R.string.checklist_action_check_all)) },
+                            leadingIcon = {
+                                RememberMaterialRoundedSymbol(
+                                    name = "done_all",
+                                    size = 20.dp,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                onChecklistCheckAll?.invoke()
+                            },
+                        )
+                        RememberDropdownMenuItem(
+                            text = { Text(stringResource(R.string.checklist_action_uncheck_all)) },
+                            leadingIcon = {
+                                RememberMaterialRoundedSymbol(
+                                    name = "remove_done",
+                                    size = 20.dp,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            onClick = {
+                                showMenu = false
+                                onChecklistUncheckAll?.invoke()
+                            },
+                        )
+                    }
+                }
+            }
             Spacer(Modifier.width(8.dp))
             val contentRange = checklistMatch.groups[3]?.range
             Column(

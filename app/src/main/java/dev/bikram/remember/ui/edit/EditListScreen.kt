@@ -640,6 +640,8 @@ fun EditListScreen(
                                         onTextChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemText(item.localId, it) }),
                                         onDetailsChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemDetails(item.localId, it) }),
                                         onToggle = if (readOnly) ({}) else ({ vm.toggleChecked(item.localId) }),
+                                        onCheckAll = if (readOnly) null else ({ vm.checkAll() }),
+                                        onUncheckAll = if (readOnly) null else ({ vm.uncheckAll() }),
                                         onRemove = if (readOnly) ({}) else ({ vm.removeItem(item.localId) }),
                                         onNext =
                                             if (readOnly) {
@@ -808,6 +810,8 @@ fun EditListScreen(
                                             onTextChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemText(item.localId, it) }),
                                             onDetailsChange = if (readOnly) ({ _ -> }) else ({ vm.updateItemDetails(item.localId, it) }),
                                             onToggle = if (readOnly) ({}) else ({ vm.toggleChecked(item.localId) }),
+                                            onCheckAll = if (readOnly) null else ({ vm.checkAll() }),
+                                            onUncheckAll = if (readOnly) null else ({ vm.uncheckAll() }),
                                             onRemove = if (readOnly) ({}) else ({ vm.removeItem(item.localId) }),
                                             onNext =
                                                 if (readOnly) {

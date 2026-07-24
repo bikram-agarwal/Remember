@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,6 +34,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
@@ -45,8 +48,10 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 
 /**
  * A synthetic, non-persisted header that stands in for the real parent row when a child has been
@@ -120,6 +125,8 @@ internal fun ChecklistRow(
     onTextChange: (String) -> Unit,
     onDetailsChange: (String) -> Unit = {},
     onToggle: () -> Unit,
+    onCheckAll: (() -> Unit)? = null,
+    onUncheckAll: (() -> Unit)? = null,
     onRemove: () -> Unit,
     onNext: () -> Unit = {},
     onTextTap: ((Int) -> Unit)? = null,
@@ -146,6 +153,7 @@ internal fun ChecklistRow(
 
     val haptic = LocalHapticFeedback.current
     var detailsExpanded by rememberSaveable(item.localId) { mutableStateOf(false) }
+    var showCheckboxMenu by remember { mutableStateOf(false) }
 
     var titleFieldValue by remember(item.localId) {
         mutableStateOf(TextFieldValue(text = item.text, selection = TextRange(item.text.length)))
@@ -312,13 +320,76 @@ internal fun ChecklistRow(
                     )
                 }
             }
-            RememberIconButton(onClick = onToggle) {
-                RememberMaterialRoundedSymbol(
-                    name = if (item.checked) "check_box" else "check_box_outline_blank",
-                    size = 24.dp,
-                    tint = if (item.checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    weight = FontWeight.Medium,
-                )
+            val hasLongPressAction = onCheckAll != null || onUncheckAll != null
+            Box {
+                Box(
+                    modifier =
+                        if (hasLongPressAction) {
+                            Modifier
+                                .size(40.dp)
+                                .tapSoundCombinedClickable(
+                                    onClick = onToggle,
+                                    onLongClick = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        showCheckboxMenu = true
+                                    },
+                                    role = Role.Checkbox,
+                                )
+                        } else {
+                            Modifier
+                                .size(40.dp)
+                                .tapSoundClickable(
+                                    onClick = onToggle,
+                                    role = Role.Checkbox,
+                                )
+                        },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = if (item.checked) "check_box" else "check_box_outline_blank",
+                        size = 24.dp,
+                        tint = if (item.checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        weight = FontWeight.Medium,
+                    )
+                }
+
+                if (hasLongPressAction) {
+                    DropdownMenu(
+                        expanded = showCheckboxMenu,
+                        onDismissRequest = { showCheckboxMenu = false },
+                        shape = RoundedCornerShape(16.dp),
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ) {
+                        RememberDropdownMenuItem(
+                            text = { Text(stringResource(R.string.checklist_action_check_all)) },
+                            leadingIcon = {
+                                RememberMaterialRoundedSymbol(
+                                    name = "done_all",
+                                    size = 20.dp,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            },
+                            onClick = {
+                                showCheckboxMenu = false
+                                onCheckAll?.invoke()
+                            },
+                        )
+                        RememberDropdownMenuItem(
+                            text = { Text(stringResource(R.string.checklist_action_uncheck_all)) },
+                            leadingIcon = {
+                                RememberMaterialRoundedSymbol(
+                                    name = "remove_done",
+                                    size = 20.dp,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            onClick = {
+                                showCheckboxMenu = false
+                                onUncheckAll?.invoke()
+                            },
+                        )
+                    }
+                }
             }
             if (isEditMode) {
                 BasicTextField(

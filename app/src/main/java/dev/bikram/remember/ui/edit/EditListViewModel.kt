@@ -120,6 +120,18 @@ class EditListViewModel
             )
         }
 
+        fun checkAll() {
+            applyChecklistEdit(
+                ChecklistEditor.checkAll(_items.value),
+            )
+        }
+
+        fun uncheckAll() {
+            applyChecklistEdit(
+                ChecklistEditor.uncheckAll(_items.value),
+            )
+        }
+
         private var draggingItemId: Long? = null
         private var originalSortOrder: Double? = null
 

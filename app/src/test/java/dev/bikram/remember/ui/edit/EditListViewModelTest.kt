@@ -36,6 +36,38 @@ class EditListViewModelTest {
     val mainDispatcherRule = MainDispatcherRule()
 
     @Test
+    fun checkAll_checks_all_items_in_list() =
+        runTest {
+            val store = FakeRepositoryStore()
+            val viewModel = editListViewModel(store)
+
+            val firstId = viewModel.addItem()
+            val secondId = viewModel.addItem()
+            viewModel.updateItemText(firstId, "Item 1")
+            viewModel.updateItemText(secondId, "Item 2")
+
+            viewModel.checkAll()
+
+            assertEquals(true, viewModel.items.value.all { it.checked })
+        }
+
+    @Test
+    fun uncheckAll_unchecks_all_items_in_list() =
+        runTest {
+            val store = FakeRepositoryStore()
+            val viewModel = editListViewModel(store)
+
+            val firstId = viewModel.addItem()
+            val secondId = viewModel.addItem()
+            viewModel.checkAll()
+            assertEquals(true, viewModel.items.value.all { it.checked })
+
+            viewModel.uncheckAll()
+
+            assertEquals(true, viewModel.items.value.all { !it.checked })
+        }
+
+    @Test
     fun invalid_reorder_does_not_make_new_draft_saveable() =
         runTest {
             val store = FakeRepositoryStore()

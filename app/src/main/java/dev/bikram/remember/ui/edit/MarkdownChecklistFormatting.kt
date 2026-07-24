@@ -27,6 +27,28 @@ internal fun String.withChecklistLineToggled(
     return lines.joinToString("\n")
 }
 
+internal fun String.withAllChecklistLinesToggled(checked: Boolean): String {
+    val lines =
+        lines().map { line ->
+            val match = MarkdownChecklistToggleRegex.matchEntire(line)
+            if (match != null) {
+                val updatedContent =
+                    if (checked) {
+                        match.groupValues[3].withStrikethroughWrapper()
+                    } else {
+                        match.groupValues[3].withoutStrikethroughWrapper()
+                    }
+                match.groupValues[1] +
+                    (if (checked) "x" else " ") +
+                    match.groupValues[2] +
+                    updatedContent
+            } else {
+                line
+            }
+        }
+    return lines.joinToString("\n")
+}
+
 private fun String.withStrikethroughWrapper(): String {
     if (isBlank() || hasStrikethroughWrapper()) return this
     return "~~$this~~"

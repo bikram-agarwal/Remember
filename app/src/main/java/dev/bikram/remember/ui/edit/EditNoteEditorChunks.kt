@@ -519,6 +519,16 @@ internal fun EditNoteMarkdownEditorSection(
                 markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
                 onMarkdownChanged(updatedMarkdown)
             },
+            onChecklistCheckAll = {
+                val updatedMarkdown = markdownEditorState.markdown.withAllChecklistLinesToggled(true)
+                markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
+                onMarkdownChanged(updatedMarkdown)
+            },
+            onChecklistUncheckAll = {
+                val updatedMarkdown = markdownEditorState.markdown.withAllChecklistLinesToggled(false)
+                markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
+                onMarkdownChanged(updatedMarkdown)
+            },
             onTextTap = { tap ->
                 onEnterEditModeAtOffset(tap.markdownOffset)
             },

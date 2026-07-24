@@ -1,3 +1,10 @@
+## v1.2.1: Check/uncheck all 
+
+### 🛠 Improved Features
+- Long press any checkbox in notes or checklist to quickly "Check all" or "Uncheck all"
+
+---
+
 ## v1.2.0: Custom fonts, AMOLED toggle
 
 ### ✨ New Features
