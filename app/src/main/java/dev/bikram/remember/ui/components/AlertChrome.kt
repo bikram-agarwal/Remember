@@ -34,7 +34,7 @@ import androidx.compose.material3.ToggleFloatingActionButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -274,12 +274,20 @@ fun AlertFloatingActionButtonMenu(
     val barContentScale = if (isSmallLandscape) barIconSize.value / 44f else 1f
     val density = LocalDensity.current
     val windowWidthPx = LocalWindowInfo.current.containerSize.width
-    var anchorLeftInWindow by remember { mutableIntStateOf(0) }
+    var anchorLeftInWindow by remember { mutableFloatStateOf(0f) }
+    var anchorScale by remember { mutableFloatStateOf(1f) }
     var anchorPlaced by remember { mutableStateOf(false) }
     Box(
         modifier =
             modifier.onPlaced { coordinates ->
-                anchorLeftInWindow = coordinates.boundsInWindow().left.roundToInt()
+                val anchorBounds = coordinates.boundsInWindow()
+                anchorLeftInWindow = anchorBounds.left
+                anchorScale =
+                    if (coordinates.size.width > 0) {
+                        (anchorBounds.width / coordinates.size.width).coerceAtLeast(0.01f)
+                    } else {
+                        1f
+                    }
                 anchorPlaced = true
             },
     ) {
@@ -306,7 +314,9 @@ fun AlertFloatingActionButtonMenu(
                     layout(0, 0) {
                         val x =
                             if (centerBarsInWindow) {
-                                ((windowWidthPx - placeable.width) / 2f).roundToInt() - anchorLeftInWindow
+                                val renderedBarsWidth = placeable.width * anchorScale
+                                val centeredLeftInWindow = (windowWidthPx - renderedBarsWidth) / 2f
+                                ((centeredLeftInWindow - anchorLeftInWindow) / anchorScale).roundToInt()
                             } else {
                                 0
                             }

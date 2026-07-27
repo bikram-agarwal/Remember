@@ -52,6 +52,7 @@ import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
@@ -114,6 +115,8 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import dev.bikram.remember.R
 import dev.bikram.remember.data.MonthlyMode
 import dev.bikram.remember.data.NoteReminder
@@ -121,6 +124,8 @@ import dev.bikram.remember.data.RecurrenceEndKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.domain.formatTimeOfDay
+import dev.bikram.remember.reminders.SnoozePreset
+import dev.bikram.remember.reminders.computeSnoozePresets
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isLandscape
@@ -128,6 +133,7 @@ import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
+import dev.bikram.remember.ui.components.RememberFilterChip
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
@@ -138,6 +144,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
@@ -631,6 +638,32 @@ fun ReminderPickerSheet(
                                     exit = shrinkVertically(animationSpec = expansionSpec) + fadeOut(animationSpec = fadeOutSpec),
                                 ) {
                                     Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                                        QuickReminderChipsRow(
+                                            draft = draft,
+                                            enabled = controlsEnabled,
+                                            onSelectPreset = { targetMillis ->
+                                                val zone = ZoneId.systemDefault()
+                                                val zdt = ZonedDateTime.ofInstant(Instant.ofEpochMilli(targetMillis), zone)
+                                                val targetDateMillis = pickerDayMillisForLocalWallClock(targetMillis)
+                                                drafts =
+                                                    drafts.mapIndexed { idx, d ->
+                                                        if (idx == index) {
+                                                            d.copy(
+                                                                selectedDate = targetDateMillis,
+                                                                reminderDateExplicit = true,
+                                                                reminderHour = zdt.hour,
+                                                                reminderMinute = zdt.minute,
+                                                                reminderTimeExplicit = true,
+                                                            )
+                                                        } else {
+                                                            d
+                                                        }
+                                                    }
+                                            },
+                                        )
+
+                                        Spacer(Modifier.height(8.dp))
+
                                         PillRow(
                                             materialSymbolName = "calendar_month",
                                             label =
@@ -2509,4 +2542,70 @@ private fun timeFormatterFor(context: Context): java.time.format.DateTimeFormatt
         }
     return java.time.format.DateTimeFormatter
         .ofPattern(pattern, Locale.getDefault())
+}
+
+@Composable
+private fun QuickReminderChipsRow(
+    draft: ReminderDraft,
+    enabled: Boolean,
+    onSelectPreset: (targetMillis: Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val now = remember { ZonedDateTime.now(ZoneId.systemDefault()) }
+    val timeFormatter = remember(context) { timeFormatterFor(context) }
+    val presets = remember(now, timeFormatter) { computeSnoozePresets(context, now, timeFormatter) }
+    val zone = remember { ZoneId.systemDefault() }
+
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        presets.forEach { preset ->
+            val zdt = ZonedDateTime.ofInstant(Instant.ofEpochMilli(preset.targetMillis), zone)
+            val dateMillis = pickerDayMillisForLocalWallClock(preset.targetMillis)
+            val isSelected =
+                draft.reminderDateExplicit &&
+                    draft.reminderTimeExplicit &&
+                    draft.selectedDate == dateMillis &&
+                    draft.reminderHour == zdt.hour &&
+                    draft.reminderMinute == zdt.minute
+
+            RememberFilterChip(
+                selected = isSelected,
+                onClick = {
+                    onSelectPreset(preset.targetMillis)
+                },
+                enabled = enabled,
+                colors =
+                    FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                label = {
+                    Text(
+                        text = preset.title,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                },
+                leadingIcon = {
+                    RememberMaterialRoundedSymbol(
+                        name = preset.symbolName,
+                        size = 16.dp,
+                        tint =
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    )
+                },
+            )
+        }
+    }
 }
