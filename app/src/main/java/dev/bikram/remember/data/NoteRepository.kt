@@ -476,6 +476,69 @@ class NoteRepository(
         postWriteBookkeeping()
     }
 
+    suspend fun snoozeSoonestReminder(
+        noteId: Long,
+        snoozedUntil: Long,
+    ): Boolean {
+        val noteWithItems = noteDao.get(noteId) ?: return false
+        val note = noteWithItems.note
+        if (note.trashed || note.archived || note.completedAt != null) return false
+        val activeReminders = note.getActiveReminders()
+        val soonestReminder = activeReminders.minByOrNull { reminder -> reminder.reminderAt }
+        val updatedReminders =
+            if (soonestReminder != null) {
+                activeReminders.map { reminder ->
+                    if (reminder == soonestReminder) {
+                        reminder.copy(
+                            reminderAt = snoozedUntil,
+                            originalReminderAt = reminder.originalReminderAt ?: reminder.reminderAt,
+                        )
+                    } else {
+                        reminder
+                    }
+                }
+            } else {
+                listOf(
+                    NoteReminder(
+                        reminderAt = snoozedUntil,
+                        recurrence = note.recurrence,
+                    ),
+                )
+            }
+        val options =
+            NoteOptions(
+                reminderAt = snoozedUntil,
+                importance = note.importance,
+                visibility = note.visibility,
+                pictureUri = note.pictureUri,
+                pictureHeroFraming = note.pictureHeroFraming,
+                locked = note.locked,
+                iconKey = note.iconKey,
+                actions = note.actions,
+                tags = note.tags,
+                recurrence = note.recurrence,
+                reminders = updatedReminders,
+            )
+        if (note.kind == NoteKind.NOTE) {
+            updateNote(note.id, note.title, note.body, note.colorIndex, options)
+        } else {
+            val persistableItems =
+                noteWithItems.items.map { item ->
+                    PersistableChecklistItem(
+                        localKey = item.id,
+                        text = item.text,
+                        details = item.details,
+                        checked = item.checked,
+                        sortOrder = item.sortOrder,
+                        parentLocalKey = item.parentId,
+                        depth = item.depth,
+                    )
+                }
+            updateList(note.id, note.title, note.colorIndex, persistableItems, options)
+        }
+        return true
+    }
+
     suspend fun moveAllArchivedToTrash() {
         val archivedIds = noteDao.archivedNoteIds()
         if (archivedIds.isEmpty()) return
@@ -728,6 +791,37 @@ class NoteRepository(
         return count
     }
 
+    @Suppress("ktlint:standard:function-expression-body")
+    internal suspend fun <Result> runImportTransaction(importBlock: suspend () -> Result): Result {
+        return if (database != null) {
+            database.withTransaction {
+                importBlock()
+            }
+        } else {
+            importBlock()
+        }
+    }
+
+    internal suspend fun reconcileImportedNotes(importedNoteIds: Collection<Long>) {
+        val schedulerNonNull = scheduler
+        if (schedulerNonNull != null) {
+            importedNoteIds.distinct().forEach { noteId ->
+                val noteWithItems = noteDao.get(noteId)
+                if (noteWithItems == null) {
+                    schedulerNonNull.cancel(noteId)
+                } else {
+                    val note = noteWithItems.note
+                    if (note.trashed || note.archived || note.completedAt != null) {
+                        schedulerNonNull.cancel(noteId)
+                    } else {
+                        schedulerNonNull.scheduleOrShow(note, noteWithItems.items)
+                    }
+                }
+            }
+        }
+        postWriteBookkeeping()
+    }
+
     private suspend fun resyncRemindersAfterMassReplace(oldIds: Set<Long>) {
         val schedulerNonNull = scheduler ?: return
         val newIds = noteDao.allNoteIds().toSet()
@@ -735,7 +829,7 @@ class NoteRepository(
         newIds.forEach { noteId ->
             val noteWithItems = noteDao.get(noteId) ?: return@forEach
             val note = noteWithItems.note
-            if (!note.trashed && note.reminderAt != null) {
+            if (!note.trashed && !note.archived && note.completedAt == null && note.reminderAt != null) {
                 schedulerNonNull.scheduleOrShow(note, noteWithItems.items)
             }
         }
@@ -771,11 +865,22 @@ class NoteRepository(
                         options = optionsWithoutReminder,
                     )
                 NoteKind.LIST -> {
-                    val texts = existing.items.map { it.text }
-                    createList(
+                    val persistableItems =
+                        existing.items.map { item ->
+                            PersistableChecklistItem(
+                                localKey = item.id,
+                                text = item.text,
+                                details = item.details,
+                                checked = item.checked,
+                                sortOrder = item.sortOrder,
+                                parentLocalKey = item.parentId,
+                                depth = item.depth,
+                            )
+                        }
+                    createListWithItems(
                         title = note.title,
                         colorIndex = note.colorIndex,
-                        items = texts,
+                        items = persistableItems,
                         options = optionsWithoutReminder,
                     )
                 }
@@ -1116,6 +1221,11 @@ class NoteRepository(
         reminders.forEach { noteWithItems ->
             schedulerNonNull.refreshNotificationIfActive(noteWithItems.note, noteWithItems.items)
         }
+    }
+
+    @Suppress("ktlint:standard:function-expression-body")
+    suspend fun activeReminderNotes(): List<NoteWithItems> {
+        return noteDao.activeRemindersUntil(Long.MAX_VALUE)
     }
 
     suspend fun refreshReminderSummaryNotification() {

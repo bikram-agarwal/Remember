@@ -91,7 +91,12 @@ class BackupIo(
     )
 
     private suspend fun snapshotNotes(): NotesSnapshot {
-        val all = repository.observeActive().first() + repository.observeTrashed().first()
+        val all =
+            notesForBackup(
+                activeNotes = repository.observeActive().first(),
+                archivedNotes = repository.observeArchived().first(),
+                trashedNotes = repository.observeTrashed().first(),
+            )
         val tagColors =
             repository.tagRepository
                 ?.observeTagColorMap()
@@ -160,13 +165,8 @@ class BackupIo(
             put(
                 "reminders",
                 JSONArray().apply {
-                    note.reminders.limitedToReminderSlots().forEach { r ->
-                        put(
-                            JSONObject().apply {
-                                put("reminderAt", r.reminderAt)
-                                RecurrenceRule.toJson(r.recurrence)?.let { put("recurrence", it) }
-                            },
-                        )
+                    note.reminders.limitedToReminderSlots().forEach { reminder ->
+                        put(encodeReminderForBackup(reminder))
                     }
                 },
             )
@@ -470,7 +470,7 @@ class BackupIo(
                             extractDir = payload.extractRoot,
                             preserveNoteIds = true,
                             suppressReminderSchedule = true,
-                        )
+                        ).noteCount
                     }
                 val settingsOutcome = importSettingsFromJson(payload.settingsJson)
                 RestoreResult(noteCount = count, settingsOutcome = settingsOutcome)
@@ -491,7 +491,11 @@ class BackupIo(
                     val text =
                         context.contentResolver.openInputStream(uri)?.use { it.reader().readText() }
                             ?: return@runCatching 0
-                    importFromJsonText(text, extractDir = null, preserveIdsForNotes)
+                    importNotesAtomically(
+                        text = text,
+                        extractDir = null,
+                        preserveNoteIds = preserveIdsForNotes,
+                    ).noteCount
                 }
             }.onFailure { throwable ->
                 DiagnosticLog.record(context, "Backup import failed", throwable)
@@ -522,6 +526,11 @@ class BackupIo(
         val settingsJson: JSONObject?,
         val manifestJson: JSONObject?,
         val extractRoot: File?,
+    )
+
+    private data class NoteImportResult(
+        val noteCount: Int,
+        val noteIds: List<Long>,
     )
 
     private fun restoreMediaSummaryFromPayload(payload: RestorePayload): RestoreMediaSummary {
@@ -680,11 +689,50 @@ class BackupIo(
             val notesText = if (notesFile.isFile) notesFile.readText() else return 0
             val settingsText = if (settingsFile.isFile) settingsFile.readText(Charsets.UTF_8) else null
             val settingsJson = settingsText?.let { runCatching { JSONObject(it) }.getOrNull() }
+            val importResult =
+                importNotesAtomically(
+                    text = notesText,
+                    extractDir = extractRoot,
+                    preserveNoteIds = preserveNoteIds,
+                )
             importSettingsFromJson(settingsJson)
-            importFromJsonText(notesText, extractRoot, preserveNoteIds)
+            importResult.noteCount
         } finally {
             extractRoot.deleteRecursively()
         }
+    }
+
+    private suspend fun importNotesAtomically(
+        text: String,
+        extractDir: File?,
+        preserveNoteIds: Boolean,
+    ): NoteImportResult {
+        val importedNoteIds = mutableListOf<Long>()
+        val importResult =
+            try {
+                repository.runImportTransaction {
+                    importFromJsonText(
+                        text = text,
+                        extractDir = extractDir,
+                        preserveNoteIds = preserveNoteIds,
+                        suppressReminderSchedule = true,
+                        importedNoteIds = importedNoteIds,
+                    )
+                }
+            } catch (error: Exception) {
+                if (!preserveNoteIds) {
+                    importedNoteIds.forEach { noteId ->
+                        File(context.filesDir, "remember_backup/$noteId").deleteRecursively()
+                    }
+                }
+                throw error
+            }
+        runCatching {
+            repository.reconcileImportedNotes(importResult.noteIds)
+        }.onFailure { error ->
+            DiagnosticLog.record(context, "Imported notes could not reconcile reminders", error)
+        }
+        return importResult
     }
 
     private suspend fun importFromJsonText(
@@ -692,10 +740,12 @@ class BackupIo(
         extractDir: File?,
         preserveNoteIds: Boolean,
         suppressReminderSchedule: Boolean = false,
-    ): Int {
+        importedNoteIds: MutableList<Long>? = null,
+    ): NoteImportResult {
         val root = JSONObject(text)
-        val arr = root.optJSONArray("notes") ?: return 0
+        val arr = root.optJSONArray("notes") ?: return NoteImportResult(0, emptyList())
         var added = 0
+        val insertedNoteIds = mutableListOf<Long>()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
             val noteFromJson = decodeNoteEntity(o)
@@ -726,6 +776,8 @@ class BackupIo(
                     attachments = nonRelAttachments,
                     suppressReminderSchedule = suppressReminderSchedule,
                 )
+            insertedNoteIds += insertedNoteId
+            importedNoteIds?.add(insertedNoteId)
             if (extractDir != null) {
                 if (picturePathForRelCopy != null) {
                     val relativePicture = picturePathForRelCopy.removePrefix(REL_PREFIX)
@@ -753,7 +805,10 @@ class BackupIo(
             added++
         }
         importTagColors(root.optJSONObject("tagColors"))
-        return added
+        return NoteImportResult(
+            noteCount = added,
+            noteIds = insertedNoteIds,
+        )
     }
 
     private suspend fun importTagColors(tagColorsJson: JSONObject?) {
@@ -801,11 +856,10 @@ class BackupIo(
     private fun decodeReminders(a: JSONArray): List<NoteReminder> {
         val out = ArrayList<NoteReminder>(a.length())
         for (i in 0 until a.length()) {
-            val o = a.optJSONObject(i) ?: continue
-            val reminderAt = o.optLong("reminderAt", 0L)
-            if (reminderAt <= 0L) continue
-            val recurrence = o.optStringOrNull("recurrence")?.let { RecurrenceRule.fromJson(it) }
-            out.add(NoteReminder(reminderAt, recurrence))
+            val reminderJson = a.optJSONObject(i) ?: continue
+            decodeReminderFromBackup(reminderJson)?.let { reminder ->
+                out.add(reminder)
+            }
         }
         return out.limitedToReminderSlots()
     }
@@ -910,11 +964,59 @@ class BackupIo(
     private fun JSONObject.optStringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
 
     companion object {
-        const val SCHEMA_VERSION = 4
+        const val SCHEMA_VERSION = 5
         const val LEGACY_SCHEMA_VERSION = 1
         const val ENTRY_MANIFEST = "backup_manifest.json"
         const val ENTRY_NOTES = "notes.json"
         const val ENTRY_SETTINGS = "settings.json"
         const val REL_PREFIX = "REL:"
     }
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun notesForBackup(
+    activeNotes: List<NoteWithItems>,
+    archivedNotes: List<NoteWithItems>,
+    trashedNotes: List<NoteWithItems>,
+): List<NoteWithItems> {
+    return buildList(activeNotes.size + archivedNotes.size + trashedNotes.size) {
+        addAll(activeNotes)
+        addAll(archivedNotes)
+        addAll(trashedNotes)
+    }
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun encodeReminderForBackup(reminder: NoteReminder): JSONObject {
+    return JSONObject().apply {
+        put("reminderAt", reminder.reminderAt)
+        RecurrenceRule.toJson(reminder.recurrence)?.let { recurrenceJson ->
+            put("recurrence", recurrenceJson)
+        }
+        reminder.originalReminderAt?.let { originalReminderAt ->
+            put("originalReminderAt", originalReminderAt)
+        }
+    }
+}
+
+internal fun decodeReminderFromBackup(reminderJson: JSONObject): NoteReminder? {
+    val reminderAt = reminderJson.optLong("reminderAt", 0L)
+    if (reminderAt <= 0L) return null
+    val recurrence =
+        if (reminderJson.has("recurrence") && !reminderJson.isNull("recurrence")) {
+            RecurrenceRule.fromJson(reminderJson.getString("recurrence"))
+        } else {
+            null
+        }
+    val originalReminderAt =
+        if (reminderJson.has("originalReminderAt") && !reminderJson.isNull("originalReminderAt")) {
+            reminderJson.getLong("originalReminderAt")
+        } else {
+            null
+        }
+    return NoteReminder(
+        reminderAt = reminderAt,
+        recurrence = recurrence,
+        originalReminderAt = originalReminderAt,
+    )
 }

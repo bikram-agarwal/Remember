@@ -23,6 +23,7 @@ import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.quickcapture.QuickCaptureNotifier
 import dev.bikram.remember.reminders.ReminderScheduler
 import dev.bikram.remember.trash.RememberTrashSweepWork
+import dev.bikram.remember.ui.lock.AppLockSession
 import dev.bikram.remember.update.PlayInAppUpdateProgressController
 import dev.bikram.remember.update.PlayStoreUpdateChecker
 import dev.bikram.remember.update.RememberUpdateChecker
@@ -74,6 +75,8 @@ class RememberApp :
 
     @Inject lateinit var notesWidgetUpdater: NotesWidgetUpdater
 
+    @Inject lateinit var appLockSession: AppLockSession
+
     @ApplicationScope @Inject
     lateinit var applicationScope: CoroutineScope
 
@@ -88,6 +91,7 @@ class RememberApp :
         super.onCreate()
         DiagnosticLog.installCrashHandler(this)
         DiagnosticLog.record(this, "RememberApp.onCreate started")
+        appLockSession.start()
         appStartupWarmup.start()
         ensureReminderChannel()
         updateAvailableNotifier.ensureNotificationChannel()

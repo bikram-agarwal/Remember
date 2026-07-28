@@ -43,6 +43,7 @@ import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.ui.InAppRatingAutoPromptHost
 import dev.bikram.remember.ui.components.UpdateChromeState
+import dev.bikram.remember.ui.lock.AppLockSession
 import dev.bikram.remember.ui.lock.LockScreen
 import dev.bikram.remember.ui.nav.RememberNavGraph
 import dev.bikram.remember.ui.settings.RememberUpdateViewModel
@@ -82,7 +83,7 @@ class MainActivity : FragmentActivity() {
 
     @Inject lateinit var pendingLaunch: MutableStateFlow<LaunchAction?>
 
-    @Inject lateinit var appUnlocked: MutableStateFlow<Boolean>
+    @Inject lateinit var appLockSession: AppLockSession
 
     @ApplicationScope @Inject
     lateinit var applicationScope: CoroutineScope
@@ -136,11 +137,16 @@ class MainActivity : FragmentActivity() {
                         playInAppUpdateProgressController = playInAppUpdateProgressController,
                         appScope = applicationScope,
                         launchFlow = pendingLaunch,
-                        appUnlocked = appUnlocked,
+                        appLockSession = appLockSession,
                     )
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        appLockSession.onAppForegrounded()
+        super.onStart()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -209,7 +215,7 @@ private fun AppRoot(
     playInAppUpdateProgressController: PlayInAppUpdateProgressController,
     appScope: CoroutineScope,
     launchFlow: MutableStateFlow<LaunchAction?>,
-    appUnlocked: MutableStateFlow<Boolean>,
+    appLockSession: AppLockSession,
 ) {
     val lockState by lockPrefs.state.collectAsStateWithLifecycle(
         initialValue = null,
@@ -220,7 +226,7 @@ private fun AppRoot(
     val updatePreferencesState by updatePrefs.state.collectAsStateWithLifecycle(
         initialValue = UpdatePreferencesState(),
     )
-    val unlocked by appUnlocked.collectAsStateWithLifecycle(initialValue = false)
+    val unlocked by appLockSession.unlocked.collectAsStateWithLifecycle()
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val updateInfo by rememberUpdateState.updateInfo.collectAsStateWithLifecycle(initialValue = null)
     val realPlayBannerState by playInAppUpdateProgressController.bannerUiState.collectAsStateWithLifecycle()
@@ -258,7 +264,7 @@ private fun AppRoot(
             biometricEnabled = currentLockState.biometric,
             hasPin = currentLockState.hasPin,
             pinLength = currentLockState.pinLength,
-            onUnlocked = { appUnlocked.value = true },
+            onUnlocked = appLockSession::unlock,
             verify = { pin -> lockPrefs.verify(pin) },
         )
     } else {

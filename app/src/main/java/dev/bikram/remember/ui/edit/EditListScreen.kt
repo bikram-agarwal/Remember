@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -105,6 +106,7 @@ fun EditListRoute(
     onNavigateUp: () -> Unit = onBack,
 ) {
     val vm: EditListViewModel = hiltViewModel()
+    val loaded by vm.loaded.collectAsStateWithLifecycle()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
     val currentNoteId by vm.currentNoteId.collectAsStateWithLifecycle()
     val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
@@ -161,19 +163,28 @@ fun EditListRoute(
     }
 
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
-        EditListScreen(
-            vm = vm,
-            appScope = appScope,
-            existing = noteId != null,
-            persistedForToolbar = hasPersistedRow,
-            activeTagSuggestions = activeTagSuggestions,
-            forceEdit = forceEdit,
-            showNavigateBack = showNavigateBack,
-            allowInitialTitleFocus = allowInitialTitleFocus,
-            interceptBack = interceptBack,
-            onBack = handleBack,
-            onNavigateUp = handleNavigateUp,
-        )
+        if (loaded) {
+            EditListScreen(
+                vm = vm,
+                appScope = appScope,
+                existing = noteId != null,
+                persistedForToolbar = hasPersistedRow,
+                activeTagSuggestions = activeTagSuggestions,
+                forceEdit = forceEdit,
+                showNavigateBack = showNavigateBack,
+                allowInitialTitleFocus = allowInitialTitleFocus,
+                interceptBack = interceptBack,
+                onBack = handleBack,
+                onNavigateUp = handleNavigateUp,
+            )
+        } else {
+            LoadingIndicator(
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(48.dp),
+            )
+        }
     }
 }
 

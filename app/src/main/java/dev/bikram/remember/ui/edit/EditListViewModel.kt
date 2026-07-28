@@ -37,23 +37,31 @@ class EditListViewModel
 
         init {
             if (noteId != null) {
+                check(persistence.tryLock()) { "persistence lock must be unlocked at construction" }
                 viewModelScope.launch {
-                    val existing = repository.get(noteId) ?: return@launch
-                    applyLoadedCommon(existing)
-                    originalItems = existing.items
-                    _items.value =
-                        existing.items
-                            .map {
-                                EditableItem(
-                                    localId = it.id,
-                                    text = it.text,
-                                    details = it.details,
-                                    checked = it.checked,
-                                    sortOrder = it.sortOrder,
-                                    parentLocalId = it.parentId,
-                                    depth = it.depth,
-                                )
-                            }.sortedBy { it.sortOrder }
+                    try {
+                        val existing = repository.get(noteId)
+                        if (existing != null) {
+                            applyLoadedCommon(existing)
+                            originalItems = existing.items
+                            _items.value =
+                                existing.items
+                                    .map {
+                                        EditableItem(
+                                            localId = it.id,
+                                            text = it.text,
+                                            details = it.details,
+                                            checked = it.checked,
+                                            sortOrder = it.sortOrder,
+                                            parentLocalId = it.parentId,
+                                            depth = it.depth,
+                                        )
+                                    }.sortedBy { it.sortOrder }
+                        }
+                    } finally {
+                        finishInitialLoad()
+                        persistence.unlock()
+                    }
                 }
                 startExternalFieldMirror(noteId)
             }
@@ -347,16 +355,16 @@ class EditListViewModel
                 }
 
         override suspend fun persistNewDraftForAttachment(): Long {
-            val entities = currentItems()
             val newId =
-                repository.createList(
+                repository.createListWithItems(
                     title = title.value,
                     colorIndex = 0,
-                    items = entities.map { it.text },
+                    items = currentPersistable(),
                     options = currentOptions(),
                 )
             loadedId = newId
             syncHasPersistedRow()
+            if (starred.value) repository.setStarred(newId, true)
             return newId
         }
 

@@ -28,10 +28,6 @@ class EditNoteViewModel
         private val _body = MutableStateFlow(if (noteId == null) prefillBody else "")
         val body: StateFlow<String> = _body.asStateFlow()
 
-        /** True after the initial DB load has populated the state flows (or immediately for a new note). */
-        private val _loaded = MutableStateFlow(noteId == null)
-        val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
-
         init {
             if (noteId != null) {
                 check(persistence.tryLock()) { "persistence lock must be unlocked at construction" }
@@ -44,7 +40,7 @@ class EditNoteViewModel
                         }
                     } finally {
                         // Leave loading when the load finishes: missing row, success, or thrown from get().
-                        _loaded.value = true
+                        finishInitialLoad()
                         persistence.unlock()
                     }
                 }

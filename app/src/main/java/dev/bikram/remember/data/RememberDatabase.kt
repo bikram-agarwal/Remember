@@ -95,7 +95,7 @@ abstract class RememberDatabase : RoomDatabase() {
                 .fallbackToDestructiveMigration(false)
                 .build()
 
-        private val MIGRATION_1_2 =
+        internal val MIGRATION_1_2 =
             object : Migration(1, 2) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE notes ADD COLUMN checklistText TEXT NOT NULL DEFAULT ''")
@@ -160,14 +160,14 @@ abstract class RememberDatabase : RoomDatabase() {
                 }
             }
 
-        private val MIGRATION_2_3 =
+        internal val MIGRATION_2_3 =
             object : Migration(2, 3) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE checklist_items ADD COLUMN details TEXT NOT NULL DEFAULT ''")
                 }
             }
 
-        private val MIGRATION_3_4 =
+        internal val MIGRATION_3_4 =
             object : Migration(3, 4) {
                 override fun migrate(db: SupportSQLiteDatabase) {
                     db.execSQL("ALTER TABLE notes ADD COLUMN reminders TEXT NOT NULL DEFAULT '[]'")

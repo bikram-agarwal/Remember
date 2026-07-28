@@ -63,6 +63,7 @@ class ReminderScheduler(
     suspend fun scheduleOrShow(
         note: NoteEntity,
         items: List<ChecklistItemEntity> = emptyList(),
+        silentDueNotification: Boolean = false,
     ) {
         val activeReminders = note.getActiveReminders()
         if (activeReminders.isEmpty()) {
@@ -86,6 +87,8 @@ class ReminderScheduler(
                 items = items,
                 reminderIndex = indexToShow,
                 keepUntilDone = keepUntilDone,
+                onlyAlertOnce = silentDueNotification,
+                silent = silentDueNotification,
             )
         }
     }

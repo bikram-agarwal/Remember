@@ -42,16 +42,15 @@ import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.WindowCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
-import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.TagRepository
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
-import dev.bikram.remember.data.getActiveReminders
+import dev.bikram.remember.di.ApplicationScope
+import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.edit.CalendarPickerDialog
@@ -59,6 +58,7 @@ import dev.bikram.remember.ui.edit.ReminderTimePickerDialog
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.time.DayOfWeek
 import java.time.Instant
@@ -80,6 +80,9 @@ class SnoozeActivity : ComponentActivity() {
     @Inject lateinit var themePrefs: ThemePrefs
 
     @Inject lateinit var interactionPrefs: InteractionPrefs
+
+    @ApplicationScope @Inject
+    lateinit var applicationScope: CoroutineScope
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -139,79 +142,32 @@ class SnoozeActivity : ComponentActivity() {
         noteId: Long,
         timeMillis: Long,
     ) {
-        // Show the confirmation toast before launching the DB write so the user gets
-        // immediate feedback even if the activity is finishing. Toast posts to the
-        // system service and survives the activity destruction.
-        Toast
-            .makeText(
-                applicationContext,
-                formatSnoozeConfirmation(applicationContext, timeMillis),
-                Toast.LENGTH_LONG,
-            ).show()
-
-        lifecycleScope.launch {
-            val noteWithItems = noteRepository.get(noteId)
-            if (noteWithItems != null) {
-                val note = noteWithItems.note
-                val activeReminders = note.getActiveReminders()
-                val soonest = activeReminders.minByOrNull { it.reminderAt }
-                val updatedReminders =
-                    if (soonest != null) {
-                        activeReminders.map { reminder ->
-                            if (reminder == soonest) {
-                                reminder.copy(
-                                    reminderAt = timeMillis,
-                                    originalReminderAt = reminder.originalReminderAt ?: reminder.reminderAt,
-                                )
-                            } else {
-                                reminder
-                            }
-                        }
-                    } else {
-                        listOf(
-                            dev.bikram.remember.data
-                                .NoteReminder(reminderAt = timeMillis, recurrence = note.recurrence),
-                        )
-                    }
-                val opts =
-                    dev.bikram.remember.data.NoteOptions(
-                        reminderAt = timeMillis,
-                        importance = note.importance,
-                        visibility = note.visibility,
-                        pictureUri = note.pictureUri,
-                        pictureHeroFraming = note.pictureHeroFraming,
-                        locked = note.locked,
-                        iconKey = note.iconKey,
-                        actions = note.actions,
-                        tags = note.tags,
-                        recurrence = note.recurrence,
-                        reminders = updatedReminders,
-                    )
-                if (note.kind == dev.bikram.remember.data.NoteKind.NOTE) {
-                    noteRepository.updateNote(note.id, note.title, note.body, note.colorIndex, opts)
-                } else {
-                    val persistable =
-                        noteWithItems.items.map {
-                            dev.bikram.remember.data.PersistableChecklistItem(
-                                localKey = it.id,
-                                text = it.text,
-                                checked = it.checked,
-                                sortOrder = it.sortOrder,
-                                parentLocalKey = it.parentId,
-                                depth = it.depth,
-                            )
-                        }
-                    noteRepository.updateList(note.id, note.title, note.colorIndex, persistable, opts)
+        applicationScope.launch {
+            val snoozeSucceeded =
+                runCatching {
+                    noteRepository.snoozeSoonestReminder(noteId, timeMillis)
+                }.onFailure { error ->
+                    DiagnosticLog.record(applicationContext, "Reminder snooze failed for noteId=$noteId", error)
+                }.getOrDefault(false)
+            if (snoozeSucceeded) {
+                val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                notificationManager.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
+                for (reminderIndex in 0 until ReminderScheduler.MAX_REMINDERS_PER_NOTE) {
+                    notificationManager.cancel(ReminderScheduler.pendingRequestCodeForNoteReminder(noteId, reminderIndex))
                 }
             }
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            notificationManager.cancel(ReminderScheduler.pendingRequestCodeForNote(noteId))
-            for (index in 0 until ReminderScheduler.MAX_REMINDERS_PER_NOTE) {
-                notificationManager.cancel(ReminderScheduler.pendingRequestCodeForNoteReminder(noteId, index))
-            }
-
-            finish()
+            Toast
+                .makeText(
+                    applicationContext,
+                    if (snoozeSucceeded) {
+                        formatSnoozeConfirmation(applicationContext, timeMillis)
+                    } else {
+                        getString(R.string.reminder_snooze_failed)
+                    },
+                    Toast.LENGTH_LONG,
+                ).show()
         }
+        finish()
     }
 
     companion object {

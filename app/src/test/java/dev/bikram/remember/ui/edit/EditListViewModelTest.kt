@@ -24,7 +24,9 @@ import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TestWatcher
@@ -34,6 +36,20 @@ import org.junit.runner.Description
 class EditListViewModelTest {
     @get:Rule
     val mainDispatcherRule = MainDispatcherRule()
+
+    @Test
+    fun existing_list_is_not_editable_until_initial_load_finishes() =
+        runTest {
+            val store = FakeRepositoryStore()
+            store.notes[1L] = noteEntity(id = 1L, title = "Existing list")
+
+            val viewModel = editListViewModel(store, noteId = 1L)
+
+            assertFalse(viewModel.loaded.value)
+            advanceUntilIdle()
+            assertTrue(viewModel.loaded.value)
+            assertEquals("Existing list", viewModel.title.value)
+        }
 
     @Test
     fun checkAll_checks_all_items_in_list() =
@@ -112,7 +128,9 @@ class EditListViewModelTest {
             viewModel.updateItemText(localId = -1L, text = "Parent")
             viewModel.addItem()
             viewModel.updateItemText(localId = -2L, text = "Child")
+            viewModel.updateItemDetails(localId = -2L, details = "Keep this detail")
             viewModel.indent(localId = -2L)
+            viewModel.toggleChecked(localId = -2L)
 
             viewModel.saveIfNeeded("Untitled")
 
@@ -121,6 +139,54 @@ class EditListViewModelTest {
             val child = savedItems.first { item -> item.text == "Child" }
             assertEquals(parent.id, child.parentId)
             assertEquals(1, child.depth)
+            assertEquals("Keep this detail", child.details)
+            assertEquals(true, child.checked)
+        }
+
+    @Test
+    fun duplicate_list_preserves_hierarchy_checked_state_details_and_sort_order() =
+        runTest {
+            val store = FakeRepositoryStore()
+            store.notes[1L] = noteEntity(id = 1L, title = "Original list")
+            store.nextNoteId = 2L
+            store.nextItemId = 12L
+            store.itemsByNote[1L] =
+                mutableListOf(
+                    ChecklistItemEntity(
+                        id = 10L,
+                        noteId = 1L,
+                        text = "Parent",
+                        details = "Parent details",
+                        checked = true,
+                        sortOrder = 20.0,
+                    ),
+                    ChecklistItemEntity(
+                        id = 11L,
+                        noteId = 1L,
+                        text = "Child",
+                        details = "Child details",
+                        checked = true,
+                        sortOrder = 40.0,
+                        parentId = 10L,
+                        depth = 1,
+                    ),
+                )
+
+            val duplicatedNoteId =
+                store.repository().duplicateNote(1L)
+                    ?: error("Expected the source list to be duplicated")
+
+            val duplicatedItems = store.itemsByNote.getValue(duplicatedNoteId)
+            val duplicatedParent = duplicatedItems.first { item -> item.text == "Parent" }
+            val duplicatedChild = duplicatedItems.first { item -> item.text == "Child" }
+            assertEquals("Parent details", duplicatedParent.details)
+            assertEquals(true, duplicatedParent.checked)
+            assertEquals(20.0, duplicatedParent.sortOrder, 0.0)
+            assertEquals("Child details", duplicatedChild.details)
+            assertEquals(true, duplicatedChild.checked)
+            assertEquals(40.0, duplicatedChild.sortOrder, 0.0)
+            assertEquals(duplicatedParent.id, duplicatedChild.parentId)
+            assertEquals(1, duplicatedChild.depth)
         }
 
     @Test
@@ -239,6 +305,8 @@ private class FakeRepositoryStore {
             itemDao = FakeChecklistItemDao(this),
             attachmentDao = FakeAttachmentDao(),
             clock = { 1_000L },
+            ioDispatcher = Dispatchers.Unconfined,
+            defaultDispatcher = Dispatchers.Unconfined,
         )
 
     fun noteWithItems(noteId: Long): NoteWithItems? {

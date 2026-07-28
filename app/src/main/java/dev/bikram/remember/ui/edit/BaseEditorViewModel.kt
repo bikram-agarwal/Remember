@@ -117,6 +117,10 @@ abstract class BaseEditorViewModel(
     private val _updatedAt = MutableStateFlow<Long?>(null)
     val updatedAt: StateFlow<Long?> = _updatedAt.asStateFlow()
 
+    /** True after an existing row's initial database load has completed. New drafts are ready immediately. */
+    private val _loaded = MutableStateFlow(noteId == null)
+    val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
+
     /**
      * Mirrors the underlying note's archived / trashed shelf. Used by the edit screen to flip into
      * read-only mode and swap the bottom-bar action set. New notes/lists always start active.
@@ -160,6 +164,10 @@ abstract class BaseEditorViewModel(
     protected fun syncHasPersistedRow() {
         _hasPersistedRow.value = loadedId != null
         _currentNoteId.value = loadedId
+    }
+
+    protected fun finishInitialLoad() {
+        _loaded.value = true
     }
 
     /**

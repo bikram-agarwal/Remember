@@ -95,6 +95,31 @@ class NoteDaoInstrumentedTest {
         }
 
     @Test
+    fun failed_multi_note_import_rolls_back_every_insert() =
+        runBlocking {
+            val originalNoteId = database.noteDao().insert(note(title = "Existing"))
+            val repository =
+                NoteRepository(
+                    noteDao = database.noteDao(),
+                    itemDao = database.checklistItemDao(),
+                    attachmentDao = database.attachmentDao(),
+                    database = database,
+                )
+
+            val importResult =
+                runCatching {
+                    repository.runImportTransaction {
+                        database.noteDao().insert(note(title = "Imported one"))
+                        database.noteDao().insert(note(title = "Imported two"))
+                        error("Simulated import failure")
+                    }
+                }
+
+            assertTrue(importResult.isFailure)
+            assertEquals(listOf(originalNoteId), database.noteDao().allNoteIds())
+        }
+
+    @Test
     fun fts_search_returns_matching_active_notes() =
         runBlocking {
             val matchingNoteId = database.noteDao().insert(note(title = "Alpha project"))

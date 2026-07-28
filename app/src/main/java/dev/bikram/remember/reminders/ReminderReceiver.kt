@@ -26,6 +26,7 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.Visibility
+import dev.bikram.remember.data.getActiveReminders
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.data.toNoteActionIconBitmap
 import dev.bikram.remember.di.ApplicationScope
@@ -64,7 +65,7 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 val noteWithItems = noteRepository.get(noteId) ?: return@launch
                 val note = noteWithItems.note
-                if (note.trashed) return@launch
+                if (!isReminderDeliveryCurrent(note, reminderIndex, System.currentTimeMillis())) return@launch
 
                 val keepUntilDone =
                     reminderPrefs
@@ -107,6 +108,7 @@ class ReminderReceiver : BroadcastReceiver() {
             reminderIndex: Int = 0,
             keepUntilDone: Boolean = false,
             onlyAlertOnce: Boolean = false,
+            silent: Boolean = false,
         ) {
             if (note.trashed) return
 
@@ -131,6 +133,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setPriority(priorityFor(note.importance))
                     .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
                     .setVisibility(notificationVisibility(note))
+                    .setSilent(silent)
                     .setContentIntent(openNotePendingIntent(context, note.id))
                     .setDeleteIntent(dismissPendingIntent(context, note.id, reminderIndex).takeIf { keepUntilDone })
                     .setOngoing(false)
@@ -686,4 +689,14 @@ class ReminderReceiver : BroadcastReceiver() {
 
         private const val NOTIFICATION_ACTION_ICON_SIZE_PX = 96
     }
+}
+
+internal fun isReminderDeliveryCurrent(
+    note: NoteEntity,
+    reminderIndex: Int,
+    now: Long,
+): Boolean {
+    if (note.trashed || note.archived || note.completedAt != null) return false
+    val reminder = note.getActiveReminders().getOrNull(reminderIndex) ?: return false
+    return reminder.reminderAt <= now
 }
