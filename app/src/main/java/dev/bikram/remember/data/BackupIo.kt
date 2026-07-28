@@ -6,9 +6,11 @@ import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import dev.bikram.remember.backup.RememberBackupWork
 import dev.bikram.remember.backup.SettingsBackup
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.domain.backupFileTimestamp
+import dev.bikram.remember.update.UpdateCheckWorkScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -34,6 +36,7 @@ class BackupIo(
     private val quickCapturePrefs: QuickCapturePrefs,
     private val reminderPrefs: ReminderPrefs,
     private val updatePrefs: UpdatePrefs,
+    private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
 ) {
     private val fileProviderAuthority: String
         get() = "${context.packageName}.fileprovider"
@@ -50,6 +53,11 @@ class BackupIo(
             get() = readable && mediaReferenceCount > mediaEmbeddedCount
     }
 
+    data class RestoreResult(
+        val noteCount: Int,
+        val settingsOutcome: BackupSettingsRestoreOutcome,
+    )
+
     private data class MediaExportStats(
         var mediaReferenceCount: Int = 0,
         var mediaEmbeddedCount: Int = 0,
@@ -61,8 +69,20 @@ class BackupIo(
 
     private suspend fun buildSettingsJson(): JSONObject = SettingsBackup.exportJson(themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
 
-    private suspend fun importSettingsFromJson(settingsJson: JSONObject?) {
-        SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
+    private suspend fun importSettingsFromJson(settingsJson: JSONObject?): BackupSettingsRestoreOutcome {
+        val restoreOutcome =
+            SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
+        runCatching {
+            RememberBackupWork.updateSchedule(context, backupPrefs.snapshot())
+        }.onFailure { error ->
+            DiagnosticLog.record(context, "Restored backup could not reconcile scheduled exports", error)
+        }
+        runCatching {
+            updateCheckWorkScheduler.syncFromPreferences()
+        }.onFailure { error ->
+            DiagnosticLog.record(context, "Restored backup could not reconcile update checks", error)
+        }
+        return restoreOutcome
     }
 
     private data class NotesSnapshot(
@@ -329,10 +349,7 @@ class BackupIo(
                 val includeMedia = backupPrefs.snapshot().includeMediaInBackup
                 val snapshot = snapshotNotes()
                 val bytes = writeZipArchive(snapshot.root, includeMedia)
-                val outputStream =
-                    context.contentResolver.openOutputStream(uri)
-                        ?: error("openOutputStream returned null")
-                outputStream.use { stream -> stream.write(bytes) }
+                writeDocumentBytes(uri, bytes)
                 snapshot.noteCount
             }.onFailure { throwable ->
                 DiagnosticLog.record(context, "Manual backup export failed", throwable)
@@ -363,34 +380,88 @@ class BackupIo(
                     if (!destinationUriString.startsWith("content://")) error("Invalid export folder")
                     val destinationUri = destinationUriString.toUri()
                     if (DocumentsContract.isTreeUri(destinationUri)) {
-                        val docTreeUri =
-                            DocumentsContract.buildDocumentUriUsingTree(
-                                destinationUri,
-                                DocumentsContract.getTreeDocumentId(destinationUri),
-                            )
-                        val docUri =
-                            DocumentsContract.createDocument(
-                                context.contentResolver,
-                                docTreeUri,
-                                "application/zip",
-                                fileName,
-                            ) ?: error("Failed to create document in export folder")
-                        context.contentResolver.openOutputStream(docUri)?.use { stream ->
-                            stream.write(bytes)
-                        } ?: error("Failed to open output stream for export")
+                        writeTreeDocument(destinationUri, fileName, "application/zip", bytes)
                     } else {
-                        context.contentResolver.openOutputStream(destinationUri, "wt")?.use { stream ->
-                            stream.write(bytes)
-                        } ?: error("Failed to open output stream for export")
+                        writeDocumentBytes(destinationUri, bytes, mode = "wt")
                     }
                 }
                 List(destinations.size) { fileName }
             }
         }
 
-    suspend fun restoreFullReplace(uri: Uri): Int =
+    private fun writeTreeDocument(
+        treeUri: Uri,
+        fileName: String,
+        mimeType: String,
+        backupBytes: ByteArray,
+    ) {
+        val resolver = context.contentResolver
+        val documentTreeUri =
+            DocumentsContract.buildDocumentUriUsingTree(
+                treeUri,
+                DocumentsContract.getTreeDocumentId(treeUri),
+            )
+        val temporaryName = "$fileName.${UUID.randomUUID()}.partial"
+        val temporaryUri =
+            DocumentsContract.createDocument(
+                resolver,
+                documentTreeUri,
+                mimeType,
+                temporaryName,
+            ) ?: error("Failed to create temporary backup document")
+        var fallbackDestinationUri: Uri? = null
+        try {
+            writeDocumentBytes(temporaryUri, backupBytes)
+            val publishedUri =
+                runCatching {
+                    DocumentsContract.renameDocument(resolver, temporaryUri, fileName)
+                }.getOrNull()
+            if (publishedUri == null) {
+                val createdDestinationUri =
+                    DocumentsContract.createDocument(
+                        resolver,
+                        documentTreeUri,
+                        mimeType,
+                        fileName,
+                    ) ?: error("Failed to create backup document")
+                fallbackDestinationUri = createdDestinationUri
+                writeDocumentBytes(createdDestinationUri, backupBytes)
+                runCatching { resolver.delete(temporaryUri, null, null) }
+            }
+        } catch (error: Exception) {
+            runCatching { resolver.delete(temporaryUri, null, null) }
+            fallbackDestinationUri?.let { destinationUri ->
+                runCatching { resolver.delete(destinationUri, null, null) }
+            }
+            throw error
+        }
+    }
+
+    private fun writeDocumentBytes(
+        documentUri: Uri,
+        backupBytes: ByteArray,
+        mode: String? = null,
+    ) {
+        val outputStream =
+            if (mode == null) {
+                context.contentResolver.openOutputStream(documentUri)
+            } else {
+                context.contentResolver.openOutputStream(documentUri, mode)
+            } ?: error("Failed to open output stream for backup document")
+        outputStream.use { stream ->
+            stream.write(backupBytes)
+            stream.flush()
+        }
+    }
+
+    suspend fun restoreFullReplace(uri: Uri): RestoreResult =
         withContext(Dispatchers.IO) {
-            val payload = readRestorePayload(uri) ?: return@withContext 0
+            val payload =
+                readRestorePayload(uri)
+                    ?: return@withContext RestoreResult(
+                        noteCount = 0,
+                        settingsOutcome = BackupSettingsRestoreOutcome(),
+                    )
             try {
                 val count =
                     repository.restoreNotesFullReplace {
@@ -401,8 +472,8 @@ class BackupIo(
                             suppressReminderSchedule = true,
                         )
                     }
-                importSettingsFromJson(payload.settingsJson)
-                count
+                val settingsOutcome = importSettingsFromJson(payload.settingsJson)
+                RestoreResult(noteCount = count, settingsOutcome = settingsOutcome)
             } finally {
                 payload.extractRoot?.deleteRecursively()
             }

@@ -1,6 +1,8 @@
 package dev.bikram.remember.data
 
 import android.content.Context
+import android.content.Intent
+import androidx.core.net.toUri
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -17,6 +19,11 @@ data class BackupPreferencesState(
     val scheduledExportEnabled: Boolean = false,
     val includeMediaInBackup: Boolean = false,
     val compressImages: Boolean = true,
+)
+
+data class BackupSettingsRestoreOutcome(
+    val foldersNeedingReselection: Int = 0,
+    val automationsDisabled: Boolean = false,
 )
 
 private val Context.backupDataStore by preferencesDataStore(name = "backup_prefs")
@@ -87,20 +94,65 @@ class BackupPrefs(
         context.backupDataStore.edit { it.clear() }
     }
 
-    suspend fun importFromBackup(json: JSONObject?) {
-        if (json == null || json.length() == 0) return
-        context.backupDataStore.edit { mutable ->
+    private fun canRetainRestoredFolder(folderUriString: String): Boolean {
+        if (folderUriString.isBlank()) return true
+        // Unlike FilePipe, Remember has no All Files Access mode, so every usable backup destination is a SAF URI.
+        if (!folderUriString.startsWith("content://")) return false
+        val folderUri = folderUriString.toUri()
+        val resolver = context.contentResolver
+        val alreadyPersisted =
+            resolver.persistedUriPermissions.any { permission ->
+                permission.uri == folderUri && permission.isReadPermission && permission.isWritePermission
+            }
+        if (alreadyPersisted) return true
+        val permissionFlags =
+            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+        if (runCatching { resolver.takePersistableUriPermission(folderUri, permissionFlags) }.isFailure) {
+            return false
+        }
+        return resolver.persistedUriPermissions.any { permission ->
+            permission.uri == folderUri && permission.isReadPermission && permission.isWritePermission
+        }
+    }
+
+    suspend fun importFromBackup(json: JSONObject?): BackupSettingsRestoreOutcome {
+        if (json == null || json.length() == 0) return BackupSettingsRestoreOutcome()
+        val existingPreferences = snapshot()
+        val requestedExportFolder =
             if (json.has(Keys.EXPORT_FOLDER_URI.name) && !json.isNull(Keys.EXPORT_FOLDER_URI.name)) {
-                mutable[Keys.EXPORT_FOLDER_URI] = json.getString(Keys.EXPORT_FOLDER_URI.name)
+                json.getString(Keys.EXPORT_FOLDER_URI.name)
+            } else {
+                existingPreferences.exportFolderUri
             }
+        val requestedCloudExportFolder =
             if (json.has(Keys.CLOUD_EXPORT_FOLDER_URI.name) && !json.isNull(Keys.CLOUD_EXPORT_FOLDER_URI.name)) {
-                mutable[Keys.CLOUD_EXPORT_FOLDER_URI] = json.getString(Keys.CLOUD_EXPORT_FOLDER_URI.name)
+                json.getString(Keys.CLOUD_EXPORT_FOLDER_URI.name)
+            } else {
+                existingPreferences.cloudExportFolderUri
             }
+        var foldersNeedingReselection = 0
+        val restoredExportFolder =
+            requestedExportFolder.takeIf(::canRetainRestoredFolder).orEmpty().also {
+                if (requestedExportFolder.isNotBlank() && it.isBlank()) foldersNeedingReselection += 1
+            }
+        val restoredCloudExportFolder =
+            requestedCloudExportFolder.takeIf(::canRetainRestoredFolder).orEmpty().also {
+                if (requestedCloudExportFolder.isNotBlank() && it.isBlank()) foldersNeedingReselection += 1
+            }
+        val hasBackupDestination = restoredExportFolder.isNotBlank() || restoredCloudExportFolder.isNotBlank()
+        var automationsDisabled = false
+        context.backupDataStore.edit { mutable ->
+            mutable[Keys.EXPORT_FOLDER_URI] = restoredExportFolder
+            mutable[Keys.CLOUD_EXPORT_FOLDER_URI] = restoredCloudExportFolder
             if (json.has(Keys.AUTO_EXPORT_ON_CHANGE.name) && !json.isNull(Keys.AUTO_EXPORT_ON_CHANGE.name)) {
-                mutable[Keys.AUTO_EXPORT_ON_CHANGE] = json.getBoolean(Keys.AUTO_EXPORT_ON_CHANGE.name)
+                val requested = json.getBoolean(Keys.AUTO_EXPORT_ON_CHANGE.name)
+                mutable[Keys.AUTO_EXPORT_ON_CHANGE] = requested && hasBackupDestination
+                automationsDisabled = automationsDisabled || (requested && !hasBackupDestination)
             }
             if (json.has(Keys.SCHEDULED_EXPORT.name) && !json.isNull(Keys.SCHEDULED_EXPORT.name)) {
-                mutable[Keys.SCHEDULED_EXPORT] = json.getBoolean(Keys.SCHEDULED_EXPORT.name)
+                val requested = json.getBoolean(Keys.SCHEDULED_EXPORT.name)
+                mutable[Keys.SCHEDULED_EXPORT] = requested && hasBackupDestination
+                automationsDisabled = automationsDisabled || (requested && !hasBackupDestination)
             }
             if (json.has(Keys.INCLUDE_MEDIA.name) && !json.isNull(Keys.INCLUDE_MEDIA.name)) {
                 mutable[Keys.INCLUDE_MEDIA] = json.getBoolean(Keys.INCLUDE_MEDIA.name)
@@ -109,5 +161,9 @@ class BackupPrefs(
                 mutable[Keys.COMPRESS_IMAGES] = json.getBoolean(Keys.COMPRESS_IMAGES.name)
             }
         }
+        return BackupSettingsRestoreOutcome(
+            foldersNeedingReselection = foldersNeedingReselection,
+            automationsDisabled = automationsDisabled,
+        )
     }
 }

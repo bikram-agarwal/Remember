@@ -52,6 +52,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.SheetValue
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -313,7 +314,7 @@ fun SettingsRoute(
         updateVm.adoptGlobalUpdateIfNone(globalUpdateInfo)
     }
 
-    var pendingBackupFolderTarget by remember { mutableStateOf<BackupFolderTarget?>(null) }
+    var pendingBackupFolderTarget by rememberSaveable { mutableStateOf<BackupFolderTarget?>(null) }
     val folderLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.OpenDocumentTree(),
@@ -321,45 +322,32 @@ fun SettingsRoute(
             val target = pendingBackupFolderTarget
             pendingBackupFolderTarget = null
             if (uri != null) {
-                runCatching {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
+                val permissionGranted =
+                    runCatching {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
+                        )
+                        true
+                    }.getOrDefault(false)
+
+                if (!permissionGranted && uri.toString().startsWith("content://")) {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            message = resources.getString(R.string.settings_export_folder_permission_failed),
+                            duration = SnackbarDuration.Short,
+                        )
+                    }
+                    return@rememberLauncherForActivityResult
                 }
+
                 scope.launch {
                     when (target) {
                         BackupFolderTarget.Cloud -> backupPrefs.setCloudExportFolderUri(uri.toString())
-                        BackupFolderTarget.Local,
-                        null,
-                        -> backupPrefs.setExportFolderUri(uri.toString())
+                        BackupFolderTarget.Local -> backupPrefs.setExportFolderUri(uri.toString())
+                        null -> return@launch
                     }
                     RememberBackupWork.updateSchedule(context, backupPrefs.snapshot())
-                }
-            }
-        }
-
-    val cloudBackupDocumentLauncher =
-        rememberLauncherForActivityResult(
-            contract = ActivityResultContracts.CreateDocument("application/zip"),
-        ) { uri: Uri? ->
-            if (uri != null) {
-                runCatching {
-                    context.contentResolver.takePersistableUriPermission(
-                        uri,
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION,
-                    )
-                }
-                scope.launch {
-                    backupPrefs.setCloudExportFolderUri(uri.toString())
-                    RememberBackupWork.updateSchedule(context, backupPrefs.snapshot())
-                    val exportedCount = backupIo.exportTo(uri)
-                    val message =
-                        when {
-                            exportedCount < 0 -> resources.getString(R.string.toast_export_failed)
-                            else -> resources.getQuantityString(R.plurals.toast_exported_notes, exportedCount, exportedCount)
-                        }
-                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -371,12 +359,11 @@ fun SettingsRoute(
             if (uri != null) {
                 scope.launch {
                     val count = backupIo.importFrom(uri, preserveIdsForNotes = false)
-                    Toast
-                        .makeText(
-                            context,
-                            resources.getQuantityString(R.plurals.toast_imported_notes, count, count),
-                            Toast.LENGTH_SHORT,
-                        ).show()
+                    val message = resources.getQuantityString(R.plurals.toast_imported_notes, count, count)
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        duration = SnackbarDuration.Short,
+                    )
                 }
             }
         }
@@ -861,7 +848,8 @@ fun SettingsRoute(
                                             folderLauncher.launch(null)
                                         },
                                         onPickCloudFolder = {
-                                            cloudBackupDocumentLauncher.launch("remember_cloud_backup.zip")
+                                            pendingBackupFolderTarget = BackupFolderTarget.Cloud
+                                            folderLauncher.launch(null)
                                         },
                                         onLaunchImportMerge = {
                                             importMergeLauncher.launch(
@@ -1133,13 +1121,31 @@ fun SettingsRoute(
                     onClick = {
                         pendingRestore = null
                         scope.launch {
-                            val count = backupIo.restoreFullReplace(restore.uri)
+                            val restoreResult = backupIo.restoreFullReplace(restore.uri)
                             Toast
                                 .makeText(
                                     context,
-                                    resources.getQuantityString(R.plurals.toast_imported_notes, count, count),
+                                    resources.getQuantityString(
+                                        R.plurals.toast_imported_notes,
+                                        restoreResult.noteCount,
+                                        restoreResult.noteCount,
+                                    ),
                                     Toast.LENGTH_SHORT,
                                 ).show()
+                            if (restoreResult.settingsOutcome.foldersNeedingReselection > 0) {
+                                snackbarHostState.showSnackbar(
+                                    resources.getQuantityString(
+                                        R.plurals.settings_restore_folders_need_reselection,
+                                        restoreResult.settingsOutcome.foldersNeedingReselection,
+                                        restoreResult.settingsOutcome.foldersNeedingReselection,
+                                    ),
+                                )
+                            }
+                            if (restoreResult.settingsOutcome.automationsDisabled) {
+                                snackbarHostState.showSnackbar(
+                                    resources.getString(R.string.settings_restore_automation_disabled_no_folder),
+                                )
+                            }
                         }
                     },
                 ) {

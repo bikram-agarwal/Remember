@@ -28,6 +28,7 @@ import dev.bikram.remember.googletasks.GoogleTasksImportPrefs
 import dev.bikram.remember.googletasks.GoogleTasksImporter
 import dev.bikram.remember.googletasks.GoogleTasksRepository
 import dev.bikram.remember.reminders.ReminderScheduler
+import dev.bikram.remember.update.UpdateCheckWorkScheduler
 import dev.bikram.remember.widget.NotesWidgetUpdater
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -169,6 +170,7 @@ object RememberModule {
         quickCapturePrefs: QuickCapturePrefs,
         reminderPrefs: ReminderPrefs,
         updatePrefs: UpdatePrefs,
+        updateCheckWorkScheduler: UpdateCheckWorkScheduler,
     ): BackupIo =
         BackupIo(
             context = context,
@@ -181,6 +183,7 @@ object RememberModule {
             quickCapturePrefs = quickCapturePrefs,
             reminderPrefs = reminderPrefs,
             updatePrefs = updatePrefs,
+            updateCheckWorkScheduler = updateCheckWorkScheduler,
         )
 
     @Provides

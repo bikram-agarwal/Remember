@@ -32,6 +32,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import javax.inject.Inject
@@ -238,12 +239,6 @@ class RememberUpdateViewModel
                                 DiagnosticLog.record(appContext, "Launching update APK installer failed", throwable)
                                 toast(R.string.settings_update_download_failed)
                             }
-                        if (BuildConfig.FLAVOR == "github" && availableUpdate.remoteApkAssetUpdatedAt.isNotBlank()) {
-                            updatePrefs.writeGithubReleaseAck(
-                                fingerprint = availableUpdate.notificationDedupeKey(),
-                                installedVersionName = BuildConfig.VERSION_NAME,
-                            )
-                        }
                         _downloadProgress.value = null
                     },
                     onFailure = { throwable ->
@@ -302,7 +297,8 @@ class RememberUpdateViewModel
                 _updateSheetChangelog.value =
                     loaded.fold(
                         onSuccess = { markdown -> ChangelogUiState.Ready(markdown) },
-                        onFailure = {
+                        onFailure = { error ->
+                            DiagnosticLog.record(appContext, "Update changelog load failed", error)
                             ChangelogUiState.Failed(appContext.getString(R.string.settings_changelog_load_failed))
                         },
                     )
@@ -319,6 +315,10 @@ class RememberUpdateViewModel
             connection.readTimeout = 20_000
             return try {
                 connection.connect()
+                val responseCode = connection.responseCode
+                if (responseCode !in 200..299) {
+                    throw IOException("Changelog request returned HTTP $responseCode")
+                }
                 connection.inputStream.bufferedReader().use { reader -> reader.readText() }
             } finally {
                 connection.disconnect()

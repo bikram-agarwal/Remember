@@ -1,6 +1,7 @@
 package dev.bikram.remember.backup
 
 import dev.bikram.remember.data.BackupPrefs
+import dev.bikram.remember.data.BackupSettingsRestoreOutcome
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.QuickCapturePrefs
@@ -51,15 +52,16 @@ object SettingsBackup {
         quickCapturePrefs: QuickCapturePrefs,
         reminderPrefs: ReminderPrefs,
         updatePrefs: UpdatePrefs,
-    ) {
-        if (root == null) return
+    ): BackupSettingsRestoreOutcome {
+        if (root == null) return BackupSettingsRestoreOutcome()
         themePrefs.importFromBackup(root.optJSONObject(KEY_THEME))
         viewOptionsPrefs.importFromBackup(root.optJSONObject(KEY_VIEW_OPTIONS))
         lockPrefs.importFromBackup(root.optJSONObject(KEY_LOCK))
         interactionPrefs.importFromBackup(root.optJSONObject(KEY_INTERACTION))
-        backupPrefs.importFromBackup(root.optJSONObject(KEY_BACKUP))
+        val backupRestoreOutcome = backupPrefs.importFromBackup(root.optJSONObject(KEY_BACKUP))
         quickCapturePrefs.importFromBackup(root.optJSONObject(KEY_QUICK_CAPTURE))
         reminderPrefs.importFromBackup(root.optJSONObject(KEY_REMINDER))
         updatePrefs.importFromBackup(root.optJSONObject(KEY_UPDATE))
+        return backupRestoreOutcome
     }
 }

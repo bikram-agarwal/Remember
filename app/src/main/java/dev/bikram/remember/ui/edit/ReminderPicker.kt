@@ -25,6 +25,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -115,8 +117,6 @@ import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import dev.bikram.remember.R
 import dev.bikram.remember.data.MonthlyMode
 import dev.bikram.remember.data.NoteReminder
@@ -133,8 +133,8 @@ import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
-import dev.bikram.remember.ui.components.RememberFilterChip
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
+import dev.bikram.remember.ui.components.RememberFilterChip
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
@@ -2552,10 +2552,17 @@ private fun QuickReminderChipsRow(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val now = remember { ZonedDateTime.now(ZoneId.systemDefault()) }
+    var presetsNow by remember { mutableStateOf(ZonedDateTime.now(ZoneId.systemDefault())) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            presetsNow = ZonedDateTime.now(ZoneId.systemDefault())
+            val millisUntilNextMinute = 60_000L - (System.currentTimeMillis() % 60_000L)
+            kotlinx.coroutines.delay(millisUntilNextMinute)
+        }
+    }
     val timeFormatter = remember(context) { timeFormatterFor(context) }
-    val presets = remember(now, timeFormatter) { computeSnoozePresets(context, now, timeFormatter) }
-    val zone = remember { ZoneId.systemDefault() }
+    val presets = remember(presetsNow, timeFormatter) { computeSnoozePresets(context, presetsNow, timeFormatter) }
+    val zone = presetsNow.zone
 
     Row(
         modifier =
