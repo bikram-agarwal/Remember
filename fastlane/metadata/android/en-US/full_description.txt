@@ -12,11 +12,11 @@ Add useful one-tap actions directly to reminder notifications so you can act wit
 * Open a link, app, or shortcut
 * Copy text or Share content
 
-<b>━━ 💤 NATURAL SNOOZE PRESETS ━━</b>
-Snooze with human-friendly presets - soon, later today, this evening, and tomorrow morning - without hunting for the right time.
+<b>━━ 💤 NATURAL REMINDER PRESETS ━━</b>
+Set reminders and snooze durations with human-friendly presets - soon, later today, this evening, and tomorrow morning - without hunting for the right time.
 
 <b>━━ 📅 RECURRING SCHEDULES ━━</b>
-Create daily, weekly, monthly, or yearly reminders. Remember also supports richer calendar-style patterns like "the last Friday of every month", with optional end dates or occurrence counts.
+Create hourly, daily, weekly, monthly, or yearly reminders. Remember also supports richer calendar-style patterns like "the last Friday of every month", with optional end dates or occurrence counts.
 
 <b>━━ 📝 MARKDOWN NOTES AND CHECKLISTS ━━</b>
 Write rich markdown notes with headings, bold, italics, underline, links, and code blocks. Build nested checklists for groceries, packing lists, project steps, or anything else that benefits from structure.
@@ -25,7 +25,7 @@ Write rich markdown notes with headings, bold, italics, underline, links, and co
 Use tags, stars, archive, trash, full-text search, filters, sorting, and bulk actions to keep your notes manageable.
 
 <b>━━ 📱 WIDGETS AND QUICK CAPTURE ━━</b>
-Home screen widgets for upcoming reminders, starred notes, and quick capture. A persistent notification can keep note creation one tap away at all times.
+Home screen widgets for upcoming reminders, starred notes, and quick capture. A persistent notification or the quick setting tiles can keep note creation one tap away at all times.
 
 <b>━━ ☁️ IMPORT FROM GOOGLE TASKS ━━</b>
 Move into Remember from Google Tasks using a connected account or a Google Takeout file. Import is read-only; Remember does not modify or delete your Google Tasks data.
@@ -34,7 +34,7 @@ Move into Remember from Google Tasks using a connected account or a Google Takeo
 Export your notes and settings to a backup, optionally including attached media. Restore when moving to a new device, or import a backup to merge notes into your current collection.
 
 <b>━━ 🎨 MAKE IT YOURS ━━</b>
-Choose Material You wallpaper colors, hand-tuned color presets, your own custom colors, palette styles, gradient backgrounds, black OLED mode, cover images, and more. Theming is deep - the app can look and feel very different from any other notes app on your phone.
+Choose Material You wallpaper colors, hand-tuned color presets, your own custom colors & fonts, palette styles, gradient backgrounds, black OLED mode, cover images, and more. Theming is deep - the app can look and feel very different from any other notes app on your phone.
 
 <b>━━ 🔒 PRIVATE BY DEFAULT ━━</b>
 Your notes are stored entirely locally. Zero tracking, analytics, or automated background telemetry. No data leaves your phone without your explicit action (such as optional update checks or manually exporting a backup).

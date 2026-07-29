@@ -19,7 +19,7 @@ If a reminder notification gets swiped away without being marked Done, Remember 
 ### ⏰ Reminders that actually work
 
 - **Keep reminders until done.** The feature the app is built around. Enable it, and accidental dismissals stop mattering — Remember re-posts the notification until the note is marked done.
-- **Snooze that speaks human.** Presets like *soon*, *later today*, *this evening*, *tomorrow morning*, or pick a custom date and time — not arbitrary minute counts.
+- **Reminers/Snooze that speaks human.** Presets like *soon*, *later today*, *this evening*, *tomorrow morning*, or pick a custom date and time — not arbitrary minute counts.
 - **Multiple reminders per note.** Add up to three reminders to the same note, each with its own time and repeat pattern.
 - **Action buttons in the notification.** A reminder to call someone shows a call button right there. A reminder to pick something up shows directions. You can act on the reminder right from the notification.
 - **High-importance mode.** Heads-up alerts, sound, and vibration for the things that cannot wait.
@@ -57,6 +57,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 - **Nine palette styles** — Tonal Spot, Vibrant, Expressive, Monochrome, and more.
 - **Visual effects:** gradient backgrounds, enhanced shading, frosted-glass blur bars, and cover images on cards.
 - **Adaptive note themes:** note cards can pick up colors from their cover image automatically.
+- **Custom fonts:** Import your own fonts into the app for a fully customized look.
 
 ### 🔒 Privacy and security
 
