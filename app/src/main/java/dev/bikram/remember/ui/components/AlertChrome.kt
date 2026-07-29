@@ -177,6 +177,7 @@ fun AlertFloatingFab(
                 )
                 RememberMaterialRoundedSymbol(
                     name = "chevron_right",
+                    autoMirror = true,
                     size = 28.dp * scaleFactor,
                     tint = contentColor,
                     weight = FontWeight.Medium,

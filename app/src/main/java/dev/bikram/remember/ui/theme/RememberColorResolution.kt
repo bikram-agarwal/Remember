@@ -55,7 +55,7 @@ internal fun rememberResolvedColorScheme(
         }
     val themed =
         if (materialYouAvailable) {
-            tinted
+            tinted.separateMaterialYouSecondaryContainerWhenNeeded(dark = darkTheme)
         } else {
             tinted
                 .boostOutlineForVisibility(darkTheme)

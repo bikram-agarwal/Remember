@@ -37,6 +37,8 @@ import java.io.StringWriter
 import java.time.Instant
 import java.util.Locale
 import java.util.TimeZone
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import kotlin.system.exitProcess
 
 object DiagnosticLog {
@@ -44,6 +46,15 @@ object DiagnosticLog {
     private const val LOG_FILE_NAME = "remember-diagnostics.log"
     private const val SHARE_FILE_NAME = "remember-diagnostics.txt"
     private const val MAX_LOG_BYTES = 256 * 1024
+    private const val LOG_WRITER_THREAD_NAME = "remember-diagnostic-writer"
+    private const val CRASH_LOG_WRITE_TIMEOUT_SECONDS = 2L
+
+    private val logWriterExecutor =
+        Executors.newSingleThreadExecutor { runnable ->
+            Thread(runnable, LOG_WRITER_THREAD_NAME).apply {
+                isDaemon = true
+            }
+        }
 
     @Volatile
     private var crashHandlerInstalled = false
@@ -53,7 +64,7 @@ object DiagnosticLog {
         val appContext = context.applicationContext
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
-            record(
+            recordSynchronously(
                 appContext,
                 appContext.getString(R.string.diagnostics_uncaught_exception_format, thread.name),
                 throwable,
@@ -72,22 +83,10 @@ object DiagnosticLog {
         message: String,
         throwable: Throwable? = null,
     ) {
-        runCatching {
-            val logFile = logFile(context)
-            logFile.parentFile?.mkdirs()
-            trimIfNeeded(logFile)
-            logFile.appendText(
-                buildString {
-                    append(Instant.now())
-                    append(" | ")
-                    append(message)
-                    append('\n')
-                    if (throwable != null) {
-                        append(stackTraceText(throwable))
-                        append('\n')
-                    }
-                },
-            )
+        val appContext = context.applicationContext
+        val logEntry = formatLogEntry(message, throwable)
+        logWriterExecutor.execute {
+            writeLogEntry(appContext, logEntry)
         }
     }
 
@@ -98,6 +97,7 @@ object DiagnosticLog {
      */
     suspend fun createShareFile(context: Context): File =
         withContext(Dispatchers.IO) {
+            awaitPendingWrites()
             val shareFile = File(File(context.cacheDir, DIAGNOSTICS_DIR), SHARE_FILE_NAME)
             shareFile.parentFile?.mkdirs()
             val logText = runCatching { logFile(context).readText() }.getOrDefault("")
@@ -125,10 +125,13 @@ object DiagnosticLog {
         }
 
     fun clear(context: Context) {
-        runCatching {
-            val logFile = logFile(context)
-            if (logFile.exists()) {
-                logFile.writeText("")
+        val appContext = context.applicationContext
+        logWriterExecutor.execute {
+            runCatching {
+                val logFile = logFile(appContext)
+                if (logFile.exists()) {
+                    logFile.writeText("")
+                }
             }
         }
     }
@@ -434,6 +437,58 @@ object DiagnosticLog {
         val text = logFile.readText()
         val keepFrom = (text.length / 2).coerceAtLeast(0)
         logFile.writeText(text.substring(keepFrom))
+    }
+
+    private fun recordSynchronously(
+        context: Context,
+        message: String,
+        throwable: Throwable?,
+    ) {
+        val logEntry = formatLogEntry(message, throwable)
+        if (Thread.currentThread().name == LOG_WRITER_THREAD_NAME) {
+            writeLogEntry(context, logEntry)
+            return
+        }
+        runCatching {
+            logWriterExecutor
+                .submit { writeLogEntry(context, logEntry) }
+                .get(CRASH_LOG_WRITE_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        }
+    }
+
+    private fun writeLogEntry(
+        context: Context,
+        logEntry: String,
+    ) {
+        runCatching {
+            val logFile = logFile(context)
+            logFile.parentFile?.mkdirs()
+            trimIfNeeded(logFile)
+            logFile.appendText(logEntry)
+        }
+    }
+
+    private fun awaitPendingWrites() {
+        runCatching {
+            logWriterExecutor.submit { }.get()
+        }
+    }
+
+    @Suppress("ktlint:standard:function-expression-body")
+    private fun formatLogEntry(
+        message: String,
+        throwable: Throwable?,
+    ): String {
+        return buildString {
+            append(Instant.now())
+            append(" | ")
+            append(message)
+            append('\n')
+            if (throwable != null) {
+                append(stackTraceText(throwable))
+                append('\n')
+            }
+        }
     }
 
     private fun stackTraceText(throwable: Throwable): String {

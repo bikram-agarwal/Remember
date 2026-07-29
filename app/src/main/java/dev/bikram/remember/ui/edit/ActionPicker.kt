@@ -43,6 +43,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.drawable.toDrawable
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.NoteAction
@@ -361,7 +362,7 @@ fun ActionPicker(
                         title = newTitle
                         details = app.packageName
                         extra = app.label
-                        targetIcon = app.icon
+                        targetIcon = app.iconBitmap?.toDrawable(resources)
                         screen = ActionPickerScreen.EditAction
                     },
                 )

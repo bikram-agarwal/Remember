@@ -2,6 +2,7 @@ package dev.bikram.remember.data
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -75,6 +76,23 @@ class BackupZipExtractionTest {
 
         assertFalse(extracted)
         assertFalse(temporaryFolder.root.resolve("escape.txt").exists())
+    }
+
+    @Test
+    fun bounded_json_reader_rejects_oversized_input() {
+        val accepted =
+            readUtf8TextWithinLimit(
+                inputStream = ByteArrayInputStream("1234".toByteArray()),
+                maximumBytes = 4,
+            )
+        val rejected =
+            readUtf8TextWithinLimit(
+                inputStream = ByteArrayInputStream("12345".toByteArray()),
+                maximumBytes = 4,
+            )
+
+        assertEquals("1234", accepted)
+        assertNull(rejected)
     }
 
     private fun archive(vararg entries: Pair<String, String>): ByteArray {

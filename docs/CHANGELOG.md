@@ -1,7 +1,28 @@
-## v1.2.1: Check/uncheck all 
+## v1.2.2: Reminder presets, check/uncheck all, fixes
 
-### 🛠 Improved Features
+## ✨ New Features
+- Added one-tap presets for quickly choosing common reminder times.
 - Long press any checkbox in notes or checklist to quickly "Check all" or "Uncheck all"
+
+## 🛠 Improved Features
+- Backups use less memory and reject unsafe or excessively large archives.
+- Cloud backups now use persistent folders and show clearer provider and folder names.
+- Restoring settings now warns when backup folders need to be selected again.
+- App lock now allows a five-minute grace period when briefly leaving the app.
+- Icon and app pickers load more smoothly in the background.
+- Directional icons now display correctly in right-to-left languages.
+- Material You controls retain better visual separation from card backgrounds.
+- Update downloads use safer filenames and clearer in-app feedback.
+
+## 🐛 Bug Fixes
+- Fixed archived notes being missing from backups.
+- Failed imports no longer leave partially restored notes behind.
+- Recurring reminders retain their original schedule after snoozing and restoring a backup.
+- Snooze no longer reports success before the change is saved.
+- External star, archive, trash, and completion changes no longer overwrite unsaved edits.
+- Duplicated and newly attached checklists retain their hierarchy, details, and completion state.
+- Two-pane Select all no longer includes notes hidden inside collapsed sections.
+- Update checks and background maintenance tasks no longer retry indefinitely.
 
 ---
 

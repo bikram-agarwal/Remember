@@ -892,6 +892,7 @@ private fun DevDeveloperModeHeader(
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = "arrow_back",
+                        autoMirror = true,
                         size = 22.dp,
                     )
                 }

@@ -218,6 +218,7 @@ internal fun ActiveFilterChips(
             leadingIcon = {
                 RememberMaterialRoundedSymbol(
                     name = "undo",
+                    autoMirror = true,
                     size = 16.dp,
                     weight = FontWeight.Medium,
                 )

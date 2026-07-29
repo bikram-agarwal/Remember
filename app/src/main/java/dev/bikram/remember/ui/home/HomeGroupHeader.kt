@@ -202,6 +202,7 @@ internal fun GroupHeader(
             ) {
                 RememberMaterialRoundedSymbol(
                     name = "chevron_right",
+                    autoMirror = true,
                     size = chevronSize,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                     weight = FontWeight.Medium,

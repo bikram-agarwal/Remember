@@ -17,11 +17,12 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
+import java.io.OutputStream
+import java.io.OutputStreamWriter
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -32,6 +33,52 @@ internal data class ZipExtractionLimits(
     val maximumEntryBytes: Long = 256L * 1024L * 1024L,
     val maximumTotalBytes: Long = 1024L * 1024L * 1024L,
 )
+
+private class ByteLimitedInputStream(
+    private val source: InputStream,
+    private val maximumBytes: Long,
+) : InputStream() {
+    private var consumedBytes = 0L
+
+    override fun read(): Int {
+        val value = source.read()
+        if (value >= 0) recordBytesRead(1)
+        return value
+    }
+
+    override fun read(
+        buffer: ByteArray,
+        offset: Int,
+        length: Int,
+    ): Int {
+        val bytesRead = source.read(buffer, offset, length)
+        if (bytesRead > 0) recordBytesRead(bytesRead)
+        return bytesRead
+    }
+
+    override fun close() {
+        source.close()
+    }
+
+    private fun recordBytesRead(bytesRead: Int) {
+        consumedBytes += bytesRead
+        if (consumedBytes > maximumBytes) {
+            throw IOException("Backup JSON exceeds the input-size limit")
+        }
+    }
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun readUtf8TextWithinLimit(
+    inputStream: InputStream,
+    maximumBytes: Long,
+): String? {
+    return runCatching {
+        ByteLimitedInputStream(inputStream, maximumBytes)
+            .bufferedReader(Charsets.UTF_8)
+            .use { reader -> reader.readText() }
+    }.getOrNull()
+}
 
 @Suppress("ktlint:standard:function-expression-body")
 internal fun extractZipEntriesWithinLimits(
@@ -48,20 +95,20 @@ internal fun extractZipEntriesWithinLimits(
             while (zipEntry != null) {
                 extractedEntryCount++
                 if (extractedEntryCount > limits.maximumEntryCount) {
-                    throw IOException("Backup archive contains too many entries")
+                    return@runCatching false
                 }
                 if (zipEntry.size > limits.maximumEntryBytes) {
-                    throw IOException("Backup archive entry exceeds the extraction limit")
+                    return@runCatching false
                 }
                 if (!zipEntry.isDirectory) {
                     val outputFile =
                         canonicalFileInsideBaseDirectoryOrNull(
                             candidate = File(extractRoot, zipEntry.name),
                             baseDirectory = extractRoot,
-                        ) ?: throw IOException("Backup archive entry has an unsafe path")
+                        ) ?: return@runCatching false
                     val outputDirectory = outputFile.parentFile
                     if (outputDirectory != null && !outputDirectory.exists() && !outputDirectory.mkdirs()) {
-                        throw IOException("Backup archive output directory could not be created")
+                        return@runCatching false
                     }
                     var extractedEntryBytes = 0L
                     FileOutputStream(outputFile).use { fileOutput ->
@@ -71,10 +118,10 @@ internal fun extractZipEntriesWithinLimits(
                                 extractedEntryBytes += bytesRead
                                 extractedTotalBytes += bytesRead
                                 if (extractedEntryBytes > limits.maximumEntryBytes) {
-                                    throw IOException("Backup archive entry exceeds the extraction limit")
+                                    return@runCatching false
                                 }
                                 if (extractedTotalBytes > limits.maximumTotalBytes) {
-                                    throw IOException("Backup archive exceeds the total extraction limit")
+                                    return@runCatching false
                                 }
                                 fileOutput.write(copyBuffer, 0, bytesRead)
                             }
@@ -271,38 +318,44 @@ class BackupIo(
     }
 
     private suspend fun writeZipArchive(
+        outputStream: OutputStream,
         notesJson: JSONObject,
         includeMedia: Boolean,
-    ): ByteArray {
-        val notesClone = JSONObject(notesJson.toString())
-        val settingsBytes = buildSettingsJson().toString(2).toByteArray(Charsets.UTF_8)
-        val out = ByteArrayOutputStream()
-        ZipOutputStream(out).use { zip ->
+    ) {
+        ZipOutputStream(outputStream).use { zip ->
             val mediaStats =
                 if (includeMedia) {
-                    embedMediaInNotesJson(zip, notesClone)
+                    embedMediaInNotesJson(zip, notesJson)
                 } else {
-                    countLinkedMediaInNotesJson(notesClone)
+                    countLinkedMediaInNotesJson(notesJson)
                 }
             if (!includeMedia) {
                 mediaStats.mediaLinkedCount = mediaStats.mediaReferenceCount
             }
-            val manifestBytes =
-                buildBackupManifestJson(
-                    includeMediaRequested = includeMedia,
-                    mediaStats = mediaStats,
-                ).toString(2).toByteArray(Charsets.UTF_8)
-            zip.putNextEntry(ZipEntry(ENTRY_MANIFEST))
-            zip.write(manifestBytes)
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry(ENTRY_NOTES))
-            zip.write(notesClone.toString(2).toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry(ENTRY_SETTINGS))
-            zip.write(settingsBytes)
-            zip.closeEntry()
+            writeZipTextEntry(
+                zip = zip,
+                entryName = ENTRY_MANIFEST,
+                text =
+                    buildBackupManifestJson(
+                        includeMediaRequested = includeMedia,
+                        mediaStats = mediaStats,
+                    ).toString(2),
+            )
+            writeZipTextEntry(zip, ENTRY_NOTES, notesJson.toString(2))
+            writeZipTextEntry(zip, ENTRY_SETTINGS, buildSettingsJson().toString(2))
         }
-        return out.toByteArray()
+    }
+
+    private fun writeZipTextEntry(
+        zip: ZipOutputStream,
+        entryName: String,
+        text: String,
+    ) {
+        zip.putNextEntry(ZipEntry(entryName))
+        val writer = OutputStreamWriter(zip, Charsets.UTF_8)
+        writer.write(text)
+        writer.flush()
+        zip.closeEntry()
     }
 
     private fun embedMediaInNotesJson(
@@ -413,8 +466,9 @@ class BackupIo(
             runCatching {
                 val includeMedia = backupPrefs.snapshot().includeMediaInBackup
                 val snapshot = snapshotNotes()
-                val bytes = writeZipArchive(snapshot.root, includeMedia)
-                writeDocumentBytes(uri, bytes)
+                openDocumentOutputStream(uri).use { outputStream ->
+                    writeZipArchive(outputStream, snapshot.root, includeMedia)
+                }
                 snapshot.noteCount
             }.onFailure { throwable ->
                 DiagnosticLog.record(context, "Manual backup export failed", throwable)
@@ -439,16 +493,23 @@ class BackupIo(
                 if (destinations.isEmpty()) error("No export folder")
                 val includeMedia = backupPrefs.snapshot().includeMediaInBackup
                 val snapshot = snapshotNotes()
-                val bytes = writeZipArchive(snapshot.root, includeMedia)
                 val fileName = "remember_backup_${backupFileTimestamp()}.zip"
-                destinations.forEach { destinationUriString ->
-                    if (!destinationUriString.startsWith("content://")) error("Invalid export folder")
-                    val destinationUri = destinationUriString.toUri()
-                    if (DocumentsContract.isTreeUri(destinationUri)) {
-                        writeTreeDocument(destinationUri, fileName, "application/zip", bytes)
-                    } else {
-                        writeDocumentBytes(destinationUri, bytes, mode = "wt")
+                val temporaryArchive = File.createTempFile("remember_backup_", ".zip", context.cacheDir)
+                try {
+                    FileOutputStream(temporaryArchive).use { outputStream ->
+                        writeZipArchive(outputStream, snapshot.root, includeMedia)
                     }
+                    destinations.forEach { destinationUriString ->
+                        if (!destinationUriString.startsWith("content://")) error("Invalid export folder")
+                        val destinationUri = destinationUriString.toUri()
+                        if (DocumentsContract.isTreeUri(destinationUri)) {
+                            writeTreeDocument(destinationUri, fileName, "application/zip", temporaryArchive)
+                        } else {
+                            writeDocumentFile(destinationUri, temporaryArchive, mode = "wt")
+                        }
+                    }
+                } finally {
+                    temporaryArchive.delete()
                 }
                 List(destinations.size) { fileName }
             }
@@ -458,7 +519,7 @@ class BackupIo(
         treeUri: Uri,
         fileName: String,
         mimeType: String,
-        backupBytes: ByteArray,
+        sourceFile: File,
     ) {
         val resolver = context.contentResolver
         val documentTreeUri =
@@ -476,7 +537,7 @@ class BackupIo(
             ) ?: error("Failed to create temporary backup document")
         var fallbackDestinationUri: Uri? = null
         try {
-            writeDocumentBytes(temporaryUri, backupBytes)
+            writeDocumentFile(temporaryUri, sourceFile)
             val publishedUri =
                 runCatching {
                     DocumentsContract.renameDocument(resolver, temporaryUri, fileName)
@@ -490,7 +551,7 @@ class BackupIo(
                         fileName,
                     ) ?: error("Failed to create backup document")
                 fallbackDestinationUri = createdDestinationUri
-                writeDocumentBytes(createdDestinationUri, backupBytes)
+                writeDocumentFile(createdDestinationUri, sourceFile)
                 runCatching { resolver.delete(temporaryUri, null, null) }
             }
         } catch (error: Exception) {
@@ -502,21 +563,29 @@ class BackupIo(
         }
     }
 
-    private fun writeDocumentBytes(
+    private fun writeDocumentFile(
         documentUri: Uri,
-        backupBytes: ByteArray,
+        sourceFile: File,
         mode: String? = null,
     ) {
-        val outputStream =
-            if (mode == null) {
-                context.contentResolver.openOutputStream(documentUri)
-            } else {
-                context.contentResolver.openOutputStream(documentUri, mode)
-            } ?: error("Failed to open output stream for backup document")
-        outputStream.use { stream ->
-            stream.write(backupBytes)
-            stream.flush()
+        openDocumentOutputStream(documentUri, mode).use { outputStream ->
+            sourceFile.inputStream().buffered().use { inputStream ->
+                inputStream.copyTo(outputStream)
+            }
+            outputStream.flush()
         }
+    }
+
+    @Suppress("ktlint:standard:function-expression-body")
+    private fun openDocumentOutputStream(
+        documentUri: Uri,
+        mode: String? = null,
+    ): OutputStream {
+        return if (mode == null) {
+            context.contentResolver.openOutputStream(documentUri)
+        } else {
+            context.contentResolver.openOutputStream(documentUri, mode)
+        } ?: error("Failed to open output stream for backup document")
     }
 
     suspend fun restoreFullReplace(uri: Uri): RestoreResult =
@@ -676,7 +745,9 @@ class BackupIo(
                 return null
             }
             val notesText =
-                runCatching { notesFile.readText() }.getOrNull() ?: run {
+                notesFile.inputStream().use { inputStream ->
+                    readUtf8TextWithinLimit(inputStream, MAX_NOTES_JSON_BYTES)
+                } ?: run {
                     extractRoot.deleteRecursively()
                     return null
                 }
@@ -692,21 +763,35 @@ class BackupIo(
             val settingsFile = File(extractRoot, ENTRY_SETTINGS)
             val settingsJson =
                 if (settingsFile.isFile) {
-                    runCatching { JSONObject(settingsFile.readText(Charsets.UTF_8)) }.getOrNull()
+                    settingsFile
+                        .inputStream()
+                        .use { inputStream ->
+                            readUtf8TextWithinLimit(inputStream, MAX_METADATA_JSON_BYTES)
+                        }?.let { settingsText ->
+                            runCatching { JSONObject(settingsText) }.getOrNull()
+                        }
                 } else {
                     null
                 }
             val manifestFile = File(extractRoot, ENTRY_MANIFEST)
             val manifestJson =
                 if (manifestFile.isFile) {
-                    runCatching { JSONObject(manifestFile.readText(Charsets.UTF_8)) }.getOrNull()
+                    manifestFile
+                        .inputStream()
+                        .use { inputStream ->
+                            readUtf8TextWithinLimit(inputStream, MAX_METADATA_JSON_BYTES)
+                        }?.let { manifestText ->
+                            runCatching { JSONObject(manifestText) }.getOrNull()
+                        }
                 } else {
                     null
                 }
             return RestorePayload(notesText, settingsJson, manifestJson, extractRoot)
         }
         val text =
-            context.contentResolver.openInputStream(uri)?.use { input -> input.reader().readText() }
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                readUtf8TextWithinLimit(inputStream, MAX_NOTES_JSON_BYTES)
+            }
                 ?: return null
         val root = runCatching { JSONObject(text) }.getOrNull() ?: return null
         if (!root.has("notes")) return null
@@ -736,8 +821,22 @@ class BackupIo(
             if (!materializeZipEntries(uri, extractRoot)) return 0
             val notesFile = File(extractRoot, ENTRY_NOTES)
             val settingsFile = File(extractRoot, ENTRY_SETTINGS)
-            val notesText = if (notesFile.isFile) notesFile.readText() else return 0
-            val settingsText = if (settingsFile.isFile) settingsFile.readText(Charsets.UTF_8) else null
+            val notesText =
+                if (notesFile.isFile) {
+                    notesFile.inputStream().use { inputStream ->
+                        readUtf8TextWithinLimit(inputStream, MAX_NOTES_JSON_BYTES)
+                    } ?: return 0
+                } else {
+                    return 0
+                }
+            val settingsText =
+                if (settingsFile.isFile) {
+                    settingsFile.inputStream().use { inputStream ->
+                        readUtf8TextWithinLimit(inputStream, MAX_METADATA_JSON_BYTES)
+                    }
+                } else {
+                    null
+                }
             val settingsJson = settingsText?.let { runCatching { JSONObject(it) }.getOrNull() }
             val importResult =
                 importNotesAtomically(
@@ -1020,6 +1119,8 @@ class BackupIo(
         const val ENTRY_NOTES = "notes.json"
         const val ENTRY_SETTINGS = "settings.json"
         const val REL_PREFIX = "REL:"
+        private const val MAX_NOTES_JSON_BYTES = 32L * 1024L * 1024L
+        private const val MAX_METADATA_JSON_BYTES = 1024L * 1024L
     }
 }
 

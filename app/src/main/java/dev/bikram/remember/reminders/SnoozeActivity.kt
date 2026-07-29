@@ -395,6 +395,7 @@ private fun SnoozePresetRow(
         } else {
             RememberMaterialRoundedSymbol(
                 name = "chevron_right",
+                autoMirror = true,
                 size = 18.dp,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 weight = FontWeight.Medium,

@@ -1,14 +1,20 @@
 package dev.bikram.remember.ui.common
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
@@ -17,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 
@@ -63,12 +70,15 @@ fun RememberMaterialRoundedSymbol(
     modifier: Modifier = Modifier,
     size: Dp = 24.dp,
     tint: Color = LocalContentColor.current,
+    contentDescription: String? = null,
     @Suppress("UNUSED_PARAMETER") weight: FontWeight = FontWeight.Medium,
     @Suppress("UNUSED_PARAMETER") grade: Float = 0f,
     filled: Boolean = true,
+    autoMirror: Boolean = false,
     opticalCenterYOffset: Dp = 0.dp,
 ) {
     val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
     val fontSize = remember(size, density) { with(density) { size.toSp() } }
     val brush = remember(tint) { SolidColor(tint) }
     val fontFamily =
@@ -77,26 +87,43 @@ fun RememberMaterialRoundedSymbol(
         } else {
             MaterialSymbolsRoundedOutlinedFontFamily
         }
-    val layoutModifier =
-        if (opticalCenterYOffset == 0.dp) {
-            modifier
+    val mirroredModifier =
+        if (autoMirror && layoutDirection == LayoutDirection.Rtl) {
+            modifier.graphicsLayer { scaleX = -1f }
         } else {
-            modifier.offset(y = opticalCenterYOffset)
+            modifier
         }
-    BasicText(
-        text = name,
-        modifier = layoutModifier,
-        style =
-            TextStyle(
-                brush = brush,
-                fontSize = fontSize,
-                lineHeight = fontSize,
-                fontFamily = fontFamily,
-                // Material Symbols icons are driven by the `rlig` feature (required ligatures).
-                fontFeatureSettings = "\"rlig\" 1, \"liga\" 1",
-                textAlign = TextAlign.Center,
-                platformStyle = PlatformTextStyle(includeFontPadding = false),
-                lineHeightStyle = FlatLineHeightStyle,
-            ),
-    )
+    val offsetModifier =
+        if (opticalCenterYOffset == 0.dp) {
+            mirroredModifier
+        } else {
+            mirroredModifier.offset(y = opticalCenterYOffset)
+        }
+    val semanticsModifier =
+        offsetModifier.clearAndSetSemantics {
+            if (contentDescription != null) {
+                this.contentDescription = contentDescription
+            }
+        }
+
+    Box(
+        modifier = semanticsModifier,
+        contentAlignment = Alignment.Center,
+    ) {
+        BasicText(
+            text = name,
+            style =
+                TextStyle(
+                    brush = brush,
+                    fontSize = fontSize,
+                    lineHeight = fontSize,
+                    fontFamily = fontFamily,
+                    // Material Symbols icons are driven by the `rlig` feature (required ligatures).
+                    fontFeatureSettings = "\"rlig\" 1, \"liga\" 1",
+                    textAlign = TextAlign.Center,
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    lineHeightStyle = FlatLineHeightStyle,
+                ),
+        )
+    }
 }

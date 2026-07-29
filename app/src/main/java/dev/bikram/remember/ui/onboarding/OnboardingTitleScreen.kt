@@ -286,6 +286,7 @@ private fun OnboardingLetsBeginButton(
             )
             RememberMaterialRoundedSymbol(
                 name = "arrow_forward",
+                autoMirror = true,
                 tint = MaterialTheme.colorScheme.onPrimary,
             )
         }
