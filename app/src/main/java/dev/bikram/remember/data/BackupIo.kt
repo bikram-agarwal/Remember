@@ -20,10 +20,75 @@ import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStream
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+
+internal data class ZipExtractionLimits(
+    val maximumEntryCount: Int = 10_000,
+    val maximumEntryBytes: Long = 256L * 1024L * 1024L,
+    val maximumTotalBytes: Long = 1024L * 1024L * 1024L,
+)
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun extractZipEntriesWithinLimits(
+    inputStream: InputStream,
+    extractRoot: File,
+    limits: ZipExtractionLimits = ZipExtractionLimits(),
+): Boolean {
+    return runCatching {
+        var extractedEntryCount = 0
+        var extractedTotalBytes = 0L
+        val copyBuffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        ZipInputStream(BufferedInputStream(inputStream)).use { zipInput ->
+            var zipEntry = zipInput.nextEntry
+            while (zipEntry != null) {
+                extractedEntryCount++
+                if (extractedEntryCount > limits.maximumEntryCount) {
+                    throw IOException("Backup archive contains too many entries")
+                }
+                if (zipEntry.size > limits.maximumEntryBytes) {
+                    throw IOException("Backup archive entry exceeds the extraction limit")
+                }
+                if (!zipEntry.isDirectory) {
+                    val outputFile =
+                        canonicalFileInsideBaseDirectoryOrNull(
+                            candidate = File(extractRoot, zipEntry.name),
+                            baseDirectory = extractRoot,
+                        ) ?: throw IOException("Backup archive entry has an unsafe path")
+                    val outputDirectory = outputFile.parentFile
+                    if (outputDirectory != null && !outputDirectory.exists() && !outputDirectory.mkdirs()) {
+                        throw IOException("Backup archive output directory could not be created")
+                    }
+                    var extractedEntryBytes = 0L
+                    FileOutputStream(outputFile).use { fileOutput ->
+                        var bytesRead = zipInput.read(copyBuffer)
+                        while (bytesRead >= 0) {
+                            if (bytesRead > 0) {
+                                extractedEntryBytes += bytesRead
+                                extractedTotalBytes += bytesRead
+                                if (extractedEntryBytes > limits.maximumEntryBytes) {
+                                    throw IOException("Backup archive entry exceeds the extraction limit")
+                                }
+                                if (extractedTotalBytes > limits.maximumTotalBytes) {
+                                    throw IOException("Backup archive exceeds the total extraction limit")
+                                }
+                                fileOutput.write(copyBuffer, 0, bytesRead)
+                            }
+                            bytesRead = zipInput.read(copyBuffer)
+                        }
+                    }
+                }
+                zipInput.closeEntry()
+                zipEntry = zipInput.nextEntry
+            }
+        }
+        true
+    }.getOrDefault(false)
+}
 
 class BackupIo(
     private val context: Context,
@@ -648,32 +713,17 @@ class BackupIo(
         return RestorePayload(text, null, null, null)
     }
 
+    @Suppress("ktlint:standard:function-expression-body")
     private fun materializeZipEntries(
         uri: Uri,
         extractRoot: File,
-    ): Boolean =
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                ZipInputStream(BufferedInputStream(input)).use { zipIn ->
-                    var entry = zipIn.nextEntry
-                    while (entry != null) {
-                        if (!entry.isDirectory) {
-                            val outFile =
-                                canonicalFileInsideBaseDirectoryOrNull(
-                                    candidate = File(extractRoot, entry.name),
-                                    baseDirectory = extractRoot,
-                                )
-                            if (outFile != null) {
-                                outFile.parentFile?.mkdirs()
-                                FileOutputStream(outFile).use { fileOutput -> zipIn.copyTo(fileOutput) }
-                            }
-                        }
-                        entry = zipIn.nextEntry
-                    }
-                }
-                true
+    ): Boolean {
+        return runCatching {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                extractZipEntriesWithinLimits(inputStream, extractRoot)
             } ?: false
         }.getOrDefault(false)
+    }
 
     private suspend fun importFromZip(
         uri: Uri,

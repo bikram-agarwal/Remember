@@ -121,6 +121,9 @@ abstract class BaseEditorViewModel(
     private val _loaded = MutableStateFlow(noteId == null)
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 
+    private val _missingNote = MutableStateFlow(false)
+    val missingNote: StateFlow<Boolean> = _missingNote.asStateFlow()
+
     /**
      * Mirrors the underlying note's archived / trashed shelf. Used by the edit screen to flip into
      * read-only mode and swap the bottom-bar action set. New notes/lists always start active.
@@ -156,6 +159,7 @@ abstract class BaseEditorViewModel(
 
     protected var loadedId: Long? = noteId
     protected var originalNote: dev.bikram.remember.data.NoteEntity? = null
+    private var starredEditedLocally = false
 
     protected fun markDirty() {
         persistence.markDirty()
@@ -166,8 +170,14 @@ abstract class BaseEditorViewModel(
         _currentNoteId.value = loadedId
     }
 
-    protected fun finishInitialLoad() {
+    protected fun finishInitialLoad(noteFound: Boolean) {
+        _missingNote.value = _missingNote.value || !noteFound
         _loaded.value = true
+    }
+
+    protected fun acceptPersistedSnapshot(note: dev.bikram.remember.data.NoteEntity?) {
+        originalNote = note
+        starredEditedLocally = false
     }
 
     /**
@@ -176,7 +186,7 @@ abstract class BaseEditorViewModel(
      */
     protected fun applyLoadedCommon(existing: NoteWithItems) {
         val n = existing.note
-        originalNote = n
+        acceptPersistedSnapshot(n)
         _title.value = n.title
         _starred.value = n.starred || n.tags.contains(RememberReservedTags.STARRED)
         val activeRems = n.getActiveReminders()
@@ -210,17 +220,38 @@ abstract class BaseEditorViewModel(
     protected fun startExternalFieldMirror(id: Long) {
         viewModelScope.launch {
             repository.observe(id).collect { row ->
-                val n = row?.note ?: return@collect
+                if (row == null) {
+                    _missingNote.value = true
+                    return@collect
+                }
+                val n = row.note
                 val activeRems = n.getActiveReminders()
                 if (_reminders.value != activeRems) _reminders.value = activeRems
                 if (_reminderAt.value != n.reminderAt) _reminderAt.value = n.reminderAt
                 val sanitized = n.recurrence?.sanitized()
                 if (_recurrence.value != sanitized) _recurrence.value = sanitized
+                val externallyStarred = n.starred || n.tags.contains(RememberReservedTags.STARRED)
+                if (!starredEditedLocally && _starred.value != externallyStarred) {
+                    _starred.value = externallyStarred
+                }
+                if (_archived.value != n.archived) _archived.value = n.archived
                 if (_trashed.value != n.trashed) _trashed.value = n.trashed
                 val isCompleted = n.completedAt != null
                 if (_completed.value != isCompleted) _completed.value = isCompleted
                 if (_createdAt.value != n.createdAt) _createdAt.value = n.createdAt
                 if (_updatedAt.value != n.updatedAt) _updatedAt.value = n.updatedAt
+                originalNote =
+                    originalNote?.copy(
+                        starred = n.starred,
+                        archived = n.archived,
+                        trashed = n.trashed,
+                        completedAt = n.completedAt,
+                        reminderAt = n.reminderAt,
+                        recurrence = n.recurrence,
+                        reminders = n.reminders,
+                        createdAt = n.createdAt,
+                        updatedAt = n.updatedAt,
+                    )
             }
         }
     }
@@ -233,6 +264,7 @@ abstract class BaseEditorViewModel(
 
     fun toggleStar() {
         _starred.value = !_starred.value
+        starredEditedLocally = true
         markDirty()
     }
 

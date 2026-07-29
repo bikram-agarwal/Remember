@@ -16,6 +16,7 @@ import dev.bikram.remember.ui.nav.Routes
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestDispatcher
@@ -49,6 +50,51 @@ class EditListViewModelTest {
             advanceUntilIdle()
             assertTrue(viewModel.loaded.value)
             assertEquals("Existing list", viewModel.title.value)
+        }
+
+    @Test
+    fun missing_existing_list_blocks_edits_and_saves() =
+        runTest {
+            val store = FakeRepositoryStore()
+            val viewModel = editListViewModel(store, noteId = 99L)
+
+            advanceUntilIdle()
+            assertTrue(viewModel.loaded.value)
+            assertTrue(viewModel.missingNote.value)
+
+            viewModel.setTitle("Must not be created")
+            val undoAction = viewModel.saveIfNeeded("Untitled")
+
+            assertNull(undoAction)
+            assertFalse(store.notes.containsKey(99L))
+        }
+
+    @Test
+    fun external_star_and_archive_changes_merge_without_clobbering_local_edits() =
+        runTest {
+            val store = FakeRepositoryStore()
+            store.notes[1L] = noteEntity(id = 1L, title = "Original")
+            val viewModel = editListViewModel(store, noteId = 1L)
+            advanceUntilIdle()
+            viewModel.setTitle("Local title")
+
+            val externalRepository = store.repository()
+            externalRepository.setStarred(1L, true)
+            advanceUntilIdle()
+
+            assertTrue(viewModel.starred.value)
+            assertEquals("Local title", viewModel.title.value)
+            viewModel.saveIfNeeded("Untitled")
+            assertTrue(store.notes.getValue(1L).starred)
+            assertEquals("Local title", store.notes.getValue(1L).title)
+
+            externalRepository.archiveNote(1L)
+            advanceUntilIdle()
+            assertTrue(viewModel.archived.value)
+
+            externalRepository.deleteForever(1L)
+            advanceUntilIdle()
+            assertTrue(viewModel.missingNote.value)
         }
 
     @Test
@@ -298,6 +344,7 @@ private class FakeRepositoryStore {
     var nextItemId = 1L
     val notes = LinkedHashMap<Long, NoteEntity>()
     val itemsByNote = LinkedHashMap<Long, MutableList<ChecklistItemEntity>>()
+    val observedNotes = LinkedHashMap<Long, MutableStateFlow<NoteWithItems?>>()
 
     fun repository(): NoteRepository =
         NoteRepository(
@@ -317,6 +364,10 @@ private class FakeRepositoryStore {
                 ?: emptyList()
         return NoteWithItems(note = note, items = items)
     }
+
+    fun publishNote(noteId: Long) {
+        observedNotes[noteId]?.value = noteWithItems(noteId)
+    }
 }
 
 private class FakeNoteDao(
@@ -328,7 +379,10 @@ private class FakeNoteDao(
 
     override fun observeArchived(): Flow<List<NoteWithItems>> = flowOf(emptyList())
 
-    override fun observe(id: Long): Flow<NoteWithItems?> = flowOf(store.noteWithItems(id))
+    override fun observe(id: Long): Flow<NoteWithItems?> =
+        store.observedNotes.getOrPut(id) {
+            MutableStateFlow(store.noteWithItems(id))
+        }
 
     override suspend fun get(id: Long): NoteWithItems? = store.noteWithItems(id)
 
@@ -354,11 +408,13 @@ private class FakeNoteDao(
         val noteId = if (note.id > 0L) note.id else store.nextNoteId++
         store.nextNoteId = maxOf(store.nextNoteId, noteId + 1L)
         store.notes[noteId] = note.copy(id = noteId)
+        store.publishNote(noteId)
         return noteId
     }
 
     override suspend fun update(note: NoteEntity) {
         store.notes[note.id] = note
+        store.publishNote(note.id)
     }
 
     override suspend fun setStarred(
@@ -368,6 +424,7 @@ private class FakeNoteDao(
     ) {
         store.notes[id]?.let { note ->
             store.notes[id] = note.copy(starred = starred, updatedAt = updatedAt)
+            store.publishNote(id)
         }
     }
 
@@ -387,6 +444,7 @@ private class FakeNoteDao(
     ) {
         store.notes[id]?.let { note ->
             store.notes[id] = note.copy(trashed = trashed, updatedAt = updatedAt)
+            store.publishNote(id)
         }
     }
 
@@ -397,12 +455,14 @@ private class FakeNoteDao(
     ) {
         store.notes[id]?.let { note ->
             store.notes[id] = note.copy(archived = archived, updatedAt = updatedAt)
+            store.publishNote(id)
         }
     }
 
     override suspend fun deleteById(id: Long) {
         store.notes.remove(id)
         store.itemsByNote.remove(id)
+        store.publishNote(id)
     }
 
     override suspend fun allNoteIds(): List<Long> = store.notes.keys.toList()

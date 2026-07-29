@@ -107,12 +107,16 @@ fun EditListRoute(
 ) {
     val vm: EditListViewModel = hiltViewModel()
     val loaded by vm.loaded.collectAsStateWithLifecycle()
+    val missingNote by vm.missingNote.collectAsStateWithLifecycle()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
     val currentNoteId by vm.currentNoteId.collectAsStateWithLifecycle()
     val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
     val sharedModifier = Modifier.rememberEditorSharedBoundsModifier(noteId)
     LaunchedEffect(currentNoteId) {
         currentNoteId?.let(onPersistedNoteIdChanged)
+    }
+    LaunchedEffect(missingNote) {
+        if (missingNote) onBack()
     }
     // Report the persisted id before leaving: a save-and-back disposes pane hosts before
     // the currentNoteId LaunchedEffect gets a chance to run, so deliver it synchronously.
@@ -163,7 +167,7 @@ fun EditListRoute(
     }
 
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
-        if (loaded) {
+        if (loaded && !missingNote) {
             EditListScreen(
                 vm = vm,
                 appScope = appScope,

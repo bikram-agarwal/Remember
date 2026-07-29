@@ -25,6 +25,16 @@ internal class EditorActionHandlers(
     val deleteForeverAndBack: () -> Unit,
 )
 
+internal fun flushThenSaveAndNavigate(
+    flushPendingEdits: () -> Unit,
+    launchSave: () -> Unit,
+    navigate: () -> Unit,
+) {
+    flushPendingEdits()
+    launchSave()
+    navigate()
+}
+
 @Composable
 internal fun rememberEditorActionHandlers(
     appScope: CoroutineScope,
@@ -41,6 +51,7 @@ internal fun rememberEditorActionHandlers(
     restoreFromTrashCurrent: suspend () -> Unit,
     deleteForeverCurrent: suspend () -> Unit,
     fireNotification: suspend (Context, String) -> Unit,
+    flushPendingEdits: () -> Unit = {},
 ): EditorActionHandlers {
     val context = LocalContext.current
     val snackbarHostState = LocalSnackbarHostState.current
@@ -69,6 +80,7 @@ internal fun rememberEditorActionHandlers(
 
     return EditorActionHandlers(
         saveAndShowToast = {
+            flushPendingEdits()
             appScope.launch {
                 if (saveIfNeeded(untitledName) != null) {
                     android.widget.Toast
@@ -81,14 +93,21 @@ internal fun rememberEditorActionHandlers(
             }
         },
         saveAndBack = {
-            appScope.launch { showUndoableSave() }
-            onBack()
+            flushThenSaveAndNavigate(
+                flushPendingEdits = flushPendingEdits,
+                launchSave = { appScope.launch { showUndoableSave() } },
+                navigate = onBack,
+            )
         },
         saveAndNavigateUp = {
-            appScope.launch { showUndoableSave() }
-            onNavigateUp()
+            flushThenSaveAndNavigate(
+                flushPendingEdits = flushPendingEdits,
+                launchSave = { appScope.launch { showUndoableSave() } },
+                navigate = onNavigateUp,
+            )
         },
         archiveAndBack = {
+            flushPendingEdits()
             val archiveStartedFromTrash = trashed
             appScope.launch {
                 archiveCurrent(untitledName)
@@ -110,6 +129,7 @@ internal fun rememberEditorActionHandlers(
             onBack()
         },
         notifyOrRequestPermission = {
+            flushPendingEdits()
             if (canPostNotifications(context)) {
                 appScope.launch { fireNotification(context, untitledName) }
             } else {
