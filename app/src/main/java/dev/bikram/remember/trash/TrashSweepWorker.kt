@@ -7,6 +7,7 @@ import androidx.work.WorkerParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.diagnostics.DiagnosticLog
 
 /**
  * Periodically deletes notes that have been in the trash for longer than
@@ -27,7 +28,24 @@ class TrashSweepWorker
                 noteRepository.autoEmptyTrashOlderThan(cutoff)
             }.fold(
                 onSuccess = { Result.success() },
-                onFailure = { Result.retry() },
+                onFailure = { error ->
+                    val attemptNumber = runAttemptCount + 1
+                    val willRetry = attemptNumber < MAX_RUN_ATTEMPTS_PER_PERIOD
+                    DiagnosticLog.record(
+                        applicationContext,
+                        "Note trash sweep failed: attempt=$attemptNumber, willRetry=$willRetry",
+                        error,
+                    )
+                    if (willRetry) {
+                        Result.retry()
+                    } else {
+                        Result.failure()
+                    }
+                },
             )
+        }
+
+        companion object {
+            private const val MAX_RUN_ATTEMPTS_PER_PERIOD = 3
         }
     }

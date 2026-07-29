@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -105,12 +106,17 @@ fun EditListRoute(
     onNavigateUp: () -> Unit = onBack,
 ) {
     val vm: EditListViewModel = hiltViewModel()
+    val loaded by vm.loaded.collectAsStateWithLifecycle()
+    val missingNote by vm.missingNote.collectAsStateWithLifecycle()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
     val currentNoteId by vm.currentNoteId.collectAsStateWithLifecycle()
     val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
     val sharedModifier = Modifier.rememberEditorSharedBoundsModifier(noteId)
     LaunchedEffect(currentNoteId) {
         currentNoteId?.let(onPersistedNoteIdChanged)
+    }
+    LaunchedEffect(missingNote) {
+        if (missingNote) onBack()
     }
     // Report the persisted id before leaving: a save-and-back disposes pane hosts before
     // the currentNoteId LaunchedEffect gets a chance to run, so deliver it synchronously.
@@ -161,19 +167,28 @@ fun EditListRoute(
     }
 
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
-        EditListScreen(
-            vm = vm,
-            appScope = appScope,
-            existing = noteId != null,
-            persistedForToolbar = hasPersistedRow,
-            activeTagSuggestions = activeTagSuggestions,
-            forceEdit = forceEdit,
-            showNavigateBack = showNavigateBack,
-            allowInitialTitleFocus = allowInitialTitleFocus,
-            interceptBack = interceptBack,
-            onBack = handleBack,
-            onNavigateUp = handleNavigateUp,
-        )
+        if (loaded && !missingNote) {
+            EditListScreen(
+                vm = vm,
+                appScope = appScope,
+                existing = noteId != null,
+                persistedForToolbar = hasPersistedRow,
+                activeTagSuggestions = activeTagSuggestions,
+                forceEdit = forceEdit,
+                showNavigateBack = showNavigateBack,
+                allowInitialTitleFocus = allowInitialTitleFocus,
+                interceptBack = interceptBack,
+                onBack = handleBack,
+                onNavigateUp = handleNavigateUp,
+            )
+        } else {
+            LoadingIndicator(
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(48.dp),
+            )
+        }
     }
 }
 

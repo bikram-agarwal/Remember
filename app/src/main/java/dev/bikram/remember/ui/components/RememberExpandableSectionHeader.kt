@@ -161,6 +161,7 @@ internal fun RememberExpandableSectionHeader(
         ) {
             RememberMaterialRoundedSymbol(
                 name = "chevron_right",
+                autoMirror = true,
                 modifier = Modifier.graphicsLayer { rotationZ = rotation },
                 size = chevronSize,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,

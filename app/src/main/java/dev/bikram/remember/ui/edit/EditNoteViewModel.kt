@@ -28,23 +28,21 @@ class EditNoteViewModel
         private val _body = MutableStateFlow(if (noteId == null) prefillBody else "")
         val body: StateFlow<String> = _body.asStateFlow()
 
-        /** True after the initial DB load has populated the state flows (or immediately for a new note). */
-        private val _loaded = MutableStateFlow(noteId == null)
-        val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
-
         init {
             if (noteId != null) {
                 check(persistence.tryLock()) { "persistence lock must be unlocked at construction" }
                 viewModelScope.launch {
+                    var noteFound = false
                     try {
                         val existing = repository.get(noteId)
                         if (existing != null) {
+                            noteFound = true
                             applyLoadedCommon(existing)
                             _body.value = existing.note.body
                         }
                     } finally {
                         // Leave loading when the load finishes: missing row, success, or thrown from get().
-                        _loaded.value = true
+                        finishInitialLoad(noteFound)
                         persistence.unlock()
                     }
                 }
@@ -68,6 +66,7 @@ class EditNoteViewModel
                 )
             loadedId = newId
             syncHasPersistedRow()
+            startExternalFieldMirror(newId)
             if (starred.value) repository.setStarred(newId, true)
             return newId
         }
@@ -101,6 +100,10 @@ class EditNoteViewModel
 
         override suspend fun saveIfNeeded(untitledName: String): (suspend () -> Unit)? {
             return persistence.withLock {
+                if (missingNote.value) {
+                    persistence.clearDirty()
+                    return@withLock null
+                }
                 if (!hasNetChanges()) {
                     persistence.clearDirty()
                     return@withLock null
@@ -115,12 +118,13 @@ class EditNoteViewModel
                     val newId = repository.createNote(finalTitle, bodyValue, 0, currentOptions())
                     loadedId = newId
                     syncHasPersistedRow()
+                    startExternalFieldMirror(newId)
                     if (titleValue.isBlank()) setTitle(finalTitle)
                     if (starred.value) repository.setStarred(newId, true)
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val savedNote = repository.get(newId)?.note
-                    originalNote = savedNote
+                    acceptPersistedSnapshot(savedNote)
                     if (savedNote != null) {
                         updateTimestamps(savedNote.createdAt, savedNote.updatedAt)
                     }
@@ -141,7 +145,7 @@ class EditNoteViewModel
 
                     val old = originalNote
                     val savedNote = repository.get(id)?.note
-                    originalNote = savedNote
+                    acceptPersistedSnapshot(savedNote)
                     if (savedNote != null) {
                         updateTimestamps(savedNote.createdAt, savedNote.updatedAt)
                     }

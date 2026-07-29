@@ -174,6 +174,7 @@ fun HelpScreen(
                     ) {
                         RememberMaterialRoundedSymbol(
                             name = "arrow_back",
+                            autoMirror = true,
                             size = 24.dp,
                             tint = MaterialTheme.colorScheme.onSurface,
                             weight = FontWeight.Medium,
@@ -384,6 +385,7 @@ private fun HelpSubsectionCard(
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = "chevron_right",
+                        autoMirror = true,
                         size = 18.dp,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         weight = FontWeight.Medium,

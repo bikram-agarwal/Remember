@@ -8,10 +8,59 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
 
 class NoteRepositoryRecurrenceTest {
+    @Test
+    fun `snooze persists new time and original recurring schedule`() =
+        runBlocking {
+            val originalReminderAt = calendarMillis(2026, Calendar.APRIL, 26, 9, 0)
+            val snoozedUntil = calendarMillis(2026, Calendar.APRIL, 26, 17, 0)
+            val recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY)
+            val noteDao =
+                FakeNoteDao(
+                    NoteEntity(
+                        id = 1L,
+                        kind = NoteKind.NOTE,
+                        title = "Daily task",
+                        body = "",
+                        colorIndex = 0,
+                        starred = false,
+                        trashed = false,
+                        createdAt = originalReminderAt,
+                        updatedAt = originalReminderAt,
+                        reminderAt = originalReminderAt,
+                        recurrence = recurrence,
+                        reminders =
+                            listOf(
+                                NoteReminder(
+                                    reminderAt = originalReminderAt,
+                                    recurrence = recurrence,
+                                ),
+                            ),
+                    ),
+                )
+            val repository =
+                NoteRepository(
+                    noteDao = noteDao,
+                    itemDao = FakeChecklistItemDao(),
+                    attachmentDao = FakeAttachmentDao(),
+                    clock = { originalReminderAt + 1_000L },
+                )
+
+            val snoozeSucceeded = repository.snoozeSoonestReminder(1L, snoozedUntil)
+
+            assertTrue(snoozeSucceeded)
+            val updatedReminder =
+                noteDao.stored.note.reminders
+                    .single()
+            assertEquals(snoozedUntil, updatedReminder.reminderAt)
+            assertEquals(originalReminderAt, updatedReminder.originalReminderAt)
+            assertEquals(recurrence, updatedReminder.recurrence)
+        }
+
     @Test
     fun `mark completed advances recurring reminder and keeps note active`() =
         runBlocking {

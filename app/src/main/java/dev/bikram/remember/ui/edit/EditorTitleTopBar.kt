@@ -177,6 +177,7 @@ internal fun EditorTitleTopBar(
                         ) {
                             RememberMaterialRoundedSymbol(
                                 name = "arrow_back",
+                                autoMirror = true,
                                 size = 24.dp,
                                 tint = MaterialTheme.colorScheme.onSurface,
                                 weight = FontWeight.Medium,

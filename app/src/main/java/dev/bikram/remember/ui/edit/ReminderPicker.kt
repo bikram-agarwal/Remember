@@ -25,6 +25,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
@@ -52,6 +54,7 @@ import androidx.compose.material3.DisplayMode
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.RadioButton
@@ -121,6 +124,8 @@ import dev.bikram.remember.data.RecurrenceEndKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.domain.formatTimeOfDay
+import dev.bikram.remember.reminders.SnoozePreset
+import dev.bikram.remember.reminders.computeSnoozePresets
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isLandscape
@@ -129,6 +134,7 @@ import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalButton
+import dev.bikram.remember.ui.components.RememberFilterChip
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
@@ -138,6 +144,7 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
+import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Calendar
 import java.util.Locale
@@ -631,6 +638,32 @@ fun ReminderPickerSheet(
                                     exit = shrinkVertically(animationSpec = expansionSpec) + fadeOut(animationSpec = fadeOutSpec),
                                 ) {
                                     Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
+                                        QuickReminderChipsRow(
+                                            draft = draft,
+                                            enabled = controlsEnabled,
+                                            onSelectPreset = { targetMillis ->
+                                                val zone = ZoneId.systemDefault()
+                                                val zdt = ZonedDateTime.ofInstant(Instant.ofEpochMilli(targetMillis), zone)
+                                                val targetDateMillis = pickerDayMillisForLocalWallClock(targetMillis)
+                                                drafts =
+                                                    drafts.mapIndexed { idx, d ->
+                                                        if (idx == index) {
+                                                            d.copy(
+                                                                selectedDate = targetDateMillis,
+                                                                reminderDateExplicit = true,
+                                                                reminderHour = zdt.hour,
+                                                                reminderMinute = zdt.minute,
+                                                                reminderTimeExplicit = true,
+                                                            )
+                                                        } else {
+                                                            d
+                                                        }
+                                                    }
+                                            },
+                                        )
+
+                                        Spacer(Modifier.height(8.dp))
+
                                         PillRow(
                                             materialSymbolName = "calendar_month",
                                             label =
@@ -2509,4 +2542,77 @@ private fun timeFormatterFor(context: Context): java.time.format.DateTimeFormatt
         }
     return java.time.format.DateTimeFormatter
         .ofPattern(pattern, Locale.getDefault())
+}
+
+@Composable
+private fun QuickReminderChipsRow(
+    draft: ReminderDraft,
+    enabled: Boolean,
+    onSelectPreset: (targetMillis: Long) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    var presetsNow by remember { mutableStateOf(ZonedDateTime.now(ZoneId.systemDefault())) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            presetsNow = ZonedDateTime.now(ZoneId.systemDefault())
+            val millisUntilNextMinute = 60_000L - (System.currentTimeMillis() % 60_000L)
+            kotlinx.coroutines.delay(millisUntilNextMinute)
+        }
+    }
+    val timeFormatter = remember(context) { timeFormatterFor(context) }
+    val presets = remember(presetsNow, timeFormatter) { computeSnoozePresets(context, presetsNow, timeFormatter) }
+    val zone = presetsNow.zone
+
+    Row(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        presets.forEach { preset ->
+            val zdt = ZonedDateTime.ofInstant(Instant.ofEpochMilli(preset.targetMillis), zone)
+            val dateMillis = pickerDayMillisForLocalWallClock(preset.targetMillis)
+            val isSelected =
+                draft.reminderDateExplicit &&
+                    draft.reminderTimeExplicit &&
+                    draft.selectedDate == dateMillis &&
+                    draft.reminderHour == zdt.hour &&
+                    draft.reminderMinute == zdt.minute
+
+            RememberFilterChip(
+                selected = isSelected,
+                onClick = {
+                    onSelectPreset(preset.targetMillis)
+                },
+                enabled = enabled,
+                colors =
+                    FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ),
+                label = {
+                    Text(
+                        text = preset.title,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                },
+                leadingIcon = {
+                    RememberMaterialRoundedSymbol(
+                        name = preset.symbolName,
+                        size = 16.dp,
+                        tint =
+                            if (isSelected) {
+                                MaterialTheme.colorScheme.onPrimaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                    )
+                },
+            )
+        }
+    }
 }

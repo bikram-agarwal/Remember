@@ -16,6 +16,37 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 internal const val REMEMBER_UPDATE_APK_CACHE_NAME = "remember_update.apk"
+private const val MAX_UPDATE_APK_DISPLAY_NAME_LENGTH = 120
+private const val INVALID_UPDATE_APK_FILENAME_CHARACTERS = "<>:\"/\\|?*"
+private const val APK_EXTENSION = ".apk"
+
+internal fun sanitizeUpdateApkDisplayName(
+    displayName: String,
+    fallbackName: String,
+): String {
+    val cleanedName =
+        buildString(displayName.length) {
+            displayName.forEach { character ->
+                if (character.isISOControl() || character in INVALID_UPDATE_APK_FILENAME_CHARACTERS) {
+                    append('_')
+                } else {
+                    append(character)
+                }
+            }
+        }.trim(' ', '.')
+    val nameWithoutExtension =
+        if (cleanedName.endsWith(".apk", ignoreCase = true)) {
+            cleanedName.dropLast(4)
+        } else {
+            cleanedName
+        }
+    val boundedName =
+        nameWithoutExtension
+            .trim(' ', '.')
+            .take(MAX_UPDATE_APK_DISPLAY_NAME_LENGTH - APK_EXTENSION.length)
+            .trimEnd(' ', '.')
+    return if (boundedName.isBlank()) fallbackName else boundedName + APK_EXTENSION
+}
 
 internal suspend fun downloadUpdateApk(
     context: Context,
@@ -65,12 +96,7 @@ internal fun copyUpdateApkToMediaStoreDownloads(
     displayName: String,
 ): Result<Unit> =
     runCatching {
-        val safeName =
-            displayName
-                .replace('/', '_')
-                .replace('\\', '_')
-                .trim()
-                .ifBlank { REMEMBER_UPDATE_APK_CACHE_NAME }
+        val safeName = sanitizeUpdateApkDisplayName(displayName, REMEMBER_UPDATE_APK_CACHE_NAME)
         val resolver = context.contentResolver
         val values =
             ContentValues().apply {
@@ -111,15 +137,29 @@ internal fun exportFolderDisplayLabel(
     if (!DocumentsContract.isTreeUri(uri)) {
         providerDisplayName(context, uri.authority)?.let { return it }
     }
+    val providerName =
+        providerDisplayName(context, uri.authority)
+            ?.takeUnless { displayName -> displayName == uri.authority }
     val relativeTreePath =
         runCatching {
             val treeId = DocumentsContract.getTreeDocumentId(uri)
-            val decoded = Uri.decode(treeId)
-            decoded.substringAfter(':', decoded)
+            val decodedTreeId = Uri.decode(treeId)
+            decodedTreeId.substringAfter(':', decodedTreeId)
         }.getOrNull()
-    relativeTreePath?.takeIf { it.isNotBlank() }?.let { return it }
     val documentName = DocumentFile.fromTreeUri(context, uri)?.name
-    return documentName?.takeIf { it.isNotBlank() } ?: internalStorageFallback
+    val folderLabel =
+        if (providerName != null) {
+            documentName?.takeIf { it.isNotBlank() }
+                ?: relativeTreePath?.takeIf { it.isNotBlank() }
+        } else {
+            relativeTreePath?.takeIf { it.isNotBlank() }
+                ?: documentName?.takeIf { it.isNotBlank() }
+        } ?: internalStorageFallback
+    return if (providerName != null && !folderLabel.equals(providerName, ignoreCase = true)) {
+        context.getString(R.string.cloud_provider_folder_path, providerName, folderLabel)
+    } else {
+        folderLabel
+    }
 }
 
 private fun providerDisplayName(

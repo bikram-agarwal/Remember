@@ -57,6 +57,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -68,6 +69,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -118,13 +120,27 @@ import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.feedback.tapSoundClickable
 import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+private data class IconPickerAssets(
+    val emojis: List<BundledEmoji>,
+    val iconKeywords: Map<String, List<String>>,
+    val iconAliases: Map<String, List<String>>,
+    val emojiSkinToneIndex: EmojiSkinToneIndex,
+)
+
+private val iconPickerAssetsLock = Any()
+
+@Volatile
+private var cachedIconPickerAssets: IconPickerAssets? = null
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun IconPicker(
     current: String?,
@@ -183,24 +199,40 @@ fun IconPicker(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    val emojis =
-        remember(configuration) {
-            loadBundledEmojis(resources)
+    val pickerAssets by
+        produceState<IconPickerAssets?>(
+            cachedIconPickerAssets,
+            resources,
+        ) {
+            if (value == null) {
+                value = loadIconPickerAssets(resources)
+            }
         }
-    val iconKeywords =
-        remember(configuration) {
-            loadIconKeywords(resources)
+    if (pickerAssets == null) {
+        AppBottomSheet(
+            title = "",
+            onDismiss = onDismiss,
+            showTitleBar = false,
+            scrollable = false,
+            contentPadding = PaddingValues(vertical = 8.dp),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(iconSheetContentHeight),
+                contentAlignment = Alignment.Center,
+            ) {
+                LoadingIndicator(modifier = Modifier.size(48.dp))
+            }
         }
-    val iconAliases =
-        remember(configuration) {
-            loadIconAliases(resources)
-        }
-    // Build the skin-tone group index once; rebuilding it on every sub-tab
-    // switch was the main culprit behind the laggy category change.
-    val emojiSkinToneIndex =
-        remember(emojis) {
-            buildEmojiSkinToneIndex(emojis)
-        }
+        return
+    }
+    val loadedPickerAssets = pickerAssets ?: return
+    val emojis = loadedPickerAssets.emojis
+    val iconKeywords = loadedPickerAssets.iconKeywords
+    val iconAliases = loadedPickerAssets.iconAliases
+    val emojiSkinToneIndex = loadedPickerAssets.emojiSkinToneIndex
     val selectedEmoji = current?.takeIf { it.startsWith(ICON_EMOJI_PREFIX) }?.removePrefix(ICON_EMOJI_PREFIX)
     var selectedEmojiCategoryKey by rememberSaveable {
         mutableStateOf(selectedEmojiCategoryKey(emojis, selectedEmoji))
@@ -1513,6 +1545,26 @@ private fun skinToneSortIndex(name: String): Int {
 }
 
 private val emojiJson = Json { ignoreUnknownKeys = true }
+
+@Suppress("ktlint:standard:function-expression-body")
+private suspend fun loadIconPickerAssets(resources: Resources): IconPickerAssets {
+    return withContext(Dispatchers.Default) {
+        cachedIconPickerAssets
+            ?: synchronized(iconPickerAssetsLock) {
+                cachedIconPickerAssets
+                    ?: loadBundledEmojis(resources).let { emojis ->
+                        IconPickerAssets(
+                            emojis = emojis,
+                            iconKeywords = loadIconKeywords(resources),
+                            iconAliases = loadIconAliases(resources),
+                            emojiSkinToneIndex = buildEmojiSkinToneIndex(emojis),
+                        ).also { loadedAssets ->
+                            cachedIconPickerAssets = loadedAssets
+                        }
+                    }
+            }
+    }
+}
 
 /**
  * Loads the bundled emoji list. Generated by `python font_subset/build_search_emojis.py`

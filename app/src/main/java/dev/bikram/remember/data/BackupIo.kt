@@ -6,22 +6,136 @@ import android.provider.DocumentsContract
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import dev.bikram.remember.backup.RememberBackupWork
 import dev.bikram.remember.backup.SettingsBackup
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.domain.backupFileTimestamp
+import dev.bikram.remember.update.UpdateCheckWorkScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedInputStream
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.OutputStreamWriter
 import java.util.UUID
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
+
+internal data class ZipExtractionLimits(
+    val maximumEntryCount: Int = 10_000,
+    val maximumEntryBytes: Long = 256L * 1024L * 1024L,
+    val maximumTotalBytes: Long = 1024L * 1024L * 1024L,
+)
+
+private class ByteLimitedInputStream(
+    private val source: InputStream,
+    private val maximumBytes: Long,
+) : InputStream() {
+    private var consumedBytes = 0L
+
+    override fun read(): Int {
+        val value = source.read()
+        if (value >= 0) recordBytesRead(1)
+        return value
+    }
+
+    override fun read(
+        buffer: ByteArray,
+        offset: Int,
+        length: Int,
+    ): Int {
+        val bytesRead = source.read(buffer, offset, length)
+        if (bytesRead > 0) recordBytesRead(bytesRead)
+        return bytesRead
+    }
+
+    override fun close() {
+        source.close()
+    }
+
+    private fun recordBytesRead(bytesRead: Int) {
+        consumedBytes += bytesRead
+        if (consumedBytes > maximumBytes) {
+            throw IOException("Backup JSON exceeds the input-size limit")
+        }
+    }
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun readUtf8TextWithinLimit(
+    inputStream: InputStream,
+    maximumBytes: Long,
+): String? {
+    return runCatching {
+        ByteLimitedInputStream(inputStream, maximumBytes)
+            .bufferedReader(Charsets.UTF_8)
+            .use { reader -> reader.readText() }
+    }.getOrNull()
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun extractZipEntriesWithinLimits(
+    inputStream: InputStream,
+    extractRoot: File,
+    limits: ZipExtractionLimits = ZipExtractionLimits(),
+): Boolean {
+    return runCatching {
+        var extractedEntryCount = 0
+        var extractedTotalBytes = 0L
+        val copyBuffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        ZipInputStream(BufferedInputStream(inputStream)).use { zipInput ->
+            var zipEntry = zipInput.nextEntry
+            while (zipEntry != null) {
+                extractedEntryCount++
+                if (extractedEntryCount > limits.maximumEntryCount) {
+                    return@runCatching false
+                }
+                if (zipEntry.size > limits.maximumEntryBytes) {
+                    return@runCatching false
+                }
+                if (!zipEntry.isDirectory) {
+                    val outputFile =
+                        canonicalFileInsideBaseDirectoryOrNull(
+                            candidate = File(extractRoot, zipEntry.name),
+                            baseDirectory = extractRoot,
+                        ) ?: return@runCatching false
+                    val outputDirectory = outputFile.parentFile
+                    if (outputDirectory != null && !outputDirectory.exists() && !outputDirectory.mkdirs()) {
+                        return@runCatching false
+                    }
+                    var extractedEntryBytes = 0L
+                    FileOutputStream(outputFile).use { fileOutput ->
+                        var bytesRead = zipInput.read(copyBuffer)
+                        while (bytesRead >= 0) {
+                            if (bytesRead > 0) {
+                                extractedEntryBytes += bytesRead
+                                extractedTotalBytes += bytesRead
+                                if (extractedEntryBytes > limits.maximumEntryBytes) {
+                                    return@runCatching false
+                                }
+                                if (extractedTotalBytes > limits.maximumTotalBytes) {
+                                    return@runCatching false
+                                }
+                                fileOutput.write(copyBuffer, 0, bytesRead)
+                            }
+                            bytesRead = zipInput.read(copyBuffer)
+                        }
+                    }
+                }
+                zipInput.closeEntry()
+                zipEntry = zipInput.nextEntry
+            }
+        }
+        true
+    }.getOrDefault(false)
+}
 
 class BackupIo(
     private val context: Context,
@@ -34,6 +148,7 @@ class BackupIo(
     private val quickCapturePrefs: QuickCapturePrefs,
     private val reminderPrefs: ReminderPrefs,
     private val updatePrefs: UpdatePrefs,
+    private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
 ) {
     private val fileProviderAuthority: String
         get() = "${context.packageName}.fileprovider"
@@ -50,6 +165,11 @@ class BackupIo(
             get() = readable && mediaReferenceCount > mediaEmbeddedCount
     }
 
+    data class RestoreResult(
+        val noteCount: Int,
+        val settingsOutcome: BackupSettingsRestoreOutcome,
+    )
+
     private data class MediaExportStats(
         var mediaReferenceCount: Int = 0,
         var mediaEmbeddedCount: Int = 0,
@@ -61,8 +181,20 @@ class BackupIo(
 
     private suspend fun buildSettingsJson(): JSONObject = SettingsBackup.exportJson(themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
 
-    private suspend fun importSettingsFromJson(settingsJson: JSONObject?) {
-        SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
+    private suspend fun importSettingsFromJson(settingsJson: JSONObject?): BackupSettingsRestoreOutcome {
+        val restoreOutcome =
+            SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
+        runCatching {
+            RememberBackupWork.updateSchedule(context, backupPrefs.snapshot())
+        }.onFailure { error ->
+            DiagnosticLog.record(context, "Restored backup could not reconcile scheduled exports", error)
+        }
+        runCatching {
+            updateCheckWorkScheduler.syncFromPreferences()
+        }.onFailure { error ->
+            DiagnosticLog.record(context, "Restored backup could not reconcile update checks", error)
+        }
+        return restoreOutcome
     }
 
     private data class NotesSnapshot(
@@ -71,7 +203,12 @@ class BackupIo(
     )
 
     private suspend fun snapshotNotes(): NotesSnapshot {
-        val all = repository.observeActive().first() + repository.observeTrashed().first()
+        val all =
+            notesForBackup(
+                activeNotes = repository.observeActive().first(),
+                archivedNotes = repository.observeArchived().first(),
+                trashedNotes = repository.observeTrashed().first(),
+            )
         val tagColors =
             repository.tagRepository
                 ?.observeTagColorMap()
@@ -140,13 +277,8 @@ class BackupIo(
             put(
                 "reminders",
                 JSONArray().apply {
-                    note.reminders.limitedToReminderSlots().forEach { r ->
-                        put(
-                            JSONObject().apply {
-                                put("reminderAt", r.reminderAt)
-                                RecurrenceRule.toJson(r.recurrence)?.let { put("recurrence", it) }
-                            },
-                        )
+                    note.reminders.limitedToReminderSlots().forEach { reminder ->
+                        put(encodeReminderForBackup(reminder))
                     }
                 },
             )
@@ -186,38 +318,44 @@ class BackupIo(
     }
 
     private suspend fun writeZipArchive(
+        outputStream: OutputStream,
         notesJson: JSONObject,
         includeMedia: Boolean,
-    ): ByteArray {
-        val notesClone = JSONObject(notesJson.toString())
-        val settingsBytes = buildSettingsJson().toString(2).toByteArray(Charsets.UTF_8)
-        val out = ByteArrayOutputStream()
-        ZipOutputStream(out).use { zip ->
+    ) {
+        ZipOutputStream(outputStream).use { zip ->
             val mediaStats =
                 if (includeMedia) {
-                    embedMediaInNotesJson(zip, notesClone)
+                    embedMediaInNotesJson(zip, notesJson)
                 } else {
-                    countLinkedMediaInNotesJson(notesClone)
+                    countLinkedMediaInNotesJson(notesJson)
                 }
             if (!includeMedia) {
                 mediaStats.mediaLinkedCount = mediaStats.mediaReferenceCount
             }
-            val manifestBytes =
-                buildBackupManifestJson(
-                    includeMediaRequested = includeMedia,
-                    mediaStats = mediaStats,
-                ).toString(2).toByteArray(Charsets.UTF_8)
-            zip.putNextEntry(ZipEntry(ENTRY_MANIFEST))
-            zip.write(manifestBytes)
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry(ENTRY_NOTES))
-            zip.write(notesClone.toString(2).toByteArray(Charsets.UTF_8))
-            zip.closeEntry()
-            zip.putNextEntry(ZipEntry(ENTRY_SETTINGS))
-            zip.write(settingsBytes)
-            zip.closeEntry()
+            writeZipTextEntry(
+                zip = zip,
+                entryName = ENTRY_MANIFEST,
+                text =
+                    buildBackupManifestJson(
+                        includeMediaRequested = includeMedia,
+                        mediaStats = mediaStats,
+                    ).toString(2),
+            )
+            writeZipTextEntry(zip, ENTRY_NOTES, notesJson.toString(2))
+            writeZipTextEntry(zip, ENTRY_SETTINGS, buildSettingsJson().toString(2))
         }
-        return out.toByteArray()
+    }
+
+    private fun writeZipTextEntry(
+        zip: ZipOutputStream,
+        entryName: String,
+        text: String,
+    ) {
+        zip.putNextEntry(ZipEntry(entryName))
+        val writer = OutputStreamWriter(zip, Charsets.UTF_8)
+        writer.write(text)
+        writer.flush()
+        zip.closeEntry()
     }
 
     private fun embedMediaInNotesJson(
@@ -328,11 +466,9 @@ class BackupIo(
             runCatching {
                 val includeMedia = backupPrefs.snapshot().includeMediaInBackup
                 val snapshot = snapshotNotes()
-                val bytes = writeZipArchive(snapshot.root, includeMedia)
-                val outputStream =
-                    context.contentResolver.openOutputStream(uri)
-                        ?: error("openOutputStream returned null")
-                outputStream.use { stream -> stream.write(bytes) }
+                openDocumentOutputStream(uri).use { outputStream ->
+                    writeZipArchive(outputStream, snapshot.root, includeMedia)
+                }
                 snapshot.noteCount
             }.onFailure { throwable ->
                 DiagnosticLog.record(context, "Manual backup export failed", throwable)
@@ -357,40 +493,109 @@ class BackupIo(
                 if (destinations.isEmpty()) error("No export folder")
                 val includeMedia = backupPrefs.snapshot().includeMediaInBackup
                 val snapshot = snapshotNotes()
-                val bytes = writeZipArchive(snapshot.root, includeMedia)
                 val fileName = "remember_backup_${backupFileTimestamp()}.zip"
-                destinations.forEach { destinationUriString ->
-                    if (!destinationUriString.startsWith("content://")) error("Invalid export folder")
-                    val destinationUri = destinationUriString.toUri()
-                    if (DocumentsContract.isTreeUri(destinationUri)) {
-                        val docTreeUri =
-                            DocumentsContract.buildDocumentUriUsingTree(
-                                destinationUri,
-                                DocumentsContract.getTreeDocumentId(destinationUri),
-                            )
-                        val docUri =
-                            DocumentsContract.createDocument(
-                                context.contentResolver,
-                                docTreeUri,
-                                "application/zip",
-                                fileName,
-                            ) ?: error("Failed to create document in export folder")
-                        context.contentResolver.openOutputStream(docUri)?.use { stream ->
-                            stream.write(bytes)
-                        } ?: error("Failed to open output stream for export")
-                    } else {
-                        context.contentResolver.openOutputStream(destinationUri, "wt")?.use { stream ->
-                            stream.write(bytes)
-                        } ?: error("Failed to open output stream for export")
+                val temporaryArchive = File.createTempFile("remember_backup_", ".zip", context.cacheDir)
+                try {
+                    FileOutputStream(temporaryArchive).use { outputStream ->
+                        writeZipArchive(outputStream, snapshot.root, includeMedia)
                     }
+                    destinations.forEach { destinationUriString ->
+                        if (!destinationUriString.startsWith("content://")) error("Invalid export folder")
+                        val destinationUri = destinationUriString.toUri()
+                        if (DocumentsContract.isTreeUri(destinationUri)) {
+                            writeTreeDocument(destinationUri, fileName, "application/zip", temporaryArchive)
+                        } else {
+                            writeDocumentFile(destinationUri, temporaryArchive, mode = "wt")
+                        }
+                    }
+                } finally {
+                    temporaryArchive.delete()
                 }
                 List(destinations.size) { fileName }
             }
         }
 
-    suspend fun restoreFullReplace(uri: Uri): Int =
+    private fun writeTreeDocument(
+        treeUri: Uri,
+        fileName: String,
+        mimeType: String,
+        sourceFile: File,
+    ) {
+        val resolver = context.contentResolver
+        val documentTreeUri =
+            DocumentsContract.buildDocumentUriUsingTree(
+                treeUri,
+                DocumentsContract.getTreeDocumentId(treeUri),
+            )
+        val temporaryName = "$fileName.${UUID.randomUUID()}.partial"
+        val temporaryUri =
+            DocumentsContract.createDocument(
+                resolver,
+                documentTreeUri,
+                mimeType,
+                temporaryName,
+            ) ?: error("Failed to create temporary backup document")
+        var fallbackDestinationUri: Uri? = null
+        try {
+            writeDocumentFile(temporaryUri, sourceFile)
+            val publishedUri =
+                runCatching {
+                    DocumentsContract.renameDocument(resolver, temporaryUri, fileName)
+                }.getOrNull()
+            if (publishedUri == null) {
+                val createdDestinationUri =
+                    DocumentsContract.createDocument(
+                        resolver,
+                        documentTreeUri,
+                        mimeType,
+                        fileName,
+                    ) ?: error("Failed to create backup document")
+                fallbackDestinationUri = createdDestinationUri
+                writeDocumentFile(createdDestinationUri, sourceFile)
+                runCatching { resolver.delete(temporaryUri, null, null) }
+            }
+        } catch (error: Exception) {
+            runCatching { resolver.delete(temporaryUri, null, null) }
+            fallbackDestinationUri?.let { destinationUri ->
+                runCatching { resolver.delete(destinationUri, null, null) }
+            }
+            throw error
+        }
+    }
+
+    private fun writeDocumentFile(
+        documentUri: Uri,
+        sourceFile: File,
+        mode: String? = null,
+    ) {
+        openDocumentOutputStream(documentUri, mode).use { outputStream ->
+            sourceFile.inputStream().buffered().use { inputStream ->
+                inputStream.copyTo(outputStream)
+            }
+            outputStream.flush()
+        }
+    }
+
+    @Suppress("ktlint:standard:function-expression-body")
+    private fun openDocumentOutputStream(
+        documentUri: Uri,
+        mode: String? = null,
+    ): OutputStream {
+        return if (mode == null) {
+            context.contentResolver.openOutputStream(documentUri)
+        } else {
+            context.contentResolver.openOutputStream(documentUri, mode)
+        } ?: error("Failed to open output stream for backup document")
+    }
+
+    suspend fun restoreFullReplace(uri: Uri): RestoreResult =
         withContext(Dispatchers.IO) {
-            val payload = readRestorePayload(uri) ?: return@withContext 0
+            val payload =
+                readRestorePayload(uri)
+                    ?: return@withContext RestoreResult(
+                        noteCount = 0,
+                        settingsOutcome = BackupSettingsRestoreOutcome(),
+                    )
             try {
                 val count =
                     repository.restoreNotesFullReplace {
@@ -399,10 +604,10 @@ class BackupIo(
                             extractDir = payload.extractRoot,
                             preserveNoteIds = true,
                             suppressReminderSchedule = true,
-                        )
+                        ).noteCount
                     }
-                importSettingsFromJson(payload.settingsJson)
-                count
+                val settingsOutcome = importSettingsFromJson(payload.settingsJson)
+                RestoreResult(noteCount = count, settingsOutcome = settingsOutcome)
             } finally {
                 payload.extractRoot?.deleteRecursively()
             }
@@ -420,7 +625,11 @@ class BackupIo(
                     val text =
                         context.contentResolver.openInputStream(uri)?.use { it.reader().readText() }
                             ?: return@runCatching 0
-                    importFromJsonText(text, extractDir = null, preserveIdsForNotes)
+                    importNotesAtomically(
+                        text = text,
+                        extractDir = null,
+                        preserveNoteIds = preserveIdsForNotes,
+                    ).noteCount
                 }
             }.onFailure { throwable ->
                 DiagnosticLog.record(context, "Backup import failed", throwable)
@@ -451,6 +660,11 @@ class BackupIo(
         val settingsJson: JSONObject?,
         val manifestJson: JSONObject?,
         val extractRoot: File?,
+    )
+
+    private data class NoteImportResult(
+        val noteCount: Int,
+        val noteIds: List<Long>,
     )
 
     private fun restoreMediaSummaryFromPayload(payload: RestorePayload): RestoreMediaSummary {
@@ -531,7 +745,9 @@ class BackupIo(
                 return null
             }
             val notesText =
-                runCatching { notesFile.readText() }.getOrNull() ?: run {
+                notesFile.inputStream().use { inputStream ->
+                    readUtf8TextWithinLimit(inputStream, MAX_NOTES_JSON_BYTES)
+                } ?: run {
                     extractRoot.deleteRecursively()
                     return null
                 }
@@ -547,53 +763,52 @@ class BackupIo(
             val settingsFile = File(extractRoot, ENTRY_SETTINGS)
             val settingsJson =
                 if (settingsFile.isFile) {
-                    runCatching { JSONObject(settingsFile.readText(Charsets.UTF_8)) }.getOrNull()
+                    settingsFile
+                        .inputStream()
+                        .use { inputStream ->
+                            readUtf8TextWithinLimit(inputStream, MAX_METADATA_JSON_BYTES)
+                        }?.let { settingsText ->
+                            runCatching { JSONObject(settingsText) }.getOrNull()
+                        }
                 } else {
                     null
                 }
             val manifestFile = File(extractRoot, ENTRY_MANIFEST)
             val manifestJson =
                 if (manifestFile.isFile) {
-                    runCatching { JSONObject(manifestFile.readText(Charsets.UTF_8)) }.getOrNull()
+                    manifestFile
+                        .inputStream()
+                        .use { inputStream ->
+                            readUtf8TextWithinLimit(inputStream, MAX_METADATA_JSON_BYTES)
+                        }?.let { manifestText ->
+                            runCatching { JSONObject(manifestText) }.getOrNull()
+                        }
                 } else {
                     null
                 }
             return RestorePayload(notesText, settingsJson, manifestJson, extractRoot)
         }
         val text =
-            context.contentResolver.openInputStream(uri)?.use { input -> input.reader().readText() }
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                readUtf8TextWithinLimit(inputStream, MAX_NOTES_JSON_BYTES)
+            }
                 ?: return null
         val root = runCatching { JSONObject(text) }.getOrNull() ?: return null
         if (!root.has("notes")) return null
         return RestorePayload(text, null, null, null)
     }
 
+    @Suppress("ktlint:standard:function-expression-body")
     private fun materializeZipEntries(
         uri: Uri,
         extractRoot: File,
-    ): Boolean =
-        runCatching {
-            context.contentResolver.openInputStream(uri)?.use { input ->
-                ZipInputStream(BufferedInputStream(input)).use { zipIn ->
-                    var entry = zipIn.nextEntry
-                    while (entry != null) {
-                        if (!entry.isDirectory) {
-                            val outFile =
-                                canonicalFileInsideBaseDirectoryOrNull(
-                                    candidate = File(extractRoot, entry.name),
-                                    baseDirectory = extractRoot,
-                                )
-                            if (outFile != null) {
-                                outFile.parentFile?.mkdirs()
-                                FileOutputStream(outFile).use { fileOutput -> zipIn.copyTo(fileOutput) }
-                            }
-                        }
-                        entry = zipIn.nextEntry
-                    }
-                }
-                true
+    ): Boolean {
+        return runCatching {
+            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                extractZipEntriesWithinLimits(inputStream, extractRoot)
             } ?: false
         }.getOrDefault(false)
+    }
 
     private suspend fun importFromZip(
         uri: Uri,
@@ -606,14 +821,67 @@ class BackupIo(
             if (!materializeZipEntries(uri, extractRoot)) return 0
             val notesFile = File(extractRoot, ENTRY_NOTES)
             val settingsFile = File(extractRoot, ENTRY_SETTINGS)
-            val notesText = if (notesFile.isFile) notesFile.readText() else return 0
-            val settingsText = if (settingsFile.isFile) settingsFile.readText(Charsets.UTF_8) else null
+            val notesText =
+                if (notesFile.isFile) {
+                    notesFile.inputStream().use { inputStream ->
+                        readUtf8TextWithinLimit(inputStream, MAX_NOTES_JSON_BYTES)
+                    } ?: return 0
+                } else {
+                    return 0
+                }
+            val settingsText =
+                if (settingsFile.isFile) {
+                    settingsFile.inputStream().use { inputStream ->
+                        readUtf8TextWithinLimit(inputStream, MAX_METADATA_JSON_BYTES)
+                    }
+                } else {
+                    null
+                }
             val settingsJson = settingsText?.let { runCatching { JSONObject(it) }.getOrNull() }
+            val importResult =
+                importNotesAtomically(
+                    text = notesText,
+                    extractDir = extractRoot,
+                    preserveNoteIds = preserveNoteIds,
+                )
             importSettingsFromJson(settingsJson)
-            importFromJsonText(notesText, extractRoot, preserveNoteIds)
+            importResult.noteCount
         } finally {
             extractRoot.deleteRecursively()
         }
+    }
+
+    private suspend fun importNotesAtomically(
+        text: String,
+        extractDir: File?,
+        preserveNoteIds: Boolean,
+    ): NoteImportResult {
+        val importedNoteIds = mutableListOf<Long>()
+        val importResult =
+            try {
+                repository.runImportTransaction {
+                    importFromJsonText(
+                        text = text,
+                        extractDir = extractDir,
+                        preserveNoteIds = preserveNoteIds,
+                        suppressReminderSchedule = true,
+                        importedNoteIds = importedNoteIds,
+                    )
+                }
+            } catch (error: Exception) {
+                if (!preserveNoteIds) {
+                    importedNoteIds.forEach { noteId ->
+                        File(context.filesDir, "remember_backup/$noteId").deleteRecursively()
+                    }
+                }
+                throw error
+            }
+        runCatching {
+            repository.reconcileImportedNotes(importResult.noteIds)
+        }.onFailure { error ->
+            DiagnosticLog.record(context, "Imported notes could not reconcile reminders", error)
+        }
+        return importResult
     }
 
     private suspend fun importFromJsonText(
@@ -621,10 +889,12 @@ class BackupIo(
         extractDir: File?,
         preserveNoteIds: Boolean,
         suppressReminderSchedule: Boolean = false,
-    ): Int {
+        importedNoteIds: MutableList<Long>? = null,
+    ): NoteImportResult {
         val root = JSONObject(text)
-        val arr = root.optJSONArray("notes") ?: return 0
+        val arr = root.optJSONArray("notes") ?: return NoteImportResult(0, emptyList())
         var added = 0
+        val insertedNoteIds = mutableListOf<Long>()
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
             val noteFromJson = decodeNoteEntity(o)
@@ -655,6 +925,8 @@ class BackupIo(
                     attachments = nonRelAttachments,
                     suppressReminderSchedule = suppressReminderSchedule,
                 )
+            insertedNoteIds += insertedNoteId
+            importedNoteIds?.add(insertedNoteId)
             if (extractDir != null) {
                 if (picturePathForRelCopy != null) {
                     val relativePicture = picturePathForRelCopy.removePrefix(REL_PREFIX)
@@ -682,7 +954,10 @@ class BackupIo(
             added++
         }
         importTagColors(root.optJSONObject("tagColors"))
-        return added
+        return NoteImportResult(
+            noteCount = added,
+            noteIds = insertedNoteIds,
+        )
     }
 
     private suspend fun importTagColors(tagColorsJson: JSONObject?) {
@@ -730,11 +1005,10 @@ class BackupIo(
     private fun decodeReminders(a: JSONArray): List<NoteReminder> {
         val out = ArrayList<NoteReminder>(a.length())
         for (i in 0 until a.length()) {
-            val o = a.optJSONObject(i) ?: continue
-            val reminderAt = o.optLong("reminderAt", 0L)
-            if (reminderAt <= 0L) continue
-            val recurrence = o.optStringOrNull("recurrence")?.let { RecurrenceRule.fromJson(it) }
-            out.add(NoteReminder(reminderAt, recurrence))
+            val reminderJson = a.optJSONObject(i) ?: continue
+            decodeReminderFromBackup(reminderJson)?.let { reminder ->
+                out.add(reminder)
+            }
         }
         return out.limitedToReminderSlots()
     }
@@ -839,11 +1113,61 @@ class BackupIo(
     private fun JSONObject.optStringOrNull(key: String): String? = if (has(key) && !isNull(key)) getString(key) else null
 
     companion object {
-        const val SCHEMA_VERSION = 4
+        const val SCHEMA_VERSION = 5
         const val LEGACY_SCHEMA_VERSION = 1
         const val ENTRY_MANIFEST = "backup_manifest.json"
         const val ENTRY_NOTES = "notes.json"
         const val ENTRY_SETTINGS = "settings.json"
         const val REL_PREFIX = "REL:"
+        private const val MAX_NOTES_JSON_BYTES = 32L * 1024L * 1024L
+        private const val MAX_METADATA_JSON_BYTES = 1024L * 1024L
     }
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun notesForBackup(
+    activeNotes: List<NoteWithItems>,
+    archivedNotes: List<NoteWithItems>,
+    trashedNotes: List<NoteWithItems>,
+): List<NoteWithItems> {
+    return buildList(activeNotes.size + archivedNotes.size + trashedNotes.size) {
+        addAll(activeNotes)
+        addAll(archivedNotes)
+        addAll(trashedNotes)
+    }
+}
+
+@Suppress("ktlint:standard:function-expression-body")
+internal fun encodeReminderForBackup(reminder: NoteReminder): JSONObject {
+    return JSONObject().apply {
+        put("reminderAt", reminder.reminderAt)
+        RecurrenceRule.toJson(reminder.recurrence)?.let { recurrenceJson ->
+            put("recurrence", recurrenceJson)
+        }
+        reminder.originalReminderAt?.let { originalReminderAt ->
+            put("originalReminderAt", originalReminderAt)
+        }
+    }
+}
+
+internal fun decodeReminderFromBackup(reminderJson: JSONObject): NoteReminder? {
+    val reminderAt = reminderJson.optLong("reminderAt", 0L)
+    if (reminderAt <= 0L) return null
+    val recurrence =
+        if (reminderJson.has("recurrence") && !reminderJson.isNull("recurrence")) {
+            RecurrenceRule.fromJson(reminderJson.getString("recurrence"))
+        } else {
+            null
+        }
+    val originalReminderAt =
+        if (reminderJson.has("originalReminderAt") && !reminderJson.isNull("originalReminderAt")) {
+            reminderJson.getLong("originalReminderAt")
+        } else {
+            null
+        }
+    return NoteReminder(
+        reminderAt = reminderAt,
+        recurrence = recurrence,
+        originalReminderAt = originalReminderAt,
+    )
 }

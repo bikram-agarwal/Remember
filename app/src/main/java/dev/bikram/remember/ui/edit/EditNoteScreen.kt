@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -54,12 +57,17 @@ fun EditNoteRoute(
     onNavigateUp: () -> Unit = onBack,
 ) {
     val vm: EditNoteViewModel = hiltViewModel()
+    val loaded by vm.loaded.collectAsStateWithLifecycle()
+    val missingNote by vm.missingNote.collectAsStateWithLifecycle()
     val hasPersistedRow by vm.hasPersistedRow.collectAsStateWithLifecycle()
     val currentNoteId by vm.currentNoteId.collectAsStateWithLifecycle()
     val activeTagSuggestions by vm.activeTagSuggestions.collectAsStateWithLifecycle()
     val sharedModifier = Modifier.rememberEditorSharedBoundsModifier(noteId)
     LaunchedEffect(currentNoteId) {
         currentNoteId?.let(onPersistedNoteIdChanged)
+    }
+    LaunchedEffect(missingNote) {
+        if (missingNote) onBack()
     }
     // Report the persisted id before leaving: a save-and-back disposes pane hosts before
     // the currentNoteId LaunchedEffect gets a chance to run, so deliver it synchronously.
@@ -73,20 +81,29 @@ fun EditNoteRoute(
     }
 
     androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
-        EditNoteScreen(
-            vm = vm,
-            appScope = appScope,
-            editorNoteKey = noteId ?: 0L,
-            existing = noteId != null,
-            persistedForToolbar = hasPersistedRow,
-            activeTagSuggestions = activeTagSuggestions,
-            forceEdit = forceEdit,
-            showNavigateBack = showNavigateBack,
-            allowInitialTitleFocus = allowInitialTitleFocus,
-            interceptBack = interceptBack,
-            onBack = handleBack,
-            onNavigateUp = handleNavigateUp,
-        )
+        if (loaded && !missingNote) {
+            EditNoteScreen(
+                vm = vm,
+                appScope = appScope,
+                editorNoteKey = noteId ?: 0L,
+                existing = noteId != null,
+                persistedForToolbar = hasPersistedRow,
+                activeTagSuggestions = activeTagSuggestions,
+                forceEdit = forceEdit,
+                showNavigateBack = showNavigateBack,
+                allowInitialTitleFocus = allowInitialTitleFocus,
+                interceptBack = interceptBack,
+                onBack = handleBack,
+                onNavigateUp = handleNavigateUp,
+            )
+        } else {
+            LoadingIndicator(
+                modifier =
+                    Modifier
+                        .align(Alignment.Center)
+                        .size(48.dp),
+            )
+        }
     }
 }
 
@@ -234,6 +251,7 @@ fun EditNoteScreen(
             restoreFromTrashCurrent = vm::restoreFromTrashCurrent,
             deleteForeverCurrent = vm::deleteForeverCurrent,
             fireNotification = vm::fireNotification,
+            flushPendingEdits = bridge::flush,
         )
     // Use the regular BackHandler instead of PredictiveBackHandler. The predictive
     // version suspends on `progress.collect { }` until the gesture's flow completes,

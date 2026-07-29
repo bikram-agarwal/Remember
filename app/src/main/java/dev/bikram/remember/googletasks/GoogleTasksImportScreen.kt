@@ -293,6 +293,7 @@ fun GoogleTasksImportRoute(
                     ) {
                         RememberMaterialRoundedSymbol(
                             name = "arrow_back",
+                            autoMirror = true,
                             size = 24.dp,
                             tint = MaterialTheme.colorScheme.onSurface,
                             weight = FontWeight.Medium,
@@ -407,6 +408,7 @@ fun GoogleTasksImportRoute(
                             ) {
                                 RememberMaterialRoundedSymbol(
                                     name = "arrow_back",
+                                    autoMirror = true,
                                     size = 24.dp,
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     weight = FontWeight.Medium,
@@ -1550,6 +1552,7 @@ private fun GroupHeaderCard(
             )
             RememberMaterialRoundedSymbol(
                 name = "chevron_right",
+                autoMirror = true,
                 size = 20.dp,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
                 weight = FontWeight.Medium,

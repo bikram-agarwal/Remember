@@ -37,23 +37,33 @@ class EditListViewModel
 
         init {
             if (noteId != null) {
+                check(persistence.tryLock()) { "persistence lock must be unlocked at construction" }
                 viewModelScope.launch {
-                    val existing = repository.get(noteId) ?: return@launch
-                    applyLoadedCommon(existing)
-                    originalItems = existing.items
-                    _items.value =
-                        existing.items
-                            .map {
-                                EditableItem(
-                                    localId = it.id,
-                                    text = it.text,
-                                    details = it.details,
-                                    checked = it.checked,
-                                    sortOrder = it.sortOrder,
-                                    parentLocalId = it.parentId,
-                                    depth = it.depth,
-                                )
-                            }.sortedBy { it.sortOrder }
+                    var noteFound = false
+                    try {
+                        val existing = repository.get(noteId)
+                        if (existing != null) {
+                            noteFound = true
+                            applyLoadedCommon(existing)
+                            originalItems = existing.items
+                            _items.value =
+                                existing.items
+                                    .map {
+                                        EditableItem(
+                                            localId = it.id,
+                                            text = it.text,
+                                            details = it.details,
+                                            checked = it.checked,
+                                            sortOrder = it.sortOrder,
+                                            parentLocalId = it.parentId,
+                                            depth = it.depth,
+                                        )
+                                    }.sortedBy { it.sortOrder }
+                        }
+                    } finally {
+                        finishInitialLoad(noteFound)
+                        persistence.unlock()
+                    }
                 }
                 startExternalFieldMirror(noteId)
             }
@@ -347,16 +357,17 @@ class EditListViewModel
                 }
 
         override suspend fun persistNewDraftForAttachment(): Long {
-            val entities = currentItems()
             val newId =
-                repository.createList(
+                repository.createListWithItems(
                     title = title.value,
                     colorIndex = 0,
-                    items = entities.map { it.text },
+                    items = currentPersistable(),
                     options = currentOptions(),
                 )
             loadedId = newId
             syncHasPersistedRow()
+            startExternalFieldMirror(newId)
+            if (starred.value) repository.setStarred(newId, true)
             return newId
         }
 
@@ -410,6 +421,10 @@ class EditListViewModel
 
         override suspend fun saveIfNeeded(untitledName: String): (suspend () -> Unit)? {
             return persistence.withLock {
+                if (missingNote.value) {
+                    persistence.clearDirty()
+                    return@withLock null
+                }
                 if (!hasNetChanges()) {
                     persistence.clearDirty()
                     return@withLock null
@@ -426,12 +441,13 @@ class EditListViewModel
                     val newId = repository.createListWithItems(finalTitle, 0, persistable, currentOptions())
                     loadedId = newId
                     syncHasPersistedRow()
+                    startExternalFieldMirror(newId)
                     if (t.isBlank()) setTitle(finalTitle)
                     if (starred.value) repository.setStarred(newId, true)
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
                     val savedList = repository.get(newId)
-                    originalNote = savedList?.note
+                    acceptPersistedSnapshot(savedList?.note)
                     originalItems = savedList?.items ?: emptyList()
                     savedList?.note?.let { note ->
                         updateTimestamps(note.createdAt, note.updatedAt)
@@ -455,7 +471,7 @@ class EditListViewModel
                     val oldItems = originalItems
 
                     val savedList = repository.get(id)
-                    originalNote = savedList?.note
+                    acceptPersistedSnapshot(savedList?.note)
                     originalItems = savedList?.items ?: emptyList()
                     savedList?.note?.let { note ->
                         updateTimestamps(note.createdAt, note.updatedAt)

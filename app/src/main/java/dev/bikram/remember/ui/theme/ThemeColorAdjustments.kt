@@ -2,6 +2,8 @@ package dev.bikram.remember.ui.theme
 
 import androidx.compose.material3.ColorScheme
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.ColorUtils
 
@@ -84,6 +86,42 @@ internal fun ColorScheme.boostContainersForSeedThemes(dark: Boolean): ColorSchem
         tertiaryContainer =
             Color(
                 ColorUtils.blendARGB(tertiaryContainer.toArgb(), tertiary.toArgb(), tertiaryBlend),
+            ),
+    )
+}
+
+internal fun colorsTooSimilar(
+    first: Color,
+    second: Color,
+    maxLuminanceDelta: Float = 0.07f,
+): Boolean {
+    val luminanceDelta = kotlin.math.abs(first.luminance() - second.luminance())
+    return luminanceDelta < maxLuminanceDelta
+}
+
+/**
+ * Material You can map [ColorScheme.secondaryContainer] too close to
+ * [ColorScheme.surfaceContainerHighest], causing tonal controls to disappear into elevated cards.
+ */
+internal fun ColorScheme.separateMaterialYouSecondaryContainerWhenNeeded(dark: Boolean): ColorScheme {
+    if (!colorsTooSimilar(secondaryContainer, surfaceContainerHighest)) {
+        return this
+    }
+    val accentTarget =
+        lerp(
+            primaryContainer,
+            primary,
+            if (dark) 0.38f else 0.28f,
+        )
+    val blendAmount = if (dark) 0.50f else 0.40f
+    return copy(
+        secondaryContainer =
+            lerp(secondaryContainer, accentTarget, blendAmount),
+        onSecondaryContainer =
+            lerp(
+                onSecondaryContainer,
+                onPrimaryContainer,
+                if (dark) 0.35f else 0.30f,
             ),
     )
 }

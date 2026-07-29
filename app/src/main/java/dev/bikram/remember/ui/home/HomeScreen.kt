@@ -161,6 +161,7 @@ fun HomeRoute(
     activeNoteId: Long? = null,
     pendingNewNoteKind: NoteKind? = null,
     showSelectionActionBar: Boolean = true,
+    onSelectableVisibleIdsChanged: (Set<Long>) -> Unit = {},
 ) {
     val vm: HomeViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
@@ -216,6 +217,7 @@ fun HomeRoute(
         activeNoteId = activeNoteId,
         pendingNewNoteKind = pendingNewNoteKind,
         showSelectionActionBar = showSelectionActionBar,
+        onSelectableVisibleIdsChanged = onSelectableVisibleIdsChanged,
     )
 }
 
@@ -248,6 +250,7 @@ fun HomeScreen(
     activeNoteId: Long? = null,
     pendingNewNoteKind: NoteKind? = null,
     showSelectionActionBar: Boolean = true,
+    onSelectableVisibleIdsChanged: (Set<Long>) -> Unit = {},
 ) {
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var searchShouldRequestFocus by rememberSaveable { mutableStateOf(false) }
@@ -357,16 +360,14 @@ fun HomeScreen(
             }
         }
     val selectableVisibleIds by
-        remember(visibleDisplayedItems) {
+        remember(displayedItems, collapsedSectionKeys) {
             derivedStateOf {
-                visibleDisplayedItems
-                    .mapNotNull { item ->
-                        (item as? HomeListItem.NoteRow)?.card?.id
-                    }.toSet()
+                selectableVisibleNoteIds(displayedItems, collapsedSectionKeys)
             }
         }
     LaunchedEffect(selectableVisibleIds) {
         onPruneSelection(selectableVisibleIds)
+        onSelectableVisibleIdsChanged(selectableVisibleIds)
     }
     val bulkTagCoverage by
         remember(visibleDisplayedItems, state.availableTags, state.selectedIds) {

@@ -41,6 +41,18 @@ sealed class HomeListItem {
     ) : HomeListItem()
 }
 
+@Suppress("ktlint:standard:function-expression-body")
+internal fun selectableVisibleNoteIds(
+    displayedItems: List<HomeListItem>,
+    collapsedSectionKeys: Set<String>,
+): Set<Long> {
+    return displayedItems
+        .mapNotNull { item ->
+            val noteRow = item as? HomeListItem.NoteRow
+            noteRow?.card?.id?.takeIf { noteRow.groupKey !in collapsedSectionKeys }
+        }.toSet()
+}
+
 @Immutable
 data class HomeState(
     val loading: Boolean = true,

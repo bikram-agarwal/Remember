@@ -728,6 +728,7 @@ private fun AboutAppStoreButton(
             Spacer(Modifier.width(8.dp))
             RememberMaterialRoundedSymbol(
                 name = "chevron_right",
+                autoMirror = true,
                 size = if (isSmallLandscape) 18.dp else 20.dp,
                 tint = accentColor.copy(alpha = 0.86f),
                 weight = FontWeight.Medium,

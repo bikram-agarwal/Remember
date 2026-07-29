@@ -59,7 +59,7 @@ data class AppChoice(
     val packageName: String,
     val componentName: ComponentName,
     val label: String,
-    val icon: Drawable,
+    val iconBitmap: Bitmap?,
 )
 
 data class ShortcutPick(
@@ -112,7 +112,10 @@ fun AppPickerContent(
                             packageName = ai.packageName,
                             componentName = ComponentName(ai.packageName, ai.name),
                             label = info.loadLabel(pm).toString(),
-                            icon = info.loadIcon(pm),
+                            iconBitmap =
+                                runCatching {
+                                    info.loadIcon(pm).toBitmap(96, 96)
+                                }.getOrNull(),
                         )
                     }.sortedBy { it.label.lowercase() }
             }
@@ -154,12 +157,10 @@ private fun AppRow(
     app: AppChoice,
     onClick: () -> Unit,
 ) {
-    val bmp =
-        remember(app.componentName) {
-            try {
-                BitmapPainter(app.icon.toBitmap(96, 96).asImageBitmap())
-            } catch (_: Throwable) {
-                null
+    val iconPainter =
+        remember(app.componentName, app.iconBitmap) {
+            app.iconBitmap?.let { bitmap ->
+                BitmapPainter(bitmap.asImageBitmap())
             }
         }
     Row(
@@ -170,9 +171,9 @@ private fun AppRow(
                 .padding(horizontal = 4.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (bmp != null) {
+        if (iconPainter != null) {
             androidx.compose.foundation.Image(
-                painter = bmp,
+                painter = iconPainter,
                 contentDescription = null,
                 modifier = Modifier.size(32.dp),
             )

@@ -32,9 +32,10 @@ class BackupExportCoordinator(
         applicationScope.launch {
             combine(
                 noteRepository.observeActive(),
+                noteRepository.observeArchived(),
                 noteRepository.observeTrashed(),
-            ) { activeNotes, trashedNotes ->
-                activeNotes to trashedNotes
+            ) { activeNotes, archivedNotes, trashedNotes ->
+                Triple(activeNotes, archivedNotes, trashedNotes)
             }.distinctUntilChanged()
                 .drop(1)
                 .collect {

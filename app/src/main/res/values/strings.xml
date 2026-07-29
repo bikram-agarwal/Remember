@@ -261,6 +261,7 @@
     <string name="edit_delete_forever_dialog_title">Delete forever?</string>
     <string name="edit_delete_forever_dialog_body">This note will be permanently deleted and cannot be recovered</string>
     <string name="edit_delete_forever_dialog_confirm">Delete</string>
+    <string name="settings_export_folder_permission_failed">Could not acquire persistent permission for the selected folder</string>
 
     <!-- History -->
     <string name="history_section_archive">Archive</string>
@@ -633,6 +634,7 @@
     <string name="snooze_toast_today">Reminder set for %1$s today</string>
     <string name="snooze_toast_tomorrow">Reminder set for tomorrow at %1$s</string>
     <string name="snooze_toast_future">Reminder set for %1$s at %2$s</string>
+    <string name="reminder_snooze_failed">Could not snooze reminder</string>
     <string name="snooze_indicator_today">Snoozed until %1$s today</string>
     <string name="snooze_indicator_tomorrow">Snoozed until tomorrow at %1$s</string>
     <string name="snooze_indicator_future">Snoozed until %1$s at %2$s</string>
@@ -884,11 +886,11 @@
     <string name="settings_backup_section">Backup &amp; restore</string>
     <string name="filesystem_folder_picker_internal_storage">Internal storage</string>
     <string name="settings_choose_local_backup_folder">Choose local backup folder</string>
-    <string name="settings_choose_cloud_backup_file">Choose cloud backup file</string>
-    <string name="settings_local_backup_folder_hint">Folder for exporting backups (notes, lists, settings)</string>
-    <string name="settings_cloud_backup_folder_hint">File on cloud for exporting backups (notes, lists, settings)</string>
+    <string name="settings_choose_cloud_backup_file">Choose cloud backup folder</string>
+    <string name="settings_local_backup_folder_hint">Local folder for exporting backups (notes, lists, settings)</string>
+    <string name="settings_cloud_backup_folder_hint">Cloud folder for exporting backups (notes, lists, settings)</string>
     <string name="settings_local_backup_folder_cleared">Local backup folder reset</string>
-    <string name="settings_cloud_backup_file_cleared">Cloud backup file reset</string>
+    <string name="settings_cloud_backup_file_cleared">Cloud backup folder reset</string>
     <string name="settings_export_select_folder_first">Select a local or cloud backup folder first</string>
     <string name="settings_include_media_in_backup">Include images &amp; attachments</string>
     <string name="settings_include_media_in_backup_hint">This significantly increases the backup file size</string>
@@ -911,11 +913,17 @@
     <string name="settings_restore_confirm_title">Replace all notes?</string>
     <string name="settings_restore_confirm_body">This will permanently delete all notes and lists in the app and replace them with the backup. This cannot be undone.</string>
     <string name="settings_restore_media_missing_warning">This backup does not include all image and attachment files. Missing media will remain as links and may not open after restore.</string>
+    <plurals name="settings_restore_folders_need_reselection">
+        <item quantity="one">%1$d restored folder could not be accessed. Select it again in settings.</item>
+        <item quantity="other">%1$d restored folders could not be accessed. Select them again in settings.</item>
+    </plurals>
+    <string name="settings_restore_automation_disabled_no_folder">Automatic backups were turned off because no accessible backup folder was restored.</string>
     <string name="settings_restore_go_ahead">Replace and import</string>
     <string name="cloud_provider_google_drive">Google Drive</string>
     <string name="cloud_provider_onedrive">OneDrive</string>
     <string name="cloud_provider_dropbox">Dropbox</string>
     <string name="cloud_provider_box">Box</string>
+    <string name="cloud_provider_folder_path">%1$s / %2$s</string>
 
     <!-- Settings: security -->
     <string name="settings_app_lock_title">App lock</string>

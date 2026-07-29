@@ -167,14 +167,14 @@ fun rememberAttachmentPicker(
 fun persistReadPermission(
     context: Context,
     uri: Uri,
-) {
+): Boolean =
     runCatching {
         context.contentResolver.takePersistableUriPermission(
             uri,
             Intent.FLAG_GRANT_READ_URI_PERMISSION,
         )
-    }
-}
+        true
+    }.getOrDefault(false)
 
 fun resolveDisplayName(
     context: Context,

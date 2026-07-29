@@ -154,6 +154,7 @@ fun NotesTwoPaneRoute(
     var pendingSavedNoteId by rememberSaveable { mutableStateOf<Long?>(null) }
     var tagSheetOpen by rememberSaveable { mutableStateOf(false) }
     var createFabExpanded by rememberSaveable { mutableStateOf(false) }
+    var selectableVisibleNoteIds by remember { mutableStateOf(emptySet<Long>()) }
     val visibleNotes =
         remember(state.items) {
             state.items.mapNotNull { item ->
@@ -294,6 +295,9 @@ fun NotesTwoPaneRoute(
                                 else -> null
                             },
                         showSelectionActionBar = false,
+                        onSelectableVisibleIdsChanged = { noteIds ->
+                            selectableVisibleNoteIds = noteIds
+                        },
                     )
                     // Touch catcher under the FAB menu: tapping the list while the speed
                     // dial is open collapses it instead of activating the tap target,
@@ -331,10 +335,10 @@ fun NotesTwoPaneRoute(
                 Box(Modifier.fillMaxSize()) {
                     if (state.selectedIds.isNotEmpty()) {
                         NotesSelectionActionPane(
-                            selectedCount = state.selectedIds.size,
-                            totalVisibleCount = visibleNotes.size,
+                            selectedCount = state.selectedIds.count { noteId -> noteId in selectableVisibleNoteIds },
+                            totalVisibleCount = selectableVisibleNoteIds.size,
                             onSelectAll = {
-                                viewModel.selectNotes(visibleNotes.map { note -> note.note.id }.toSet())
+                                viewModel.selectNotes(selectableVisibleNoteIds)
                             },
                             onClearSelection = viewModel::clearSelection,
                             onTagSelected = { tagSheetOpen = true },

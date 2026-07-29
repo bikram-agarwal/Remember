@@ -6,19 +6,15 @@ import android.content.Intent
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.QuickCapturePrefs
-import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.quickcapture.QuickCaptureNotifier
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class BootReceiver : BroadcastReceiver() {
     @Inject lateinit var reminderScheduler: ReminderScheduler
-
-    @Inject lateinit var reminderPrefs: ReminderPrefs
 
     @Inject lateinit var noteRepository: NoteRepository
 
@@ -41,16 +37,15 @@ class BootReceiver : BroadcastReceiver() {
             return
         }
         val pendingResult = goAsync()
-        val now = System.currentTimeMillis()
         applicationScope.launch {
             try {
-                val keepUntilDone =
-                    reminderPrefs
-                        .snapshot()
-                        .keepReminderNotificationsUntilDone
-                val all = noteRepository.observeActive().first()
-                all.forEach { item ->
-                    reminderScheduler.scheduleOrShow(item.note, item.items)
+                val reminderNotes = noteRepository.activeReminderNotes()
+                reminderNotes.forEach { noteWithItems ->
+                    reminderScheduler.scheduleOrShow(
+                        note = noteWithItems.note,
+                        items = noteWithItems.items,
+                        silentDueNotification = true,
+                    )
                 }
                 noteRepository.refreshReminderSummaryNotification()
                 // Re-post the quick-capture notification if the user has it enabled. The

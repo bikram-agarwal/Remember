@@ -319,6 +319,7 @@ internal fun UpdateCheckBottomSheetContent(
                                 ) {
                                     RememberMaterialRoundedSymbol(
                                         name = "arrow_back",
+                                        autoMirror = true,
                                         size = 20.dp,
                                         tint =
                                             if (canGoBack) {
@@ -364,6 +365,7 @@ internal fun UpdateCheckBottomSheetContent(
                                 ) {
                                     RememberMaterialRoundedSymbol(
                                         name = "arrow_forward",
+                                        autoMirror = true,
                                         size = 20.dp,
                                         tint =
                                             if (canGoForward) {

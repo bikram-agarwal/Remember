@@ -8,6 +8,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.BackupPrefs
+import dev.bikram.remember.diagnostics.DiagnosticLog
 
 @HiltWorker
 class ScheduledNotesBackupWorker
@@ -38,7 +39,25 @@ class ScheduledNotesBackupWorker
             }
             return exportOutcome.fold(
                 onSuccess = { Result.success() },
-                onFailure = { Result.retry() },
+                onFailure = { error ->
+                    val attemptNumber = runAttemptCount + 1
+                    val willRetry = attemptNumber < MAX_RUN_ATTEMPTS_PER_PERIOD
+                    DiagnosticLog.record(
+                        applicationContext,
+                        "Scheduled backup export failed: destinations=${backupDestinations.size}, " +
+                            "attempt=$attemptNumber, willRetry=$willRetry",
+                        error,
+                    )
+                    if (willRetry) {
+                        Result.retry()
+                    } else {
+                        Result.failure()
+                    }
+                },
             )
+        }
+
+        companion object {
+            private const val MAX_RUN_ATTEMPTS_PER_PERIOD = 3
         }
     }

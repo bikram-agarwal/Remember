@@ -48,8 +48,11 @@ class UpdateCheckWorker
                     }
                 }.onFailure { error ->
                     DiagnosticLog.record(applicationContext, "Scheduled update check failed: attempt=$runAttemptCount", error)
+                    if (runAttemptCount < MAX_IMMEDIATE_RETRIES) {
+                        return Result.retry()
+                    }
                     updateCheckWorkScheduler.syncFromPreferences()
-                    return Result.retry()
+                    return Result.success()
                 }
             }
             updateCheckWorkScheduler.syncFromPreferences()
@@ -58,5 +61,6 @@ class UpdateCheckWorker
 
         companion object {
             const val UNIQUE_WORK_NAME = "remember_update_check_work"
+            private const val MAX_IMMEDIATE_RETRIES = 3
         }
     }
