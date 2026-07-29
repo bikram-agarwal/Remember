@@ -1,10 +1,10 @@
 ## v1.2.2: Reminder presets, check/uncheck all, fixes
 
-## ✨ New Features
+### ✨ New Features
 - Added one-tap presets for quickly choosing common reminder times.
 - Long press any checkbox in notes or checklist to quickly "Check all" or "Uncheck all"
 
-## 🛠 Improved Features
+### 🛠 Improved Features
 - Backups use less memory and reject unsafe or excessively large archives.
 - Cloud backups now use persistent folders and show clearer provider and folder names.
 - Restoring settings now warns when backup folders need to be selected again.
@@ -14,7 +14,7 @@
 - Material You controls retain better visual separation from card backgrounds.
 - Update downloads use safer filenames and clearer in-app feedback.
 
-## 🐛 Bug Fixes
+### 🐛 Bug Fixes
 - Fixed archived notes being missing from backups.
 - Failed imports no longer leave partially restored notes behind.
 - Recurring reminders retain their original schedule after snoozing and restoring a backup.
