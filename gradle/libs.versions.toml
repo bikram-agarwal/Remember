@@ -1,21 +1,21 @@
 [versions]
 activityCompose = "1.13.0"
-agp = "9.4.0-alpha06"
+agp = "9.4.0-alpha07"
 androidxHilt = "1.4.0"
 androidxTestExtJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
 biometric = "1.1.0"
 coil = "3.5.0"
 collectionsImmutable = "0.5.1"
-composeBom = "2026.07.00"
+composeBom = "2026.07.01"
 composeMaterial3Adaptive = "1.2.0"
-composeMaterial3Expressive = "1.5.0-alpha24"
+composeMaterial3Expressive = "1.5.0-alpha25"
 coreKtx = "1.19.0"
 coroutines = "1.11.0"
 datastore = "1.2.1"
 detekt = "2.0.0-alpha.5"
 glance = "1.3.0-alpha02"
-gradleVersionsPlugin = "0.56.0"
+gradleVersionsPlugin = "0.58.0"
 graphicsShapes = "1.1.0"
 hilt = "2.60.1"
 java = "21"
@@ -97,5 +97,5 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
-version-catalog-update = "nl.littlerobots.version-catalog-update:1.1.0"
+version-catalog-update = "nl.littlerobots.version-catalog-update:1.1.1"
 versions = { id = "io.github.ben-manes.versions", version.ref = "gradleVersionsPlugin" }

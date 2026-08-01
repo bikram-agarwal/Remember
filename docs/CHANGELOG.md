@@ -1,3 +1,10 @@
+## v1.2.3: Faster same day reminders
+
+### 🛠 Improved Features
+- Setting same day reminder is now faster — choose a time and tap Save. Current date is automatically selected.
+
+---
+
 ## v1.2.2: Reminder presets, check/uncheck all, fixes
 
 ### ✨ New Features

@@ -1,5 +1,7 @@
 package dev.bikram.remember.data
 
+import dev.bikram.remember.ui.edit.MonthlyKind
+import dev.bikram.remember.ui.edit.ReminderDraft
 import dev.bikram.remember.ui.edit.toDraft
 import dev.bikram.remember.ui.edit.toReminder
 import kotlinx.coroutines.flow.Flow
@@ -471,6 +473,35 @@ class NoteRepositoryRecurrenceTest {
         assertEquals(expectedNewTime, restored.reminderAt)
         assertNull(restored.originalReminderAt)
         assertEquals(recurrence, restored.recurrence)
+    }
+
+    @Test
+    fun `toReminder automatically selects today date when time is entered without date`() {
+        val now = calendarMillis(2026, Calendar.AUGUST, 1, 11, 30)
+        val draft =
+            ReminderDraft(
+                selectedDate = 0L,
+                reminderDateExplicit = false,
+                reminderHour = 15,
+                reminderMinute = 45,
+                reminderTimeExplicit = true,
+                repeatOn = false,
+                repeatExpanded = false,
+                unit = RecurrenceUnit.DAY,
+                intervalText = "1",
+                daysOfWeek = emptySet(),
+                monthlyKind = MonthlyKind.BY_DAY,
+                dayOfMonth = 1,
+                nthOrdinal = 1,
+                nthWeekday = Calendar.SATURDAY,
+                endKind = RecurrenceEndKind.NEVER,
+                endDate = null,
+                endCountText = "10",
+            )
+
+        val reminder = draft.toReminder(nowMillis = now)
+        val expectedTime = calendarMillis(2026, Calendar.AUGUST, 1, 15, 45)
+        assertEquals(expectedTime, reminder.reminderAt)
     }
 
     private fun calendarMillis(

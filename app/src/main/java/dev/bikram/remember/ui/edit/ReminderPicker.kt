@@ -308,10 +308,16 @@ internal fun NoteReminder.toDraft(): ReminderDraft {
     )
 }
 
-internal fun ReminderDraft.toReminder(): NoteReminder {
+internal fun ReminderDraft.toReminder(nowMillis: Long = System.currentTimeMillis()): NoteReminder {
     val hour24 = if (reminderTimeExplicit) reminderHour else 9
     val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
-    val selectedDay = Instant.ofEpochMilli(selectedDate).atZone(ZoneOffset.UTC).toLocalDate()
+    val effectiveDate =
+        if (!reminderDateExplicit && reminderTimeExplicit) {
+            pickerDayMillisForLocalWallClock(nowMillis)
+        } else {
+            selectedDate
+        }
+    val selectedDay = Instant.ofEpochMilli(effectiveDate).atZone(ZoneOffset.UTC).toLocalDate()
     val fireAt =
         selectedDay
             .atTime(LocalTime.of(hour24, minuteVal))
@@ -397,7 +403,7 @@ private fun formatCollapsedHeader(
     context: Context,
     draft: ReminderDraft,
 ): String {
-    if (!draft.reminderDateExplicit) {
+    if (!draft.reminderDateExplicit && !draft.reminderTimeExplicit) {
         return context.getString(R.string.options_reminder)
     }
     val timePart =
@@ -406,10 +412,16 @@ private fun formatCollapsedHeader(
         } else {
             formatTimeOfDay(context, 9, 0)
         }
+    val effectiveDate =
+        if (!draft.reminderDateExplicit && draft.reminderTimeExplicit) {
+            pickerDayMillisForLocalWallClock(System.currentTimeMillis())
+        } else {
+            draft.selectedDate
+        }
     val formatter = DateTimeFormatter.ofPattern("EEE, MMM d", Locale.getDefault())
     val formattedDate =
         Instant
-            .ofEpochMilli(draft.selectedDate)
+            .ofEpochMilli(effectiveDate)
             .atZone(ZoneOffset.UTC)
             .toLocalDate()
             .format(formatter)
@@ -457,9 +469,9 @@ fun ReminderPickerSheet(
 
     val hasChanges =
         if (initialReminders.isEmpty()) {
-            drafts.any { it.reminderDateExplicit }
+            drafts.any { it.reminderDateExplicit || it.reminderTimeExplicit }
         } else {
-            drafts.map { it.toReminder() } != initialReminders
+            drafts.map { it.toReminder(now) } != initialReminders
         }
     val currentHasChanges = rememberUpdatedState(hasChanges)
     var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }
@@ -944,7 +956,7 @@ fun ReminderPickerSheet(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             RememberFilledTonalButton(
-                enabled = drafts.any { it.reminderDateExplicit },
+                enabled = drafts.any { it.reminderDateExplicit || it.reminderTimeExplicit },
                 onClick = {
                     showClearAllConfirmDialog = true
                 },
@@ -965,7 +977,7 @@ fun ReminderPickerSheet(
                     if (drafts.isEmpty()) return@run initialReminders.isNotEmpty()
                     if (!controlsEnabled) return@run initialReminders.isNotEmpty()
                     drafts.forEach { draft ->
-                        if (!draft.reminderDateExplicit) return@run false
+                        if (!draft.reminderDateExplicit && !draft.reminderTimeExplicit) return@run false
                         if (draft.repeatOn) {
                             if (draft.unit == RecurrenceUnit.WEEK && draft.daysOfWeek.isEmpty()) return@run false
                             if (draft.endKind == RecurrenceEndKind.ON_DATE && draft.endDate == null) return@run false
@@ -973,7 +985,7 @@ fun ReminderPickerSheet(
                             if (draft.intervalText.toIntOrNull() == null || draft.intervalText.toInt() < 1) return@run false
                         }
                     }
-                    val currentReminders = drafts.map { it.toReminder() }
+                    val currentReminders = drafts.map { it.toReminder(now) }
                     if (currentReminders == initialReminders) return@run false
                     true
                 }
@@ -984,7 +996,7 @@ fun ReminderPickerSheet(
                     if (drafts.isEmpty()) {
                         onConfirm(emptyList())
                     } else {
-                        val remindersList = drafts.map { it.toReminder() }
+                        val remindersList = drafts.map { it.toReminder(now) }
                         onConfirm(remindersList)
                     }
                 },
