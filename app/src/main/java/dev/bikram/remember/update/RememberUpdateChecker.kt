@@ -173,12 +173,46 @@ private fun JsonObject.longOrNull(key: String): Long? {
     return element.longOrNull ?: element.contentOrNull?.toLongOrNull()
 }
 
+private val recognizedPrereleasePattern =
+    Regex(
+        pattern = """^(.+)-(preview|alpha|beta|rc)(?:[.-]?\d+)?$""",
+        option = RegexOption.IGNORE_CASE,
+    )
+
+private fun normalizeLeadingVersionPrefix(version: String): String {
+    val trimmedVersion = version.trim()
+    return if (trimmedVersion.length > 1 &&
+        trimmedVersion[0].equals('v', ignoreCase = true) &&
+        trimmedVersion[1].isDigit()
+    ) {
+        trimmedVersion.substring(1)
+    } else {
+        trimmedVersion
+    }
+}
+
+private fun compareMatchingPrereleaseAndStableVersions(
+    left: String,
+    right: String,
+): Int? {
+    val normalizedLeft = normalizeLeadingVersionPrefix(left).lowercase()
+    val normalizedRight = normalizeLeadingVersionPrefix(right).lowercase()
+    val leftPrerelease = recognizedPrereleasePattern.matchEntire(normalizedLeft)
+    val rightPrerelease = recognizedPrereleasePattern.matchEntire(normalizedRight)
+
+    if (leftPrerelease?.groupValues?.get(1) == normalizedRight) return -1
+    if (rightPrerelease?.groupValues?.get(1) == normalizedLeft) return 1
+    return null
+}
+
 internal fun compareGithubVersionNames(
     left: String,
     right: String,
 ): Int {
-    val leftParts = left.trim().removePrefix("v").split('.', '-', limit = 10)
-    val rightParts = right.trim().removePrefix("v").split('.', '-', limit = 10)
+    compareMatchingPrereleaseAndStableVersions(left, right)?.let { return it }
+
+    val leftParts = normalizeLeadingVersionPrefix(left).lowercase().split('.', '-', limit = 10)
+    val rightParts = normalizeLeadingVersionPrefix(right).lowercase().split('.', '-', limit = 10)
     val maxLength = maxOf(leftParts.size, rightParts.size)
     for (partIndex in 0 until maxLength) {
         val leftToken = leftParts.getOrNull(partIndex).orEmpty()

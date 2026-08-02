@@ -1,6 +1,7 @@
 # Manual-only release build (workflow_dispatch). No push/tag triggers.
 #
-# - Git tag: creates v{versionName} from app/build.gradle.kts at the workflow commit (github.sha).
+# - Main/tag build: creates stable v{versionName}.
+# - Non-main branch build: creates draft prerelease v{versionName}-Preview-{run number}.
 # - Build toggles:
 #     - build_github: remember-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
 #     - build_fdroid: remember-v{version}-fdroid.apk   (F-Droid distribution flavor)
@@ -128,6 +129,7 @@ jobs:
         run: |
           set -euo pipefail
           gradle_tasks=()
+          gradle_arguments=()
           if [ "${{ inputs.build_github }}" = "true" ]; then
             gradle_tasks+=(":app:assembleGithubRelease")
           fi
@@ -137,7 +139,10 @@ jobs:
           if [ "${{ inputs.build_playstore }}" = "true" ]; then
             gradle_tasks+=(":app:bundlePlaystoreRelease")
           fi
-          ./gradlew "${gradle_tasks[@]}" --no-configuration-cache
+          if [[ "$GITHUB_REF" == refs/heads/* && "$GITHUB_REF" != refs/heads/main ]]; then
+            gradle_arguments+=("-PpreviewVersionSuffix=-Preview-${GITHUB_RUN_NUMBER}")
+          fi
+          ./gradlew "${gradle_tasks[@]}" "${gradle_arguments[@]}" --no-configuration-cache
 
       - name: Collect and rename release assets
         run: |
@@ -192,7 +197,8 @@ jobs:
 
       # Pass token via `with.token`, not env GITHUB_TOKEN — env-only breaks
       # `on: release: types: [published]` for downstream workflows (softprops/action-gh-release #770).
-      - name: Create draft GitHub Release (tag v${{ steps.version.outputs.version }})
+      - name: Create stable draft GitHub Release (tag v${{ steps.version.outputs.version }})
+        if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2.6.1
         with:
           token: ${{ github.token }}
@@ -204,6 +210,29 @@ jobs:
             **Release assets**
           files: release-assets/*
           generate_release_notes: true
+
+      - name: Create preview draft GitHub Release
+        if: startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/main'
+        uses: softprops/action-gh-release@v2.6.1
+        with:
+          token: ${{ github.token }}
+          draft: true
+          prerelease: true
+          make_latest: false
+          tag_name: v${{ steps.version.outputs.version }}-Preview-${{ github.run_number }}
+          name: v${{ steps.version.outputs.version }}-Preview-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          body: |
+            > [!WARNING]
+            > This is a preview build intended for testing. It may contain bugs,
+            > unfinished changes, or regressions. Do not install it if you want a
+            > stable experience.
+
+            Back up your Remember data before installing and report any problems
+            through the repository's issue tracker.
+
+            Built from `${{ github.ref_name }}` at commit `${{ github.sha }}`.
+          files: release-assets/*
 
       - name: Write Play service account JSON
         if: ${{ inputs.play_track != 'none' }}

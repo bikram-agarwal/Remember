@@ -24,4 +24,15 @@ class GithubUpdateVersionTest {
         assertFalse(isGithubReleaseNewerThanInstalled("1.0.9", "1.1.0"))
         assertFalse(isGithubReleaseNewerThanInstalled("1.9.9", "2.0.0"))
     }
+
+    @Test
+    fun stableReleaseIsNewerThanMatchingPreview() {
+        assertTrue(isGithubReleaseNewerThanInstalled("v1.2.4", "1.2.4-preview-239"))
+        assertFalse(isGithubReleaseNewerThanInstalled("v1.2.4-Preview-239", "1.2.4"))
+    }
+
+    @Test
+    fun newerPreviewRunIsNewer() {
+        assertTrue(isGithubReleaseNewerThanInstalled("v1.2.4-Preview-240", "1.2.4-preview-239"))
+    }
 }

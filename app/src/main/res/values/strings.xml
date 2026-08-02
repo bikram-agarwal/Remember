@@ -1001,7 +1001,7 @@
     <string name="settings_about_filepipe_play_store_url" translatable="false">https://play.google.com/store/apps/details?id=dev.bikram.filepipe</string>
     <string name="settings_about_filepipe_website_url" translatable="false">https://bikram-agarwal.github.io/filepipe</string>
     <string name="settings_about_obtainx_website_url" translatable="false">https://bikram-agarwal.github.io/obtainx</string>
-    <string name="about_author_github_profile_url" translatable="false">https://github.com/bikram-agarwal</string>
+    <string name="about_author_github_profile_url" translatable="false">https://bikram-agarwal.github.io/</string>
 
     <!-- Developer options -->
     <string name="dev_options_title">Developer options</string>

@@ -63,6 +63,8 @@ val hasReleaseSigning =
         releaseStorePassword != null &&
         releaseKeyAlias != null &&
         releaseKeyPassword != null
+val previewVersionSuffix =
+    providers.gradleProperty("previewVersionSuffix").orNull?.takeIf { it.isNotBlank() }
 
 extensions.configure<ApplicationExtension>("android") {
     val rememberApplicationId = "dev.bikram.remember"
@@ -112,6 +114,7 @@ extensions.configure<ApplicationExtension>("android") {
             matchingFallbacks += listOf("release")
         }
         release {
+            versionNameSuffix = previewVersionSuffix
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
