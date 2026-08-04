@@ -497,7 +497,7 @@ fun EditListScreen(
                                 onTrash = editorActions.trashAndBack,
                                 onRestore = editorActions.restore,
                                 onDeleteForever = { deleteForeverConfirmOpen = true },
-                                showEditAction = true,
+                                showEditAction = false,
                             )
                         },
                     )

@@ -1,7 +1,10 @@
-## v1.2.3: Faster same day reminders
+## v1.2.4: Faster same day reminders
 
 ### 🛠 Improved Features
 - Setting same day reminder is now faster — choose a time and tap Save. Current date is automatically selected.
+
+### 🐛 Bug Fixes
+- Removed the edit button from the checklist action toolbar. Tapping anywhere on the body already puts it in edit mode. 
 
 ---
 
