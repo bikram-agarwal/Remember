@@ -63,7 +63,7 @@ jobs:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -185,7 +185,7 @@ jobs:
           ls -la "$out"
 
       - name: Generate GitHub Artifact Attestations
-        uses: actions/attest@v4.1.0
+        uses: actions/attest@v4
         with:
           subject-path: 'release-assets/*'
 
@@ -199,7 +199,7 @@ jobs:
       # `on: release: types: [published]` for downstream workflows (softprops/action-gh-release #770).
       - name: Create stable draft GitHub Release (tag v${{ steps.version.outputs.version }})
         if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2.6.1
+        uses: softprops/action-gh-release@v3
         with:
           token: ${{ github.token }}
           draft: true
@@ -213,7 +213,7 @@ jobs:
 
       - name: Create preview draft GitHub Release
         if: startsWith(github.ref, 'refs/heads/') && github.ref != 'refs/heads/main'
-        uses: softprops/action-gh-release@v2.6.1
+        uses: softprops/action-gh-release@v3
         with:
           token: ${{ github.token }}
           draft: true

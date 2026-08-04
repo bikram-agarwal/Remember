@@ -2,6 +2,31 @@
 
 <img alt="Remember: Notes, tasks, reminders - done right." src="fastlane/metadata/android/en-US/images/featureGraphic.jpg" />
 
+<br/>
+
+<p align="center">
+  <!-- Stack / Technical Chips -->
+  <img alt="Android API" src="https://img.shields.io/badge/Api%2031+-50f270?logo=android&logoColor=black&style=for-the-badge"/>
+  <img alt="Kotlin" src="https://img.shields.io/badge/Kotlin-a503fc?logo=kotlin&logoColor=white&style=for-the-badge"/>
+  <img alt="Jetpack Compose" src="https://img.shields.io/static/v1?style=for-the-badge&message=Jetpack+Compose&color=4285F4&logo=Jetpack+Compose&logoColor=FFFFFF&label="/>
+  <img alt="Material You" src="https://custom-icon-badges.demolab.com/badge/material%20you-lightblue?style=for-the-badge&logoColor=333&logo=material-you"/>
+  <br/>
+  <!-- Dynamic Lines of Code Badge -->
+  <img alt="Lines of Code" src="https://img.shields.io/endpoint?url=https%3A%2F%2Ftokei.kojix2.net%2Fbadge%2Fgithub%2Fbikram-agarwal%2FRemember%2Flines&style=for-the-badge&color=aeff4d&labelColor=4b731a&label=Lines%20of%20code"/>
+  <!-- Forks -->
+  <a href="https://github.com/bikram-agarwal/Remember/network/members"><img alt="Forks" src="https://img.shields.io/github/forks/bikram-agarwal/Remember?color=DAA520&style=for-the-badge&labelColor=664D0F"/></a>
+  <!-- Stars -->
+  <a href="https://github.com/bikram-agarwal/Remember/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/bikram-agarwal/Remember?color=ffff00&style=for-the-badge&labelColor=a1a116"/></a>
+  <a href="https://github.com/bikram-agarwal/Remember/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/bikram-agarwal/Remember/total?color=00bcd4&style=for-the-badge&labelColor=006064"/></a>
+  <br/>
+  <!-- Distribution Badges -->
+  <a href="https://github.com/bikram-agarwal/Remember/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/bikram-agarwal/Remember?color=a1168e&include_prereleases&logo=github&style=for-the-badge&labelColor=700f63"/></a>
+  <a href="https://play.google.com/store/apps/details?id=dev.bikram.remember"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v1.2.4-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
+  <a href="https://f-droid.org/packages/dev.bikram.remember.gh"><img alt="F-Droid" src="https://img.shields.io/f-droid/v/dev.bikram.remember.gh?color=a1168e&logo=FDROID&style=for-the-badge&labelColor=700f63"/></a>
+  <br/>
+  <a href="https://trendshift.io/repositories/72537" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/72537/daily?language=Kotlin" alt="bikram-agarwal%2FRemember | Trendshift" width="250" height="55"/></a>
+</p>
+
 **Never lose an important reminder to an accidental swipe.**
 
 You're clearing your notification shade — swiping away emails, messages, news — and a reminder goes with them. You didn't mean to. Now you're not sure what it said, just that it was probably important. That brief flash of *"wait, what was that?"* is the problem Remember solves.
