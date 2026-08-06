@@ -129,6 +129,7 @@ fun NoteCard(
     val heroScrimColor = if (showHero) heroImageColors?.imageScrimColor ?: Color.Black else surface
     val cardShape = MaterialTheme.shapes.medium
     val starredIconDescription = stringResource(R.string.notecard_starred_cd)
+    val pinnedIconDescription = stringResource(R.string.notecard_pinned_cd)
 
     // Pre-resolve every fragment of the merged TalkBack announcement so the body of
     // [remember] below can stay context-free. The five child icon contentDescriptions
@@ -153,6 +154,7 @@ fun NoteCard(
             model.body,
             model.completed,
             model.starred,
+            model.pinned,
             model.reminderAt,
             model.recurring,
             model.pictureUri,
@@ -178,6 +180,7 @@ fun NoteCard(
                 if (model.reminderAt != null) add(cdReminderForAnnouncement)
                 if (model.recurring) add(cdRecurringForAnnouncement)
                 if (model.starred) add(starredIconDescription)
+                if (model.pinned) add(pinnedIconDescription)
                 if (model.pictureUri != null) add(cdPictureForAnnouncement)
                 if (model.hasAttachment) add(cdAttachmentForAnnouncement)
             }.joinToString(cdSeparator)

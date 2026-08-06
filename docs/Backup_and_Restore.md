@@ -50,7 +50,7 @@ Every manual or scheduled backup is a ZIP file containing `notes.json` and `sett
 **`notes.json` includes:**
 
 - All notes and lists — active, archived, and trashed
-- Per note: title, body, kind (NOTE / LIST), color index, starred, archived, trashed, locked, icon key, importance, visibility, timestamps (created, updated, trashed, completed)
+- Per note: title, body, kind (NOTE / LIST), color index, starred, pinned, archived, trashed, locked, icon key, importance, visibility, timestamps (created, updated, trashed, completed, pinned)
 - Reminders: the scheduled timestamp and full recurrence rule (serialized JSON)
 - Notification actions (all 10 action types, with title, details, and extra)
 - Tags assigned to each note

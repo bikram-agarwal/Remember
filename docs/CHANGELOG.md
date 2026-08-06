@@ -1,3 +1,10 @@
+## v1.2.5 Pinned notes
+
+### ✨ New Features
+- **Pin** the notes you need at hand: they stay at the top of the list, regardless of your sorting or grouping.
+
+---
+
 ## v1.2.4: Faster same day reminders
 
 ### 🛠 Improved Features

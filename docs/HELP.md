@@ -41,12 +41,28 @@ Lists contain checkable items you can reorder, and supports one level of nesting
 
 ## Organization
 
-### Tags, stars, archive, and trash
+### Tags, stars, pins, archive, and trash
 
 - **Tags** group related notes and lists for quick filtering.
-- **Star** marks important items so they surface easily.
+- **Star** marks important items so they surface easily. Starred items also feed the Starred widget.
+- **Pin** keeps an item at the very top of the Notes tab. See [Pinning](#pinning) below.
 - **Archive** removes items from the active list without deleting them.
 - **Trash** is for items you intend to remove.
+
+### Pinning
+
+Pinned notes and lists collect in a **Pinned** section at the very top of the Notes tab. The section
+stays there no matter how you sort or group the list — pinning is about placement, and starring is
+about marking a favorite, so the two are separate and can be used together.
+
+- Pin or unpin from the note's bottom bar, by swiping a card right (Pin is the first reveal action
+  by default), or by selecting several notes and using **Pin** in the selection bar.
+- Searching or filtering can hide a pinned item, because those narrow down what the list contains.
+  Changing the sort or grouping never will. The **Pinned** filter under "Others" does the reverse —
+  it shows only your pinned items.
+- Marking a pinned item done moves it to the **Done** section at the bottom, like anything else. It
+  stays pinned, so it returns to the top if you mark it not done again.
+- Duplicating a pinned item does not pin the copy.
 
 ### Search
 
@@ -225,10 +241,12 @@ Controls how Material 3 expands your seed color into a full palette. The same se
 
 ### Swipe actions
 
-**Reveal mode** (default) — swiping a note reveals a row of action buttons rather than immediately doing something. Each direction (right swipe and left swipe) has three slots, giving you six configurable actions in total. You can long-press and drag actions to reorder them within the slots, and any slot can be left empty. Default layout: right swipe shows Edit, Duplicate, Star; left swipe shows Mark done, Archive, Trash.
+**Reveal mode** (default) — swiping a note reveals a row of action buttons rather than immediately doing something. Each direction (right swipe and left swipe) has three slots, giving you six configurable actions in total. You can long-press and drag actions to swap their positions between slots. Default layout: right swipe shows Pin, Star, Duplicate; left swipe shows Mark done, Archive, Trash.
 
-**Direct mode** — swiping immediately executes a single action with no intermediate step. One action per direction. Useful if you have a single operation you want to do as fast as possible.
+Reveal mode holds six of the seven available actions, and its editor rearranges the six that are there rather than swapping in a different one. Edit is the action left out of the default layout — it is one tap away inside the note anyway. To use Edit on swipe, choose **Direct mode**, where every action is selectable.
 
-Available actions for either mode: Edit, Trash, Duplicate, Star, Archive, Mark done.
+**Direct mode** — swiping immediately executes a single action with no intermediate step. One action per direction. Useful if you have a single operation you want to do as fast as possible. Defaults: swipe right pins, swipe left moves to trash — the same as each direction's first reveal action.
+
+Available actions for either mode: Pin, Star, Duplicate, Mark done, Archive, Trash, Edit.
 
 Haptic feedback at swipe thresholds can be turned on or off independently of the mode.

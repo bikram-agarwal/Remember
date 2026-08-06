@@ -48,6 +48,15 @@ sealed interface BulkUndoableAction {
         val snapshots: Map<Long, NoteCompletionSnapshot> = emptyMap(),
     ) : BulkUndoableAction
 
+    /**
+     * @param ids only the rows this action actually pinned. Already-pinned rows in the selection
+     *     are excluded by the caller so undo unpins exactly what it pinned, leaving pre-existing
+     *     pins alone.
+     */
+    data class Pinned(
+        override val ids: Set<Long>,
+    ) : BulkUndoableAction
+
     data class Restored(
         override val ids: Set<Long>,
     ) : BulkUndoableAction
@@ -81,6 +90,7 @@ fun bulkActionSnackbarMessage(
             is BulkUndoableAction.Archived -> R.plurals.bulk_action_archived
             is BulkUndoableAction.Trashed -> R.plurals.bulk_action_trashed
             is BulkUndoableAction.MarkedDone -> R.plurals.bulk_action_marked_done
+            is BulkUndoableAction.Pinned -> R.plurals.bulk_action_pinned
             is BulkUndoableAction.Restored -> R.plurals.bulk_action_restored
             is BulkUndoableAction.Unarchived -> R.plurals.bulk_action_unarchived
             is BulkUndoableAction.ArchivedFromTrash -> R.plurals.bulk_action_archived_from_trash

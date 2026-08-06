@@ -342,6 +342,7 @@ fun NotesTwoPaneRoute(
                             },
                             onClearSelection = viewModel::clearSelection,
                             onTagSelected = { tagSheetOpen = true },
+                            onPinSelected = viewModel::pinSelected,
                             onMarkDoneSelected = viewModel::markSelectedDone,
                             onArchiveSelected = viewModel::archiveSelected,
                             onTrashSelected = viewModel::trashSelected,
@@ -1228,6 +1229,7 @@ private fun NotesSelectionActionPane(
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit,
     onTagSelected: () -> Unit,
+    onPinSelected: () -> Unit,
     onMarkDoneSelected: () -> Unit,
     onArchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
@@ -1300,6 +1302,17 @@ private fun NotesSelectionActionPane(
                 contentPadding = buttonPadding,
             ) {
                 SelectionPaneButtonContent("label", stringResource(R.string.home_bulk_tag), compact)
+            }
+            RememberFilledTonalButton(
+                onClick = onPinSelected,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(buttonHeight),
+                shape = SelectionPaneButtonShape,
+                contentPadding = buttonPadding,
+            ) {
+                SelectionPaneButtonContent("push_pin", stringResource(R.string.edit_bottom_bar_pin), compact)
             }
             RememberFilledTonalButton(
                 onClick = onMarkDoneSelected,

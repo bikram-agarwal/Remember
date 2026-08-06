@@ -75,8 +75,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 124
-        versionName = "1.2.4"
+        versionCode = 125
+        versionName = "1.2.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -288,6 +288,7 @@ dependencies {
     implementation(libs.kotlinx.collections.immutable)
     implementation(libs.androidx.biometric)
     implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
     implementation(libs.androidx.graphics.shapes)

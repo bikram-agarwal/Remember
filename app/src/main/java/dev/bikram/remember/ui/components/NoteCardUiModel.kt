@@ -5,6 +5,7 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.getActiveReminders
+import dev.bikram.remember.data.pinned
 import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.edit.resolveNoteIcon
 import kotlinx.collections.immutable.PersistentList
@@ -17,6 +18,13 @@ data class NoteCardUiModel(
     val title: String,
     val body: String,
     val starred: Boolean,
+    /**
+     * Pinned to the top of Home. Separate from [starred] on purpose: starred is a favorite
+     * (filter chip + its own widget), pinned is placement only. The two cues must stay
+     * visually distinct - starred owns the card border + watermark, pinned gets its own
+     * leading glyph in the metadata row.
+     */
+    val pinned: Boolean,
     val completed: Boolean,
     val icon: NoteIcon,
     val pictureUri: String?,
@@ -51,6 +59,7 @@ fun NoteWithItems.toNoteCardUiModel(
         title = note.title,
         body = note.body,
         starred = note.starred || note.tags.contains(RememberReservedTags.STARRED),
+        pinned = note.pinned,
         completed = note.completedAt != null,
         icon = resolveNoteIcon(note.iconKey, note.kind),
         pictureUri = note.pictureUri,

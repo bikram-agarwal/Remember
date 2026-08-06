@@ -389,6 +389,9 @@ class HistoryViewModel
                     is BulkUndoableAction.MarkedDone ->
                         repository.markIncomplete(action.ids, action.snapshots)
                     is BulkUndoableAction.Restored -> repository.moveToTrash(action.ids)
+                    // Not produced by History (pinning is a Home action), but the exhaustive
+                    // mapping keeps the inverse correct if that ever changes.
+                    is BulkUndoableAction.Pinned -> repository.setPinned(action.ids, false)
                     is BulkUndoableAction.Unarchived -> repository.archiveNotes(action.ids)
                     is BulkUndoableAction.ArchivedFromTrash -> repository.moveToTrash(action.ids)
                     is BulkUndoableAction.MovedArchiveToTrash -> repository.archiveNotes(action.ids)

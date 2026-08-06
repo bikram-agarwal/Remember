@@ -22,11 +22,12 @@ class RememberDatabaseSchemaTest {
 
         migrationHelper.runMigrationsAndValidate(
             VERSION_1_DATABASE_NAME,
-            4,
+            CURRENT_VERSION,
             true,
             RememberDatabase.MIGRATION_1_2,
             RememberDatabase.MIGRATION_2_3,
             RememberDatabase.MIGRATION_3_4,
+            RememberDatabase.MIGRATION_4_5,
         )
     }
 
@@ -36,10 +37,11 @@ class RememberDatabaseSchemaTest {
 
         migrationHelper.runMigrationsAndValidate(
             VERSION_2_DATABASE_NAME,
-            4,
+            CURRENT_VERSION,
             true,
             RememberDatabase.MIGRATION_2_3,
             RememberDatabase.MIGRATION_3_4,
+            RememberDatabase.MIGRATION_4_5,
         )
     }
 
@@ -49,15 +51,30 @@ class RememberDatabaseSchemaTest {
 
         migrationHelper.runMigrationsAndValidate(
             VERSION_3_DATABASE_NAME,
-            4,
+            CURRENT_VERSION,
             true,
             RememberDatabase.MIGRATION_3_4,
+            RememberDatabase.MIGRATION_4_5,
+        )
+    }
+
+    @Test
+    fun migration_from_version_4_reaches_current_schema() {
+        migrationHelper.createDatabase(VERSION_4_DATABASE_NAME, 4).close()
+
+        migrationHelper.runMigrationsAndValidate(
+            VERSION_4_DATABASE_NAME,
+            CURRENT_VERSION,
+            true,
+            RememberDatabase.MIGRATION_4_5,
         )
     }
 
     companion object {
+        private const val CURRENT_VERSION = 5
         private const val VERSION_1_DATABASE_NAME = "remember-schema-v1-test.db"
         private const val VERSION_2_DATABASE_NAME = "remember-schema-v2-test.db"
         private const val VERSION_3_DATABASE_NAME = "remember-schema-v3-test.db"
+        private const val VERSION_4_DATABASE_NAME = "remember-schema-v4-test.db"
     }
 }

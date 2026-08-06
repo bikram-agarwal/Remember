@@ -52,6 +52,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import dev.bikram.remember.R
+import dev.bikram.remember.data.DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS
+import dev.bikram.remember.data.DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.SwipeGestureMode
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -686,14 +688,28 @@ private fun SwipeHintText(text: String) {
     )
 }
 
+/**
+ * Canonical action order, used for both jobs so the two modes never disagree:
+ *
+ *  - the direct-mode dropdowns list actions in exactly this order;
+ *  - reveal slots the user left empty are back-filled from it, in order.
+ *
+ * The first [SWIPE_REVEAL_TOTAL_SLOT_COUNT] entries are therefore the default reveal layout, and
+ * must stay in step with [DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS] /
+ * [DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS] (SwipeRevealDefaultsTest enforces this).
+ *
+ * Edit is last on purpose: there are 7 actions for 6 slots, so the tail entry is the one that
+ * cannot be reached in reveal mode. Edit is the cheapest to reach another way - open the note.
+ */
 private val SwipeActionDisplayOrder: List<NoteSwipeAction> =
     listOf(
-        NoteSwipeAction.EDIT,
-        NoteSwipeAction.DUPLICATE,
+        NoteSwipeAction.TOGGLE_PIN,
         NoteSwipeAction.TOGGLE_STAR,
+        NoteSwipeAction.DUPLICATE,
         NoteSwipeAction.MARK_DONE,
         NoteSwipeAction.ARCHIVE,
         NoteSwipeAction.TRASH,
+        NoteSwipeAction.EDIT,
     )
 
 private fun fullSwipeSlotActions(
@@ -748,6 +764,7 @@ internal fun noteSwipeActionLabel(action: NoteSwipeAction): String =
             NoteSwipeAction.TRASH -> R.string.edit_bottom_bar_trash
             NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
             NoteSwipeAction.TOGGLE_STAR -> R.string.swipe_action_toggle_star
+            NoteSwipeAction.TOGGLE_PIN -> R.string.swipe_action_pin
             NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
             NoteSwipeAction.MARK_DONE -> R.string.swipe_action_mark_done
         },

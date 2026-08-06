@@ -106,7 +106,7 @@ import kotlinx.coroutines.launch
 private object HomeScreenSessionState {
     var archiveSectionExpanded: Boolean = false
     var trashSectionExpanded: Boolean = false
-    var collapsedSectionKeys: Set<String> = setOf("DONE")
+    var collapsedSectionKeys: Set<String> = setOf(DONE_SECTION_KEY)
     var listFirstVisibleItemIndex: Int = 0
     var listFirstVisibleItemScrollOffset: Int = 0
     var initialListLiftApplied: Boolean = false
@@ -125,6 +125,7 @@ private fun PendingNewNoteCard(
                 title = "",
                 body = "",
                 starred = false,
+                pinned = false,
                 completed = false,
                 icon =
                     when (kind) {
@@ -207,6 +208,7 @@ fun HomeRoute(
         onSelectAllVisible = vm::selectNotes,
         onPruneSelection = vm::pruneSelection,
         onClearSelection = vm::clearSelection,
+        onPinSelected = vm::pinSelected,
         onMarkSelectedDone = vm::markSelectedDone,
         onArchiveSelected = vm::archiveSelected,
         onTrashSelected = vm::trashSelected,
@@ -240,6 +242,7 @@ fun HomeScreen(
     onSelectAllVisible: (Set<Long>) -> Unit,
     onPruneSelection: (Set<Long>) -> Unit,
     onClearSelection: () -> Unit,
+    onPinSelected: () -> Unit,
     onMarkSelectedDone: () -> Unit,
     onArchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
@@ -461,6 +464,7 @@ fun HomeScreen(
                     visible = state.inSelectionMode,
                     onClearSelection = onClearSelection,
                     onTagSelected = { tagSheetOpen = true },
+                    onPinSelected = onPinSelected,
                     onMarkDoneSelected = onMarkSelectedDone,
                     onArchiveSelected = onArchiveSelected,
                     onTrashSelected = onTrashSelected,
@@ -533,9 +537,11 @@ fun HomeScreen(
                     } else {
                         null
                     },
-                // Bookend sections (Overdue at top, Done at bottom) stay put when the
-                // user reverses sort. The pin icon advertises that to avoid surprise.
-                pinned = item.stableKey == "OVERDUE" || item.stableKey == "DONE",
+                // Bookend sections (Pinned and Overdue at top, Done at bottom) stay put when the
+                // user reverses sort or changes grouping. Each gets its own badge naming what it
+                // is; ordinary grouping sections get none, so the badge itself also reads as
+                // "this one is fixed".
+                badgeSymbolName = item.bookendBadgeSymbol(),
                 modifier = modifier,
             )
         }

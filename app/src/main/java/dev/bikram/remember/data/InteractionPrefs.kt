@@ -16,8 +16,9 @@ import org.json.JSONObject
 @Immutable
 data class InteractionState(
     val swipeGestureMode: SwipeGestureMode = SwipeGestureMode.REVEAL_ACTIONS,
-    val swipeStartToEnd: NoteSwipeAction = NoteSwipeAction.EDIT,
-    val swipeEndToStart: NoteSwipeAction = NoteSwipeAction.TRASH,
+    /** Direct-mode default: swipe right pins, matching the first reveal slot. */
+    val swipeStartToEnd: NoteSwipeAction = DEFAULT_SWIPE_START_TO_END_ACTION,
+    val swipeEndToStart: NoteSwipeAction = DEFAULT_SWIPE_END_TO_START_ACTION,
     val swipeStartToEndRevealActions: PersistentList<NoteSwipeAction?> = DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS,
     val swipeEndToStartRevealActions: PersistentList<NoteSwipeAction?> = DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS,
 )
@@ -27,11 +28,36 @@ enum class SwipeGestureMode {
     REVEAL_ACTIONS,
 }
 
+/**
+ * Reveal mode has exactly three slots per direction and its editor can only *swap* two occupied
+ * slots - there is no palette to drag an unused action in from. So an action that is not in this
+ * default (and not already in a user's saved layout) is unreachable on swipe.
+ *
+ * Edit is the one deliberately left out: it is the cheapest action to reach another way (tap the
+ * note, then Edit), whereas Pin has no other one-gesture path from the list. Existing users keep
+ * whatever they already saved - [InteractionPrefs.sanitizedRevealActions] only falls back to these
+ * defaults when nothing is stored.
+ */
 val DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS: PersistentList<NoteSwipeAction?> =
-    persistentListOf(NoteSwipeAction.EDIT, NoteSwipeAction.DUPLICATE, NoteSwipeAction.TOGGLE_STAR)
+    persistentListOf(NoteSwipeAction.TOGGLE_PIN, NoteSwipeAction.TOGGLE_STAR, NoteSwipeAction.DUPLICATE)
 
 val DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS: PersistentList<NoteSwipeAction?> =
     persistentListOf(NoteSwipeAction.MARK_DONE, NoteSwipeAction.ARCHIVE, NoteSwipeAction.TRASH)
+
+/**
+ * Direct-mode ("execute one") defaults.
+ *
+ * Swipe right pins, matching [DEFAULT_SWIPE_START_TO_END_REVEAL_ACTIONS]'s first slot, so the two
+ * gesture modes agree on what a right swipe does out of the box.
+ *
+ * Swipe left deliberately stays Trash and does NOT follow the left reveal slots (which lead with
+ * Mark done). Direct mode fires on the swipe itself with no confirmation step, and Trash is the
+ * long-standing default there; quietly repointing it at Mark done would change what an existing
+ * gesture does. Do not "fix" this into symmetry with the reveal defaults.
+ */
+val DEFAULT_SWIPE_START_TO_END_ACTION: NoteSwipeAction = NoteSwipeAction.TOGGLE_PIN
+
+val DEFAULT_SWIPE_END_TO_START_ACTION: NoteSwipeAction = NoteSwipeAction.TRASH
 
 private val Context.interactionDataStore by preferencesDataStore(name = "interaction_prefs")
 
@@ -60,11 +86,11 @@ class InteractionPrefs(
                 swipeStartToEnd =
                     prefs[Keys.SWIPE_START_TO_END]
                         ?.let { noteSwipeActionFromStoredName(it) }
-                        ?: NoteSwipeAction.EDIT,
+                        ?: DEFAULT_SWIPE_START_TO_END_ACTION,
                 swipeEndToStart =
                     prefs[Keys.SWIPE_END_TO_START]
                         ?.let { noteSwipeActionFromStoredName(it) }
-                        ?: NoteSwipeAction.TRASH,
+                        ?: DEFAULT_SWIPE_END_TO_START_ACTION,
                 swipeStartToEndRevealActions =
                     sanitizedRevealActions(
                         listOf(

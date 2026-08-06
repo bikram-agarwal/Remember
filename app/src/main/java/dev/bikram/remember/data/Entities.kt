@@ -151,7 +151,26 @@ data class NoteEntity(
      * end condition).
      */
     val completedAt: Long? = null,
+    /**
+     * Wall-clock instant at which the note was pinned; null = not pinned. A timestamp rather
+     * than a boolean so "most recently pinned" is available as a tie-breaker without another
+     * migration, matching the [trashedAt] / [completedAt] convention.
+     *
+     * Pinning is purely an *ordering* concern - it hoists the note into the top-pinned
+     * "Pinned" section on Home regardless of the active grouping or sort. It is deliberately
+     * distinct from [starred], which marks a favorite (own filter chip + home-screen widget)
+     * and does not affect placement.
+     *
+     * The flag is inert while the note is archived or trashed, and it loses to Done: a pinned
+     * note that gets marked done drops to the bottom-pinned Done section and re-asserts its
+     * pin when un-done. See `HomeListArrangement.arrangeItems`.
+     */
+    val pinnedAt: Long? = null,
 )
+
+/** True when the note is pinned to the top of Home. */
+val NoteEntity.pinned: Boolean
+    get() = pinnedAt != null
 
 fun NoteEntity.getActiveReminders(): List<NoteReminder> {
     if (reminders.isNotEmpty()) return reminders.limitedToReminderSlots()

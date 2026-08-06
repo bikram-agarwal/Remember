@@ -12,6 +12,7 @@ import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.data.ViewOptionsPrefs
 import dev.bikram.remember.data.matches
+import dev.bikram.remember.data.pinned
 import dev.bikram.remember.ui.common.BulkUndoableAction
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentList
@@ -239,6 +240,11 @@ class HomeViewModel
         ) {
             val id = note.note.id
             viewModelScope.launch {
+                // Toggle actions read their current state from the row rather than from [note],
+                // which is a snapshot taken when the card composed. Flipping a stale snapshot
+                // re-applies the state it is already in, which the repository treats as a no-op -
+                // that is what made "unpin"/"unstar" appear to do nothing on a second swipe.
+                val liveNote = if (action.isToggle) repository.get(id)?.note else null
                 when (action) {
                     NoteSwipeAction.EDIT -> _events.trySend(HomeEvent.OpenNote(note = note, forceEdit = true))
                     NoteSwipeAction.TRASH -> {
@@ -251,7 +257,12 @@ class HomeViewModel
                     // Star toggles the star icon in place. The state change is
                     // already visible on the card so an Undo snackbar would be redundant.
                     NoteSwipeAction.TOGGLE_STAR ->
-                        repository.setStarred(id, !note.note.starred)
+                        repository.setStarred(id, !(liveNote ?: note.note).starred)
+                    // Pin/unpin moves the card into (or out of) the top Pinned section. The
+                    // row visibly relocates, which is its own confirmation - no snackbar,
+                    // same reasoning as the star toggle above.
+                    NoteSwipeAction.TOGGLE_PIN ->
+                        repository.setPinned(id, !(liveNote ?: note.note).pinned)
                     NoteSwipeAction.ARCHIVE -> {
                         repository.archiveNote(id)
                         emitSingleSwipeAction(BulkUndoableAction.Archived(setOf(id)))
@@ -262,7 +273,7 @@ class HomeViewModel
                     // snackbar with Undo only on the FORWARD direction (incomplete ->
                     // complete); the reverse is the user's own undo so it stays silent.
                     NoteSwipeAction.MARK_DONE -> {
-                        if (note.note.completedAt != null) {
+                        if ((liveNote ?: note.note).completedAt != null) {
                             repository.markIncomplete(id)
                         } else {
                             // markCompleted now returns the pre-completion snapshot
@@ -324,6 +335,26 @@ class HomeViewModel
             }
         }
 
+        /**
+         * Pins every selected note that is not already pinned. "Pin all" rather than a per-note
+         * toggle: with a mixed selection a toggle would scatter the group in two directions, which
+         * is not what one tap on one button should do. Already-pinned rows are left untouched and
+         * excluded from the undo set.
+         */
+        fun pinSelected() {
+            val noteIds = visibleSelectedIdsSnapshot()
+            if (noteIds.isEmpty()) return
+            val ids = noteIds.toSet()
+            viewModelScope.launch {
+                val pinnedIds = repository.setPinned(ids, true)
+                selectedIds.value = persistentSetOf()
+                if (pinnedIds.isEmpty()) return@launch
+                val action = BulkUndoableAction.Pinned(pinnedIds)
+                lastBulkAction = action
+                _events.trySend(HomeEvent.BulkActionPerformed(action))
+            }
+        }
+
         fun archiveSelected() {
             val noteIds = visibleSelectedIdsSnapshot()
             if (noteIds.isEmpty()) return
@@ -365,6 +396,7 @@ class HomeViewModel
                     is BulkUndoableAction.Trashed -> repository.restoreFromTrash(action.ids)
                     is BulkUndoableAction.MarkedDone ->
                         repository.markIncomplete(action.ids, action.snapshots)
+                    is BulkUndoableAction.Pinned -> repository.setPinned(action.ids, false)
                     // The rest aren't produced by HomeViewModel, but exhaustiveness keeps
                     // the inverse mapping correct if a new variant is ever added.
                     is BulkUndoableAction.Restored -> repository.moveToTrash(action.ids)

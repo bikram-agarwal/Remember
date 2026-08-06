@@ -40,6 +40,7 @@ internal fun HomeSelectionActionBar(
     visible: Boolean,
     onClearSelection: () -> Unit,
     onTagSelected: () -> Unit,
+    onPinSelected: () -> Unit,
     onMarkDoneSelected: () -> Unit,
     onArchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
@@ -81,6 +82,9 @@ internal fun HomeSelectionActionBar(
                 val tagLabel = stringResource(R.string.home_bulk_tag)
                 val contentDescriptionTag = stringResource(R.string.home_bulk_tag_cd)
                 val tagInteractionSource = remember { MutableInteractionSource() }
+                val pinLabel = stringResource(R.string.edit_bottom_bar_pin)
+                val contentDescriptionPin = stringResource(R.string.home_bulk_pin_cd)
+                val pinInteractionSource = remember { MutableInteractionSource() }
                 val markDoneLabel = stringResource(R.string.edit_bottom_bar_mark_done)
                 val contentDescriptionMarkDone = stringResource(R.string.home_bulk_mark_done_cd)
                 val markDoneInteractionSource = remember { MutableInteractionSource() }
@@ -148,6 +152,31 @@ internal fun HomeSelectionActionBar(
                                 text = { Text(tagLabel) },
                                 onClick = {
                                     onTagSelected()
+                                    menuState.dismiss()
+                                },
+                            )
+                        },
+                    )
+                    customItem(
+                        buttonGroupContent = {
+                            RememberFilledTonalIconButton(
+                                onClick = onPinSelected,
+                                modifier = Modifier.size(actionButtonSize).animateWidth(pinInteractionSource),
+                                interactionSource = pinInteractionSource,
+                                tooltipLabel = pinLabel,
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "push_pin",
+                                    weight = FontWeight.Medium,
+                                    modifier = Modifier.semantics { contentDescription = contentDescriptionPin },
+                                )
+                            }
+                        },
+                        menuContent = { menuState ->
+                            RememberDropdownMenuItem(
+                                text = { Text(pinLabel) },
+                                onClick = {
+                                    onPinSelected()
                                     menuState.dismiss()
                                 },
                             )

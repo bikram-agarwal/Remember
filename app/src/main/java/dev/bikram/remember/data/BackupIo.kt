@@ -247,6 +247,7 @@ class BackupIo(
             put("archived", note.archived)
             note.trashedAt?.let { put("trashedAt", it) }
             note.completedAt?.let { put("completedAt", it) }
+            note.pinnedAt?.let { put("pinnedAt", it) }
             put("createdAt", note.createdAt)
             put("updatedAt", note.updatedAt)
             note.reminderAt?.let { put("reminderAt", it) }
@@ -982,6 +983,7 @@ class BackupIo(
             archived = o.optBoolean("archived", false),
             trashedAt = o.optLongOrNull("trashedAt"),
             completedAt = o.optLongOrNull("completedAt"),
+            pinnedAt = o.optLongOrNull("pinnedAt"),
             createdAt = o.optLong("createdAt"),
             updatedAt = o.optLong("updatedAt"),
             reminderAt = o.optLongOrNull("reminderAt"),

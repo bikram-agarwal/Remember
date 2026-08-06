@@ -210,6 +210,7 @@ fun EditListScreen(
 ) {
     val title by vm.title.collectAsStateWithLifecycle()
     val starred by vm.starred.collectAsStateWithLifecycle()
+    val pinned by vm.pinned.collectAsStateWithLifecycle()
     val completed by vm.completed.collectAsStateWithLifecycle()
     val items by vm.items.collectAsStateWithLifecycle()
     val reminders by vm.reminders.collectAsStateWithLifecycle()
@@ -483,11 +484,15 @@ fun EditListScreen(
                                 existing = persistedForToolbar,
                                 isEditMode = isEditMode,
                                 starred = starred,
+                                pinned = pinned,
                                 completed = completed,
                                 onToggleEdit = {
                                     if (!isEditMode) isEditMode = true else saveAndExitEditMode()
                                 },
                                 onToggleStar = { vm.toggleStar() },
+                                onTogglePin = {
+                                    appScope.launch { vm.togglePinned() }
+                                },
                                 onToggleCompleted = {
                                     appScope.launch { vm.toggleCompleted() }
                                 },

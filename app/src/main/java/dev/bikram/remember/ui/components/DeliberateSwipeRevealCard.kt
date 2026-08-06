@@ -22,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -71,6 +72,17 @@ fun DeliberateSwipeRevealCard(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var laidOutWidthPx by remember { mutableFloatStateOf(0f) }
     val swipeSettleSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>())
+
+    // The gesture detector below lives inside a `pointerInput` whose keys are the measured width
+    // and the allow-flags - deliberately NOT these callbacks, since re-keying on a new lambda
+    // every recomposition would cancel an in-flight drag. That means the suspend block would
+    // otherwise capture whichever lambda existed when it last started and keep calling it
+    // forever, so a caller whose callback closes over changing state gets a stale one. That
+    // broke toggle actions: after a swipe flipped a note to starred/pinned, the captured lambda
+    // still meant "set starred/pinned = true", so the next swipe was a no-op instead of undoing
+    // it. Reading through these snapshots keeps the handler installed AND current.
+    val currentOnSwipeStartToEnd by rememberUpdatedState(onSwipeStartToEnd)
+    val currentOnSwipeEndToStart by rememberUpdatedState(onSwipeEndToStart)
 
     BoxWithConstraints(modifier = modifier.clip(cardShape)) {
         val constraintWidthPx =
@@ -131,11 +143,11 @@ fun DeliberateSwipeRevealCard(
                                         scope.launch {
                                             when {
                                                 allowSwipeStartToEnd && offsetX >= thresholdPx -> {
-                                                    onSwipeStartToEnd()
+                                                    currentOnSwipeStartToEnd()
                                                     offsetX = 0f
                                                 }
                                                 allowSwipeEndToStart && offsetX <= -thresholdPx -> {
-                                                    onSwipeEndToStart()
+                                                    currentOnSwipeEndToStart()
                                                     offsetX = 0f
                                                 }
                                                 else -> {

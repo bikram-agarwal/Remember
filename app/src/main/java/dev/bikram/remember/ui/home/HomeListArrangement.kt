@@ -8,16 +8,60 @@ import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.SortDir
 import dev.bikram.remember.data.SortKey
 import dev.bikram.remember.data.ViewOptions
+import dev.bikram.remember.data.pinned
 import dev.bikram.remember.ui.components.toNoteCardUiModel
 import java.time.ZoneId
 import java.time.ZonedDateTime
 
+/** Section key for the top-pinned "Pinned" group. Shared with the collapse-state plumbing. */
+internal const val PINNED_SECTION_KEY = "PINNED"
+
+internal const val OVERDUE_SECTION_KEY = "OVERDUE"
+
+internal const val DONE_SECTION_KEY = "DONE"
+
+internal const val PINNED_SECTION_BADGE_SYMBOL = "push_pin"
+
+/**
+ * Badge glyph for each section that holds its position no matter how the user sorts or groups,
+ * or null for the ordinary grouping sections (dates, tags, types) which get no badge.
+ *
+ * Each one names what the section *is*, rather than all three sharing a pin to mean "fixed in
+ * place": a pin for Pinned, an alarm clock for Overdue (late, not broken - and distinct from the
+ * plain bell on the cards inside it), and the Mark-done action's own `check_circle` for Done, so
+ * the section matches the gesture that fills it.
+ */
+internal fun HomeListItem.Header.bookendBadgeSymbol(): String? =
+    when (stableKey) {
+        PINNED_SECTION_KEY -> PINNED_SECTION_BADGE_SYMBOL
+        OVERDUE_SECTION_KEY -> "alarm"
+        DONE_SECTION_KEY -> "check_circle"
+        else -> null
+    }
+
 /**
  * Lay out the home list with the task-first section model:
  *
+ *   [Pinned]             - always first when non-empty; ignores the grouping mode entirely.
  *   [Overdue]            - always pinned at top when non-empty.
  *   [middle]             - date sub-sections or the selected grouping mode.
  *   [Done] (collapsible) - always pinned at bottom when non-empty.
+ *
+ * Pinning rules, chosen so that grouping and sorting stay legible:
+ *
+ *  - **Pinned outranks every grouping mode.** A pinned note is *extracted* from the rest of
+ *    the layout and appears exactly once, under Pinned - never duplicated into its date /
+ *    tag / type section. (Same contract Overdue and Done already follow, and it keeps the
+ *    `duplicatedRowNoteIds` row-keying in HomeScreen honest.)
+ *  - **Done outranks pinned.** A pinned note that is marked done drops to the bottom Done
+ *    section; the pin flag survives untouched and re-asserts when it is un-done. A
+ *    struck-through card at the very top of the list is the most confusing outcome available,
+ *    so we avoid it.
+ *  - **Sorting still applies inside the section.** [sortNotes] has already run over the whole
+ *    list, so pinned rows honour the user's sort key + direction relative to each other.
+ *  - **Only search / filter can hide a pinned note.** That falls out of the pipeline for free:
+ *    HomeViewModel filters before calling this function, so anything the filter rejects never
+ *    reaches the Pinned bucket.
  */
 internal fun arrangeItems(
     notes: List<NoteWithItems>,
@@ -27,7 +71,11 @@ internal fun arrangeItems(
     val sortedNotes = sortNotes(notes, opts)
 
     val doneNotes = sortedNotes.filter { it.note.completedAt != null }
-    val activeNotes = sortedNotes.filter { it.note.completedAt == null }
+    val notDoneNotes = sortedNotes.filter { it.note.completedAt == null }
+    // Pinned is evaluated after Done (Done wins) and before Overdue (pin wins), so a pinned
+    // overdue note shows up once, under Pinned.
+    val pinnedNotes = notDoneNotes.filter { it.note.pinned }
+    val activeNotes = notDoneNotes.filterNot { it.note.pinned }
     val overdueNotes =
         activeNotes.filter { noteWithItems ->
             val reminderAt = noteWithItems.note.reminderAt
@@ -40,12 +88,31 @@ internal fun arrangeItems(
         }
 
     return buildList {
+        if (pinnedNotes.isNotEmpty()) {
+            add(
+                HomeListItem.Header(
+                    label = "",
+                    count = pinnedNotes.size,
+                    stableKey = PINNED_SECTION_KEY,
+                    labelRes = R.string.home_section_pinned,
+                ),
+            )
+            pinnedNotes.forEach { noteWithItems ->
+                add(
+                    HomeListItem.NoteRow(
+                        note = noteWithItems,
+                        card = noteWithItems.toNoteCardUiModel(),
+                        groupKey = PINNED_SECTION_KEY,
+                    ),
+                )
+            }
+        }
         if (overdueNotes.isNotEmpty()) {
             add(
                 HomeListItem.Header(
                     label = "",
                     count = overdueNotes.size,
-                    stableKey = "OVERDUE",
+                    stableKey = OVERDUE_SECTION_KEY,
                     labelRes = R.string.home_section_overdue,
                 ),
             )
@@ -54,7 +121,7 @@ internal fun arrangeItems(
                     HomeListItem.NoteRow(
                         note = noteWithItems,
                         card = noteWithItems.toNoteCardUiModel(),
-                        groupKey = "OVERDUE",
+                        groupKey = OVERDUE_SECTION_KEY,
                     ),
                 )
             }
@@ -65,7 +132,7 @@ internal fun arrangeItems(
                 HomeListItem.Header(
                     label = "",
                     count = doneNotes.size,
-                    stableKey = "DONE",
+                    stableKey = DONE_SECTION_KEY,
                     labelRes = R.string.home_section_done,
                 ),
             )
@@ -74,7 +141,7 @@ internal fun arrangeItems(
                     HomeListItem.NoteRow(
                         note = noteWithItems,
                         card = noteWithItems.toNoteCardUiModel(),
-                        groupKey = "DONE",
+                        groupKey = DONE_SECTION_KEY,
                     ),
                 )
             }

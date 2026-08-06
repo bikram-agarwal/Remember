@@ -16,6 +16,7 @@ import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.getActiveReminders
+import dev.bikram.remember.data.pinned
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.nav.Routes
@@ -66,6 +67,16 @@ abstract class BaseEditorViewModel(
      */
     private val _completed = MutableStateFlow(false)
     val completed: StateFlow<Boolean> = _completed.asStateFlow()
+
+    /**
+     * Snapshot of [dev.bikram.remember.data.NoteEntity.pinnedAt] as a boolean. Unlike [starred],
+     * pinning is NOT part of the editor draft: it writes through immediately via
+     * [NoteRepository.setPinned] and comes back through the live observer, the same way
+     * [completed] and [archived] do. Pinning is placement, not content, so it should never
+     * mark the editor dirty or need a save to take effect.
+     */
+    private val _pinned = MutableStateFlow(false)
+    val pinned: StateFlow<Boolean> = _pinned.asStateFlow()
 
     private val _reminderAt = MutableStateFlow<Long?>(null)
     val reminderAt: StateFlow<Long?> = _reminderAt.asStateFlow()
@@ -206,6 +217,7 @@ abstract class BaseEditorViewModel(
         _archived.value = n.archived
         _trashed.value = n.trashed
         _completed.value = n.completedAt != null
+        _pinned.value = n.pinned
         _createdAt.value = n.createdAt
         _updatedAt.value = n.updatedAt
     }
@@ -238,6 +250,7 @@ abstract class BaseEditorViewModel(
                 if (_trashed.value != n.trashed) _trashed.value = n.trashed
                 val isCompleted = n.completedAt != null
                 if (_completed.value != isCompleted) _completed.value = isCompleted
+                if (_pinned.value != n.pinned) _pinned.value = n.pinned
                 if (_createdAt.value != n.createdAt) _createdAt.value = n.createdAt
                 if (_updatedAt.value != n.updatedAt) _updatedAt.value = n.updatedAt
                 originalNote =
@@ -246,6 +259,7 @@ abstract class BaseEditorViewModel(
                         archived = n.archived,
                         trashed = n.trashed,
                         completedAt = n.completedAt,
+                        pinnedAt = n.pinnedAt,
                         reminderAt = n.reminderAt,
                         recurrence = n.recurrence,
                         reminders = n.reminders,
@@ -528,6 +542,16 @@ abstract class BaseEditorViewModel(
             repository.markCompleted(id)
         }
         syncTimestamps()
+    }
+
+    /**
+     * Pin / unpin from the editor's bottom bar. Writes through immediately (no dirty flag, no
+     * save required) and the live observer started in `init` reflects the new value back into
+     * [pinned]. No-op for a draft that has no backing row yet, matching [toggleCompleted].
+     */
+    suspend fun togglePinned() {
+        val id = loadedId ?: return
+        repository.setPinned(id, !_pinned.value)
     }
 
     /** Flip the note to the archive shelf after saving any in-flight edits. */

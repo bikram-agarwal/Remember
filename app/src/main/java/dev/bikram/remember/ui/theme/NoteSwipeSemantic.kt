@@ -9,6 +9,9 @@ fun NoteSwipeAction.swipeActionAccent(): Color =
         NoteSwipeAction.EDIT -> Color(0xFF3F7AF6)
         NoteSwipeAction.DUPLICATE -> Color(0xFF7E57C2)
         NoteSwipeAction.TOGGLE_STAR -> Color(0xFFFFC107)
+        // Teal, deliberately far from star's amber: pin and star are different concepts and
+        // the swipe backgrounds must not be mistaken for each other mid-gesture.
+        NoteSwipeAction.TOGGLE_PIN -> Color(0xFF00897B)
         NoteSwipeAction.MARK_DONE -> Color(0xFF2E7D32)
         NoteSwipeAction.ARCHIVE -> Color(0xFF5F6F82)
         NoteSwipeAction.TRASH -> Color(0xFFE53935)
@@ -20,6 +23,7 @@ fun NoteSwipeAction.semanticSwipeBackground(): Color =
         NoteSwipeAction.EDIT -> Color(0xFF0A3050)
         NoteSwipeAction.DUPLICATE -> Color(0xFF33215F)
         NoteSwipeAction.TOGGLE_STAR -> Color(0xFF4D3E00)
+        NoteSwipeAction.TOGGLE_PIN -> Color(0xFF07403A)
         NoteSwipeAction.MARK_DONE -> Color(0xFF0F3D1A)
         NoteSwipeAction.ARCHIVE -> Color(0xFF3F3F3F)
         NoteSwipeAction.TRASH -> Color(0xFF5C1414)
@@ -31,6 +35,7 @@ fun NoteSwipeAction.semanticSwipeIconTint(): Color =
         NoteSwipeAction.EDIT -> Color(0xFF9ECAFF)
         NoteSwipeAction.DUPLICATE -> Color(0xFFD0BCFF)
         NoteSwipeAction.TOGGLE_STAR -> Color(0xFFFFE082)
+        NoteSwipeAction.TOGGLE_PIN -> Color(0xFF80CBC4)
         NoteSwipeAction.MARK_DONE -> Color(0xFFA3D9B0)
         NoteSwipeAction.ARCHIVE -> Color(0xFFCAC4D0)
         NoteSwipeAction.TRASH -> Color(0xFFF2B8B5)

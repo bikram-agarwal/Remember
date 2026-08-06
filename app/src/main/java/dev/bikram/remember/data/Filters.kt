@@ -15,6 +15,11 @@ data class NotesFilter(
     val hasPicture: Boolean? = null,
     val hasAttachment: Boolean? = null,
     val starred: Boolean? = null,
+    /**
+     * Filtering is the one thing that can hide a pinned note from Home (grouping and sorting
+     * cannot), so this facet is also the way to see *only* the pinned ones.
+     */
+    val pinned: Boolean? = null,
 ) {
     /** True if any non-text facet is narrowing the results. */
     val facetActive: Boolean
@@ -24,7 +29,8 @@ data class NotesFilter(
                 hasReminder != null ||
                 hasPicture != null ||
                 hasAttachment != null ||
-                starred != null
+                starred != null ||
+                pinned != null
 
     val active: Boolean
         get() = text.isNotBlank() || facetActive
@@ -51,6 +57,7 @@ fun NotesFilter.matches(n: NoteWithItems): Boolean {
     hasPicture?.let { if ((!note.pictureUri.isNullOrBlank()) != it) return false }
     hasAttachment?.let { if (n.attachments.isNotEmpty() != it) return false }
     starred?.let { if (note.starred != it) return false }
+    pinned?.let { if (note.pinned != it) return false }
     if (text.isBlank()) return true
     val needle = text.trim().lowercase()
     if (note.title.lowercase().contains(needle)) return true

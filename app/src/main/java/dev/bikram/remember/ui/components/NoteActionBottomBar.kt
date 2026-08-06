@@ -59,7 +59,7 @@ enum class NoteShelfState { ACTIVE, ARCHIVED, TRASHED }
  * Action buttons for the Edit Note / Edit List screens, rendered as a full-width bottom bar
  * anchored to the navigation inset. The button set swaps based on [shelfState]:
  *
- *   ACTIVE   -> Edit/Done, Star, Archive, Trash
+ *   ACTIVE   -> Edit/Done, Pin, Star, Notification, Mark done, Archive, Trash
  *   ARCHIVED -> Unarchive, Trash
  *   TRASHED  -> Restore, Delete forever
  *
@@ -74,10 +74,12 @@ fun NoteActionBottomBar(
     existing: Boolean,
     isEditMode: Boolean,
     starred: Boolean,
+    pinned: Boolean,
     completed: Boolean,
     visible: Boolean,
     onToggleEdit: () -> Unit,
     onToggleStar: () -> Unit,
+    onTogglePin: () -> Unit,
     onToggleCompleted: () -> Unit,
     onArchive: () -> Unit,
     onNotification: () -> Unit,
@@ -102,9 +104,11 @@ fun NoteActionBottomBar(
             existing = existing,
             isEditMode = isEditMode,
             starred = starred,
+            pinned = pinned,
             completed = completed,
             onToggleEdit = onToggleEdit,
             onToggleStar = onToggleStar,
+            onTogglePin = onTogglePin,
             onToggleCompleted = onToggleCompleted,
             onArchive = onArchive,
             onNotification = onNotification,
@@ -132,9 +136,11 @@ fun NoteActionBottomBarContent(
     existing: Boolean,
     isEditMode: Boolean,
     starred: Boolean,
+    pinned: Boolean,
     completed: Boolean,
     onToggleEdit: () -> Unit,
     onToggleStar: () -> Unit,
+    onTogglePin: () -> Unit,
     onToggleCompleted: () -> Unit,
     onArchive: () -> Unit,
     onNotification: () -> Unit,
@@ -161,13 +167,35 @@ fun NoteActionBottomBarContent(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            val activeActionModifier = if (compact) Modifier.weight(1f) else Modifier.width(72.dp)
+            // The ACTIVE set is the widest one, and it grew past what five fixed 72.dp columns
+            // could hold once Pin joined it (6 x 72 = 432.dp overflows a 360.dp-wide phone).
+            // Past five items we share the width instead, the way the TRASHED branch already
+            // does, so the row shrinks to fit rather than clipping its last action.
+            val activeActionCount = (if (showEditAction) 1 else 0) + 1 + (if (existing) 5 else 0)
+            val activeActionModifier =
+                if (compact || activeActionCount > 5) Modifier.weight(1f) else Modifier.width(72.dp)
             when (shelfState) {
                 NoteShelfState.ACTIVE -> {
                     if (showEditAction) {
                         EditActionItem(
                             isEditMode = isEditMode,
                             onClick = onToggleEdit,
+                            compact = compact,
+                            modifier = activeActionModifier,
+                        )
+                    }
+                    // Pin sits next to Star on purpose: showing the two toggles side by side
+                    // with distinct icons and labels teaches the difference between "favorite"
+                    // and "keep at the top", instead of hiding it. Pin leads, matching the
+                    // action order used by the swipe settings.
+                    //
+                    // Split across two `existing` checks because Pin needs a saved row to write
+                    // to, while Star is part of the draft and works on a brand-new note. A new
+                    // note therefore shows Star alone here.
+                    if (existing) {
+                        PinActionItem(
+                            pinned = pinned,
+                            onClick = onTogglePin,
                             compact = compact,
                             modifier = activeActionModifier,
                         )
@@ -334,6 +362,10 @@ private fun ActionItem(
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center,
             maxLines = 1,
+            // Ellipsis rather than a hard clip, matching the Star / Pin / Done items. Without
+            // it an over-long label is cut mid-word, which reads as a broken row rather than a
+            // truncated word.
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -486,6 +518,96 @@ private fun DoneActionItem(
                     } else {
                         R.string.edit_bottom_bar_mark_done
                     },
+                ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = TextAlign.Center,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+    if (compact) {
+        Row(
+            modifier = clickableModifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            iconContent()
+            Spacer(Modifier.width(3.dp))
+            labelContent()
+        }
+    } else {
+        Column(
+            modifier = clickableModifier.padding(vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            iconContent()
+            Spacer(Modifier.height(4.dp))
+            labelContent()
+        }
+    }
+}
+
+/**
+ * Pin toggle: same pulse choreography as [StarActionItem] and [DoneActionItem], but tinted with
+ * the theme's tertiary colour and using the `push_pin` FILL toggle. Deliberately NOT yellow and
+ * not star-shaped - pin (placement on Home) and star (favorite + widget) are different features
+ * and must not be mistaken for each other.
+ */
+@Composable
+private fun PinActionItem(
+    pinned: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    compact: Boolean = false,
+) {
+    val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+    val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
+    val haptic = LocalHapticFeedback.current
+    var pulsing by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(
+        targetValue = if (pulsing) 1.35f else 1f,
+        animationSpec = effectsSpec,
+        finishedListener = { if (pulsing) pulsing = false },
+        label = "bottomBarPinScale",
+    )
+    val activeTint = MaterialTheme.colorScheme.tertiary
+    val tint by animateColorAsState(
+        targetValue = if (pulsing || pinned) activeTint else MaterialTheme.colorScheme.onSurface,
+        animationSpec = colorEffectsSpec,
+        label = "bottomBarPinColor",
+    )
+    val clickableModifier =
+        modifier
+            .clip(MaterialTheme.shapes.large)
+            .clickable(
+                onClick = {
+                    if (!pinned) {
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        pulsing = true
+                    }
+                    onClick()
+                },
+            )
+    val iconContent: @Composable () -> Unit = {
+        // Fill swap alongside the tint change, so the state reads without relying on colour.
+        // Upright, unlike the tilted badge in GroupHeader: in a row of upright toolbar glyphs a
+        // rotated pin reads as crooked rather than as deliberate.
+        RememberMaterialRoundedSymbol(
+            name = "push_pin",
+            filled = pinned,
+            size = if (compact) 19.dp else 24.dp,
+            tint = tint,
+            weight = FontWeight.Medium,
+            modifier = Modifier.scale(scale),
+        )
+    }
+    val labelContent: @Composable () -> Unit = {
+        Text(
+            text =
+                stringResource(
+                    if (pinned) R.string.edit_bottom_bar_unpin else R.string.edit_bottom_bar_pin,
                 ),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurface,

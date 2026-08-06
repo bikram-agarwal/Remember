@@ -86,6 +86,7 @@ fun SwipeableRememberNoteCard(
     val swipeEnd = interaction.swipeEndToStart
     val noteCompleted = model.completed
     val noteStarred = model.starred
+    val notePinned = model.pinned
     val revealKey = note.note.id
     val noteCardShape = MaterialTheme.shapes.medium
     // Always route through one of the two swipe wrappers below so the inner
@@ -103,6 +104,7 @@ fun SwipeableRememberNoteCard(
                         action.revealTile(
                             noteCompleted = noteCompleted,
                             noteStarred = noteStarred,
+                            notePinned = notePinned,
                             onClick = { onSwipeAction(note, action) },
                         )
                     }
@@ -117,6 +119,7 @@ fun SwipeableRememberNoteCard(
                         action.revealTile(
                             noteCompleted = noteCompleted,
                             noteStarred = noteStarred,
+                            notePinned = notePinned,
                             onClick = { onSwipeAction(note, action) },
                         )
                     }
@@ -157,6 +160,7 @@ fun SwipeableRememberNoteCard(
             val actionIconFilled =
                 when (action) {
                     NoteSwipeAction.TOGGLE_STAR -> noteStarred
+                    NoteSwipeAction.TOGGLE_PIN -> notePinned
                     NoteSwipeAction.MARK_DONE -> noteCompleted
                     else -> false
                 }
@@ -195,13 +199,13 @@ fun SwipeableRememberNoteCard(
                         )
                         Spacer(Modifier.width(6.dp))
                         Text(
-                            text = action.labelString(noteCompleted, noteStarred),
+                            text = action.labelString(noteCompleted, noteStarred, notePinned),
                             style = MaterialTheme.typography.labelMedium,
                             color = tint,
                         )
                     } else {
                         Text(
-                            text = action.labelString(noteCompleted, noteStarred),
+                            text = action.labelString(noteCompleted, noteStarred, notePinned),
                             style = MaterialTheme.typography.labelMedium,
                             color = tint,
                         )
@@ -238,6 +242,7 @@ fun SwipeableRememberNoteCard(
 private fun NoteSwipeAction.labelString(
     noteCompleted: Boolean = false,
     noteStarred: Boolean = false,
+    notePinned: Boolean = false,
 ): String =
     stringResource(
         when (this) {
@@ -246,6 +251,9 @@ private fun NoteSwipeAction.labelString(
             NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
             NoteSwipeAction.TOGGLE_STAR -> {
                 if (noteStarred) R.string.swipe_action_unstar else R.string.swipe_action_toggle_star
+            }
+            NoteSwipeAction.TOGGLE_PIN -> {
+                if (notePinned) R.string.swipe_action_unpin else R.string.swipe_action_pin
             }
             NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
             NoteSwipeAction.MARK_DONE ->
@@ -261,6 +269,7 @@ private fun NoteSwipeAction.labelString(
 private fun NoteSwipeAction.revealTile(
     noteCompleted: Boolean,
     noteStarred: Boolean,
+    notePinned: Boolean,
     onClick: () -> Unit,
 ): SwipeRevealTile {
     val labelRes =
@@ -270,6 +279,9 @@ private fun NoteSwipeAction.revealTile(
             NoteSwipeAction.DUPLICATE -> R.string.swipe_action_duplicate
             NoteSwipeAction.TOGGLE_STAR -> {
                 if (noteStarred) R.string.swipe_action_unstar else R.string.swipe_action_toggle_star
+            }
+            NoteSwipeAction.TOGGLE_PIN -> {
+                if (notePinned) R.string.swipe_action_unpin else R.string.swipe_action_pin
             }
             NoteSwipeAction.ARCHIVE -> R.string.edit_bottom_bar_archive
             NoteSwipeAction.MARK_DONE -> {
@@ -289,6 +301,7 @@ private fun NoteSwipeAction.revealTile(
         filled =
             when (this) {
                 NoteSwipeAction.TOGGLE_STAR -> noteStarred
+                NoteSwipeAction.TOGGLE_PIN -> notePinned
                 NoteSwipeAction.MARK_DONE -> noteCompleted
                 else -> false
             },

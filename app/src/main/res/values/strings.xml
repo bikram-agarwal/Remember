@@ -73,10 +73,6 @@
 
     <!-- Toasts and transient feedback -->
     <string name="toast_export_failed">Export failed</string>
-    <plurals name="toast_exported_notes">
-        <item quantity="one">Exported %1$d note</item>
-        <item quantity="other">Exported %1$d notes</item>
-    </plurals>
     <plurals name="toast_exported_to_destinations">
         <item quantity="one">Backup exported to %1$d folder</item>
         <item quantity="other">Backup exported to %1$d folders</item>
@@ -144,6 +140,7 @@
     <string name="filter_has_picture">Has picture</string>
     <string name="filter_has_attachment">Has attachment</string>
     <string name="filter_starred">Starred</string>
+    <string name="filter_pinned">Pinned</string>
     <string name="filter_dropdown_type">Type: %1$s</string>
     <string name="filter_dropdown_group">Group: %1$s</string>
     <string name="filter_dropdown_sort">Sort: %1$s</string>
@@ -169,6 +166,7 @@
 
     <!-- Note cards -->
     <string name="notecard_starred_cd">Starred</string>
+    <string name="notecard_pinned_cd">Pinned</string>
     <string name="notecard_reminder_cd">Has reminder</string>
     <string name="notecard_recurring_cd">Repeats</string>
     <string name="notecard_picture_cd">Has picture</string>
@@ -237,8 +235,10 @@
     <string name="edit_bottom_bar_edit">Edit</string>
     <string name="edit_bottom_bar_done">Done</string>
     <string name="edit_bottom_bar_star">Star</string>
+    <string name="edit_bottom_bar_pin">Pin</string>
+    <string name="edit_bottom_bar_unpin">Unpin</string>
     <string name="edit_bottom_bar_archive">Archive</string>
-    <string name="edit_bottom_bar_notification">Notification</string>
+    <string name="edit_bottom_bar_notification">Notify</string>
     <string name="edit_bottom_bar_unarchive">Unarchive</string>
     <string name="edit_bottom_bar_trash">Trash</string>
     <string name="edit_bottom_bar_mark_done">Done</string>
@@ -294,6 +294,7 @@
     <string name="home_select_exit_cd">Exit selection</string>
     <string name="home_select_all">Select all</string>
     <string name="home_unselect_all">Unselect all</string>
+    <string name="home_section_pinned">Pinned</string>
     <string name="home_section_overdue">Overdue</string>
     <string name="home_section_active">Active</string>
     <string name="home_section_done">Done</string>
@@ -318,6 +319,7 @@
     <string name="home_bulk_archive_cd">Archive selected notes</string>
     <string name="home_bulk_trash_cd">Move selected notes to trash</string>
     <string name="home_bulk_mark_done_cd">Mark selected notes done</string>
+    <string name="home_bulk_pin_cd">Pin selected notes</string>
     <string name="home_bulk_tag_cd">Tag selected notes</string>
     <string name="two_pane_notes_selection_title" tools:ignore="PluralsCandidate">%1$d selected</string>
 
@@ -334,6 +336,10 @@
     <plurals name="bulk_action_marked_done">
         <item quantity="one">%1$d marked done</item>
         <item quantity="other">%1$d marked done</item>
+    </plurals>
+    <plurals name="bulk_action_pinned">
+        <item quantity="one">%1$d pinned</item>
+        <item quantity="other">%1$d pinned</item>
     </plurals>
     <plurals name="bulk_action_restored">
         <item quantity="one">%1$d restored</item>
@@ -688,7 +694,6 @@
     <string name="icon_picker_emoji_category_objects">Objects</string>
     <string name="icon_picker_emoji_category_symbols">Symbols</string>
     <string name="icon_picker_emoji_category_flags">Flags</string>
-    <string name="reminder_time_picker_title">Set time</string>
     <string name="reminder_time_input_mode">Type time with keyboard</string>
     <string name="reminder_time_dial_mode">Pick time with clock dial</string>
     <string name="reminder_pick_time">Set time</string>
@@ -799,6 +804,8 @@
     <string name="swipe_action_duplicate">Duplicate</string>
     <string name="swipe_action_toggle_star">Star</string>
     <string name="swipe_action_unstar">Unstar</string>
+    <string name="swipe_action_pin">Pin</string>
+    <string name="swipe_action_unpin">Unpin</string>
     <string name="swipe_action_mark_done">Done</string>
     <string name="swipe_action_mark_not_done">Reopen</string>
 

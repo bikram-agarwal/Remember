@@ -165,6 +165,7 @@ internal fun ActiveFilterChips(
                 filter.hasPicture,
                 filter.hasAttachment,
                 filter.starred,
+                filter.pinned,
             ).count { active -> active == true }
         FilterDropdownChip(
             label =
@@ -198,6 +199,11 @@ internal fun ActiveFilterChips(
                 label = stringResource(R.string.filter_starred),
                 checked = filter.starred == true,
                 onClick = { onChange(filter.copy(starred = if (filter.starred == true) null else true)) },
+            )
+            CheckableMenuItem(
+                label = stringResource(R.string.filter_pinned),
+                checked = filter.pinned == true,
+                onClick = { onChange(filter.copy(pinned = if (filter.pinned == true) null else true)) },
             )
         }
         RememberInputChip(

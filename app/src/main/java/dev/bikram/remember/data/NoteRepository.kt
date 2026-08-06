@@ -469,6 +469,24 @@ class NoteRepository(
         postWriteBookkeeping(includeSummary = false)
     }
 
+    /**
+     * Pins or unpins [id]. Pinning only affects placement on Home (the top "Pinned" section),
+     * so - like [setStarred] - this skips the reminder-summary refresh.
+     *
+     * Deliberately does not touch [NoteEntity.updatedAt]: pinning is a view concern, and
+     * bumping the modified timestamp would silently reshuffle the list under a
+     * "sort by last modified" user, which is exactly the confusion pinning is meant to avoid.
+     */
+    suspend fun setPinned(
+        id: Long,
+        pinned: Boolean,
+    ) {
+        val row = noteDao.get(id) ?: return
+        if (row.note.pinned == pinned) return
+        noteDao.update(row.note.copy(pinnedAt = if (pinned) clock() else null))
+        postWriteBookkeeping(includeSummary = false)
+    }
+
     suspend fun moveToTrash(id: Long) {
         noteDao.setTrashed(id, true, clock())
         scheduler?.cancel(id)
@@ -620,6 +638,30 @@ class NoteRepository(
 
     private suspend fun runInTransaction(block: suspend () -> Unit) {
         if (database != null) database.withTransaction { block() } else block()
+    }
+
+    /**
+     * Bulk pin / unpin. One transaction so the Pinned section reflows in a single emission and
+     * the cards animate as one move instead of a cascade. Returns the ids whose state actually
+     * changed, which is what the Undo path needs so it does not clear pins the user already had.
+     */
+    suspend fun setPinned(
+        ids: Collection<Long>,
+        pinned: Boolean,
+    ): Set<Long> {
+        if (ids.isEmpty()) return emptySet()
+        val now = clock()
+        val changed = mutableSetOf<Long>()
+        runInTransaction {
+            ids.forEach { id ->
+                val note = noteDao.get(id)?.note ?: return@forEach
+                if (note.pinned == pinned) return@forEach
+                noteDao.update(note.copy(pinnedAt = if (pinned) now else null))
+                changed += id
+            }
+        }
+        if (changed.isNotEmpty()) postWriteBookkeeping(includeSummary = false)
+        return changed
     }
 
     suspend fun archiveNotes(ids: Collection<Long>) {
@@ -837,6 +879,9 @@ class NoteRepository(
 
     /**
      * Copies the note or list into a new row. Reminders are not copied on the duplicate.
+     * Neither are the starred and pinned flags (both go through the create path, which
+     * defaults them off) - two identical cards side by side at the top of Home is not what
+     * "duplicate" should mean.
      */
     suspend fun duplicateNote(id: Long): Long? {
         val existing = get(id) ?: return null

@@ -68,8 +68,9 @@ Reminders are more useful when they carry information. Remember's notes and list
 - **Full-text search** across note titles, bodies, checklist items, tags, and action details.
 - **Tags with colors** for grouping notes any way you like.
 - **Star** notes for quick access. **Archive** ones you want to keep but not see. Or send to **Trash** that clears after 30 days automatically.
-- **Filter** by type, tag, starred status, has-reminder, has-picture, or has-attachment.
+- **Filter** by type, tag, starred status, pinned status, has-reminder, has-picture, or has-attachment.
 - **Sort and group** by last modified, created date, or reminder time — grouped by date, type, or tag.
+- **Pin** the notes you need at hand: they stay at the top of the list, regardless of your sorting or grouping.
 - **List or grid view** for note cards, so you can choose a compact list or a visual mosaic.
 
 
