@@ -2,17 +2,17 @@ package dev.bikram.remember.ui.nav
 
 import android.app.Activity
 import android.net.Uri
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedContentScope
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -20,11 +20,13 @@ import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -32,11 +34,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
+import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.bikram.remember.data.InteractionPrefs
@@ -78,7 +84,20 @@ object Routes {
     const val ONBOARDING_TITLE = "onboardingTitle"
     const val ONBOARDING_PERMISSIONS = "onboardingPermissions"
     const val EXTERNAL_LAUNCH = "externalLaunch"
-    const val MAIN = "main"
+
+    /**
+     * The three main tabs, each a **real registered destination** (see [mainTabComposable]).
+     *
+     * PARITY: matches FilePipe's `Screen.Rules` / `Screen.History` / `Screen.Settings`. Because these
+     * are destinations, "go to a tab" is expressible as ordinary navigation - `popBackStack(route)`,
+     * `navigate(route)` - instead of assigning tab state and then navigating to a shared host route.
+     *
+     * A previous revision hosted all three as `MainTab` state inside one `main` destination while
+     * *also* keeping these constants around unregistered. That combination caused a real bug:
+     * `popBackStack(Routes.SETTINGS, inclusive = false)` looked correct but could never match, so a
+     * Help deep link switched the tab behind a Help screen that was never dismissed. Keep them
+     * registered.
+     */
     const val NOTES = "notes"
     const val HISTORY = "history"
     const val SETTINGS = "settings"
@@ -151,6 +170,124 @@ object Routes {
         }
 }
 
+/**
+ * The destination that backs each main tab. Exhaustive `when` on purpose: a new [MainTab] will not
+ * compile until it is given a route, so a tab can never silently lack a destination.
+ */
+private val MainTab.route: String
+    get() =
+        when (this) {
+            MainTab.Notes -> Routes.NOTES
+            MainTab.History -> Routes.HISTORY
+            MainTab.Settings -> Routes.SETTINGS
+        }
+
+/** Tab order, keyed by route - drives the direction of the tab-switch slide. */
+private val mainTabRouteOrdinals: Map<String, Int> =
+    MainTab.entries.associate { tab -> tab.route to tab.ordinal }
+
+/**
+ * Destinations that cross-fade with a tab instead of sliding.
+ *
+ * The editors morph a note card into the editor with `sharedBounds`, so the tab has to cross-fade for
+ * the morph to read; Dev options declares its own fade. For these the tab transition returns `null`,
+ * deferring to the NavHost default so both halves of the transition agree.
+ *
+ * This short exception list is the whole reason Remember attaches tab transitions per destination
+ * while FilePipe attaches them to the entire NavHost: FilePipe has no shared-element morph out of a
+ * tab, so it can slide unconditionally.
+ */
+private fun crossFadesWithTab(route: String?): Boolean =
+    route != null &&
+        (
+            route.startsWith(Routes.EDIT_CONTENT) ||
+                route.startsWith(Routes.EDIT_NOTE) ||
+                route.startsWith(Routes.EDIT_LIST) ||
+                route == Routes.DEV_OPTIONS
+        )
+
+/**
+ * Registers one main-tab destination with its transitions.
+ *
+ * PARITY: tab-to-tab is FilePipe's `primaryTabEnterTransition` / `primaryTabExitTransition` - the
+ * directional slide keyed on tab order. Anything else slides horizontally, matching FilePipe's
+ * NavHost-level default, except for [crossFadesWithTab].
+ */
+private fun NavGraphBuilder.mainTabComposable(
+    route: String,
+    reducedMotion: Boolean,
+    verticalMotion: Boolean,
+    spatialSpec: FiniteAnimationSpec<IntOffset>,
+    fadeInSpec: FiniteAnimationSpec<Float>,
+    fadeOutSpec: FiniteAnimationSpec<Float>,
+    content: @Composable AnimatedContentScope.(NavBackStackEntry) -> Unit,
+) = composable(
+    route = route,
+    enterTransition = { mainTabEnterTransition(reducedMotion, verticalMotion, spatialSpec, fadeInSpec, pop = false) },
+    exitTransition = { mainTabExitTransition(reducedMotion, verticalMotion, spatialSpec, fadeOutSpec, pop = false) },
+    popEnterTransition = { mainTabEnterTransition(reducedMotion, verticalMotion, spatialSpec, fadeInSpec, pop = true) },
+    popExitTransition = { mainTabExitTransition(reducedMotion, verticalMotion, spatialSpec, fadeOutSpec, pop = true) },
+    content = content,
+)
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.mainTabEnterTransition(
+    reducedMotion: Boolean,
+    verticalMotion: Boolean,
+    spatialSpec: FiniteAnimationSpec<IntOffset>,
+    fadeInSpec: FiniteAnimationSpec<Float>,
+    pop: Boolean,
+): EnterTransition? {
+    val initialRoute = initialState.destination.route
+    val initialOrdinal = mainTabRouteOrdinals[initialRoute]
+    val targetOrdinal = mainTabRouteOrdinals[targetState.destination.route]
+
+    // Tab to tab: slide in from the edge we are travelling from, per tab order.
+    if (initialOrdinal != null && targetOrdinal != null) {
+        if (reducedMotion) return EnterTransition.None
+        val offset: (Int) -> Int = if (targetOrdinal > initialOrdinal) { size -> size } else { size -> -size }
+        return if (verticalMotion) {
+            slideInVertically(animationSpec = spatialSpec, initialOffsetY = offset)
+        } else {
+            slideInHorizontally(animationSpec = spatialSpec, initialOffsetX = offset)
+        } + fadeIn(animationSpec = fadeInSpec)
+    }
+
+    if (crossFadesWithTab(initialRoute)) return null
+    if (reducedMotion) return EnterTransition.None
+    // Entering a tab from any other screen (Help, Google Tasks import, onboarding): FilePipe's
+    // NavHost-level default. A pop comes back in from the left, a forward navigation from the right.
+    return slideInHorizontally(animationSpec = spatialSpec) { size -> if (pop) -size else size } +
+        fadeIn(animationSpec = fadeInSpec)
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.mainTabExitTransition(
+    reducedMotion: Boolean,
+    verticalMotion: Boolean,
+    spatialSpec: FiniteAnimationSpec<IntOffset>,
+    fadeOutSpec: FiniteAnimationSpec<Float>,
+    pop: Boolean,
+): ExitTransition? {
+    val targetRoute = targetState.destination.route
+    val initialOrdinal = mainTabRouteOrdinals[initialState.destination.route]
+    val targetOrdinal = mainTabRouteOrdinals[targetRoute]
+
+    if (initialOrdinal != null && targetOrdinal != null) {
+        if (reducedMotion) return ExitTransition.None
+        val offset: (Int) -> Int =
+            if (targetOrdinal > initialOrdinal) { size -> -size / 3 } else { size -> size }
+        return if (verticalMotion) {
+            slideOutVertically(animationSpec = spatialSpec, targetOffsetY = offset)
+        } else {
+            slideOutHorizontally(animationSpec = spatialSpec, targetOffsetX = offset)
+        } + fadeOut(animationSpec = fadeOutSpec)
+    }
+
+    if (crossFadesWithTab(targetRoute)) return null
+    if (reducedMotion) return ExitTransition.None
+    return slideOutHorizontally(animationSpec = spatialSpec) { size -> if (pop) size else -size / 3 } +
+        fadeOut(animationSpec = fadeOutSpec)
+}
+
 @Composable
 fun RememberNavGraph(
     repository: NoteRepository,
@@ -168,6 +305,8 @@ fun RememberNavGraph(
     onInstallUpdate: () -> Unit = {},
 ) {
     val navController = rememberNavController()
+    val navBackStackEntry by navController.currentBackStackEntryAsState()
+    val currentDestination = navBackStackEntry?.destination
     val helpVm: HelpViewModel = hiltViewModel()
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
     var openSettingsUpdatesRequest by remember { mutableIntStateOf(0) }
@@ -181,11 +320,19 @@ fun RememberNavGraph(
     val devOptionsFadeSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
     var historySection by rememberSaveable { mutableStateOf(HistorySection.ARCHIVE) }
     var historyVisibleItemCount by rememberSaveable { mutableIntStateOf(0) }
-    var currentMainTab by rememberSaveable { mutableStateOf(MainTab.Notes) }
+    // PARITY with FilePipe: the selected tab is derived from the back stack, not held as state.
+    // There is exactly one source of truth, so the chrome can never show a tab the NavHost isn't
+    // actually displaying (which is what let a Help deep link switch tabs behind a live Help screen).
+    val currentMainTab =
+        MainTab.entries.firstOrNull { tab ->
+            currentDestination?.hierarchy?.any { it.route == tab.route } == true
+        }
+    val onMainTab = currentMainTab != null
     var alertBarsExpanded by rememberSaveable { mutableStateOf(false) }
     var lastPresentedAlertKey by rememberSaveable { mutableStateOf<String?>(null) }
     var createNoteInPane by remember { mutableStateOf<(() -> Unit)?>(null) }
     var createListInPane by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val shareApp = rememberShareAppAction()
     val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
     val paneScaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
     val useDualPaneMode = paneScaffoldDirective.maxHorizontalPartitions > 1
@@ -269,18 +416,33 @@ fun RememberNavGraph(
             when {
                 !currentOnboardingState.hasSeenIntro -> Routes.ONBOARDING_TITLE
                 initialExternalLaunch -> Routes.EXTERNAL_LAUNCH
-                else -> Routes.MAIN
+                else -> Routes.NOTES
             }
         }
 
+    /** Select a main tab. Identical to FilePipe's bottom-nav / navigation-rail click handler. */
     val openMainTab: (MainTab) -> Unit = { selectedTab ->
-        currentMainTab = selectedTab
-        navController.navigate(Routes.MAIN) {
+        navController.navigate(selectedTab.route) {
             popUpTo(navController.graph.findStartDestination().id) {
                 saveState = true
             }
             launchSingleTop = true
             restoreState = true
+        }
+    }
+
+    /** Bring the Settings tab to the front for an external request. Mirrors FilePipe's `openSettingsRoot`. */
+    val openSettingsRoot: () -> Unit = {
+        if (navController.currentDestination?.route != Routes.SETTINGS) {
+            val poppedToSettings = navController.popBackStack(Routes.SETTINGS, inclusive = false)
+            if (!poppedToSettings) {
+                navController.navigate(Routes.SETTINGS) {
+                    popUpTo(navController.graph.findStartDestination().id) {
+                        saveState = true
+                    }
+                    launchSingleTop = true
+                }
+            }
         }
     }
 
@@ -296,8 +458,7 @@ fun RememberNavGraph(
                         val note = repository.get(action.id)
                         if (note == null) {
                             if (action.exitOnBack) {
-                                currentMainTab = MainTab.Notes
-                                navController.navigate(Routes.MAIN) {
+                                navController.navigate(Routes.NOTES) {
                                     popUpTo(navController.graph.findStartDestination().id) {
                                         inclusive = true
                                     }
@@ -309,11 +470,7 @@ fun RememberNavGraph(
                         navController.openEditRouteFor(note, exitOnBack = action.exitOnBack)
                     }
                     LaunchAction.OpenSettingsUpdates -> {
-                        currentMainTab = MainTab.Settings
-                        navController.navigate(Routes.MAIN) {
-                            popUpTo(navController.graph.findStartDestination().id)
-                            launchSingleTop = true
-                        }
+                        openSettingsRoot()
                         openSettingsUpdatesRequest += 1
                         updateVm.requestOpenSheet()
                     }
@@ -327,16 +484,17 @@ fun RememberNavGraph(
     val settingsRequest = openSettingsRequest + openSettingsUpdatesRequest
     LaunchedEffect(settingsRequest) {
         if (settingsRequest > 0) {
-            openMainTab(MainTab.Settings)
+            openSettingsRoot()
         }
     }
-    LaunchedEffect(settingsHighlightSection) {
-        if (settingsHighlightSection != null) {
-            openMainTab(MainTab.Settings)
-        }
-    }
+    // No LaunchedEffect on settingsHighlightSection: the Help deep link navigates itself via
+    // goToSettingsFromHelp. Reacting to the highlight separately is what previously switched the tab
+    // behind a Help screen that was never dismissed. FilePipe has no such effect either.
     androidx.compose.animation.SharedTransitionLayout {
-        val navHostContent: @Composable (Int) -> Unit = { closeNotesRevealRequest ->
+        // Passed as a State, not an Int: NavHost keys its remembered graph on the builder lambda, so
+        // capturing a value that changes on every tab tap would rebuild the whole graph mid-navigation.
+        // A State has stable identity, and the .value read happens inside the tab content instead.
+        val navHostContent: @Composable (State<Int>) -> Unit = { closeNotesRevealRequest ->
             NavHost(
                 navController = navController,
                 startDestination = lockedStartDestination,
@@ -392,7 +550,7 @@ fun RememberNavGraph(
                     },
                     exitTransition = {
                         if (targetState.destination.route == Routes.ONBOARDING_TITLE ||
-                            targetState.destination.route == Routes.MAIN
+                            targetState.destination.route == Routes.NOTES
                         ) {
                             if (reducedMotion) {
                                 ExitTransition.None
@@ -433,8 +591,7 @@ fun RememberNavGraph(
                         onContinue = {
                             onboardingScope.launch {
                                 onboardingPrefs.markIntroSeen()
-                                currentMainTab = MainTab.Notes
-                                navController.navigate(Routes.MAIN) {
+                                navController.navigate(Routes.NOTES) {
                                     popUpTo(navController.graph.id) {
                                         inclusive = true
                                     }
@@ -448,150 +605,115 @@ fun RememberNavGraph(
                     Box(modifier = Modifier.fillMaxSize())
                 }
 
-                composable(Routes.MAIN) {
-                    val shareApp = rememberShareAppAction()
+                mainTabComposable(
+                    route = Routes.NOTES,
+                    reducedMotion = reducedMotion,
+                    verticalMotion = useDualPaneMode,
+                    spatialSpec = navSpatialSpec,
+                    fadeInSpec = navFadeInSpec,
+                    fadeOutSpec = navFadeOutSpec,
+                ) {
                     androidx.compose.runtime.CompositionLocalProvider(
-                        LocalSharedTransitionScope provides this@SharedTransitionLayout,
-                        LocalNavAnimatedVisibilityScope provides this@composable,
+                        LocalNavAnimatedVisibilityScope provides this@mainTabComposable,
                     ) {
-                        MainTabScaffold(
-                            repository = repository,
-                            currentTab = currentMainTab,
-                            useDualPaneMode = useDualPaneMode,
-                            onTabSelected = openMainTab,
-                            onCreateNote = {
-                                if (useDualPaneMode && createNoteInPane != null) {
-                                    createNoteInPane?.invoke()
-                                } else {
-                                    navController.navigate(Routes.editNote(null))
-                                }
-                            },
-                            onCreateList = {
-                                if (useDualPaneMode && createListInPane != null) {
-                                    createListInPane?.invoke()
-                                } else {
-                                    navController.navigate(Routes.editList(null))
-                                }
-                            },
-                            onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
-                            historySection = historySection,
-                            historyVisibleItemCount = historyVisibleItemCount,
-                            updateBarState = updateBarState,
-                            onUpdateClick = onUpdateClick,
-                            onDismissUpdateAvailable = onDismissUpdateAvailable,
-                            onInstallUpdate = onInstallUpdate,
-                            alertSummary = alertSummary,
-                            blockedReminderCount = blockedReminderCount,
-                            alertBarsExpanded = alertBarsExpanded,
-                            onAlertBarsExpandedChange = { expanded -> alertBarsExpanded = expanded },
-                        ) { closeRevealRequest ->
-                            AnimatedContent(
-                                targetState = currentMainTab,
-                                transitionSpec = {
-                                    if (reducedMotion) {
-                                        EnterTransition.None togetherWith ExitTransition.None
-                                    } else {
-                                        val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                                        if (useDualPaneMode) {
-                                            (
-                                                slideInVertically(animationSpec = navSpatialSpec) { direction * it } +
-                                                    fadeIn(animationSpec = navFadeInSpec)
-                                            ) togetherWith (
-                                                slideOutVertically(animationSpec = navSpatialSpec) { -direction * it / 3 } +
-                                                    fadeOut(animationSpec = navFadeOutSpec)
-                                            )
-                                        } else {
-                                            (
-                                                slideInHorizontally(animationSpec = navSpatialSpec) { direction * it } +
-                                                    fadeIn(animationSpec = navFadeInSpec)
-                                            ) togetherWith (
-                                                slideOutHorizontally(animationSpec = navSpatialSpec) { -direction * it / 3 } +
-                                                    fadeOut(animationSpec = navFadeOutSpec)
-                                            )
-                                        }
-                                    }.using(SizeTransform(clip = false))
+                        if (useDualPaneMode) {
+                            NotesTwoPaneRoute(
+                                interactionPrefs = interactionPrefs,
+                                appScope = appScope,
+                                closeRevealRequest = closeNotesRevealRequest.value,
+                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                                onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
+                                onOpenNoteInSinglePane = { note, forceEdit ->
+                                    navController.openEditRouteFor(note, forceEdit)
                                 },
-                                label = "main_tab_content",
-                            ) { tab ->
-                                when (tab) {
-                                    MainTab.Notes ->
-                                        if (useDualPaneMode) {
-                                            NotesTwoPaneRoute(
-                                                interactionPrefs = interactionPrefs,
-                                                appScope = appScope,
-                                                closeRevealRequest = closeRevealRequest,
-                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
-                                                onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
-                                                onOpenNoteInSinglePane = { note, forceEdit ->
-                                                    navController.openEditRouteFor(note, forceEdit)
-                                                },
-                                                onCreateNoteInSinglePane = { navController.navigate(Routes.editNote(null)) },
-                                                onCreateListInSinglePane = { navController.navigate(Routes.editList(null)) },
-                                                onRegisterCreateNoteInPane = { callback -> createNoteInPane = callback },
-                                                onRegisterCreateListInPane = { callback -> createListInPane = callback },
-                                            )
-                                        } else {
-                                            HomeRoute(
-                                                interactionPrefs = interactionPrefs,
-                                                closeRevealRequest = closeRevealRequest,
-                                                onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
-                                                onCreateNote = { navController.navigate(Routes.editNote(null)) },
-                                                onCreateList = { navController.navigate(Routes.editList(null)) },
-                                            )
-                                        }
+                                onCreateNoteInSinglePane = { navController.navigate(Routes.editNote(null)) },
+                                onCreateListInSinglePane = { navController.navigate(Routes.editList(null)) },
+                                onRegisterCreateNoteInPane = { callback -> createNoteInPane = callback },
+                                onRegisterCreateListInPane = { callback -> createListInPane = callback },
+                            )
+                        } else {
+                            HomeRoute(
+                                interactionPrefs = interactionPrefs,
+                                closeRevealRequest = closeNotesRevealRequest.value,
+                                onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
+                                onCreateNote = { navController.navigate(Routes.editNote(null)) },
+                                onCreateList = { navController.navigate(Routes.editList(null)) },
+                            )
+                        }
+                    }
+                }
 
-                                    MainTab.History ->
-                                        if (useDualPaneMode) {
-                                            HistoryTwoPaneRoute(
-                                                interactionPrefs = interactionPrefs,
-                                                appScope = appScope,
-                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
-                                                section = historySection,
-                                                onSectionChange = { selectedSection -> historySection = selectedSection },
-                                                onVisibleItemCountChange = { visibleItemCount ->
-                                                    historyVisibleItemCount = visibleItemCount
-                                                },
-                                                onOpenNoteInSinglePane = { note, forceEdit ->
-                                                    navController.openEditRouteFor(note, forceEdit)
-                                                },
-                                            )
-                                        } else {
-                                            HistoryRoute(
-                                                interactionPrefs = interactionPrefs,
-                                                section = historySection,
-                                                onSectionChange = { selectedSection -> historySection = selectedSection },
-                                                onVisibleItemCountChange = { visibleItemCount ->
-                                                    historyVisibleItemCount = visibleItemCount
-                                                },
-                                                onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
-                                            )
-                                        }
+                mainTabComposable(
+                    route = Routes.HISTORY,
+                    reducedMotion = reducedMotion,
+                    verticalMotion = useDualPaneMode,
+                    spatialSpec = navSpatialSpec,
+                    fadeInSpec = navFadeInSpec,
+                    fadeOutSpec = navFadeOutSpec,
+                ) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalNavAnimatedVisibilityScope provides this@mainTabComposable,
+                    ) {
+                        if (useDualPaneMode) {
+                            HistoryTwoPaneRoute(
+                                interactionPrefs = interactionPrefs,
+                                appScope = appScope,
+                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                                section = historySection,
+                                onSectionChange = { selectedSection -> historySection = selectedSection },
+                                onVisibleItemCountChange = { visibleItemCount ->
+                                    historyVisibleItemCount = visibleItemCount
+                                },
+                                onOpenNoteInSinglePane = { note, forceEdit ->
+                                    navController.openEditRouteFor(note, forceEdit)
+                                },
+                            )
+                        } else {
+                            HistoryRoute(
+                                interactionPrefs = interactionPrefs,
+                                section = historySection,
+                                onSectionChange = { selectedSection -> historySection = selectedSection },
+                                onVisibleItemCountChange = { visibleItemCount ->
+                                    historyVisibleItemCount = visibleItemCount
+                                },
+                                onOpenNote = { note, forceEdit -> navController.openEditRouteFor(note, forceEdit) },
+                            )
+                        }
+                    }
+                }
 
-                                    MainTab.Settings ->
-                                        if (useDualPaneMode) {
-                                            SettingsTwoPaneRoute(
-                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
-                                                onOpenHelp = { navController.navigate(Routes.HELP) },
-                                                onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
-                                                updateVm = updateVm,
-                                                onUpdateCheckStarted = handleUpdateCheckStarted,
-                                                onShareApp = shareApp,
-                                                highlightSectionKey = settingsHighlightSection,
-                                                onHighlightHandled = { settingsHighlightSection = null },
-                                            )
-                                        } else {
-                                            SettingsRoute(
-                                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
-                                                onOpenHelp = { navController.navigate(Routes.HELP) },
-                                                onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
-                                                updateVm = updateVm,
-                                                onUpdateCheckStarted = handleUpdateCheckStarted,
-                                                highlightSectionKey = settingsHighlightSection,
-                                                onHighlightHandled = { settingsHighlightSection = null },
-                                            )
-                                        }
-                                }
-                            }
+                mainTabComposable(
+                    route = Routes.SETTINGS,
+                    reducedMotion = reducedMotion,
+                    verticalMotion = useDualPaneMode,
+                    spatialSpec = navSpatialSpec,
+                    fadeInSpec = navFadeInSpec,
+                    fadeOutSpec = navFadeOutSpec,
+                ) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        LocalNavAnimatedVisibilityScope provides this@mainTabComposable,
+                    ) {
+                        if (useDualPaneMode) {
+                            SettingsTwoPaneRoute(
+                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                                onOpenHelp = { navController.navigate(Routes.HELP) },
+                                onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
+                                updateVm = updateVm,
+                                onUpdateCheckStarted = handleUpdateCheckStarted,
+                                onShareApp = shareApp,
+                                highlightSectionKey = settingsHighlightSection,
+                                onHighlightHandled = { settingsHighlightSection = null },
+                            )
+                        } else {
+                            SettingsRoute(
+                                onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
+                                onOpenHelp = { navController.navigate(Routes.HELP) },
+                                onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
+                                updateVm = updateVm,
+                                onUpdateCheckStarted = handleUpdateCheckStarted,
+                                highlightSectionKey = settingsHighlightSection,
+                                onHighlightHandled = { settingsHighlightSection = null },
+                            )
                         }
                     }
                 }
@@ -654,8 +776,7 @@ fun RememberNavGraph(
                     }
                     val onNavigateUp = {
                         if (exitOnBack) {
-                            currentMainTab = MainTab.Notes
-                            navController.navigate(Routes.MAIN) {
+                            navController.navigate(Routes.NOTES) {
                                 popUpTo(navController.graph.id) {
                                     inclusive = true
                                 }
@@ -734,8 +855,7 @@ fun RememberNavGraph(
                     }
                     val onNavigateUp = {
                         if (exitOnBack) {
-                            currentMainTab = MainTab.Notes
-                            navController.navigate(Routes.MAIN) {
+                            navController.navigate(Routes.NOTES) {
                                 popUpTo(navController.graph.id) {
                                     inclusive = true
                                 }
@@ -804,15 +924,29 @@ fun RememberNavGraph(
                         }
                     },
                 ) {
+                    /**
+                     * Open the Settings section a help deep link points at, dismissing the help
+                     * screen on the way.
+                     *
+                     * Identical to FilePipe's `goToSettingsFromHelp`, now that Settings is a real
+                     * destination in both apps. The fallback branch pops explicitly because the
+                     * observable result must be that the target section is selected AND the help
+                     * screen is gone - a bare `navigate` would leave help on the back stack under
+                     * the Settings tab.
+                     */
+                    val goToSettingsFromHelp: () -> Unit = {
+                        val poppedToExistingSettings =
+                            navController.popBackStack(Routes.SETTINGS, inclusive = false)
+                        if (!poppedToExistingSettings) {
+                            navController.popBackStack()
+                            navController.navigate(Routes.SETTINGS) { launchSingleTop = true }
+                        }
+                    }
                     HelpScreen(
                         onBack = { navController.popBackStack() },
                         onOpenAppSection = { sectionKey ->
                             settingsHighlightSection = sectionKey
-                            val returnedToExistingSettings =
-                                navController.popBackStack(Routes.SETTINGS, inclusive = false)
-                            if (!returnedToExistingSettings) {
-                                openMainTab(MainTab.Settings)
-                            }
+                            goToSettingsFromHelp()
                         },
                         helpVm = helpVm,
                     )
@@ -895,8 +1029,7 @@ fun RememberNavGraph(
                     }
                     val onNavigateUp = {
                         if (exitOnBack) {
-                            currentMainTab = MainTab.Notes
-                            navController.navigate(Routes.MAIN) {
+                            navController.navigate(Routes.NOTES) {
                                 popUpTo(navController.graph.id) {
                                     inclusive = true
                                 }
@@ -923,7 +1056,48 @@ fun RememberNavGraph(
             }
         }
 
-        navHostContent(0)
+        // PARITY with FilePipe: the tab chrome (nav pill / rail, alert FAB, per-tab FAB, snackbar host)
+        // lives OUTSIDE the NavHost and is gated on whether the current destination is a tab. It
+        // therefore survives tab-to-tab navigation instead of being torn down and rebuilt with each
+        // tab's destination, and it cannot display a tab the NavHost isn't showing.
+        androidx.compose.runtime.CompositionLocalProvider(
+            LocalSharedTransitionScope provides this@SharedTransitionLayout,
+        ) {
+            MainTabScaffold(
+                repository = repository,
+                currentTab = currentMainTab ?: MainTab.Notes,
+                chromeVisible = onMainTab,
+                useDualPaneMode = useDualPaneMode,
+                onTabSelected = openMainTab,
+                onCreateNote = {
+                    if (useDualPaneMode && createNoteInPane != null) {
+                        createNoteInPane?.invoke()
+                    } else {
+                        navController.navigate(Routes.editNote(null))
+                    }
+                },
+                onCreateList = {
+                    if (useDualPaneMode && createListInPane != null) {
+                        createListInPane?.invoke()
+                    } else {
+                        navController.navigate(Routes.editList(null))
+                    }
+                },
+                onImportGoogleTasks = { navController.navigate(Routes.GOOGLE_TASKS_IMPORT) },
+                historySection = historySection,
+                historyVisibleItemCount = historyVisibleItemCount,
+                updateBarState = updateBarState,
+                onUpdateClick = onUpdateClick,
+                onDismissUpdateAvailable = onDismissUpdateAvailable,
+                onInstallUpdate = onInstallUpdate,
+                alertSummary = alertSummary,
+                blockedReminderCount = blockedReminderCount,
+                alertBarsExpanded = alertBarsExpanded,
+                onAlertBarsExpandedChange = { expanded -> alertBarsExpanded = expanded },
+            ) { closeRevealRequest ->
+                navHostContent(rememberUpdatedState(closeRevealRequest))
+            }
+        }
     }
 }
 

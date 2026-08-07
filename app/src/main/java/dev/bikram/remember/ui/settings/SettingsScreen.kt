@@ -551,8 +551,14 @@ fun SettingsRoute(
     }
     val highlightSection = highlightSectionKey?.substringBefore(".")
     val highlightItem = highlightSectionKey?.substringAfter(".", "")?.takeIf { it.isNotEmpty() }
-    var activeHighlightItem by remember { mutableStateOf<String?>(null) }
-    var activeHighlightItemRequestId by remember { mutableIntStateOf(0) }
+    // rememberSaveable, NOT remember: this request counter is acknowledged by a matching
+    // rememberSaveable counter in the receiving section (see RemindersSection's
+    // `handledKeepUntilDoneHighlightRequestId`). A monotonic-counter handshake only works if both
+    // halves have the same lifetime. With a plain remember, the request side reset to 0 every time
+    // Settings left the back stack while the ack side survived at 1 - so the second item-level deep
+    // link raised request 1 again, the ack already read 1, and the highlight silently never fired.
+    var activeHighlightItem by rememberSaveable { mutableStateOf<String?>(null) }
+    var activeHighlightItemRequestId by rememberSaveable { mutableIntStateOf(0) }
     LaunchedEffect(highlightSectionKey) {
         val key = highlightSection ?: return@LaunchedEffect
         activeHighlightItem = null

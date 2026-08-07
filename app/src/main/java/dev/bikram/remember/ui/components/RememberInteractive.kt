@@ -2,9 +2,6 @@ package dev.bikram.remember.ui.components
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,7 +44,6 @@ import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.TooltipState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -57,8 +53,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -72,12 +66,6 @@ import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-
-private const val FLOATING_ACTION_TOOLTIP_DISMISS_MILLIS = 5_000L
 
 @Composable
 fun rememberResponsiveActionButtonSize(
@@ -166,17 +154,15 @@ private fun RememberLongPressLabelTooltip(
     enabled: Boolean,
     content: @Composable () -> Unit,
 ) {
-    if (label == null) {
+    if (label == null || !enabled) {
         content()
         return
     }
 
-    val tooltipState = rememberTooltipState(isPersistent = true)
+    val tooltipState = rememberTooltipState()
     val hapticEnabled = LocalHapticEnabled.current
     val view = LocalView.current
 
-    // The label tooltip is itself a long-press affordance, so it buzzes like any other long-press.
-    // Matches FilePipe's tooltip-bearing icon buttons.
     LaunchedEffect(tooltipState.isVisible) {
         if (tooltipState.isVisible && hapticEnabled) {
             view.performLongPressHaptic()
@@ -199,52 +185,8 @@ private fun RememberLongPressLabelTooltip(
             }
         },
         state = tooltipState,
-        modifier =
-            Modifier.showLabelTooltipOnLongPress(
-                enabled = enabled,
-                tooltipState = tooltipState,
-            ),
-        enableUserInput = false,
     ) {
         content()
-    }
-}
-
-private fun Modifier.showLabelTooltipOnLongPress(
-    enabled: Boolean,
-    tooltipState: TooltipState,
-): Modifier {
-    if (!enabled) return this
-
-    return pointerInput(tooltipState) {
-        coroutineScope {
-            awaitEachGesture {
-                val firstDown = awaitFirstDown(requireUnconsumed = false)
-                val releasedBeforeLongPress =
-                    withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
-                        waitForUpOrCancellation(PointerEventPass.Initial)
-                    }
-                if (releasedBeforeLongPress == null) {
-                    launch { tooltipState.show() }
-
-                    var labelFingerReleased = false
-                    while (!labelFingerReleased) {
-                        val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
-                        val activePointerChange =
-                            pointerEvent.changes.firstOrNull { pointerChange ->
-                                pointerChange.id == firstDown.id
-                            }
-                        activePointerChange?.consume()
-                        labelFingerReleased = activePointerChange?.pressed != true
-                    }
-
-                    launch {
-                        delay(FLOATING_ACTION_TOOLTIP_DISMISS_MILLIS)
-                        tooltipState.dismiss()
-                    }
-                }
-            }
-        }
     }
 }
 

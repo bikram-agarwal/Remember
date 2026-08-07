@@ -143,10 +143,12 @@ fun MainTabScaffold(
     var closeNotesRevealRequest by rememberSaveable { mutableIntStateOf(0) }
     val context = LocalContext.current
     val shareApp = rememberShareAppAction()
-    val navAnimatedVisibilityScope = LocalNavAnimatedVisibilityScope.current
-    val chromeTargetVisible =
-        navAnimatedVisibilityScope?.transition?.targetState == EnterExitState.Visible
-    val effectiveChromeVisible = chromeVisible && (navAnimatedVisibilityScope == null || chromeTargetVisible)
+    // [chromeVisible] is the whole story. This scaffold sits OUTSIDE the NavHost (PARITY with
+    // FilePipe, which gates its chrome on `showBottomBar`), so the caller derives visibility from
+    // whether the current destination is a main tab. There is no enclosing nav AnimatedVisibility
+    // scope to cross-check against any more - it used to be consulted when the scaffold lived inside
+    // the single `main` destination.
+    val effectiveChromeVisible = chromeVisible
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val chromeOverlayModifier =
         if (sharedTransitionScope != null) {

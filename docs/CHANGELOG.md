@@ -1,7 +1,14 @@
 ## v1.3.0 Pinned notes
 
 ### ✨ New Features
-- **Pin** the notes you need at hand: they stay at the top of the list, regardless of your sorting or grouping.
+- Pin notes to keep them at the top of Home, no matter how you sort or group. 
+    - Filter by pinned, pin from the editor or with a swipe, and pin several notes at once from multi-select.
+- Star several notes at once from multi-select. Pin and Star stay disabled when everything you selected is already pinned or starred.
+- Turn haptic feedback on or off in Settings.
+
+### 🐛 Bug Fixes
+- Swiping to unpin, unstar, or reopen works again (i.e. it no longer gets stuck after pin, star, done).
+- Fixed a bug where taps were acting like long-press on high density screen phones. 
 
 ---
 
