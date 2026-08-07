@@ -90,6 +90,7 @@ import dev.bikram.remember.ui.components.NoteCardUiModel
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
+import dev.bikram.remember.ui.components.rememberSelectionActionBarListClearance
 import dev.bikram.remember.ui.components.toNoteCardUiModel
 import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
@@ -209,6 +210,7 @@ fun HomeRoute(
         onPruneSelection = vm::pruneSelection,
         onClearSelection = vm::clearSelection,
         onPinSelected = vm::pinSelected,
+        onStarSelected = vm::starSelected,
         onMarkSelectedDone = vm::markSelectedDone,
         onArchiveSelected = vm::archiveSelected,
         onTrashSelected = vm::trashSelected,
@@ -243,6 +245,7 @@ fun HomeScreen(
     onPruneSelection: (Set<Long>) -> Unit,
     onClearSelection: () -> Unit,
     onPinSelected: () -> Unit,
+    onStarSelected: () -> Unit,
     onMarkSelectedDone: () -> Unit,
     onArchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
@@ -465,6 +468,9 @@ fun HomeScreen(
                     onClearSelection = onClearSelection,
                     onTagSelected = { tagSheetOpen = true },
                     onPinSelected = onPinSelected,
+                    pinEnabled = state.canPinSelected,
+                    onStarSelected = onStarSelected,
+                    starEnabled = state.canStarSelected,
                     onMarkDoneSelected = onMarkSelectedDone,
                     onArchiveSelected = onArchiveSelected,
                     onTrashSelected = onTrashSelected,
@@ -482,7 +488,11 @@ fun HomeScreen(
                     ?: Modifier
             }
         val topInset = statusBarInset + 68.dp
-        val bottomPadding = bottomInset + 24.dp
+        val selectionBarClearance =
+            rememberSelectionActionBarListClearance(
+                visible = showSelectionActionBar && state.inSelectionMode,
+            )
+        val bottomPadding = bottomInset + 24.dp + selectionBarClearance
         val listContentPadding =
             remember(topInset, bottomPadding) {
                 PaddingValues(

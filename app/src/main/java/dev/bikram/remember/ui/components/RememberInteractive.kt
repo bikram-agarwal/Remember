@@ -1,5 +1,6 @@
 package dev.bikram.remember.ui.components
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -51,6 +52,7 @@ import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -94,6 +97,27 @@ fun rememberResponsiveActionButtonSize(
             else -> defaultSize
         }
     return targetSize
+}
+
+/**
+ * Extra list bottom inset for when the floating multi-select action bar is showing.
+ *
+ * The bar is drawn in the Scaffold bottomBar slot above the nav pill, so it does not grow
+ * the list's contentPadding by itself. This clearance matches the bar height (responsive
+ * action button + ButtonGroup vertical padding) plus a small gap, and animates with the
+ * bar's enter/exit so the last rows / section headers can scroll clear of it.
+ */
+@Composable
+fun rememberSelectionActionBarListClearance(visible: Boolean): Dp {
+    val barHeight = rememberResponsiveActionButtonSize() + 8.dp
+    val targetClearance = if (visible) barHeight + 8.dp else 0.dp
+    val animatedClearance by
+        animateDpAsState(
+            targetValue = targetClearance,
+            animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec()),
+            label = "selectionActionBarListClearance",
+        )
+    return animatedClearance
 }
 
 @Composable

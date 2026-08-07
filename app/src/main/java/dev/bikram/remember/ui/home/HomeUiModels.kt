@@ -65,6 +65,16 @@ data class HomeState(
     val selectedIds: PersistentSet<Long> = persistentSetOf(),
     val inSelectionMode: Boolean = false,
     /**
+     * True when at least one selected note is not pinned. Drives the bulk Pin button: disabled
+     * when every selected note is already pinned (a no-op tap).
+     */
+    val canPinSelected: Boolean = false,
+    /**
+     * True when at least one selected note is not starred. Same enablement rule as
+     * [canPinSelected] for the bulk Star button.
+     */
+    val canStarSelected: Boolean = false,
+    /**
      * Archived notes that match the current search query + facet filters. Only non-empty while
      * [NotesFilter.text] is non-blank; drives the collapsible "Archive (N)" section on Home.
      */

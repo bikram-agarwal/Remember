@@ -664,6 +664,31 @@ class NoteRepository(
         return changed
     }
 
+    /**
+     * Bulk star / unstar. One transaction so the starred flag + reserved tag stay in lockstep
+     * across the selection, and Undo can reverse only the rows that actually changed.
+     */
+    suspend fun setStarred(
+        ids: Collection<Long>,
+        starred: Boolean,
+    ): Set<Long> {
+        if (ids.isEmpty()) return emptySet()
+        val now = clock()
+        val changed = mutableSetOf<Long>()
+        runInTransaction {
+            ids.forEach { id ->
+                val note = noteDao.get(id)?.note ?: return@forEach
+                val baseTags = note.tags.filterNot { it == RememberReservedTags.STARRED }
+                val newTags = if (starred) (baseTags + RememberReservedTags.STARRED).distinct() else baseTags
+                if (note.starred == starred && note.tags == newTags) return@forEach
+                noteDao.update(note.copy(starred = starred, tags = newTags, updatedAt = now))
+                changed += id
+            }
+        }
+        if (changed.isNotEmpty()) postWriteBookkeeping(includeSummary = false)
+        return changed
+    }
+
     suspend fun archiveNotes(ids: Collection<Long>) {
         if (ids.isEmpty()) return
         val now = clock()

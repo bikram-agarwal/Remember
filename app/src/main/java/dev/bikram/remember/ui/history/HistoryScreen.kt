@@ -115,6 +115,7 @@ import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.SwipeRevealTile
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
+import dev.bikram.remember.ui.components.rememberSelectionActionBarListClearance
 import dev.bikram.remember.ui.components.toNoteCardUiModel
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
@@ -390,9 +391,10 @@ class HistoryViewModel
                     is BulkUndoableAction.MarkedDone ->
                         repository.markIncomplete(action.ids, action.snapshots)
                     is BulkUndoableAction.Restored -> repository.moveToTrash(action.ids)
-                    // Not produced by History (pinning is a Home action), but the exhaustive
+                    // Not produced by History (pin / star are Home actions), but the exhaustive
                     // mapping keeps the inverse correct if that ever changes.
                     is BulkUndoableAction.Pinned -> repository.setPinned(action.ids, false)
+                    is BulkUndoableAction.Starred -> repository.setStarred(action.ids, false)
                     is BulkUndoableAction.Unarchived -> repository.archiveNotes(action.ids)
                     is BulkUndoableAction.ArchivedFromTrash -> repository.moveToTrash(action.ids)
                     is BulkUndoableAction.MovedArchiveToTrash -> repository.archiveNotes(action.ids)
@@ -669,13 +671,17 @@ fun HistoryRoute(
                             topBarInset + 12.dp
                         }
                     }
+                val selectionBarClearance =
+                    rememberSelectionActionBarListClearance(
+                        visible = showSelectionActionBar && inSelectionMode,
+                    )
                 if (targetRows.isNotEmpty()) {
                     val contentPadding =
                         PaddingValues(
                             start = 16.dp,
                             end = 16.dp,
                             top = listTopPadding,
-                            bottom = pillInset + 24.dp,
+                            bottom = pillInset + 24.dp + selectionBarClearance,
                         )
                     BoxWithConstraints(Modifier.fillMaxSize()) {
                         val mosaicColumnCount = noteMosaicColumnCount(maxWidth)

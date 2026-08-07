@@ -172,6 +172,18 @@ class HomeViewModel
                         .mapNotNull { item -> (item as? HomeListItem.NoteRow)?.card?.id }
                         .toSet()
                 val prunedSelection = selected.intersect(visibleIds).toPersistentSet()
+                var canPinSelected = false
+                var canStarSelected = false
+                if (prunedSelection.isNotEmpty()) {
+                    val seenSelectedIds = HashSet<Long>()
+                    for (item in arrangedItems) {
+                        if (canPinSelected && canStarSelected) break
+                        val card = (item as? HomeListItem.NoteRow)?.card ?: continue
+                        if (card.id !in prunedSelection || !seenSelectedIds.add(card.id)) continue
+                        if (!card.pinned) canPinSelected = true
+                        if (!card.starred) canStarSelected = true
+                    }
+                }
                 HomeState(
                     loading = false,
                     filter = currentFilter,
@@ -181,6 +193,8 @@ class HomeViewModel
                     viewOptions = viewOptions,
                     selectedIds = prunedSelection,
                     inSelectionMode = prunedSelection.isNotEmpty(),
+                    canPinSelected = canPinSelected,
+                    canStarSelected = canStarSelected,
                     archivedMatches = filteredArchived.toPersistentList(),
                     trashedMatches = filteredTrashed.toPersistentList(),
                 )
@@ -355,6 +369,24 @@ class HomeViewModel
             }
         }
 
+        /**
+         * Stars every selected note that is not already starred. Same "star all" semantics as
+         * [pinSelected]: mixed selections converge to starred rather than flipping each row.
+         */
+        fun starSelected() {
+            val noteIds = visibleSelectedIdsSnapshot()
+            if (noteIds.isEmpty()) return
+            val ids = noteIds.toSet()
+            viewModelScope.launch {
+                val starredIds = repository.setStarred(ids, true)
+                selectedIds.value = persistentSetOf()
+                if (starredIds.isEmpty()) return@launch
+                val action = BulkUndoableAction.Starred(starredIds)
+                lastBulkAction = action
+                _events.trySend(HomeEvent.BulkActionPerformed(action))
+            }
+        }
+
         fun archiveSelected() {
             val noteIds = visibleSelectedIdsSnapshot()
             if (noteIds.isEmpty()) return
@@ -397,6 +429,7 @@ class HomeViewModel
                     is BulkUndoableAction.MarkedDone ->
                         repository.markIncomplete(action.ids, action.snapshots)
                     is BulkUndoableAction.Pinned -> repository.setPinned(action.ids, false)
+                    is BulkUndoableAction.Starred -> repository.setStarred(action.ids, false)
                     // The rest aren't produced by HomeViewModel, but exhaustiveness keeps
                     // the inverse mapping correct if a new variant is ever added.
                     is BulkUndoableAction.Restored -> repository.moveToTrash(action.ids)

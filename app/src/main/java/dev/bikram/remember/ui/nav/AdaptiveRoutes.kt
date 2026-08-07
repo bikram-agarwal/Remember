@@ -343,6 +343,9 @@ fun NotesTwoPaneRoute(
                             onClearSelection = viewModel::clearSelection,
                             onTagSelected = { tagSheetOpen = true },
                             onPinSelected = viewModel::pinSelected,
+                            pinEnabled = state.canPinSelected,
+                            onStarSelected = viewModel::starSelected,
+                            starEnabled = state.canStarSelected,
                             onMarkDoneSelected = viewModel::markSelectedDone,
                             onArchiveSelected = viewModel::archiveSelected,
                             onTrashSelected = viewModel::trashSelected,
@@ -1230,6 +1233,9 @@ private fun NotesSelectionActionPane(
     onClearSelection: () -> Unit,
     onTagSelected: () -> Unit,
     onPinSelected: () -> Unit,
+    pinEnabled: Boolean,
+    onStarSelected: () -> Unit,
+    starEnabled: Boolean,
     onMarkDoneSelected: () -> Unit,
     onArchiveSelected: () -> Unit,
     onTrashSelected: () -> Unit,
@@ -1305,6 +1311,7 @@ private fun NotesSelectionActionPane(
             }
             RememberFilledTonalButton(
                 onClick = onPinSelected,
+                enabled = pinEnabled,
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -1313,6 +1320,18 @@ private fun NotesSelectionActionPane(
                 contentPadding = buttonPadding,
             ) {
                 SelectionPaneButtonContent("push_pin", stringResource(R.string.edit_bottom_bar_pin), compact)
+            }
+            RememberFilledTonalButton(
+                onClick = onStarSelected,
+                enabled = starEnabled,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(buttonHeight),
+                shape = SelectionPaneButtonShape,
+                contentPadding = buttonPadding,
+            ) {
+                SelectionPaneButtonContent("star", stringResource(R.string.edit_bottom_bar_star), compact)
             }
             RememberFilledTonalButton(
                 onClick = onMarkDoneSelected,

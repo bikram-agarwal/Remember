@@ -320,6 +320,7 @@
     <string name="home_bulk_trash_cd">Move selected notes to trash</string>
     <string name="home_bulk_mark_done_cd">Mark selected notes done</string>
     <string name="home_bulk_pin_cd">Pin selected notes</string>
+    <string name="home_bulk_star_cd">Star selected notes</string>
     <string name="home_bulk_tag_cd">Tag selected notes</string>
     <string name="two_pane_notes_selection_title" tools:ignore="PluralsCandidate">%1$d selected</string>
 
@@ -340,6 +341,10 @@
     <plurals name="bulk_action_pinned">
         <item quantity="one">%1$d pinned</item>
         <item quantity="other">%1$d pinned</item>
+    </plurals>
+    <plurals name="bulk_action_starred">
+        <item quantity="one">%1$d starred</item>
+        <item quantity="other">%1$d starred</item>
     </plurals>
     <plurals name="bulk_action_restored">
         <item quantity="one">%1$d restored</item>
