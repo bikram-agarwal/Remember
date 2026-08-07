@@ -59,7 +59,7 @@ import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 
 private const val LEGACY_CONTACT_MANUAL_ENTRY_EXTRA = "__remember_manual_contact_entry__"
 
@@ -406,7 +406,7 @@ private fun ActionTypeChooser(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .tapSoundClickable { onPick(type) }
+                            .appClickable { onPick(type) }
                             .padding(horizontal = 8.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -604,7 +604,7 @@ private fun ActionNavigationRow(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .tapSoundClickable(onClick = onClick)
+                        .appClickable(onClick = onClick)
                         .padding(horizontal = 20.dp, vertical = 17.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

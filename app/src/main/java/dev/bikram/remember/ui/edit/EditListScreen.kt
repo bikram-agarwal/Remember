@@ -78,7 +78,7 @@ import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.NoteActionBottomBarContent
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.LocalSnackbarHostState
@@ -558,7 +558,7 @@ fun EditListScreen(
                                     Modifier
                                         .fillMaxWidth()
                                         .height(140.dp)
-                                        .tapSoundClickable(
+                                        .appClickable(
                                             enabled = !readOnly,
                                             onClick = {
                                                 isEditMode = true
@@ -726,7 +726,7 @@ fun EditListScreen(
                                         .fillMaxWidth()
                                         .animateItem(
                                             placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
-                                        ).tapSoundClickable {
+                                        ).appClickable {
                                             pendingFocusItemId = vm.addItem()
                                             pendingFocusField = FocusField.TITLE
                                             isEditMode = true
@@ -758,7 +758,7 @@ fun EditListScreen(
                                         .fillMaxWidth()
                                         .animateItem(
                                             placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
-                                        ).tapSoundClickable { showChecked = !showChecked }
+                                        ).appClickable { showChecked = !showChecked }
                                         .padding(vertical = 8.dp),
                             ) {
                                 RememberMaterialRoundedSymbol(

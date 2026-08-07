@@ -35,6 +35,7 @@ import androidx.core.view.WindowCompat
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.effectiveDarkTheme
 import dev.bikram.remember.ui.common.responsiveTextScaleForWidth
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 
 private const val MAX_APP_DISPLAY_SCALE = 1.15f
 
@@ -56,6 +57,7 @@ val LocalIsDark = staticCompositionLocalOf { false }
 fun RememberTheme(
     themeState: ThemeState = ThemeState(),
     paintBackground: Boolean = true,
+    hapticFeedbackEnabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -120,6 +122,7 @@ fun RememberTheme(
         LocalUseEnhancedShading provides themeState.useEnhancedShading,
         LocalThemeState provides themeState,
         LocalReducedMotion provides reducedMotion,
+        LocalHapticEnabled provides hapticFeedbackEnabled,
     ) {
         MaterialExpressiveTheme(
             colorScheme = targetColorScheme,

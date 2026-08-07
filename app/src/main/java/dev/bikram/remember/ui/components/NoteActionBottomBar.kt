@@ -36,8 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -47,6 +46,8 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isSmallLandscape
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
@@ -382,14 +383,15 @@ private fun EditActionItem(
     compact: Boolean = false,
 ) {
     val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
-    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     val clickableModifier =
         modifier
             .clip(MaterialTheme.shapes.large)
             .clickable(
                 onClick = {
                     if (isEditMode) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (hapticEnabled) view.performLongPressHaptic()
                     }
                     onClick()
                 },
@@ -472,7 +474,8 @@ private fun DoneActionItem(
 ) {
     val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
-    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     var pulsing by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pulsing) 1.35f else 1f,
@@ -493,7 +496,7 @@ private fun DoneActionItem(
             .clickable(
                 onClick = {
                     if (!completed) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (hapticEnabled) view.performLongPressHaptic()
                         pulsing = true
                     }
                     onClick()
@@ -564,7 +567,8 @@ private fun PinActionItem(
 ) {
     val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
-    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     var pulsing by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         targetValue = if (pulsing) 1.35f else 1f,
@@ -584,7 +588,7 @@ private fun PinActionItem(
             .clickable(
                 onClick = {
                     if (!pinned) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (hapticEnabled) view.performLongPressHaptic()
                         pulsing = true
                     }
                     onClick()
@@ -651,7 +655,8 @@ private fun StarActionItem(
 ) {
     val effectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val colorEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Color>())
-    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     var starPulsing by remember { mutableStateOf(false) }
     val starScale by animateFloatAsState(
         targetValue = if (starPulsing) 1.35f else 1f,
@@ -670,7 +675,7 @@ private fun StarActionItem(
             .clickable(
                 onClick = {
                     if (!starred) {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        if (hapticEnabled) view.performLongPressHaptic()
                         starPulsing = true
                     }
                     onClick()

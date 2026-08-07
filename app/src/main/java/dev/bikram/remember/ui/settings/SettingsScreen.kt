@@ -115,7 +115,7 @@ import dev.bikram.remember.ui.components.rememberResponsiveActionIconSize
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
@@ -150,10 +150,24 @@ enum class SettingsSectionKey(
     val routeKey: String,
     val iconName: String,
     @param:StringRes val titleRes: Int,
+    /**
+     * Historic [routeKey] values. [routeKey] is a *stored identifier*: it is persisted in the
+     * collapsed-sections preference and accepted from deep links. Renaming one would orphan that
+     * stored state, so move the old value here rather than deleting it and everything keeps
+     * resolving.
+     *
+     * This has nothing to do with [titleRes]. The displayed heading is never persisted or compared,
+     * so section labels in `strings.xml` can be reworded freely with no effect anywhere else.
+     */
+    val legacyRouteKeys: List<String> = emptyList(),
 ) {
     Appearance("appearance", "palette", R.string.settings_section_appearance),
     Notifications("notifications", "notifications", R.string.settings_notifications_section),
-    Swipe("swipe", "swipe_left", R.string.settings_swipe_section),
+
+    // FilePipe files the same toggle under its broader "Touch & Sound" section. Divergent heading
+    // only; the toggle and its behaviour are in parity.
+    Haptics("haptics", "vibration", R.string.settings_haptics_section),
+    Swipe("swipe", "swipe_left", R.string.settings_swipe_section, legacyRouteKeys = listOf("swipe_actions")),
     Security("security", "security", R.string.settings_section_security),
     Backup("backup", "save", R.string.settings_backup_section),
     Updates("updates", "system_update", R.string.settings_updates_section),
@@ -161,25 +175,29 @@ enum class SettingsSectionKey(
     DevOptions("dev_options", "developer_board", R.string.dev_options_title),
 }
 
+/**
+ * Resolves a stored or deep-linked route key - current or historic - to its section's current
+ * [SettingsSectionKey.routeKey]. Returns null when the key matches no section.
+ */
+fun canonicalSettingsSectionRouteKey(storedKey: String): String? =
+    SettingsSectionKey.entries
+        .firstOrNull { section -> section.routeKey == storedKey || storedKey in section.legacyRouteKeys }
+        ?.routeKey
+
 val settingsPaneSections: List<SettingsSectionKey>
     get() =
         SettingsSectionKey.entries.filter { sectionKey ->
             sectionKey != SettingsSectionKey.DevOptions
         }
 
-fun settingsSectionKeyForHighlight(highlightSectionKey: String?): SettingsSectionKey? =
-    when (highlightSectionKey?.substringBefore(".")) {
-        SettingsSectionKey.Appearance.routeKey -> SettingsSectionKey.Appearance
-        SettingsSectionKey.Notifications.routeKey -> SettingsSectionKey.Notifications
-        SettingsSectionKey.Swipe.routeKey,
-        "swipe_actions",
-        -> SettingsSectionKey.Swipe
-        SettingsSectionKey.Security.routeKey -> SettingsSectionKey.Security
-        SettingsSectionKey.Backup.routeKey -> SettingsSectionKey.Backup
-        SettingsSectionKey.Updates.routeKey -> SettingsSectionKey.Updates
-        SettingsSectionKey.About.routeKey -> SettingsSectionKey.About
-        else -> null
+// Resolved from the enum rather than a hand-maintained `when`, so a routeKey has exactly one home.
+// settingsPaneSections already excludes DevOptions, which is precisely the set this used to accept.
+fun settingsSectionKeyForHighlight(highlightSectionKey: String?): SettingsSectionKey? {
+    val routeKey = highlightSectionKey?.substringBefore(".") ?: return null
+    return settingsPaneSections.firstOrNull { section ->
+        section.routeKey == routeKey || routeKey in section.legacyRouteKeys
     }
+}
 
 private object SettingsScreenSessionState {
     var collapsedSectionKeys: Set<String> = emptySet()
@@ -396,10 +414,12 @@ fun SettingsRoute(
     var collapsedSettingsSectionKeys by rememberSaveable {
         mutableStateOf<Set<String>?>(null)
     }
+    // Stored keys are canonicalised first so a key written under an older routeKey still resolves.
     val currentCollapsedSectionKeys =
         collapsedSettingsSectionKeys
             ?: viewOptionsState
                 ?.settingsCollapsedSectionKeys
+                ?.mapNotNull { storedKey -> canonicalSettingsSectionRouteKey(storedKey) }
                 ?.filter { it in settingsExpandableSectionKeys }
                 ?.toSet()
             ?: SettingsScreenSessionState.collapsedSectionKeys
@@ -407,6 +427,7 @@ fun SettingsRoute(
         val keys = viewOptionsState?.settingsCollapsedSectionKeys ?: return@LaunchedEffect
         collapsedSettingsSectionKeys =
             keys
+                .mapNotNull { storedKey -> canonicalSettingsSectionRouteKey(storedKey) }
                 .filter { sectionKey -> sectionKey in settingsExpandableSectionKeys }
                 .toSet()
     }
@@ -535,19 +556,21 @@ fun SettingsRoute(
     LaunchedEffect(highlightSectionKey) {
         val key = highlightSection ?: return@LaunchedEffect
         activeHighlightItem = null
-        val wasCollapsed = key in currentCollapsedSectionKeys
-        updateCollapsedSettingsSectionKeys(currentCollapsedSectionKeys - key)
+        // Canonicalise so a deep link written against an older routeKey still expands its section.
+        val sectionRouteKey = canonicalSettingsSectionRouteKey(key) ?: key
+        val wasCollapsed = sectionRouteKey in currentCollapsedSectionKeys
+        updateCollapsedSettingsSectionKeys(currentCollapsedSectionKeys - sectionRouteKey)
         // Wait for expandVertically to finish before scrolling or starting item-level highlights.
         if (wasCollapsed) delay(SETTINGS_SECTION_EXPAND_SETTLE_DELAY_MS)
         val index =
-            settingsSectionScrollIndex[key] ?: run {
+            settingsSectionScrollIndex(sectionRouteKey, includeSettingsSection) ?: run {
                 onHighlightHandled()
                 return@LaunchedEffect
             }
         settingsListState.animateScrollToItem(index)
         if (highlightItem == null) {
             val highlightExpiresAtMillis = SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
-            when (key) {
+            when (sectionRouteKey) {
                 "notifications" -> {
                     notificationsHighlight = true
                     notificationsHighlightExpiresAtMillis = highlightExpiresAtMillis
@@ -738,6 +761,33 @@ fun SettingsRoute(
                                     )
                                 }
                             } // notifications Column
+                        }
+                    }
+
+                    if (includeSettingsSection(SettingsSectionKey.Haptics)) {
+                        item(key = "haptics") {
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Haptics.routeKey,
+                                materialSymbolName = SettingsSectionKey.Haptics.iconName,
+                                title = stringResource(SettingsSectionKey.Haptics.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                            ) {
+                                GroupedListColumn {
+                                    GroupedListItem(position = GroupPosition.ONLY) {
+                                        SettingsToggleRow(
+                                            materialSymbolName = "vibration",
+                                            title = stringResource(R.string.settings_haptic_feedback),
+                                            subtitle = stringResource(R.string.settings_haptic_feedback_desc),
+                                            checked = interactionState.hapticFeedbackEnabled,
+                                            onCheckedChange = { enabled ->
+                                                scope.launch { interactionPrefs.setHapticFeedbackEnabled(enabled) }
+                                            },
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -945,7 +995,7 @@ fun SettingsRoute(
                                             modifier =
                                                 Modifier
                                                     .fillMaxWidth()
-                                                    .tapSoundClickable {
+                                                    .appClickable {
                                                         beginUpdateCheck(true)
                                                     }.padding(horizontal = 16.dp, vertical = 10.dp),
                                             verticalAlignment = Alignment.CenterVertically,
@@ -1197,7 +1247,7 @@ private fun DevOptionsSettingsEntry(
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                .tapSoundClickable(onClick = onClick)
+                .appClickable(onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1269,9 +1319,29 @@ private fun openFdroidPackagePage(context: Context) {
     }
 }
 
-private val settingsSectionScrollIndex =
-    mapOf(
-        "notifications" to 1,
-        "security" to 4,
-        "backup" to 5,
-    )
+/**
+ * Index of a section's item within the settings list, derived from declaration order and the
+ * sections actually emitted.
+ *
+ * This was a hardcoded `routeKey -> index` map, which silently pointed at the wrong section whenever
+ * the list changed: removing the Haptics section left every index below it off by one, and in
+ * two-pane mode - where [includeSettingsSection] emits only the selected section - all of them were
+ * wrong. Deriving it means adding, removing or hiding a section cannot leave it stale.
+ *
+ * About and DevOptions are emitted after a non-section item, so they are not scroll targets, which
+ * matches the old map having no entry for them.
+ */
+private fun settingsSectionScrollIndex(
+    storedRouteKey: String,
+    isIncluded: (SettingsSectionKey) -> Boolean,
+): Int? {
+    val canonicalRouteKey = canonicalSettingsSectionRouteKey(storedRouteKey) ?: return null
+    val target =
+        SettingsSectionKey.entries.firstOrNull { section -> section.routeKey == canonicalRouteKey }
+            ?: return null
+    if (target == SettingsSectionKey.About || target == SettingsSectionKey.DevOptions) return null
+    if (!isIncluded(target)) return null
+    return SettingsSectionKey.entries
+        .takeWhile { section -> section != target }
+        .count { section -> isIncluded(section) }
+}

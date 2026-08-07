@@ -90,7 +90,7 @@ import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.history.HistorySection
 import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
 import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
@@ -196,7 +196,7 @@ fun MainTabScaffold(
                     modifier =
                         Modifier
                             .fillMaxSize()
-                            .tapSoundClickable(
+                            .appClickable(
                                 onClick = {
                                     fabExpanded = false
                                     onAlertBarsExpandedChange(false)

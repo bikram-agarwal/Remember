@@ -38,7 +38,7 @@ import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.components.EditorShelfNotice
 import dev.bikram.remember.ui.components.EditorShelfNoticeState
 import dev.bikram.remember.ui.components.NoteShelfState
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.modifiers.rememberExpressiveOverscrollEffect
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
@@ -211,7 +211,7 @@ internal fun EditorContentPictureHero(
                         .then(sharedModifier)
                         .clip(MaterialTheme.shapes.large)
                         .background(MaterialTheme.colorScheme.surfaceContainer)
-                        .tapSoundClickable(onClick = onOpenFull),
+                        .appClickable(onClick = onOpenFull),
             ) {
                 HeroFramedImage(
                     imageUri = uri,

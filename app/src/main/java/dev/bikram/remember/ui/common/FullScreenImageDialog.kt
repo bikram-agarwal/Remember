@@ -69,7 +69,7 @@ import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.launch
 import kotlin.math.max
@@ -710,7 +710,7 @@ private fun PhotoOverlayActionPill(
         modifier =
             modifier
                 .then(contentDescriptionModifier)
-                .tapSoundCombinedClickable(
+                .appCombinedClickable(
                     interactionSource = interactionSource,
                     indication = null,
                     onClick = onClick,

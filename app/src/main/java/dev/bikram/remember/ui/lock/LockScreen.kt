@@ -36,7 +36,7 @@ import androidx.fragment.app.FragmentActivity
 import dev.bikram.remember.R
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import kotlinx.coroutines.launch
 
 @Composable
@@ -208,7 +208,7 @@ private fun DeviceUnlockButton(onClick: () -> Unit) {
             Modifier
                 .size(96.dp)
                 .clip(CircleShape)
-                .tapSoundClickable(onClick = onClick),
+                .appClickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
             RememberMaterialRoundedSymbol(
@@ -271,7 +271,7 @@ private fun DigitKey(
             Modifier
                 .size(72.dp)
                 .clip(CircleShape)
-                .tapSoundClickable(onClick = onClick),
+                .appClickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
             Text(digit, style = MaterialTheme.typography.headlineSmall)
@@ -295,7 +295,7 @@ private fun ActionKey(
             Modifier
                 .size(72.dp)
                 .clip(CircleShape)
-                .tapSoundClickable(onClick = onClick),
+                .appClickable(onClick = onClick),
     ) {
         Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
             RememberMaterialRoundedSymbol(

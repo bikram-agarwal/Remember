@@ -29,6 +29,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.data.InteractionPrefs
+import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.OnboardingPrefs
@@ -122,9 +123,13 @@ class MainActivity : FragmentActivity() {
             val tagColors by tagRepository.observeTagColorMap().collectAsStateWithLifecycle(
                 initialValue = emptyMap(),
             )
+            val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
+                initialValue = InteractionState(),
+            )
             CompositionLocalProvider(LocalTagColors provides tagColors) {
                 RememberTheme(
                     themeState = themeState,
+                    hapticFeedbackEnabled = interactionState.hapticFeedbackEnabled,
                 ) {
                     AppRoot(
                         noteRepository = noteRepository,

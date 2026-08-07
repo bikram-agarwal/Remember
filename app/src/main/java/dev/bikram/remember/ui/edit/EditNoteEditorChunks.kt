@@ -87,7 +87,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
 import kotlinx.coroutines.CoroutineScope
@@ -484,7 +484,7 @@ internal fun EditNoteMarkdownEditorSection(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 140.dp)
-                    .tapSoundClickable {
+                    .appClickable {
                         onEnterEditModeAtOffset(markdownEditorState.markdown.length)
                     },
             verticalArrangement = Arrangement.spacedBy(4.dp),

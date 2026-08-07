@@ -26,10 +26,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
@@ -45,8 +44,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
-import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.appCombinedClickable
+import dev.bikram.remember.ui.feedback.performLongPressHaptic
 
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
 private val MarkdownChecklistContinuationLineRegex = Regex("""^\s{4,}(.+)$""")
@@ -260,7 +261,6 @@ private fun MarkdownLine(
         val checkboxSize = markdownChecklistCheckboxSize(style, LocalDensity.current)
         val hasLongPressAction = onChecklistCheckAll != null || onChecklistUncheckAll != null
         var showMenu by remember { mutableStateOf(false) }
-        val haptic = LocalHapticFeedback.current
         Row(
             modifier = Modifier.padding(start = styler.listStartPadding(checklistMatch.groupValues[1], baseIndent = 0.dp)),
             verticalAlignment = Alignment.CenterVertically,
@@ -274,16 +274,14 @@ private fun MarkdownLine(
                     modifier =
                         if (onChecklistToggle != null) {
                             if (hasLongPressAction) {
-                                Modifier.tapSoundCombinedClickable(
+                                Modifier.appCombinedClickable(
                                     role = Role.Checkbox,
                                     onClick = { onChecklistToggle(lineIndex, !checked) },
-                                    onLongClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        showMenu = true
-                                    },
+                                    // appCombinedClickable fires the long-press haptic itself.
+                                    onLongClick = { showMenu = true },
                                 )
                             } else {
-                                Modifier.tapSoundClickable(role = Role.Checkbox) {
+                                Modifier.appClickable(role = Role.Checkbox) {
                                     onChecklistToggle(lineIndex, !checked)
                                 }
                             }
@@ -466,6 +464,8 @@ private fun MarkdownInlineText(
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)? = null,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)? = null,
 ) {
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     val inlineInteractionMap =
         remember(source, sourceOffset, sourceOffsetByIndex) {
@@ -491,15 +491,25 @@ private fun MarkdownInlineText(
                             }
                         }
                     },
+                    // Raw pointerInput long-presses cannot inherit appCombinedClickable's haptic, so
+                    // they fire it here - but only once a handler is known to exist, so a long-press
+                    // that nothing acts on stays silent.
                     onLongPress = { pressOffset ->
                         val visibleOffset =
                             textLayoutResult
                                 ?.getOffsetForPosition(pressOffset)
                                 ?: return@detectTapGestures
                         when (val interaction = inlineInteractionMap.interactionAt(visibleOffset)) {
-                            is MarkdownInlineInteraction.Link -> onLinkLongPress?.invoke(interaction.link)
+                            is MarkdownInlineInteraction.Link ->
+                                onLinkLongPress?.let { callback ->
+                                    if (hapticEnabled) view.performLongPressHaptic()
+                                    callback(interaction.link)
+                                }
                             is MarkdownInlineInteraction.Text ->
-                                onTextLongPress?.invoke(MarkdownTextTap(interaction.markdownOffset))
+                                onTextLongPress?.let { callback ->
+                                    if (hapticEnabled) view.performLongPressHaptic()
+                                    callback(MarkdownTextTap(interaction.markdownOffset))
+                                }
                         }
                     },
                 )
@@ -586,6 +596,8 @@ private fun MarkdownCodeBlock(
     onTextTap: ((MarkdownTextTap) -> Unit)?,
     onTextLongPress: ((MarkdownTextTap) -> Unit)?,
 ) {
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
     Surface(
         color = styler.codeBackground,
@@ -620,7 +632,10 @@ private fun MarkdownCodeBlock(
                                     textLayoutResult
                                         ?.getOffsetForPosition(pressOffset)
                                         ?: return@detectTapGestures
-                                onTextLongPress?.invoke(MarkdownTextTap(sourceOffset + visibleOffset))
+                                onTextLongPress?.let { callback ->
+                                    if (hapticEnabled) view.performLongPressHaptic()
+                                    callback(MarkdownTextTap(sourceOffset + visibleOffset))
+                                }
                             },
                         )
                     },

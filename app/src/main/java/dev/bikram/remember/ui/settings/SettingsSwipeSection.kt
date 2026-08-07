@@ -42,11 +42,13 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -59,7 +61,9 @@ import dev.bikram.remember.data.SwipeGestureMode
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberToggleButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.theme.swipeActionAccent
 
 private const val SWIPE_REVEAL_SLOT_COUNT = 3
@@ -163,8 +167,11 @@ private fun SwipeGestureModeSegmentedControl(
                         Text(
                             text = label,
                             style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
                             maxLines = 1,
+                            softWrap = false,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 },
@@ -289,6 +296,11 @@ private fun SwipeRevealDirectionSection(
     onDragEnd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    // Reordering a slot starts with a long press, which appCombinedClickable cannot see because the
+    // gesture lives in a raw pointerInput. Fire the shared haptic so it matches every other
+    // long-press in the app.
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -324,6 +336,7 @@ private fun SwipeRevealDirectionSection(
                             }.pointerInput(slotIndex, action) {
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = { localOffset ->
+                                        if (hapticEnabled) view.performLongPressHaptic()
                                         val slotTopLeft = slotBounds[slotIndex]?.topLeft ?: Offset.Zero
                                         onDragStart(slotIndex, slotTopLeft + localOffset)
                                     },
@@ -582,7 +595,7 @@ private fun SwipeExecuteActionPicker(
                     .fillMaxWidth()
                     .height(48.dp)
                     .clip(shape)
-                    .tapSoundClickable(role = Role.Button) { expanded = true },
+                    .appClickable(role = Role.Button) { expanded = true },
             shape = shape,
             color = action.settingsSwipeTileColor(isDropTarget = false),
             border = BorderStroke(1.dp, actionAccent.copy(alpha = 0.55f)),

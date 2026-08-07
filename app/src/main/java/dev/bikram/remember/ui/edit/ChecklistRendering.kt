@@ -29,10 +29,9 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -50,8 +49,11 @@ import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.appCombinedClickable
+import dev.bikram.remember.ui.feedback.performLongPressHaptic
+import dev.bikram.remember.ui.feedback.performSwipeThresholdHaptic
 
 /**
  * A synthetic, non-persisted header that stands in for the real parent row when a child has been
@@ -151,7 +153,8 @@ internal fun ChecklistRow(
     val animatedIndent by androidx.compose.animation.core
         .animateDpAsState(depthIndent, label = "checklistDepthIndent")
 
-    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     var detailsExpanded by rememberSaveable(item.localId) { mutableStateOf(false) }
     var showCheckboxMenu by remember { mutableStateOf(false) }
 
@@ -220,8 +223,8 @@ internal fun ChecklistRow(
     val detailsToggleLabel = stringResource(R.string.edit_list_item_details_placeholder)
 
     LaunchedEffect(isDragging) {
-        if (isDragging) {
-            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        if (isDragging && hapticEnabled) {
+            view.performLongPressHaptic()
         }
     }
 
@@ -264,12 +267,14 @@ internal fun ChecklistRow(
                         val effective = if (isRtl) -accumulated else accumulated
                         when {
                             effective > indentThresholdPx -> {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                // Crossing the indent threshold is a commit, so it uses the same
+                                // confirm-strength haptic as a swipe threshold, not the long-press one.
+                                if (hapticEnabled) view.performSwipeThresholdHaptic()
                                 onIndentChange(+1)
                                 fired = true
                             }
                             effective < -indentThresholdPx -> {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                if (hapticEnabled) view.performSwipeThresholdHaptic()
                                 onIndentChange(-1)
                                 fired = true
                             }
@@ -327,18 +332,16 @@ internal fun ChecklistRow(
                         if (hasLongPressAction) {
                             Modifier
                                 .size(40.dp)
-                                .tapSoundCombinedClickable(
+                                .appCombinedClickable(
                                     onClick = onToggle,
-                                    onLongClick = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        showCheckboxMenu = true
-                                    },
+                                    // appCombinedClickable fires the long-press haptic itself.
+                                    onLongClick = { showCheckboxMenu = true },
                                     role = Role.Checkbox,
                                 )
                         } else {
                             Modifier
                                 .size(40.dp)
-                                .tapSoundClickable(
+                                .appClickable(
                                     onClick = onToggle,
                                     role = Role.Checkbox,
                                 )
@@ -569,7 +572,7 @@ internal fun ChecklistRow(
                             }
                         }
                     } else if (detailsCanExpand) {
-                        Modifier.tapSoundClickable { detailsExpanded = !detailsExpanded }
+                        Modifier.appClickable { detailsExpanded = !detailsExpanded }
                     } else {
                         Modifier
                     }

@@ -91,7 +91,7 @@ import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.edit.EditListRoute
 import dev.bikram.remember.ui.edit.EditNoteRoute
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.history.HistoryRoute
 import dev.bikram.remember.ui.history.HistorySection
 import dev.bikram.remember.ui.history.HistoryViewModel
@@ -306,7 +306,7 @@ fun NotesTwoPaneRoute(
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .tapSoundClickable(onClick = { createFabExpanded = false }),
+                                .appClickable(onClick = { createFabExpanded = false }),
                         )
                     }
                     NotesListPaneFabMenu(
@@ -398,7 +398,7 @@ fun NotesTwoPaneRoute(
                         Box(
                             Modifier
                                 .fillMaxSize()
-                                .tapSoundClickable(onClick = { createFabExpanded = false }),
+                                .appClickable(onClick = { createFabExpanded = false }),
                         )
                     }
                 }
@@ -1134,7 +1134,7 @@ private fun SettingsPaneSectionRow(
             Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(28.dp))
-                .tapSoundClickable(
+                .appClickable(
                     onClick = onClick,
                     indication = null,
                 ),

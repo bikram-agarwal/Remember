@@ -53,13 +53,12 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -90,7 +89,9 @@ import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.components.parseHexColor
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.performRejectHaptic
 import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
@@ -715,7 +716,7 @@ private fun TagSheetIntentChip(
             Modifier
                 .clip(CircleShape)
                 .background(containerColor)
-                .tapSoundClickable(onClick = onClick)
+                .appClickable(onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         RememberMaterialRoundedSymbol(
@@ -884,7 +885,8 @@ internal fun EditableTagHexChip(
         )
     val shape = CircleShape
     val focusRequester = remember { FocusRequester() }
-    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     var hadFocus by remember(editing) { mutableStateOf(false) }
 
     LaunchedEffect(editing) {
@@ -903,7 +905,7 @@ internal fun EditableTagHexChip(
                     .width(TagHexChipWidth)
                     .clip(shape)
                     .background(containerColor)
-                    .tapSoundClickable(onClick = onStartEditing)
+                    .appClickable(onClick = onStartEditing)
                     .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
@@ -955,7 +957,7 @@ internal fun EditableTagHexChip(
                 if (acceptedValue != null) {
                     onDraftChange(acceptedValue)
                 } else {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (hapticEnabled) view.performRejectHaptic()
                 }
             },
             modifier =

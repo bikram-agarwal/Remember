@@ -1,4 +1,4 @@
-## v1.2.5 Pinned notes
+## v1.3.0 Pinned notes
 
 ### ✨ New Features
 - **Pin** the notes you need at hand: they stay at the top of the list, regardless of your sorting or grouping.

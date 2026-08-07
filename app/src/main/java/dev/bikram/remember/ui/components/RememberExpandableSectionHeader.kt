@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @Composable
@@ -117,7 +117,7 @@ internal fun RememberExpandableSectionHeader(
                     shape = RoundedCornerShape(headerCorner.coerceAtLeast(0.dp)),
                 ).clip(MaterialTheme.shapes.extraLargeIncreased)
                 .semantics { contentDescription = if (collapsed) cdExpand else cdCollapse }
-                .tapSoundClickable(
+                .appClickable(
                     onClick = onToggle,
                     indication = LocalIndication.current,
                     interactionSource = interactionSource,

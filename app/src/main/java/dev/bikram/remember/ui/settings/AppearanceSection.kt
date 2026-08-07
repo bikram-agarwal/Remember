@@ -66,14 +66,13 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -115,7 +114,9 @@ import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.performRejectHaptic
 import dev.bikram.remember.ui.theme.CustomFontStorage
 import dev.bikram.remember.ui.theme.colorSourceSpecFor
 import dev.bikram.remember.ui.theme.contrastingTextColor
@@ -173,7 +174,7 @@ fun AppearanceSection(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .tapSoundClickable(enabled = !enabled) {
+                            .appClickable(enabled = !enabled) {
                                 scope.launch {
                                     snackbarHostState.currentSnackbarData?.dismiss()
                                     snackbarHostState.showSnackbar(blackThemeSurfaceSettingDisabledMessage)
@@ -341,7 +342,7 @@ private fun CustomFontSettingsRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable { showImportDialog = true }
+                .appClickable { showImportDialog = true }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -415,7 +416,7 @@ private fun AppearanceThemeControls(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .tapSoundClickable { onUseBlackThemeChange(!state.useBlackTheme) },
+                            .appClickable { onUseBlackThemeChange(!state.useBlackTheme) },
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -564,8 +565,7 @@ private fun ThemeModeSegmentedRow(
                 checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
                 checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
             )
-        val labels = themePickerOrder.map { mode -> themeModeLabel(mode, compact) }
-        val menuLabels = themePickerOrder.map { mode -> themeModeLabel(mode, compact = false) }
+        val labels = themePickerOrder.map { mode -> themeModeLabel(mode) }
         val shapes =
             themePickerOrder.mapIndexed { index, _ ->
                 when (index) {
@@ -583,7 +583,6 @@ private fun ThemeModeSegmentedRow(
         ) {
             themePickerOrder.forEachIndexed { index, mode ->
                 val label = labels[index]
-                val menuLabel = menuLabels[index]
                 val itemModifier = Modifier.weight(1f).semantics { role = Role.RadioButton }
                 customItem(
                     buttonGroupContent = {
@@ -605,18 +604,21 @@ private fun ThemeModeSegmentedRow(
                                 text = label,
                                 style =
                                     if (ultraCompact) {
-                                        MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp)
+                                        MaterialTheme.typography.labelSmall
                                     } else {
                                         MaterialTheme.typography.labelMedium
                                     },
+                                textAlign = TextAlign.Center,
                                 maxLines = 1,
-                                overflow = TextOverflow.Clip,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth(),
                             )
                         }
                     },
                     menuContent = { menuState ->
                         RememberDropdownMenuItem(
-                            text = { Text(menuLabel) },
+                            text = { Text(label) },
                             onClick = {
                                 onSelect(mode)
                                 menuState.dismiss()
@@ -655,7 +657,7 @@ private fun AppearanceSettingsToggleItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable {
+                .appClickable {
                     if (enabled) {
                         onCheckedChange(!checked)
                     } else {
@@ -896,7 +898,8 @@ private fun EditableHexValue(
     onBoundsChange: (Rect?) -> Unit,
 ) {
     val shape = CircleShape
-    val haptic = LocalHapticFeedback.current
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
     val textStyle =
         MaterialTheme.typography.labelMedium.copy(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -919,7 +922,7 @@ private fun EditableHexValue(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.outlineVariant,
                         shape = shape,
-                    ).tapSoundClickable(onClick = onStartEditing)
+                    ).appClickable(onClick = onStartEditing)
                     .padding(horizontal = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -955,7 +958,7 @@ private fun EditableHexValue(
                 if (acceptedValue != null) {
                     onDraftChange(acceptedValue)
                 } else {
-                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (hapticEnabled) view.performRejectHaptic()
                 }
             },
             modifier =
@@ -1068,25 +1071,14 @@ private val themePickerOrder =
     )
 
 @Composable
-private fun themeModeLabel(
-    mode: ThemeMode,
-    compact: Boolean,
-): String {
-    if (compact) {
-        return when (mode.name) {
-            ThemeMode.SYSTEM.name -> "Sys"
-            ThemeMode.LIGHT.name -> "Light"
-            else -> "Dark"
-        }
-    }
-    return stringResource(
+private fun themeModeLabel(mode: ThemeMode): String =
+    stringResource(
         when (mode.name) {
             ThemeMode.SYSTEM.name -> R.string.appearance_theme_system
             ThemeMode.LIGHT.name -> R.string.appearance_theme_light
             else -> R.string.appearance_theme_dark
         },
     )
-}
 
 /**
  * Live preview card showing how the active palette + style produce surface and accent
@@ -1273,7 +1265,7 @@ private fun AccentChip(
     val outlineColor = MaterialTheme.colorScheme.primary
     val chipModifier =
         if (isInteractive) {
-            modifier.tapSoundClickable(onClick = onClick)
+            modifier.appClickable(onClick = onClick)
         } else {
             modifier
         }

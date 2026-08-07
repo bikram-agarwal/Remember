@@ -49,7 +49,7 @@ import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -117,7 +117,7 @@ internal fun RemindersSection(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .tapSoundClickable {
+                        .appClickable {
                             if (!notificationsGranted) {
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                     notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)

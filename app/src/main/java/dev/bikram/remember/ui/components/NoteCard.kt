@@ -63,8 +63,8 @@ import dev.bikram.remember.ui.common.rememberImageDerivedColors
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.NoteIcon
-import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.elevatedCardColors
@@ -280,13 +280,13 @@ fun NoteCard(
         }
     val clickableModifier =
         if (onLongClick != null) {
-            Modifier.tapSoundCombinedClickable(
+            Modifier.appCombinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
                 indication = null,
             )
         } else {
-            Modifier.tapSoundClickable(onClick = onClick)
+            Modifier.appClickable(onClick = onClick)
         }
     val completedContainerColor =
         cardColors.containerColor

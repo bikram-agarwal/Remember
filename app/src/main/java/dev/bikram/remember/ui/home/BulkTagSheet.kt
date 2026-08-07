@@ -73,7 +73,7 @@ import dev.bikram.remember.ui.edit.TagColorSlider
 import dev.bikram.remember.ui.edit.defaultTagColorHex
 import dev.bikram.remember.ui.edit.sanitizeTagNameInput
 import dev.bikram.remember.ui.edit.toTagHexFieldValue
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
 
@@ -579,7 +579,7 @@ private fun CreateNewTagPullTab(
                     .background(sheetSurface)
                     .border(width = 1.dp, color = borderColor, shape = CircleShape)
                     .semantics { contentDescription = cd }
-                    .tapSoundClickable(onClick = onToggle)
+                    .appClickable(onClick = onToggle)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -684,7 +684,7 @@ private fun TriStateTagChip(
             Modifier
                 .clip(CircleShape)
                 .background(containerColor)
-                .tapSoundClickable(onClick = onCycle)
+                .appClickable(onClick = onCycle)
                 .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         RememberMaterialRoundedSymbol(

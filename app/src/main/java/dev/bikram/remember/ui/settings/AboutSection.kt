@@ -11,7 +11,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -66,7 +65,7 @@ import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.theme.pillShape
 import kotlinx.coroutines.launch
 
@@ -297,7 +296,7 @@ private fun AboutSettingsBlock(
                                 BuildConfig.VERSION_NAME,
                             ),
                         modifier =
-                            Modifier.combinedClickable(
+                            Modifier.appCombinedClickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
                                 onClick = {
@@ -373,7 +372,7 @@ private fun AboutSettingsBlock(
                                 Modifier
                                     .size(if (isSmallLandscape) 64.dp else 84.dp)
                                     .clip(authorShape)
-                                    .tapSoundCombinedClickable(
+                                    .appCombinedClickable(
                                         onClick = {
                                             runCatching {
                                                 context.startActivity(Intent(Intent.ACTION_VIEW, profileUrl.toUri()))
@@ -405,7 +404,7 @@ private fun AboutSettingsBlock(
                                 modifier =
                                     Modifier
                                         .clip(aboutPillShape)
-                                        .tapSoundCombinedClickable(
+                                        .appCombinedClickable(
                                             onClick = {
                                                 runCatching {
                                                     context.startActivity(
@@ -442,7 +441,7 @@ private fun AboutSettingsBlock(
                                     modifier =
                                         Modifier
                                             .clip(aboutPillShape)
-                                            .tapSoundCombinedClickable(
+                                            .appCombinedClickable(
                                                 onClick = {
                                                     runCatching {
                                                         context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
@@ -482,7 +481,7 @@ private fun AboutSettingsBlock(
                                 modifier =
                                     Modifier
                                         .clip(aboutPillShape)
-                                        .tapSoundCombinedClickable(
+                                        .appCombinedClickable(
                                             onClick = {
                                                 if (playStoreAboutUsesListingOnly) {
                                                     runCatching {
@@ -525,7 +524,7 @@ private fun AboutSettingsBlock(
                                     modifier =
                                         Modifier
                                             .clip(aboutPillShape)
-                                            .tapSoundCombinedClickable(
+                                            .appCombinedClickable(
                                                 onClick = {
                                                     runCatching {
                                                         context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
@@ -690,7 +689,7 @@ private fun AboutAppStoreButton(
             Modifier
                 .fillMaxWidth()
                 .clip(shape)
-                .tapSoundCombinedClickable(
+                .appCombinedClickable(
                     onClick = { openAboutAppRoute(context, route) },
                     onLongClick = { copyAboutLink(route.copyUrl) },
                 ),
@@ -786,7 +785,7 @@ private fun AboutTextLink(
         modifier =
             modifier
                 .padding(horizontal = 4.dp, vertical = 2.dp)
-                .tapSoundCombinedClickable(
+                .appCombinedClickable(
                     onClick = {
                         runCatching {
                             context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))

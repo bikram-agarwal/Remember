@@ -68,7 +68,7 @@ import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -169,7 +169,7 @@ fun HelpScreen(
                                 .padding(start = 4.dp)
                                 .size(40.dp)
                                 .clip(MaterialTheme.shapes.extraExtraLarge)
-                                .tapSoundClickable(onClick = onBack),
+                                .appClickable(onClick = onBack),
                         contentAlignment = Alignment.Center,
                     ) {
                         RememberMaterialRoundedSymbol(
@@ -244,7 +244,7 @@ fun HelpScreen(
                                     Modifier
                                         .size(32.dp)
                                         .clip(MaterialTheme.shapes.extraExtraLarge)
-                                        .tapSoundClickable { helpVm.setSearchQuery("") },
+                                        .appClickable { helpVm.setSearchQuery("") },
                                 contentAlignment = Alignment.Center,
                             ) {
                                 RememberMaterialRoundedSymbol(

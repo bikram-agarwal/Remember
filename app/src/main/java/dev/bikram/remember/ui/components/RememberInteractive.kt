@@ -39,6 +39,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonColors
+import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.ToggleButtonShapes
 import androidx.compose.material3.TooltipAnchorPosition
 import androidx.compose.material3.TooltipBox
 import androidx.compose.material3.TooltipDefaults
@@ -46,6 +50,7 @@ import androidx.compose.material3.TooltipState
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -53,6 +58,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -61,6 +67,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.isSmallLandscape
+import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -140,6 +148,16 @@ private fun RememberLongPressLabelTooltip(
     }
 
     val tooltipState = rememberTooltipState(isPersistent = true)
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
+
+    // The label tooltip is itself a long-press affordance, so it buzzes like any other long-press.
+    // Matches FilePipe's tooltip-bearing icon buttons.
+    LaunchedEffect(tooltipState.isVisible) {
+        if (tooltipState.isVisible && hapticEnabled) {
+            view.performLongPressHaptic()
+        }
+    }
 
     TooltipBox(
         positionProvider =
@@ -212,25 +230,23 @@ fun RememberToggleButton(
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    shapes: androidx.compose.material3.ToggleButtonShapes =
-        androidx.compose.material3.ButtonGroupDefaults
-            .connectedLeadingButtonShapes(),
-    colors: androidx.compose.material3.ToggleButtonColors =
-        androidx.compose.material3.ToggleButtonDefaults
-            .toggleButtonColors(),
-    contentPadding: PaddingValues = androidx.compose.material3.ToggleButtonDefaults.ContentPadding,
+    shapes: ToggleButtonShapes = ToggleButtonDefaults.shapesFor(ButtonDefaults.MinHeight),
+    colors: ToggleButtonColors = ToggleButtonDefaults.toggleButtonColors(),
+    elevation: ButtonElevation? = null,
+    border: BorderStroke? = null,
+    contentPadding: PaddingValues = ToggleButtonDefaults.ContentPadding,
     interactionSource: MutableInteractionSource? = null,
     content: @Composable RowScope.() -> Unit,
 ) {
-    androidx.compose.material3.ToggleButton(
+    ToggleButton(
         checked = checked,
-        onCheckedChange = {
-            onCheckedChange(it)
-        },
+        onCheckedChange = onCheckedChange,
         modifier = modifier,
         enabled = enabled,
         shapes = shapes,
         colors = colors,
+        elevation = elevation,
+        border = border,
         contentPadding = contentPadding,
         interactionSource = interactionSource,
         content = content,

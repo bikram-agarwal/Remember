@@ -90,6 +90,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -111,7 +112,7 @@ import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentTopAppBarColors
@@ -288,7 +289,7 @@ fun GoogleTasksImportRoute(
                                 .padding(start = 4.dp)
                                 .size(40.dp)
                                 .clip(MaterialTheme.shapes.extraExtraLarge)
-                                .tapSoundClickable(onClick = requestBack),
+                                .appClickable(onClick = requestBack),
                         contentAlignment = Alignment.Center,
                     ) {
                         RememberMaterialRoundedSymbol(
@@ -403,7 +404,7 @@ fun GoogleTasksImportRoute(
                                     Modifier
                                         .size(40.dp)
                                         .clip(MaterialTheme.shapes.extraExtraLarge)
-                                        .tapSoundClickable(onClick = requestBack),
+                                        .appClickable(onClick = requestBack),
                                 contentAlignment = Alignment.Center,
                             ) {
                                 RememberMaterialRoundedSymbol(
@@ -593,8 +594,11 @@ private fun ImportMethodSelector(
                         Text(
                             text = label,
                             style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
                             maxLines = 1,
+                            softWrap = false,
                             overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(),
                         )
                     }
                 },
@@ -664,7 +668,7 @@ private fun ImportMethodRail(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .tapSoundClickable { onChange(method) }
+                            .appClickable { onChange(method) }
                             .padding(horizontal = 16.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -1308,7 +1312,7 @@ private fun SearchPill(
                         Modifier
                             .size(28.dp)
                             .clip(MaterialTheme.shapes.extraExtraLarge)
-                            .tapSoundClickable { onQueryChange("") },
+                            .appClickable { onQueryChange("") },
                     contentAlignment = Alignment.Center,
                 ) {
                     RememberMaterialRoundedSymbol(
@@ -1541,7 +1545,7 @@ private fun GroupHeaderCard(
                     .fillMaxWidth()
                     .clip(headerShape)
                     .semantics { contentDescription = if (collapsed) expandLabel else collapseLabel }
-                    .tapSoundClickable(onClick = onHeaderClick)
+                    .appClickable(onClick = onHeaderClick)
                     .padding(horizontal = 12.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -1929,7 +1933,7 @@ private fun SourceActionRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .let { if (enabled) it.tapSoundClickable(onClick = onClick) else it }
+                .let { if (enabled) it.appClickable(onClick = onClick) else it }
                 .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -2275,7 +2279,7 @@ private fun TaskRow(
                 // clickable's ripple uses the rectangular layout bounds and the long-press
                 // ripple shows sharp corners that bleed past the rounded card edges.
                 .clip(cardShape)
-                .tapSoundClickable(onClick = onToggle),
+                .appClickable(onClick = onToggle),
         shape = cardShape,
         color = cardColor,
     ) {

@@ -83,8 +83,8 @@ import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.components.TagChipFilled
-import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import java.text.DateFormat
 import java.util.Date
@@ -468,7 +468,7 @@ private fun OptionRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .let { if (onClick != null) it.tapSoundClickable(onClick = onClick) else it }
+                .let { if (onClick != null) it.appClickable(onClick = onClick) else it }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -677,12 +677,12 @@ private fun OptionCell(
                         when {
                             onClick == null -> it
                             onLongClick != null ->
-                                it.tapSoundCombinedClickable(
+                                it.appCombinedClickable(
                                     onClick = onClick,
                                     onLongClick = onLongClick,
                                     onLongClickLabel = onLongClickLabel,
                                 )
-                            else -> it.tapSoundClickable(onClick = onClick)
+                            else -> it.appClickable(onClick = onClick)
                         }
                     }.padding(horizontal = 10.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -1040,7 +1040,7 @@ private fun <T> ChoiceOptionRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable { onSelect(option.value) }
+                .appClickable { onSelect(option.value) }
                 .padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

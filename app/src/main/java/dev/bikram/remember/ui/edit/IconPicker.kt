@@ -99,6 +99,8 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
@@ -117,8 +119,8 @@ import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberToggleButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -808,7 +810,15 @@ private fun IconPickerTabRow(
                         shapes = shapes[index],
                         colors = colors,
                     ) {
-                        Text(label)
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                     }
                 },
                 menuContent = { menuState ->
@@ -1827,7 +1837,7 @@ private fun EditStarredTile(
                 Modifier
                     .size(cellSize)
                     .clip(CircleShape)
-                    .tapSoundClickable(onClick = onClick)
+                    .appClickable(onClick = onClick)
                     .semantics { this.contentDescription = contentDescription },
         ) {
             Box(
@@ -1898,7 +1908,7 @@ private fun IconTile(
                 .graphicsLayer {
                     scaleX = pulseScale.value
                     scaleY = pulseScale.value
-                }.tapSoundCombinedClickable(
+                }.appCombinedClickable(
                     onClick = onClick,
                     onLongClick = {
                         pulseAdding = !favorite
@@ -1986,7 +1996,7 @@ private fun EmojiTile(
                 .graphicsLayer {
                     scaleX = pulseScale.value
                     scaleY = pulseScale.value
-                }.tapSoundCombinedClickable(
+                }.appCombinedClickable(
                     onClick = {
                         if (hasVariants) {
                             expanded = true
@@ -2059,7 +2069,7 @@ private fun EmojiTile(
                             Modifier
                                 .size(44.dp)
                                 .clip(CircleShape)
-                                .tapSoundCombinedClickable(
+                                .appCombinedClickable(
                                     onClick = {
                                         expanded = false
                                         onClick(variant.emoji)

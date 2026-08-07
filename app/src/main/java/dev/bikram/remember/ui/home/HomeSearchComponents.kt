@@ -63,7 +63,7 @@ import dev.bikram.remember.ui.components.NoteCardUiModel
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
@@ -382,7 +382,7 @@ internal fun SearchSectionPillDivider(
                             } else {
                                 contentDescriptionExpand
                             }
-                    }.tapSoundClickable(onClick = onToggle)
+                    }.appClickable(onClick = onToggle)
                     .padding(horizontal = 14.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),

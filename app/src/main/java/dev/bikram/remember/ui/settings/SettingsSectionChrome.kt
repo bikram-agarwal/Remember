@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberExpandableSectionHeader
 import dev.bikram.remember.ui.components.RememberSwitch
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -128,7 +128,7 @@ internal fun SettingsToggleRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable { onCheckedChange(!checked) }
+                .appClickable { onCheckedChange(!checked) }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -207,7 +207,7 @@ internal fun SettingsToggleSwitch(
                     Modifier
                         .matchParentSize()
                         .clip(MaterialTheme.shapes.extraExtraLarge)
-                        .tapSoundClickable { onDisabledInteraction() },
+                        .appClickable { onDisabledInteraction() },
             )
         }
     }
@@ -227,7 +227,7 @@ internal fun ToggleRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .let { modifier -> if (enabled) modifier.tapSoundClickable { onChange(!checked) } else modifier }
+                .let { modifier -> if (enabled) modifier.appClickable { onChange(!checked) } else modifier }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

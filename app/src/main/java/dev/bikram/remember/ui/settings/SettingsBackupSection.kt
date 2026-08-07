@@ -29,8 +29,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberOutlinedButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.appCombinedClickable
 
 @Composable
 internal fun BackupFolderSettingsToggleItem(
@@ -59,7 +59,7 @@ internal fun BackupFolderSettingsToggleItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable {
+                .appClickable {
                     if (!switchEnabled) {
                         onDisabledInteraction?.invoke()
                     } else {
@@ -175,7 +175,7 @@ internal fun BackupFolderPickerItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundCombinedClickable(onClick = onClick, onLongClick = onLongClick)
+                .appCombinedClickable(onClick = onClick, onLongClick = onLongClick)
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

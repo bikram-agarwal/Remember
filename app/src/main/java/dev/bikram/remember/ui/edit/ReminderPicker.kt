@@ -138,7 +138,7 @@ import dev.bikram.remember.ui.components.RememberFilterChip
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import java.time.Instant
 import java.time.LocalTime
@@ -930,7 +930,7 @@ fun ReminderPickerSheet(
                         .fillMaxWidth()
                         .clip(MaterialTheme.shapes.medium)
                         .background(MaterialTheme.colorScheme.errorContainer)
-                        .tapSoundClickable {
+                        .appClickable {
                             @SuppressLint("InlinedApi")
                             val intent =
                                 Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
@@ -1788,7 +1788,7 @@ private fun PillRow(
                     },
                 ).let { modifier ->
                     if (enabled) {
-                        modifier.tapSoundClickable(onClick = onClick)
+                        modifier.appClickable(onClick = onClick)
                     } else {
                         modifier
                     }
@@ -2181,7 +2181,7 @@ private fun SheetDropdown(
                         width = 1.dp,
                         color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f),
                         shape = MaterialTheme.shapes.medium,
-                    ).tapSoundClickable { onExpandedChange(true) }
+                    ).appClickable { onExpandedChange(true) }
                     .padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -2217,7 +2217,7 @@ private fun RadioOption(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable(onClick = onSelect)
+                .appClickable(onClick = onSelect)
                 .padding(vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -2268,7 +2268,7 @@ private fun WeekdayRow(
                             shape = CircleShape,
                         ).semantics {
                             this.contentDescription = contentDescription
-                        }.tapSoundClickable { onToggle(day) },
+                        }.appClickable { onToggle(day) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(

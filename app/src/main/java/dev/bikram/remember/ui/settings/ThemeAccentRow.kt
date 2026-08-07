@@ -44,8 +44,8 @@ import dev.bikram.remember.data.normalizeCustomSeed
 import dev.bikram.remember.data.normalizeHex
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberFilterChip
-import dev.bikram.remember.ui.feedback.tapSoundClickable
-import dev.bikram.remember.ui.feedback.tapSoundCombinedClickable
+import dev.bikram.remember.ui.feedback.appClickable
+import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.theme.ColorSourceSpec
 import dev.bikram.remember.ui.theme.ColorSourceSwatchType
 import dev.bikram.remember.ui.theme.CuratedPalette
@@ -126,7 +126,7 @@ fun ThemeAccentRow(
                                 width = if (isSelected) 3.dp else 1.dp,
                                 color = borderColor,
                                 shape = CircleShape,
-                            ).tapSoundClickable(
+                            ).appClickable(
                                 onClick = { onSelectPreset(spec.source) },
                                 indication = ripple(bounded = true),
                                 interactionSource = remember { MutableInteractionSource() },
@@ -162,7 +162,7 @@ fun ThemeAccentRow(
                                 width = if (isSelected) 3.dp else 1.dp,
                                 color = borderColor,
                                 shape = CircleShape,
-                            ).tapSoundCombinedClickable(
+                            ).appCombinedClickable(
                                 onClick = { onSelectCustomHex(storedHex) },
                                 onLongClick = { onCustomHexLongPress(storedHex) },
                                 indication = ripple(bounded = true),
@@ -198,7 +198,7 @@ fun ThemeAccentRow(
                             .clip(CircleShape)
                             .border(width = 1.dp, color = addBorder, shape = CircleShape)
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.85f))
-                            .tapSoundClickable(
+                            .appClickable(
                                 onClick = onAddCustomHexClick,
                                 indication = ripple(bounded = true),
                                 interactionSource = remember { MutableInteractionSource() },

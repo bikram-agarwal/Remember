@@ -43,7 +43,7 @@ import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import kotlinx.coroutines.launch
 
 @Composable
@@ -152,7 +152,7 @@ private fun AttachmentRow(
                 .fillMaxWidth()
                 .scale(scaleFactor)
                 .clip(rowShape)
-                .tapSoundClickable(
+                .appClickable(
                     interactionSource = rowInteractionSource,
                     indication = androidx.compose.material3.ripple(),
                     onClick = {

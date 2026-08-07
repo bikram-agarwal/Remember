@@ -45,7 +45,7 @@ import androidx.core.graphics.drawable.toDrawable
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.components.RememberTextButton
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -167,7 +167,7 @@ private fun AppRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable(onClick = onClick)
+                .appClickable(onClick = onClick)
                 .padding(horizontal = 4.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

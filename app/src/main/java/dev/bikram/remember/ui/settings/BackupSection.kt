@@ -42,7 +42,7 @@ import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -392,7 +392,7 @@ internal fun BackupSection(
                         modifier =
                             Modifier
                                 .matchParentSize()
-                                .tapSoundClickable(onClick = onLaunchImportReplace),
+                                .appClickable(onClick = onLaunchImportReplace),
                     )
                     Box(
                         modifier =

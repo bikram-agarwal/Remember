@@ -59,7 +59,7 @@ import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.components.text.SimpleMarkdown
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.theme.compactControlShape
 import dev.bikram.remember.ui.theme.pillShape
 import dev.bikram.remember.update.RememberUpdateInfo
@@ -749,7 +749,7 @@ internal fun UpdateSettingsToggleItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .tapSoundClickable { onCheckedChange(!checked) }
+                .appClickable { onCheckedChange(!checked) }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

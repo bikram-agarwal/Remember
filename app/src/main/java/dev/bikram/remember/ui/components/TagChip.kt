@@ -33,7 +33,7 @@ import androidx.core.graphics.toColorInt
 import dev.bikram.remember.R
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.tags.LocalTagColors
 
 /** Parse "#RRGGBB" into a Compose Color. Returns null if invalid. */
@@ -160,7 +160,7 @@ fun TagChipFilled(
                 // the rounded edges of the chip.
                 .let {
                     if (onClick != null) {
-                        it.clip(shape).tapSoundClickable(onClick = onClick)
+                        it.clip(shape).appClickable(onClick = onClick)
                     } else {
                         it
                     }
@@ -209,7 +209,7 @@ fun TagChipFilled(
                 modifier =
                     Modifier
                         .semantics { contentDescription = cdRemoveTag }
-                        .tapSoundClickable(onClick = onRemove),
+                        .appClickable(onClick = onRemove),
             )
         }
     }

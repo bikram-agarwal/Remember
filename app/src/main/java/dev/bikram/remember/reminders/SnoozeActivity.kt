@@ -45,6 +45,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
+import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.TagRepository
 import dev.bikram.remember.data.ThemePrefs
@@ -55,7 +56,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.edit.CalendarPickerDialog
 import dev.bikram.remember.ui.edit.ReminderTimePickerDialog
-import dev.bikram.remember.ui.feedback.tapSoundClickable
+import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
 import kotlinx.coroutines.CoroutineScope
@@ -113,10 +114,14 @@ class SnoozeActivity : ComponentActivity() {
             val tagColors by tagRepository.observeTagColorMap().collectAsStateWithLifecycle(
                 initialValue = emptyMap(),
             )
+            val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
+                initialValue = InteractionState(),
+            )
             CompositionLocalProvider(LocalTagColors provides tagColors) {
                 RememberTheme(
                     themeState = themeState,
                     paintBackground = false,
+                    hapticFeedbackEnabled = interactionState.hapticFeedbackEnabled,
                 ) {
                     Box(
                         modifier =
@@ -349,7 +354,7 @@ private fun SnoozePresetRow(
             Modifier
                 .fillMaxWidth()
                 .clip(MaterialTheme.shapes.medium)
-                .tapSoundClickable(onClick = onClick)
+                .appClickable(onClick = onClick)
                 .padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
