@@ -5,9 +5,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * The reveal-mode slot editor can only *swap* two occupied slots - it has no palette to drag an
- * unused action in from. So the default layout is the only thing that decides which actions are
- * reachable on swipe, and these are the invariants that keeps honest.
+ * Reveal-mode slots default layout invariants.
+ *
+ * Edit is omitted from the default 6-slot layout, but can be swapped in via tap-to-replace or reordered.
  */
 class SwipeRevealDefaultsTest {
     private val defaultSlots =

@@ -214,6 +214,22 @@ private fun SwipeRevealSlotsEditor(
         )
     }
 
+    fun replaceSlotAction(
+        slotIndex: Int,
+        newAction: NoteSwipeAction,
+    ) {
+        val currentAction = slotActions.getOrNull(slotIndex) ?: return
+        if (currentAction == newAction) return
+
+        val nextActions = slotActions.toMutableList()
+        val existingIndex = nextActions.indexOf(newAction)
+        if (existingIndex != -1) {
+            nextActions[existingIndex] = currentAction
+        }
+        nextActions[slotIndex] = newAction
+        commitSlotActions(nextActions)
+    }
+
     fun finishDrag() {
         val fromSlot = draggingSlot ?: return
         val toSlot = slotBounds.entries.firstOrNull { (_, bounds) -> bounds.contains(dragPointerRoot) }?.key
@@ -250,6 +266,7 @@ private fun SwipeRevealSlotsEditor(
                 dragPointerRoot += delta
             },
             onDragEnd = ::finishDrag,
+            onSlotActionReplace = ::replaceSlotAction,
             modifier = Modifier.zIndex(if (draggingSlot != null && draggingSlot!! < SWIPE_REVEAL_SLOT_COUNT) 1f else 0f),
         )
         SwipePanelDivider()
@@ -273,6 +290,7 @@ private fun SwipeRevealSlotsEditor(
                 dragPointerRoot += delta
             },
             onDragEnd = ::finishDrag,
+            onSlotActionReplace = ::replaceSlotAction,
             modifier = Modifier.zIndex(if (draggingSlot != null && draggingSlot!! >= SWIPE_REVEAL_SLOT_COUNT) 1f else 0f),
         )
         SwipePanelDivider()
@@ -294,6 +312,7 @@ private fun SwipeRevealDirectionSection(
     onDragStart: (slotIndex: Int, pointerRoot: Offset) -> Unit,
     onDrag: (delta: Offset) -> Unit,
     onDragEnd: () -> Unit,
+    onSlotActionReplace: (slotIndex: Int, action: NoteSwipeAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // Reordering a slot starts with a long press, which appCombinedClickable cannot see because the
@@ -322,6 +341,9 @@ private fun SwipeRevealDirectionSection(
                     slotNumber = rowSlotIndex + 1,
                     action = action,
                     isDropTarget = isDropTarget,
+                    onSelectAction = { selectedAction ->
+                        onSlotActionReplace(slotIndex, selectedAction)
+                    },
                     modifier =
                         Modifier
                             .weight(1f)
@@ -495,8 +517,10 @@ private fun SwipeRevealSlotCard(
     slotNumber: Int,
     action: NoteSwipeAction,
     isDropTarget: Boolean,
+    onSelectAction: (NoteSwipeAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     val shape = MaterialTheme.shapes.medium
     val actionAccent = action.settingsSwipeAccent()
     val wiggleTransition = rememberInfiniteTransition(label = "swipe_drop_target_wiggle")
@@ -511,50 +535,62 @@ private fun SwipeRevealSlotCard(
                 ),
             label = "swipe_drop_target_rotation",
         )
-    Surface(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .graphicsLayer {
-                    rotationZ = if (isDropTarget) wiggleRotation else 0f
-                    scaleX = if (isDropTarget) 1.03f else 1f
-                    scaleY = if (isDropTarget) 1.03f else 1f
-                }.clip(shape),
-        shape = shape,
-        color = action.settingsSwipeTileColor(isDropTarget),
-        border =
-            BorderStroke(
-                width = 1.dp,
-                color = actionAccent.copy(alpha = if (isDropTarget) 0.82f else 0.55f),
-            ),
-    ) {
-        Row(
+    Box(modifier = modifier) {
+        Surface(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically,
+                    .height(44.dp)
+                    .graphicsLayer {
+                        rotationZ = if (isDropTarget) wiggleRotation else 0f
+                        scaleX = if (isDropTarget) 1.03f else 1f
+                        scaleY = if (isDropTarget) 1.03f else 1f
+                    }.clip(shape)
+                    .appClickable(role = Role.Button) { expanded = true },
+            shape = shape,
+            color = action.settingsSwipeTileColor(isDropTarget),
+            border =
+                BorderStroke(
+                    width = 1.dp,
+                    color = actionAccent.copy(alpha = if (isDropTarget) 0.82f else 0.55f),
+                ),
         ) {
-            SlotNumberBadge(number = slotNumber)
-            Spacer(Modifier.size(3.dp))
-            SwipeActionIconBubble(action = action, size = 22.dp, symbolSize = 13.dp)
-            Spacer(Modifier.size(3.dp))
-            Text(
-                text = swipeSettingsActionLabel(action),
-                style = MaterialTheme.typography.labelSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            RememberMaterialRoundedSymbol(
-                name = "drag_indicator",
-                size = 12.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
-            )
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SlotNumberBadge(number = slotNumber)
+                Spacer(Modifier.size(3.dp))
+                SwipeActionIconBubble(action = action, size = 22.dp, symbolSize = 13.dp)
+                Spacer(Modifier.size(3.dp))
+                Text(
+                    text = swipeSettingsActionLabel(action),
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
+                RememberMaterialRoundedSymbol(
+                    name = "drag_indicator",
+                    size = 12.dp,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f),
+                )
+            }
         }
+        SwipeActionDropdownMenu(
+            expanded = expanded,
+            availableActions = SwipeActionDisplayOrder,
+            onDismiss = { expanded = false },
+            onSelect = { selectedAction ->
+                expanded = false
+                onSelectAction(selectedAction)
+            },
+        )
     }
 }
 
@@ -704,7 +740,7 @@ private fun SwipeHintText(text: String) {
 /**
  * Canonical action order, used for both jobs so the two modes never disagree:
  *
- *  - the direct-mode dropdowns list actions in exactly this order;
+ *  - the direct-mode dropdowns and reveal-slot pickers list actions in exactly this order;
  *  - reveal slots the user left empty are back-filled from it, in order.
  *
  * The first [SWIPE_REVEAL_TOTAL_SLOT_COUNT] entries are therefore the default reveal layout, and
@@ -712,7 +748,7 @@ private fun SwipeHintText(text: String) {
  * [DEFAULT_SWIPE_END_TO_START_REVEAL_ACTIONS] (SwipeRevealDefaultsTest enforces this).
  *
  * Edit is last on purpose: there are 7 actions for 6 slots, so the tail entry is the one that
- * cannot be reached in reveal mode. Edit is the cheapest to reach another way - open the note.
+ * is omitted in the default layout without customizing. Edit is the cheapest to reach another way - open the note.
  */
 private val SwipeActionDisplayOrder: List<NoteSwipeAction> =
     listOf(

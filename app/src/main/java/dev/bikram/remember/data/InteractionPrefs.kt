@@ -31,11 +31,9 @@ enum class SwipeGestureMode {
 }
 
 /**
- * Reveal mode has exactly three slots per direction and its editor can only *swap* two occupied
- * slots - there is no palette to drag an unused action in from. So an action that is not in this
- * default (and not already in a user's saved layout) is unreachable on swipe.
+ * Reveal mode has exactly three slots per direction.
  *
- * Edit is the one deliberately left out: it is the cheapest action to reach another way (tap the
+ * Edit is the one deliberately left out of the initial defaults: it is the cheapest action to reach another way (tap the
  * note, then Edit), whereas Pin has no other one-gesture path from the list. Existing users keep
  * whatever they already saved - [InteractionPrefs.sanitizedRevealActions] only falls back to these
  * defaults when nothing is stored.

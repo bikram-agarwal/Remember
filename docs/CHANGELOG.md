@@ -1,4 +1,4 @@
-## v1.3.0 Pinned notes
+## v1.3.1 Pinned notes
 
 ### ✨ New Features
 - Pin notes to keep them at the top of Home, no matter how you sort or group. 

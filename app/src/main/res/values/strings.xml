@@ -805,7 +805,7 @@
     <string name="settings_swipe_left_label">Swipe left</string>
     <string name="settings_swipe_reveal_title">Reveal</string>
     <string name="settings_swipe_execute_title">Execute</string>
-    <string name="settings_swipe_drag_hint">Each swipe reveals three actions. Drag to reorder.</string>
+    <string name="settings_swipe_drag_hint">Each swipe reveals three actions. Tap to change or drag to reorder.</string>
     <string name="settings_swipe_tap_hint">Each swipe runs one action. Tap to change the action.</string>
     <string name="settings_swipe_action_done_short">Done</string>
     <string name="swipe_action_open">Edit</string>
