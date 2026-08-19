@@ -17,6 +17,7 @@ class NotesWidgetTest {
         assertEquals("Heading", widgetPlainText("\n## Heading\nBody"))
         assertEquals("Buy milk", widgetPlainText("- [ ] Buy milk"))
         assertEquals("Quoted", widgetPlainText("> Quoted"))
+        assertEquals("Body", widgetPlainText("---\nBody"))
     }
 
     @Test

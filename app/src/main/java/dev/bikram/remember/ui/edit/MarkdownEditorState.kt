@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.bikram.remember.ui.common.MarkdownHorizontalRuleLineRegex
 import dev.bikram.remember.ui.common.indexOfMarkdownClosingMarker
 import dev.bikram.remember.ui.common.isValidOpening
 import kotlin.math.max
@@ -140,6 +141,7 @@ internal class MarkdownEditorState(
     fun update(
         value: TextFieldValue,
         cleanUpEmptyMarkdownWrappers: Boolean = true,
+        breakLineAfterHorizontalRule: Boolean = true,
     ) {
         val previousValue = textFieldValue
         // Read before textFieldValue is reassigned below: reflects whether the cursor sat inside
@@ -155,11 +157,19 @@ internal class MarkdownEditorState(
             } else {
                 updatedValue
             }
-        textFieldValue =
+        val capitalizedValue =
             cleanedValue.withAutoCapitalizedSingleCharacterInsertion(
                 previousValue = previousValue,
                 shouldCapitalize = shouldCapitalizeNext,
             )
+        // Runs last so it cannot disturb the single-character/single-newline detection the
+        // transforms above do against previousValue.
+        textFieldValue =
+            if (breakLineAfterHorizontalRule) {
+                capitalizedValue.withLineBreakAfterCompletedHorizontalRule(previousValue = previousValue)
+            } else {
+                capitalizedValue
+            }
         selectionRevision++
     }
 
@@ -886,6 +896,53 @@ internal class MarkdownEditorState(
             text = updatedText,
             selection = TextRange(newlineInsertion.index + 1 + continuationPrefix.nextPrefix.length),
             composition = null,
+        )
+    }
+
+    // Live preview hides a completed rule line outright, so leaving the cursor on it is a trap:
+    // the next character typed lands between the dashes and silently dissolves the rule back into
+    // text. Completing one therefore moves the cursor to a fresh line below it, exactly as if the
+    // user had pressed enter. Only the keystroke that *completes* a rule qualifies - anything else
+    // (a paste, an edit mid-line, a fourth dash on a line that is already a rule) is left alone.
+    private fun TextFieldValue.withLineBreakAfterCompletedHorizontalRule(previousValue: TextFieldValue): TextFieldValue {
+        if (!selection.collapsed || !previousValue.selection.collapsed) {
+            return this
+        }
+        if (text.length != previousValue.text.length + 1) {
+            return this
+        }
+        val cursor = selection.start
+        val insertionIndex = cursor - 1
+        if (insertionIndex !in text.indices || text[insertionIndex] != '-') {
+            return this
+        }
+        if (text.removeRange(insertionIndex, cursor) != previousValue.text) {
+            return this
+        }
+        // Typing anywhere but the end of the line means the dashes are part of something else.
+        val lineEndIndex =
+            text.indexOf('\n', cursor).let { newlineIndex ->
+                if (newlineIndex < 0) text.length else newlineIndex
+            }
+        if (cursor != lineEndIndex) {
+            return this
+        }
+        val lineStartIndex =
+            text.lastIndexOf('\n', insertionIndex).let { newlineIndex ->
+                if (newlineIndex < 0) 0 else newlineIndex + 1
+            }
+        // markdownHorizontalRuleLineStarts is the same check live preview renders by, so a dash run
+        // inside a fenced code block stays literal text here too.
+        if (lineStartIndex !in markdownHorizontalRuleLineStarts(text)) {
+            return this
+        }
+        // Already a rule before this dash landed, so nothing was completed.
+        if (MarkdownHorizontalRuleLineRegex.matches(text.substring(lineStartIndex, insertionIndex))) {
+            return this
+        }
+        return TextFieldValue(
+            text = text.replaceRange(startIndex = cursor, endIndex = cursor, replacement = "\n"),
+            selection = TextRange(cursor + 1),
         )
     }
 
