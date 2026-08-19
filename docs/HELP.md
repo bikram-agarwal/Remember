@@ -31,7 +31,7 @@ Each note and list supports: an icon, tags, reminder, notification action, impor
 
 ### Note formatting
 
-Notes support Markdown-style writing: headings, bold, italic, underline, strikethrough, lists, quotes, code blocks, and links. Reminder notifications use a plain-text version of the note so they stay readable.
+Notes support Markdown-style writing: headings, bold, italic, underline, strikethrough, lists, quotes, code blocks, links, and dividers. Reminder notifications use a plain-text version of the note so they stay readable.
 
 ### Checklists
 

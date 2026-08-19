@@ -39,6 +39,93 @@ class MarkdownEditorStateTest {
     }
 
     @Test
+    fun completingHorizontalRuleMovesCursorToFreshLineBelowIt() {
+        val state = MarkdownEditorState("--")
+        state.update(TextFieldValue("--", selection = TextRange(2)))
+
+        state.update(TextFieldValue("---", selection = TextRange(3)))
+
+        assertEquals("---\n", state.markdown)
+        assertEquals(TextRange(4), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun completingHorizontalRuleKeepsFollowingContentOnItsOwnLine() {
+        val state = MarkdownEditorState("intro\n--\nafter")
+        state.update(TextFieldValue("intro\n--\nafter", selection = TextRange(8)))
+
+        state.update(TextFieldValue("intro\n---\nafter", selection = TextRange(9)))
+
+        assertEquals("intro\n---\n\nafter", state.markdown)
+        assertEquals(TextRange(10), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun typingBeyondACompletedHorizontalRuleDoesNotBreakTheLineAgain() {
+        val state = MarkdownEditorState("---")
+        state.update(TextFieldValue("---", selection = TextRange(3)))
+
+        state.update(TextFieldValue("----", selection = TextRange(4)))
+
+        assertEquals("----", state.markdown)
+        assertEquals(TextRange(4), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun twoDashesDoNotBreakTheLine() {
+        val state = MarkdownEditorState("-")
+        state.update(TextFieldValue("-", selection = TextRange(1)))
+
+        state.update(TextFieldValue("--", selection = TextRange(2)))
+
+        assertEquals("--", state.markdown)
+        assertEquals(TextRange(2), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun pastedHorizontalRuleDoesNotBreakTheLine() {
+        val state = MarkdownEditorState()
+
+        state.update(TextFieldValue("---", selection = TextRange(3)))
+
+        assertEquals("---", state.markdown)
+        assertEquals(TextRange(3), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun dashTypedMidLineDoesNotBreakTheLine() {
+        val state = MarkdownEditorState("-- tail")
+        state.update(TextFieldValue("-- tail", selection = TextRange(2)))
+
+        state.update(TextFieldValue("--- tail", selection = TextRange(3)))
+
+        assertEquals("--- tail", state.markdown)
+        assertEquals(TextRange(3), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun dashRunCompletedInsideCodeBlockDoesNotBreakTheLine() {
+        val state = MarkdownEditorState("```\n--\n```")
+        state.update(TextFieldValue("```\n--\n```", selection = TextRange(6)))
+
+        state.update(TextFieldValue("```\n---\n```", selection = TextRange(7)))
+
+        assertEquals("```\n---\n```", state.markdown)
+        assertEquals(TextRange(7), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun horizontalRuleLineBreakCanBeDisabledForMarkdownCodeMode() {
+        val state = MarkdownEditorState("--")
+        state.update(TextFieldValue("--", selection = TextRange(2)), breakLineAfterHorizontalRule = false)
+
+        state.update(TextFieldValue("---", selection = TextRange(3)), breakLineAfterHorizontalRule = false)
+
+        assertEquals("---", state.markdown)
+        assertEquals(TextRange(3), state.textFieldValue.selection)
+    }
+
+    @Test
     fun backspaceAtStartOfLeadingNewlineDoesNotCrash() {
         val state = MarkdownEditorState("\n")
         state.update(TextFieldValue("\n", selection = TextRange(0)))

@@ -9,6 +9,7 @@ import dev.bikram.remember.ui.common.MarkdownBulletLineRegex
 import dev.bikram.remember.ui.common.MarkdownChecklistLineRegex
 import dev.bikram.remember.ui.common.MarkdownCodeFenceLineRegex
 import dev.bikram.remember.ui.common.MarkdownHeadingLineRegex
+import dev.bikram.remember.ui.common.MarkdownHorizontalRuleLineRegex
 import dev.bikram.remember.ui.common.MarkdownNumberedLineRegex
 import dev.bikram.remember.ui.common.MarkdownQuoteLineRegex
 import dev.bikram.remember.ui.common.MarkdownStyler
@@ -28,6 +29,36 @@ internal const val LIVE_PREVIEW_HIGHLIGHT_MAX_CHARS = 20_000
 // At or above it, callers should debounce the `settledSource` they pass in so highlighting only
 // recomputes once typing pauses instead of on every keystroke; see MarkdownTextEditor.
 internal const val LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS = 4_000
+
+// Source offsets of the line starts that live preview renders as a horizontal rule, for callers
+// that draw the rule themselves. Deliberately mirrors collectMarkdownRanges' code-fence tracking:
+// a dash run inside a fenced block is literal code, not a rule.
+internal fun markdownHorizontalRuleLineStarts(source: String): List<Int> {
+    if (!source.contains("---")) {
+        return emptyList()
+    }
+    val ruleLineStarts = mutableListOf<Int>()
+    var lineStartIndex = 0
+    var inCodeBlock = false
+    while (lineStartIndex <= source.length) {
+        val lineEndIndex =
+            source.indexOf('\n', lineStartIndex).let { newlineIndex ->
+                if (newlineIndex < 0) source.length else newlineIndex
+            }
+        val line = source.substring(lineStartIndex, lineEndIndex)
+        if (MarkdownCodeFenceLineRegex.matches(line)) {
+            inCodeBlock = !inCodeBlock
+        } else if (!inCodeBlock && MarkdownHorizontalRuleLineRegex.matches(line)) {
+            ruleLineStarts.add(lineStartIndex)
+        }
+
+        if (lineEndIndex == source.length) {
+            break
+        }
+        lineStartIndex = lineEndIndex + 1
+    }
+    return ruleLineStarts
+}
 
 internal class MarkdownVisualTransformation(
     private val styler: MarkdownStyler,
@@ -176,6 +207,15 @@ private class MarkdownPreviewTransformationBuilder(
         lineStartIndex: Int,
         lineEndIndex: Int,
     ) {
+        if (MarkdownHorizontalRuleLineRegex.matches(line)) {
+            // The dashes are hidden outright, leaving a blank line that MarkdownTextEditor paints
+            // the rule across (see markdownHorizontalRuleLineStarts). Nothing is inserted in their
+            // place, so the source text is untouched: deleting one dash makes the line stop
+            // matching and the remaining `--` becomes visible again.
+            hiddenRanges.add(HiddenRange(lineStartIndex, lineEndIndex))
+            return
+        }
+
         MarkdownHeadingLineRegex.matchEntire(line)?.let { match ->
             val headingLevel = match.groupValues[1].length
             val contentStartIndex = lineStartIndex + match.groupValues[1].length + 1

@@ -27,6 +27,12 @@ internal val MarkdownChecklistLineRegex = Regex("""^(\s*)- \[([ xX])\]\s+(.*)$""
 internal val MarkdownBulletLineRegex = Regex("""^(\s*)[-*+]\s+(.*)$""")
 internal val MarkdownNumberedLineRegex = Regex("""^(\s*)(\d+)[.)]\s+(.*)$""")
 internal val MarkdownQuoteLineRegex = Regex("""^\s*>\s?(.*)$""")
+
+// A dash-run line is a horizontal rule, not a bullet: MarkdownBulletLineRegex requires whitespace
+// after its marker, so `---` never matched it and is safe to claim here. Only `-` runs are treated
+// as rules - `***` and `___` are deliberately left alone because they collide with the inline
+// bold/italic markers, which would make typing emphasis at the start of a line ambiguous.
+internal val MarkdownHorizontalRuleLineRegex = Regex("""^ {0,3}-{3,}[ \t]*$""")
 internal val MarkdownCodeFenceLineRegex = Regex("""^\s*```\s*$""")
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
 

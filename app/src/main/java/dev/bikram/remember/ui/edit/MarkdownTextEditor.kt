@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -117,6 +118,38 @@ internal fun MarkdownTextEditor(
     var focused by remember { mutableStateOf(false) }
     var editorCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
+
+    // A `---` line is hidden entirely by the live-preview transformation, so the rule itself is
+    // painted here across the blank line that is left behind. Resolving the offsets outside the
+    // draw phase keeps parsing off the draw path, and bodies without any dash run never parse at
+    // all (markdownHorizontalRuleLineStarts short-circuits on them).
+    val horizontalRuleTransformedOffsets =
+        remember(displayMode, visualTransformation, state.markdown) {
+            if (displayMode != MarkdownEditorDisplayMode.LivePreview) {
+                emptyList()
+            } else {
+                val ruleLineStarts = markdownHorizontalRuleLineStarts(state.markdown)
+                if (ruleLineStarts.isEmpty()) {
+                    emptyList()
+                } else {
+                    // filter() is memoized on the source, so this reuses the parse the text field
+                    // itself needs for the same frame.
+                    val transformedText = visualTransformation.filter(AnnotatedString(state.markdown))
+                    if (transformedText.text.text == state.markdown) {
+                        // Nothing was hidden, so highlighting is off for this body (over
+                        // LIVE_PREVIEW_HIGHLIGHT_MAX_CHARS, or still mid-debounce) and the dashes
+                        // are showing as plain text. Painting a rule over them would be noise.
+                        emptyList()
+                    } else {
+                        ruleLineStarts.map { lineStart ->
+                            transformedText.offsetMapping.originalToTransformed(lineStart)
+                        }
+                    }
+                }
+            }
+        }
+    val horizontalRuleColor = MaterialTheme.colorScheme.outlineVariant
+    val horizontalRuleStrokeWidthPx = with(density) { 1.dp.toPx() }
     val activeTagToken =
         remember(state.markdown, state.textFieldValue.selection) {
             activeHashTagToken(
@@ -193,6 +226,9 @@ internal fun MarkdownTextEditor(
                 state.update(
                     value = value,
                     cleanUpEmptyMarkdownWrappers = displayMode == MarkdownEditorDisplayMode.LivePreview,
+                    // Only live preview hides the dashes, so only live preview needs the cursor
+                    // moved off the finished rule. Markdown-code mode stays a literal text editor.
+                    breakLineAfterHorizontalRule = displayMode == MarkdownEditorDisplayMode.LivePreview,
                 )
             },
             textStyle = editorTextStyle,
@@ -213,7 +249,26 @@ internal fun MarkdownTextEditor(
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 140.dp)
-                    .semantics { contentDescription = bodyPlaceholder }
+                    .drawBehind {
+                        val layoutResult = textLayoutResult ?: return@drawBehind
+                        val layoutTextLength = layoutResult.layoutInput.text.length
+                        horizontalRuleTransformedOffsets.forEach { transformedOffset ->
+                            // The layout can lag a keystroke behind the offsets computed above; an
+                            // out-of-range offset just skips this frame rather than crashing.
+                            if (transformedOffset > layoutTextLength) {
+                                return@forEach
+                            }
+                            val lineIndex = layoutResult.getLineForOffset(transformedOffset)
+                            val lineCenterY =
+                                (layoutResult.getLineTop(lineIndex) + layoutResult.getLineBottom(lineIndex)) / 2f
+                            drawLine(
+                                color = horizontalRuleColor,
+                                start = Offset(x = 0f, y = lineCenterY),
+                                end = Offset(x = size.width, y = lineCenterY),
+                                strokeWidth = horizontalRuleStrokeWidthPx,
+                            )
+                        }
+                    }.semantics { contentDescription = bodyPlaceholder }
                     .onGloballyPositioned { editorCoordinates = it }
                     .focusRequester(focusRequester)
                     .pointerInput(onStylusInput) {

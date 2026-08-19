@@ -1,3 +1,10 @@
+## v1.3.2 Horizontal line
+
+### ✨ New Features
+- Markdown in notes now support rendering `---` as a horiozntal line / divider. 
+
+---
+
 ## v1.3.1 Pinned notes
 
 ### ✨ New Features
