@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -51,6 +52,7 @@ import dev.bikram.remember.ui.feedback.performLongPressHaptic
 
 private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
 private val MarkdownChecklistContinuationLineRegex = Regex("""^\s{4,}(.+)$""")
+private const val MARKDOWN_PREVIEW_HORIZONTAL_RULE = "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
 
 internal data class MarkdownTextTap(
     val markdownOffset: Int,
@@ -210,6 +212,7 @@ private data class MarkdownContinuationLine(
 
 private fun isMarkdownBlockLine(line: String): Boolean =
     MarkdownHeadingLineRegex.matchEntire(line) != null ||
+        MarkdownHorizontalRuleLineRegex.matches(line) ||
         MarkdownChecklistLineRegex.matchEntire(line) != null ||
         MarkdownBulletLineRegex.matchEntire(line) != null ||
         MarkdownNumberedLineRegex.matchEntire(line) != null ||
@@ -233,6 +236,17 @@ private fun MarkdownLine(
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)?,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)?,
 ) {
+    if (MarkdownHorizontalRuleLineRegex.matches(line)) {
+        MarkdownHorizontalRule(
+            // Tapping the rule enters editing at the end of the dashes, so a backspace right after
+            // is all it takes to turn the rule back into plain text.
+            markdownOffset = lineStartOffset + line.length,
+            onTextTap = onTextTap,
+            onTextLongPress = onTextLongPress,
+        )
+        return
+    }
+
     val headingMatch = MarkdownHeadingLineRegex.matchEntire(line)
     if (headingMatch != null) {
         val headingLevel = headingMatch.groupValues[1].length
@@ -447,6 +461,43 @@ private fun MarkdownLine(
         onLinkClick = onLinkClick,
         onLinkLongPress = onLinkLongPress,
     )
+}
+
+@Composable
+private fun MarkdownHorizontalRule(
+    markdownOffset: Int,
+    onTextTap: ((MarkdownTextTap) -> Unit)?,
+    onTextLongPress: ((MarkdownTextTap) -> Unit)?,
+) {
+    val hapticEnabled = LocalHapticEnabled.current
+    val view = LocalView.current
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                // Roughly one text line tall, so a rule takes about as much room as the blank line
+                // it replaces and stays as easy to tap as the text around it.
+                .height(20.dp)
+                .pointerInput(markdownOffset, onTextTap, onTextLongPress) {
+                    if (onTextTap == null && onTextLongPress == null) {
+                        return@pointerInput
+                    }
+                    detectTapGestures(
+                        onTap = { onTextTap?.invoke(MarkdownTextTap(markdownOffset)) },
+                        // Raw pointerInput long-presses cannot inherit appCombinedClickable's
+                        // haptic, so it fires here - only when a handler exists to act on it.
+                        onLongPress = {
+                            onTextLongPress?.let { callback ->
+                                if (hapticEnabled) view.performLongPressHaptic()
+                                callback(MarkdownTextTap(markdownOffset))
+                            }
+                        },
+                    )
+                },
+        contentAlignment = Alignment.Center,
+    ) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    }
 }
 
 @Composable
@@ -930,6 +981,12 @@ private fun appendPreviewLine(
     appendSyntheticText: (String, Int) -> Unit,
     appendSourceRange: (String, Int, IntRange) -> Unit,
 ) {
+    if (MarkdownHorizontalRuleLineRegex.matches(line)) {
+        // Card previews are a single Text, so the rule cannot be a real divider here; a short
+        // dash run at least reads as one instead of leaking the raw `---` syntax.
+        appendSyntheticText(MARKDOWN_PREVIEW_HORIZONTAL_RULE, lineStartOffset)
+        return
+    }
     MarkdownHeadingLineRegex
         .matchEntire(line)
         ?.groups

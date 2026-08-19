@@ -29,6 +29,68 @@ class MarkdownVisualTransformationBlockTest {
     }
 
     @Test
+    fun horizontalRuleLineIsHiddenFromLivePreviewText() {
+        val transformation = MarkdownVisualTransformation(testMarkdownStyler())
+
+        val transformedText = transformation.filter(AnnotatedString("before\n---\nafter"))
+
+        assertEquals("before\n\nafter", transformedText.text.text)
+    }
+
+    @Test
+    fun horizontalRuleBlankLineMapsBackToEndOfDashes() {
+        val transformation = MarkdownVisualTransformation(testMarkdownStyler())
+
+        val transformedText = transformation.filter(AnnotatedString("---\nafter"))
+
+        // A backspace on the blank rule line has to land on the last dash, turning `---` into `--`.
+        assertEquals("---".length, transformedText.offsetMapping.transformedToOriginal(0))
+        assertEquals(0, transformedText.offsetMapping.originalToTransformed("---".length))
+    }
+
+    @Test
+    fun twoDashesStayVisibleInLivePreviewText() {
+        val transformation = MarkdownVisualTransformation(testMarkdownStyler())
+
+        val transformedText = transformation.filter(AnnotatedString("--"))
+
+        assertEquals("--", transformedText.text.text)
+    }
+
+    @Test
+    fun bulletLineIsNotTreatedAsHorizontalRule() {
+        val transformation = MarkdownVisualTransformation(testMarkdownStyler())
+
+        val transformedText = transformation.filter(AnnotatedString("- item"))
+
+        assertEquals("  \u2022 item", transformedText.text.text)
+    }
+
+    @Test
+    fun dashRunInsideCodeBlockStaysVisible() {
+        val transformation = MarkdownVisualTransformation(testMarkdownStyler())
+
+        val transformedText = transformation.filter(AnnotatedString("```\n---\n```"))
+
+        assertEquals("\n---\n", transformedText.text.text)
+    }
+
+    @Test
+    fun horizontalRuleLineStartsSkipsBulletsAndFencedDashRuns() {
+        val source = "intro\n---\n- item\n```\n---\n```\n----"
+
+        assertEquals(
+            listOf(source.indexOf("---"), source.lastIndexOf("----")),
+            markdownHorizontalRuleLineStarts(source),
+        )
+    }
+
+    @Test
+    fun horizontalRuleLineStartsIgnoresBodiesWithoutDashRuns() {
+        assertEquals(emptyList<Int>(), markdownHorizontalRuleLineStarts("plain body\n-- not a rule"))
+    }
+
+    @Test
     fun codeBlockContentGetsBackgroundInLivePreviewText() {
         val transformation = MarkdownVisualTransformation(testMarkdownStyler())
 

@@ -1077,8 +1077,12 @@ private fun String.toWidgetPlainText(): String = widgetPlainText(this)
 internal fun widgetPlainText(markdown: String): String =
     markdown
         .lineSequence()
-        .filterNot { line -> widgetMarkdownCodeFenceRegex.matches(line) }
-        .map { line ->
+        .filterNot { line ->
+            widgetMarkdownCodeFenceRegex.matches(line) ||
+                // A horizontal rule carries no text, so it must not become the widget's one-line
+                // preview of the note.
+                widgetMarkdownHorizontalRuleRegex.matches(line)
+        }.map { line ->
             line
                 .replace(widgetMarkdownHeadingRegex, "")
                 .replace(widgetMarkdownChecklistRegex, "")
@@ -1189,6 +1193,7 @@ private val widgetMarkdownChecklistRegex = Regex("""^\s*[-*+]\s+\[[ xX]\]\s+""")
 private val widgetMarkdownBulletRegex = Regex("""^\s*[-*+]\s+""")
 private val widgetMarkdownQuoteRegex = Regex("""^\s*>\s?""")
 private val widgetMarkdownCodeFenceRegex = Regex("""^\s*```.*$""")
+private val widgetMarkdownHorizontalRuleRegex = Regex("""^ {0,3}-{3,}[ \t]*$""")
 private val widgetMarkdownLinkRegex = Regex("""\[([^]]+)]\([^)]+\)""")
 private val widgetMarkdownInlineCodeRegex = Regex("""`([^`]+)`""")
 private val widgetMarkdownBoldItalicRegex = Regex("""\*\*\*(.+?)\*\*\*""")
