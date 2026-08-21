@@ -1,6 +1,6 @@
 [versions]
 activityCompose = "1.13.0"
-agp = "9.5.0-alpha01"
+agp = "9.5.0-alpha02"
 androidxHilt = "1.4.0"
 androidxTestExtJunit = "1.3.0"
 androidxTestRunner = "1.7.0"
