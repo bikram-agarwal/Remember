@@ -3,6 +3,11 @@
 ### ✨ New Features
 - Markdown in notes now support rendering `---` as a horizontal line / divider. 
 
+### 🛠 Improved Features
+- When there are no overdue reminders, the "Overdue" section is hidden in the homescreen widget, giving more space to the "Upcoming" reminders.
+- Scaled down and optically centered the "New note" button icon.
+- "Done" button icon and colors are tweaked slightly for better visual balance.
+
 ---
 
 ## v1.3.1 Pinned notes

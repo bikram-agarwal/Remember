@@ -121,11 +121,11 @@
         <ImageView
             android:layout_width="22dp"
             android:layout_height="22dp"
-            android:background="@drawable/widget_preview_small_action"
+            android:background="@drawable/widget_preview_icon_circle_error"
             android:contentDescription="@string/widget_mark_done_cd"
             android:padding="3dp"
             android:src="@drawable/ic_widget_done"
-            android:tint="@color/widget_preview_on_surface" />
+            android:tint="@color/widget_preview_on_error" />
     </LinearLayout>
 
     <TextView

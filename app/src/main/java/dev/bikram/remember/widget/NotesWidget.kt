@@ -248,47 +248,39 @@ private fun AgendaWidgetContent(
             AgendaEmptyState()
         } else {
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                if (overdue.isNotEmpty() || upcoming.isNotEmpty()) {
+                if (overdue.isNotEmpty()) {
                     item { SectionHeader(context.getString(R.string.widget_section_overdue), strong = true) }
-                    if (overdue.isEmpty()) {
-                        item { InlineEmptyState(context.getString(R.string.widget_empty_nothing_overdue)) }
-                    } else {
-                        items(count = overdue.size) { index ->
-                            Column {
-                                ReminderCard(
-                                    note = overdue[index],
-                                    context = context,
-                                    now = now,
-                                    overdue = true,
-                                    compact = compact,
-                                )
-                                if (index != overdue.lastIndex) {
-                                    Spacer(GlanceModifier.height(6.dp))
-                                }
+                    items(count = overdue.size) { index ->
+                        Column {
+                            ReminderCard(
+                                note = overdue[index],
+                                context = context,
+                                now = now,
+                                overdue = true,
+                                compact = compact,
+                            )
+                            if (index != overdue.lastIndex) {
+                                Spacer(GlanceModifier.height(6.dp))
                             }
                         }
                     }
                 }
-                if (upcoming.isNotEmpty() || overdue.isNotEmpty()) {
+                if (overdue.isNotEmpty() && upcoming.isNotEmpty()) {
                     item { Spacer(GlanceModifier.height(8.dp)) }
                 }
-                if (upcoming.isNotEmpty() || overdue.isNotEmpty()) {
+                if (upcoming.isNotEmpty()) {
                     item { SectionHeader(context.getString(R.string.widget_section_upcoming), strong = false) }
-                    if (upcoming.isEmpty()) {
-                        item { InlineEmptyState(context.getString(R.string.widget_empty_nothing_upcoming)) }
-                    } else {
-                        items(count = upcoming.size) { index ->
-                            Column {
-                                ReminderCard(
-                                    note = upcoming[index],
-                                    context = context,
-                                    now = now,
-                                    overdue = false,
-                                    compact = compact,
-                                )
-                                if (index != upcoming.lastIndex) {
-                                    Spacer(GlanceModifier.height(6.dp))
-                                }
+                    items(count = upcoming.size) { index ->
+                        Column {
+                            ReminderCard(
+                                note = upcoming[index],
+                                context = context,
+                                now = now,
+                                overdue = false,
+                                compact = compact,
+                            )
+                            if (index != upcoming.lastIndex) {
+                                Spacer(GlanceModifier.height(6.dp))
                             }
                         }
                     }
@@ -487,6 +479,8 @@ private fun WidgetIconButton(
     contentDescription: String,
     action: Action,
     compact: Boolean,
+    backgroundColor: ColorProvider = GlanceTheme.colors.primaryContainer,
+    contentColor: ColorProvider = GlanceTheme.colors.onPrimaryContainer,
 ) {
     CircleIconButton(
         imageProvider = provider,
@@ -495,8 +489,8 @@ private fun WidgetIconButton(
         modifier =
             GlanceModifier
                 .size(if (compact) 26.dp else 28.dp),
-        backgroundColor = GlanceTheme.colors.primaryContainer,
-        contentColor = GlanceTheme.colors.onPrimaryContainer,
+        backgroundColor = backgroundColor,
+        contentColor = contentColor,
     )
 }
 
@@ -552,28 +546,6 @@ private fun SectionHeader(
             ),
         modifier = GlanceModifier.padding(vertical = 4.dp),
     )
-}
-
-@Composable
-private fun InlineEmptyState(label: String) {
-    Box(
-        modifier =
-            GlanceModifier
-                .fillMaxWidth()
-                .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            maxLines = 1,
-            style =
-                TextStyle(
-                    color = GlanceTheme.colors.onSurfaceVariant,
-                    fontSize = 12.scaledSp(),
-                    fontWeight = FontWeight.Medium,
-                ),
-        )
-    }
 }
 
 @Composable
@@ -714,6 +686,8 @@ private fun ReminderCard(
                     actionParametersOf(WidgetNoteIdKey to note.note.id),
                 ),
             compact = compact,
+            backgroundColor = if (overdue) GlanceTheme.colors.error else GlanceTheme.colors.primaryContainer,
+            contentColor = if (overdue) GlanceTheme.colors.onError else GlanceTheme.colors.onPrimaryContainer,
         )
     }
 }

@@ -4,7 +4,14 @@
     android:viewportWidth="24"
     android:viewportHeight="24"
     android:tint="?android:attr/colorForeground">
-    <path
-        android:fillColor="@android:color/white"
-        android:pathData="M14,2H6c-1.1,0 -2,0.9 -2,2v16c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V8l-6,-6zM13,9V3.5L18.5,9H13zM16,15h-3v3h-2v-3H8v-2h3v-3h2v3h3v2z" />
+    <group
+        android:pivotX="12"
+        android:pivotY="12"
+        android:scaleX="0.80"
+        android:scaleY="0.80"
+        android:translateX="0.8">
+        <path
+            android:fillColor="@android:color/white"
+            android:pathData="M14,2H6c-1.1,0 -2,0.9 -2,2v16c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2V8l-6,-6zM13,9V3.5L18.5,9H13zM16,15h-3v3h-2v-3H8v-2h3v-3h2v3h3v2z" />
+    </group>
 </vector>
