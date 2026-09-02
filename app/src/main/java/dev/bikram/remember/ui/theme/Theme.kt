@@ -85,9 +85,10 @@ fun RememberTheme(
             )
         }
     val responsiveDensity =
-        remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale, stableDensity) {
+        remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale, stableDensity, themeState.uiScale) {
+            val cappedDisplayDensity = baseDensity.density.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE)
             Density(
-                density = baseDensity.density.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE),
+                density = cappedDisplayDensity * themeState.uiScale,
                 fontScale = (baseDensity.fontScale * responsiveTextScale).coerceAtMost(MAX_APP_FONT_SCALE),
             )
         }

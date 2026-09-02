@@ -1,3 +1,11 @@
+## v1.4.0 Bulk expand/collapse, UI Scale
+
+### ✨ New Features
+- Expand or collapse every note group at once from the home toolbar. 
+- UI scale in Appearance settings (75% to 125%). Make the whole interface - Text, icons, and spacing - smaller or larger.
+
+---
+
 ## v1.3.2 Horizontal line
 
 ### ✨ New Features

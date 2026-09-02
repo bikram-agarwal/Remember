@@ -235,6 +235,7 @@ Controls how Material 3 expands your seed color into a full palette. The same se
 **Visual effects**
 
 - **Gradient background** — blends your primary color into the background for tinted depth rather than a flat surface. Disabled in Black mode.
+- **UI scale** - makes the whole interface smaller or larger (75% to 125%). Text, icons, and spacing change together.
 - **Enhanced shading** — makes cards darker in dark mode, lighter in light mode. Disabled in Black mode.
 - **Blur bars** — frosted glass effect on the top and bottom bars, so content scrolls behind them.
 - **Hero images on cards** — shows a note's picture as a soft background on the card in list view, not just inside the note.

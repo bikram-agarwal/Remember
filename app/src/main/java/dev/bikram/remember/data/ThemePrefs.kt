@@ -135,6 +135,16 @@ enum class PaletteStyleOpt {
 /** Surface-shading intensity used when nothing is stored yet. 1.0 == the slider's "medium" notch. */
 const val DEFAULT_SHADING_INTENSITY = 1.0f
 
+/** ObtainX-style UI scale. Multiplies Compose density so layout, icons, and text grow together. */
+const val DEFAULT_UI_SCALE = 1.0f
+const val UI_SCALE_MIN = 0.75f
+const val UI_SCALE_MAX = 1.25f
+
+fun clampUiScale(raw: Float): Float {
+    if (!raw.isFinite() || raw <= 0f) return DEFAULT_UI_SCALE
+    return raw.coerceIn(UI_SCALE_MIN, UI_SCALE_MAX)
+}
+
 /**
  * Legacy discrete shading levels from versions before the continuous [shading_intensity_factor].
  * Read-only: kept so installs that stored one of these still migrate to a factor on read. New
@@ -159,6 +169,7 @@ data class ThemeState(
     val activeCustomSeed: String = "",
     val useGradient: Boolean = true,
     val shadingIntensity: Float = DEFAULT_SHADING_INTENSITY,
+    val uiScale: Float = DEFAULT_UI_SCALE,
     val heroOnCards: Boolean = true,
     val adaptiveNoteThemes: Boolean = true,
     val blurBars: Boolean = true,
@@ -193,6 +204,7 @@ class ThemePrefs(
         val USE_ENHANCED_SHADING = booleanPreferencesKey("use_enhanced_shading")
         val SHADING_INTENSITY = stringPreferencesKey("shading_intensity")
         val SHADING_INTENSITY_FACTOR = floatPreferencesKey("shading_intensity_factor")
+        val UI_SCALE = floatPreferencesKey("ui_scale")
         val HERO_ON_CARDS = booleanPreferencesKey("hero_on_cards")
         val ADAPTIVE_NOTE_THEMES = booleanPreferencesKey("adaptive_note_themes")
         val BLUR_BARS = booleanPreferencesKey("blur_bars")
@@ -227,6 +239,7 @@ class ThemePrefs(
                         }.getOrElse {
                             if (p[Keys.USE_ENHANCED_SHADING] == true) 0.0f else DEFAULT_SHADING_INTENSITY
                         },
+                uiScale = clampUiScale(p[Keys.UI_SCALE] ?: DEFAULT_UI_SCALE),
                 heroOnCards = p[Keys.HERO_ON_CARDS] ?: true,
                 adaptiveNoteThemes = p[Keys.ADAPTIVE_NOTE_THEMES] ?: true,
                 blurBars = p[Keys.BLUR_BARS] ?: true,
@@ -339,6 +352,10 @@ class ThemePrefs(
         context.themePrefsDataStore.edit { it[Keys.SHADING_INTENSITY_FACTOR] = intensity }
     }
 
+    suspend fun setUiScale(scale: Float) {
+        context.themePrefsDataStore.edit { it[Keys.UI_SCALE] = clampUiScale(scale) }
+    }
+
     suspend fun setHeroOnCards(value: Boolean) {
         context.themePrefsDataStore.edit { it[Keys.HERO_ON_CARDS] = value }
     }
@@ -416,6 +433,7 @@ class ThemePrefs(
             put(Keys.ACTIVE_CUSTOM_SEED.name, prefs[Keys.ACTIVE_CUSTOM_SEED].orEmpty())
             put(Keys.USE_GRADIENT.name, prefs[Keys.USE_GRADIENT] ?: true)
             put(Keys.SHADING_INTENSITY_FACTOR.name, (prefs[Keys.SHADING_INTENSITY_FACTOR] ?: DEFAULT_SHADING_INTENSITY).toDouble())
+            put(Keys.UI_SCALE.name, clampUiScale(prefs[Keys.UI_SCALE] ?: DEFAULT_UI_SCALE).toDouble())
             put(Keys.HERO_ON_CARDS.name, prefs[Keys.HERO_ON_CARDS] ?: true)
             put(Keys.ADAPTIVE_NOTE_THEMES.name, prefs[Keys.ADAPTIVE_NOTE_THEMES] ?: true)
             put(Keys.BLUR_BARS.name, prefs[Keys.BLUR_BARS] ?: true)
@@ -503,6 +521,11 @@ class ThemePrefs(
                     }
                 }
             importedShadingFactor?.let { value -> mutable[Keys.SHADING_INTENSITY_FACTOR] = value }
+            if (json.has(Keys.UI_SCALE.name) && !json.isNull(Keys.UI_SCALE.name)) {
+                runCatching { json.getDouble(Keys.UI_SCALE.name).toFloat() }.getOrNull()?.let { rawScale ->
+                    mutable[Keys.UI_SCALE] = clampUiScale(rawScale)
+                }
+            }
             booleanOrNull(Keys.HERO_ON_CARDS.name)?.let { value ->
                 mutable[Keys.HERO_ON_CARDS] = value
             }

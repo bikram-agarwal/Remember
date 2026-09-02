@@ -235,6 +235,7 @@ object DiagnosticLog {
         )
         appendLine(context.getString(R.string.diagnostics_gradient_background_format, snapshot.theme.useGradient.toString()))
         appendLine(context.getString(R.string.diagnostics_surface_shading_format, snapshot.theme.shadingIntensity.toString()))
+        appendLine(context.getString(R.string.diagnostics_ui_scale_format, snapshot.theme.uiScale.toString()))
         appendLine(context.getString(R.string.diagnostics_hero_on_cards_format, snapshot.theme.heroOnCards.toString()))
         appendLine(context.getString(R.string.diagnostics_adaptive_note_themes_format, snapshot.theme.adaptiveNoteThemes.toString()))
         appendLine(context.getString(R.string.diagnostics_blur_bars_format, snapshot.theme.blurBars.toString()))

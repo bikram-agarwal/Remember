@@ -754,6 +754,10 @@
     <string name="appearance_adaptive_note_themes_subtitle">Use color from cover image to tint the note page</string>
     <string name="appearance_shading_intensity_title">Surface shading</string>
     <string name="appearance_shading_intensity_subtitle">Adjust how strongly theme colors tint surfaces</string>
+    <string name="appearance_shading_intensity_info_cd">Explain surface shading</string>
+    <string name="appearance_ui_scale_title">UI scale</string>
+    <string name="appearance_ui_scale_subtitle">Make the whole interface smaller or larger</string>
+    <string name="appearance_ui_scale_info_cd">Explain UI scale</string>
     <string name="appearance_remove_custom_color_title">Remove custom color?</string>
     <string name="appearance_remove_custom_color_message">It will be removed from your saved custom colors</string>
     <string name="appearance_add_custom_color_cd">Add custom color</string>
@@ -1196,6 +1200,7 @@
     <string name="diagnostics_active_custom_seed_format">Active custom seed set: %1$s</string>
     <string name="diagnostics_gradient_background_format">Gradient background: %1$s</string>
     <string name="diagnostics_surface_shading_format">Surface shading: %1$s</string>
+    <string name="diagnostics_ui_scale_format">UI scale: %1$s</string>
     <string name="diagnostics_hero_on_cards_format">Hero images on cards: %1$s</string>
     <string name="diagnostics_adaptive_note_themes_format">Adaptive note themes: %1$s</string>
     <string name="diagnostics_blur_bars_format">Blur bars: %1$s</string>
