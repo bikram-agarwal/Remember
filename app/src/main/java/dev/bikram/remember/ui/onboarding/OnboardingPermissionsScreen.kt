@@ -30,11 +30,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -434,7 +434,10 @@ fun OnboardingPermissionsScreen(
                                     .fillMaxWidth()
                                     .onGloballyPositioned { coordinates ->
                                         bottomActionsHeight = with(responsiveDensity) { coordinates.size.height.toDp() }
-                                    }.padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                                    }.navigationBarsPadding()
+                                    // Sits a constant 16.dp above the system bar, so the tall 3-button
+                                    // bar and the short gesture handle both get the same visual gap.
+                                    .padding(start = 24.dp, end = 24.dp, bottom = 16.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Row(

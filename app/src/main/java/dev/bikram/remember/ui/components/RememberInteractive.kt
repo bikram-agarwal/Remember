@@ -63,6 +63,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.bikram.remember.ui.common.LocalAllowCompactControls
 import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
@@ -455,9 +456,8 @@ fun RememberFloatingActionButton(
     tooltipLabel: String? = null,
     content: @Composable () -> Unit,
 ) {
-    val isSmallLandscape = isSmallLandscape()
     val sizeModifier =
-        if (isSmallLandscape) {
+        if (isSmallLandscape() && LocalAllowCompactControls.current) {
             Modifier.size(rememberResponsiveActionButtonSize())
         } else {
             Modifier

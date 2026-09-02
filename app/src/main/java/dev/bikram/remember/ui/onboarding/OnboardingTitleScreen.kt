@@ -15,9 +15,9 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -154,7 +154,8 @@ fun OnboardingTitleScreen(
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 120.dp),
+                        .navigationBarsPadding()
+                        .padding(bottom = 96.dp),
             )
 
             OnboardingLetsBeginButton(
@@ -165,7 +166,10 @@ fun OnboardingTitleScreen(
                     Modifier
                         .align(Alignment.BottomCenter)
                         .fillMaxWidth()
-                        .padding(start = 32.dp, end = 32.dp, bottom = 40.dp),
+                        .navigationBarsPadding()
+                        // Sits a constant 16.dp above the system bar, so the tall 3-button bar and
+                        // the short gesture handle both get the same visual gap.
+                        .padding(start = 32.dp, end = 32.dp, bottom = 16.dp),
             )
         }
     }

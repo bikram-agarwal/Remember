@@ -21,12 +21,14 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBars
@@ -51,6 +53,7 @@ import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -77,6 +80,7 @@ import androidx.graphics.shapes.Morph
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.notifications.appNotificationSettingsIntent
+import dev.bikram.remember.ui.common.LocalAllowCompactControls
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.common.isLandscape
@@ -242,93 +246,94 @@ fun MainTabScaffold(
                         }
                     }
                 } else {
-                    val notesFabBottomInset =
-                        if (currentTab == MainTab.Notes) {
-                            if (isLandscape) 8.dp else 16.dp
-                        } else {
-                            0.dp
-                        }
-                    CenteredPillWithSideFab(
-                        modifier =
-                            Modifier
-                                .align(Alignment.BottomCenter)
-                                .then(chromeOverlayModifier)
-                                .fillMaxWidth()
-                                .windowInsetsPadding(WindowInsets.navigationBars)
-                                .padding(
-                                    bottom = if (isLandscape) 6.dp else 12.dp,
-                                    start = 24.dp,
-                                    end = 24.dp,
-                                ),
-                        fabGap = 12.dp,
-                        pill = {
-                            RememberFloatingNavPill(
-                                currentTab = currentTab,
-                                onTabClick = { selected ->
-                                    closeNotesRevealRequest++
-                                    onTabSelected(selected)
-                                    fabExpanded = false
-                                },
-                            )
-                        },
-                        leadingFab =
-                            if (alertSummary.count == 0) {
-                                null
-                            } else {
-                                {
-                                    AlertFloatingActionButtonMenu(
-                                        expanded = alertBarsExpanded,
-                                        onExpandedChange = { expanded ->
-                                            fabExpanded = false
-                                            onAlertBarsExpandedChange(expanded)
-                                        },
-                                        summary = alertSummary,
-                                        updateState = updateBarState,
-                                        blockedReminderCount = blockedReminderCount,
-                                        onEnableReminderNotifications = enableReminderNotifications,
-                                        onUpdateClick = onUpdateClick,
-                                        onDismissUpdateAvailable = onDismissUpdateAvailable,
-                                        onInstallUpdate = onInstallUpdate,
-                                        centerBarsInWindow = true,
-                                    )
-                                }
+                    // Single-pane chrome keeps full-size controls even on a short landscape window:
+                    // it is one row of buttons over the content, so it can afford the height, and
+                    // shrinking them made the same FABs a different size per orientation. The rail
+                    // branch above deliberately stays compact - it shares its window with a pane of
+                    // list content.
+                    CompositionLocalProvider(LocalAllowCompactControls provides false) {
+                        CenteredPillWithSideFab(
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .then(chromeOverlayModifier)
+                                    .fillMaxWidth()
+                                    .windowInsetsPadding(WindowInsets.navigationBars)
+                                    .padding(
+                                        bottom = if (isLandscape) 6.dp else 12.dp,
+                                        start = 24.dp,
+                                        end = 24.dp,
+                                    ),
+                            fabGap = 16.dp,
+                            fabCoreSize = 56.dp,
+                            // Notes is the only tab whose FAB is a FloatingActionButtonMenu; the rest
+                            // are bare FABs whose placeable is already just the button.
+                            fabWrapperInset = if (currentTab == MainTab.Notes) NotesFabMenuButtonInset else 0.dp,
+                            pill = {
+                                RememberFloatingNavPill(
+                                    currentTab = currentTab,
+                                    onTabClick = { selected ->
+                                        closeNotesRevealRequest++
+                                        onTabSelected(selected)
+                                        fabExpanded = false
+                                    },
+                                )
                             },
-                        fab = {
-                            MainFabSlot(
-                                tab = currentTab,
-                                fabExpanded = fabExpanded,
-                                onToggleNotesFab = {
-                                    closeNotesRevealRequest++
-                                    onAlertBarsExpandedChange(false)
-                                    fabExpanded = !fabExpanded
+                            leadingFab =
+                                if (alertSummary.count == 0) {
+                                    null
+                                } else {
+                                    {
+                                        AlertFloatingActionButtonMenu(
+                                            expanded = alertBarsExpanded,
+                                            onExpandedChange = { expanded ->
+                                                fabExpanded = false
+                                                onAlertBarsExpandedChange(expanded)
+                                            },
+                                            summary = alertSummary,
+                                            updateState = updateBarState,
+                                            blockedReminderCount = blockedReminderCount,
+                                            onEnableReminderNotifications = enableReminderNotifications,
+                                            onUpdateClick = onUpdateClick,
+                                            onDismissUpdateAvailable = onDismissUpdateAvailable,
+                                            onInstallUpdate = onInstallUpdate,
+                                            centerBarsInWindow = true,
+                                        )
+                                    }
                                 },
-                                historySection = historySection,
-                                historyVisibleItemCount = historyVisibleItemCount,
-                                onClearTrashRequest = { clearTrashOpen = true },
-                                onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
-                                onShareApp = shareApp,
-                                onPickImport = {
-                                    closeNotesRevealRequest++
-                                    fabExpanded = false
-                                    onImportGoogleTasks()
-                                },
-                                onPickList = {
-                                    closeNotesRevealRequest++
-                                    fabExpanded = false
-                                    onCreateList()
-                                },
-                                onPickNote = {
-                                    closeNotesRevealRequest++
-                                    fabExpanded = false
-                                    onCreateNote()
-                                },
-                            )
-                        },
-                        fabRightInset = if (currentTab == MainTab.Notes) 16.dp else 0.dp,
-                        fabBottomInset = notesFabBottomInset,
-                        leadingFabGap = 18.dp,
-                        leadingFabBottomInset = if (isSmallLandscape) notesFabBottomInset else 0.dp,
-                    )
+                            fab = {
+                                MainFabSlot(
+                                    tab = currentTab,
+                                    fabExpanded = fabExpanded,
+                                    onToggleNotesFab = {
+                                        closeNotesRevealRequest++
+                                        onAlertBarsExpandedChange(false)
+                                        fabExpanded = !fabExpanded
+                                    },
+                                    historySection = historySection,
+                                    historyVisibleItemCount = historyVisibleItemCount,
+                                    onClearTrashRequest = { clearTrashOpen = true },
+                                    onMoveArchiveToTrashRequest = { moveArchiveToTrashOpen = true },
+                                    onShareApp = shareApp,
+                                    onPickImport = {
+                                        closeNotesRevealRequest++
+                                        fabExpanded = false
+                                        onImportGoogleTasks()
+                                    },
+                                    onPickList = {
+                                        closeNotesRevealRequest++
+                                        fabExpanded = false
+                                        onCreateList()
+                                    },
+                                    onPickNote = {
+                                        closeNotesRevealRequest++
+                                        fabExpanded = false
+                                        onCreateNote()
+                                    },
+                                )
+                            },
+                        )
+                    }
                 }
             }
 
@@ -344,10 +349,20 @@ fun MainTabScaffold(
     }
 
     if (effectiveChromeVisible && useAdaptiveNavigationRail) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    // Landscape 3-button nav sits on a side edge, not the bottom, so the rail and
+                    // both panes have to clear it. Insetting here (rather than inside the rail) keeps
+                    // the theme background bleeding under the bar.
+                    .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)),
+        ) {
             NavigationRail(
                 containerColor = Color.Transparent,
-                windowInsets = WindowInsets.systemBars,
+                // Vertical only: with full systemBars the rail also absorbed the opposite edge's
+                // horizontal inset, widening itself and pushing the list pane off-centre.
+                windowInsets = WindowInsets.systemBars.only(WindowInsetsSides.Vertical),
                 modifier = Modifier.padding(start = 24.dp),
             ) {
                 MainTab.entries.forEach { tabItem ->
@@ -380,7 +395,16 @@ fun MainTabScaffold(
             }
         }
     } else {
-        mainContent()
+        // Single pane needs the same side-bar clearance as the rail branch above: in landscape the
+        // 3-button nav bar sits on a side edge, and nothing else here insets content horizontally.
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.navigationBars.only(WindowInsetsSides.Horizontal)),
+        ) {
+            mainContent()
+        }
     }
 
     if (clearTrashOpen) {
@@ -444,14 +468,15 @@ private fun CenteredPillWithSideFab(
     pill: @Composable () -> Unit,
     fab: @Composable () -> Unit,
     fabGap: androidx.compose.ui.unit.Dp,
+    // Must be the real rendered FAB diameter: a core that disagrees with the buttons is what used to
+    // push each tab's FABs to a slightly different spot. Callers that let their FABs shrink on short
+    // landscape windows have to pass the shrunken size here too.
+    fabCoreSize: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     leadingFab: (@Composable () -> Unit)? = null,
-    fabCoreSize: androidx.compose.ui.unit.Dp = 56.dp,
-    fabRightInset: androidx.compose.ui.unit.Dp = 0.dp,
-    fabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
-    leadingFabGap: androidx.compose.ui.unit.Dp = fabGap,
-    leadingFabLeftInset: androidx.compose.ui.unit.Dp = 0.dp,
-    leadingFabBottomInset: androidx.compose.ui.unit.Dp = 0.dp,
+    // Padding the trailing FAB's own wrapper leaves between its visible button and its placeable's
+    // right/bottom edges. Cancelling it is what lets a wrapped FAB and a bare one land identically.
+    fabWrapperInset: androidx.compose.ui.unit.Dp = 0.dp,
 ) {
     androidx.compose.ui.layout.Layout(
         modifier = modifier,
@@ -479,12 +504,8 @@ private fun CenteredPillWithSideFab(
                 .getOrNull(2)
                 ?.measure(loose.copy(maxHeight = androidx.compose.ui.unit.Constraints.Infinity))
         val gapPx = fabGap.roundToPx()
-        val leadingGapPx = leadingFabGap.roundToPx()
         val fabCorePx = fabCoreSize.roundToPx()
-        val fabRightInsetPx = fabRightInset.roundToPx()
-        val fabBottomInsetPx = fabBottomInset.roundToPx()
-        val leadingFabLeftInsetPx = leadingFabLeftInset.roundToPx()
-        val leadingFabBottomInsetPx = leadingFabBottomInset.roundToPx()
+        val fabWrapperInsetPx = fabWrapperInset.roundToPx()
 
         val width =
             if (constraints.hasBoundedWidth) {
@@ -492,23 +513,10 @@ private fun CenteredPillWithSideFab(
             } else {
                 pillPlaceable.width + gapPx + fabPlaceable.width
             }
-        val trailingSideFootprintPx =
-            if (fabRightInsetPx > 0 || fabBottomInsetPx > 0) {
-                fabCorePx
-            } else {
-                maxOf(fabCorePx, fabPlaceable.width)
-            }
-        val leadingSideFootprintPx =
-            if (leadingFabPlaceable != null) {
-                if (leadingFabLeftInsetPx > 0 || leadingFabBottomInsetPx > 0) {
-                    fabCorePx
-                } else {
-                    maxOf(fabCorePx, leadingFabPlaceable.width)
-                }
-            } else {
-                0
-            }
-        val sideRoomPx = maxOf(gapPx + trailingSideFootprintPx, leadingGapPx + leadingSideFootprintPx)
+        // Identical slot on both sides keeps the pill centred and the two FABs equidistant from it.
+        // Deliberately ignores the measured FAB widths: an expanded FAB menu is far wider than its
+        // button and must not feed back into the scale or shift the pill.
+        val sideRoomPx = gapPx + fabCorePx
         val rowNaturalWidth = pillPlaceable.width + sideRoomPx * 2
         val chromeScale =
             if (rowNaturalWidth > width && rowNaturalWidth > 0) {
@@ -522,11 +530,7 @@ private fun CenteredPillWithSideFab(
         val scaledFabHeight = (fabPlaceable.height * chromeScale).roundToInt()
         val scaledFabCore = (fabCorePx * chromeScale).roundToInt()
         val scaledGap = (gapPx * chromeScale).roundToInt()
-        val scaledFabRightInset = (fabRightInsetPx * chromeScale).roundToInt()
-        val scaledFabBottomInset = (fabBottomInsetPx * chromeScale).roundToInt()
-        val scaledLeadingGap = (leadingGapPx * chromeScale).roundToInt()
-        val scaledLeadingFabLeftInset = (leadingFabLeftInsetPx * chromeScale).roundToInt()
-        val scaledLeadingFabBottomInset = (leadingFabBottomInsetPx * chromeScale).roundToInt()
+        val scaledFabWrapperInset = (fabWrapperInsetPx * chromeScale).roundToInt()
         val stripHeight = maxOf(scaledPillHeight, scaledFabCore)
 
         layout(width, stripHeight) {
@@ -538,18 +542,13 @@ private fun CenteredPillWithSideFab(
                 transformOrigin = TransformOrigin(0f, 0f)
             }
 
-            val fabX =
-                if (scaledFabRightInset > 0 || scaledFabBottomInset > 0) {
-                    val desiredFabElementRight = pillX + scaledPillWidth + scaledGap + scaledFabCore
-                    val fabElementRight = desiredFabElementRight.coerceAtMost(width)
-                    (fabElementRight - scaledFabWidth + scaledFabRightInset).coerceAtLeast(0)
-                } else {
-                    (pillX + scaledPillWidth + scaledGap)
-                        .coerceAtMost(width - scaledFabWidth)
-                        .coerceAtLeast(0)
-                }
-            val fabBottomY = (stripHeight + scaledFabCore) / 2 + scaledFabBottomInset
-            val fabY = fabBottomY - scaledFabHeight
+            // Anchored by the visible button's bottom-right corner, so the button lands on the pill's
+            // centre line scaledGap away, and an expanded menu grows up and to the left from there.
+            // fabWrapperInset backs the placeable off by whatever padding sits outside the button.
+            val fabCoreRight = (pillX + scaledPillWidth + scaledGap + scaledFabCore).coerceAtMost(width)
+            val fabCoreBottom = (stripHeight + scaledFabCore) / 2
+            val fabX = (fabCoreRight - scaledFabWidth + scaledFabWrapperInset).coerceAtLeast(0)
+            val fabY = fabCoreBottom + scaledFabWrapperInset - scaledFabHeight
             fabPlaceable.placeWithLayer(fabX, fabY) {
                 scaleX = chromeScale
                 scaleY = chromeScale
@@ -558,18 +557,12 @@ private fun CenteredPillWithSideFab(
 
             leadingFabPlaceable?.let { leadingPlaceable ->
                 val scaledLeadingFabWidth = (leadingPlaceable.width * chromeScale).roundToInt()
-                val leadingX =
-                    if (scaledLeadingFabLeftInset > 0 || scaledLeadingFabBottomInset > 0) {
-                        val leadingFabElementLeft =
-                            (pillX - scaledLeadingGap - scaledFabCore).coerceAtLeast(0)
-                        (leadingFabElementLeft - scaledLeadingFabLeftInset).coerceAtLeast(0)
-                    } else {
-                        (pillX - scaledLeadingGap - scaledLeadingFabWidth).coerceAtLeast(0)
-                    }
-                val leadingFabBottomY = (stripHeight + scaledFabCore) / 2 + scaledLeadingFabBottomInset
-                val leadingY =
-                    leadingFabBottomY -
-                        (leadingPlaceable.height * chromeScale).roundToInt()
+                val scaledLeadingFabHeight = (leadingPlaceable.height * chromeScale).roundToInt()
+                // The alert FAB's placeable is always just its button - the unfurled bars are placed
+                // in a zero-size layer - so mirroring the trailing gap and centring on the strip puts
+                // it the same distance from the pill, on the same centre line.
+                val leadingX = (pillX - scaledGap - scaledLeadingFabWidth).coerceAtLeast(0)
+                val leadingY = (stripHeight - scaledLeadingFabHeight) / 2
                 leadingPlaceable.placeWithLayer(leadingX, leadingY) {
                     scaleX = chromeScale
                     scaleY = chromeScale
@@ -658,8 +651,9 @@ private fun MainFabSlot(
     onPickList: () -> Unit,
     onPickNote: () -> Unit,
 ) {
-    val isLandscape = isLandscape()
-    val isSmallLandscape = isSmallLandscape()
+    // Follows the FAB size rather than the window on its own: this slot's buttons stay full size in
+    // the single-pane chrome strip, so their glyphs have to as well.
+    val useCompactControls = isSmallLandscape() && LocalAllowCompactControls.current
 
     when (tab) {
         MainTab.Notes ->
@@ -680,44 +674,46 @@ private fun MainFabSlot(
                     stringResource(R.string.edit_bottom_bar_delete_forever)
                 }
             val iconSize =
-                if (isSmallLandscape || !isArchive) {
+                if (useCompactControls || !isArchive) {
                     22.dp
                 } else {
                     24.dp
                 }
-            val shouldShowFab =
-                if (isSmallLandscape) {
-                    historyVisibleItemCount > 0
-                } else {
-                    true
-                }
-
-            if (shouldShowFab) {
-                SimpleHistoryOrSettingsFab(
-                    symbolName = symbolName,
-                    description = description,
-                    enabled = historyVisibleItemCount > 0,
-                    iconSize = iconSize,
-                    onClick = {
-                        if (isArchive) {
-                            onMoveArchiveToTrashRequest()
-                        } else {
-                            onClearTrashRequest()
-                        }
-                    },
-                )
-            }
+            // Kept mounted (just disabled) even on short landscape windows, so the chrome has the
+            // same two FABs on every tab instead of the slot emptying out when the list is empty.
+            SimpleHistoryOrSettingsFab(
+                symbolName = symbolName,
+                description = description,
+                enabled = historyVisibleItemCount > 0,
+                iconSize = iconSize,
+                onClick = {
+                    if (isArchive) {
+                        onMoveArchiveToTrashRequest()
+                    } else {
+                        onClearTrashRequest()
+                    }
+                },
+            )
         }
         MainTab.Settings ->
             SimpleHistoryOrSettingsFab(
                 symbolName = "share",
                 description = stringResource(R.string.main_menu_share_app),
                 enabled = true,
-                iconSize = if (isSmallLandscape) 22.dp else 26.dp,
+                iconSize = if (useCompactControls) 22.dp else 26.dp,
                 onClick = onShareApp,
             )
     }
 }
+
+/**
+ * Padding M3's `FloatingActionButtonMenu` leaves outside its visible button: it applies
+ * `padding(horizontal = FabMenuPaddingHorizontal)` to itself and places the button
+ * `FabMenuButtonPaddingBottom` above its own bottom edge. Both are 16.dp, and both are inside
+ * [NotesCreateFabMenu]'s measured size, so [CenteredPillWithSideFab] must cancel them to line the
+ * button up with the nav pill the way the bare FABs on the other tabs already do.
+ */
+private val NotesFabMenuButtonInset = 16.dp
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -763,8 +759,9 @@ internal fun NotesCreateFabMenu(
         FloatingActionButtonMenu(
             expanded = expanded,
             button = {
-                val isLandscape = isLandscape()
-                val isSmallLandscape = isSmallLandscape()
+                // Compact only where the host chrome is compact: this menu is used both in the
+                // single-pane strip (full size) and in the two-pane list pane (compact).
+                val useCompactControls = isSmallLandscape() && LocalAllowCompactControls.current
                 val containerColor =
                     if (expanded) {
                         MaterialTheme.colorScheme.primary
@@ -789,7 +786,7 @@ internal fun NotesCreateFabMenu(
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = "add",
-                        size = if (isSmallLandscape) 22.dp else 26.dp,
+                        size = if (useCompactControls) 22.dp else 26.dp,
                         tint = iconColor,
                         weight = FontWeight.Medium,
                         modifier = Modifier.graphicsLayer { rotationZ = iconRotation },

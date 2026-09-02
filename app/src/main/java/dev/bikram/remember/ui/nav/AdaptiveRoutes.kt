@@ -45,6 +45,7 @@ import androidx.compose.material3.adaptive.layout.PaneScaffoldDirective
 import androidx.compose.material3.adaptive.layout.rememberPaneExpansionState
 import androidx.compose.material3.adaptive.navigation.rememberListDetailPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -863,35 +864,46 @@ private fun NoteDetailPaneHost(
                 // Only a pending new note intercepts system back (back cancels the
                 // placeholder); existing notes leave back to the system so the app
                 // stays exitable while the editor lives permanently in this pane.
-                when (detailKind) {
-                    NoteKind.NOTE ->
-                        EditNoteRoute(
-                            appScope = appScope,
-                            noteId = noteId,
-                            forceEdit = forceEdit,
-                            showNavigateBack = false,
-                            allowInitialTitleFocus = false,
-                            interceptBack = noteId == null,
-                            onPersistedNoteIdChanged = { persistedNoteId ->
-                                onPersistedNoteId(persistedNoteId, NoteKind.NOTE)
-                            },
-                            onBack = onBack,
-                            onNavigateUp = onBack,
-                        )
-                    NoteKind.LIST ->
-                        EditListRoute(
-                            appScope = appScope,
-                            noteId = noteId,
-                            forceEdit = forceEdit,
-                            showNavigateBack = false,
-                            allowInitialTitleFocus = false,
-                            interceptBack = noteId == null,
-                            onPersistedNoteIdChanged = { persistedNoteId ->
-                                onPersistedNoteId(persistedNoteId, NoteKind.LIST)
-                            },
-                            onBack = onBack,
-                            onNavigateUp = onBack,
-                        )
+                //
+                // The editor and the list pane's note card both register shared bounds under
+                // "note-card-<id>", and in two-pane mode both resolve to this tab's nav
+                // destination scope - two visible halves of one shared element. That made the
+                // editor render at the card's bounds over in the list pane and slide across on
+                // every tab switch. Nothing here is the target of a nav transition (the pane is
+                // part of the tab that's already arriving), so the editor opts out of the nav
+                // scope and simply appears where it is. The cards keep theirs, for the
+                // single-pane push where the editor really is a separate destination.
+                CompositionLocalProvider(LocalNavAnimatedVisibilityScope provides null) {
+                    when (detailKind) {
+                        NoteKind.NOTE ->
+                            EditNoteRoute(
+                                appScope = appScope,
+                                noteId = noteId,
+                                forceEdit = forceEdit,
+                                showNavigateBack = false,
+                                allowInitialTitleFocus = false,
+                                interceptBack = noteId == null,
+                                onPersistedNoteIdChanged = { persistedNoteId ->
+                                    onPersistedNoteId(persistedNoteId, NoteKind.NOTE)
+                                },
+                                onBack = onBack,
+                                onNavigateUp = onBack,
+                            )
+                        NoteKind.LIST ->
+                            EditListRoute(
+                                appScope = appScope,
+                                noteId = noteId,
+                                forceEdit = forceEdit,
+                                showNavigateBack = false,
+                                allowInitialTitleFocus = false,
+                                interceptBack = noteId == null,
+                                onPersistedNoteIdChanged = { persistedNoteId ->
+                                    onPersistedNoteId(persistedNoteId, NoteKind.LIST)
+                                },
+                                onBack = onBack,
+                                onNavigateUp = onBack,
+                            )
+                    }
                 }
             }
         }
