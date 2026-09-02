@@ -9,7 +9,7 @@
 // them. `./gradlew checkDependencyUpdates` still REPORTS newer versions for them (they're live
 // on github/playstoreImplementation on a normal checkout) — but you must apply any bump by
 // editing the version literals below by hand.
-val playServicesAuthVersion = "21.6.0"
+val playServicesAuthVersion = "22.0.0"
 val androidxCredentialsVersion = "1.6.0"
 
 dependencies {

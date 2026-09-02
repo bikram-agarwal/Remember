@@ -6,8 +6,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -18,7 +21,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
 import coil3.request.ImageRequest
+import coil3.request.crossfade
 import coil3.size.Size
+import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Size as ComposeSize
@@ -62,8 +67,23 @@ fun HeroFramedImage(
             viewportW = containerW
             viewportH = containerH
         }
-        val requestWidthPx = (viewportW * 2f).coerceIn(1f, 2048f).roundToInt()
-        val requestHeightPx = (viewportH * 2f).coerceIn(1f, 2048f).roundToInt()
+        val liveRequestWidthPx = (viewportW * 2f).coerceIn(1f, 2048f).roundToInt()
+        val liveRequestHeightPx = (viewportH * 2f).coerceIn(1f, 2048f).roundToInt()
+
+        // The container is resized on every animation frame during the card <-> editor
+        // shared-bounds morph, so liveRequestWidthPx/Height changes every frame too. If
+        // the Coil request tracked that directly, remember(cacheKey) would rebuild a new
+        // ImageRequest each frame and restart the crossfade dozens of times mid-morph,
+        // reading as a continuous fade instead of a smooth resize. Debounce the *decode*
+        // size so it only updates once the size has settled; the crop/scale math below
+        // still uses the live viewport size every frame, so on-screen positioning stays
+        // smooth throughout.
+        var settledRequestSize by remember { mutableStateOf(liveRequestWidthPx to liveRequestHeightPx) }
+        LaunchedEffect(liveRequestWidthPx, liveRequestHeightPx) {
+            delay(120)
+            settledRequestSize = liveRequestWidthPx to liveRequestHeightPx
+        }
+        val (requestWidthPx, requestHeightPx) = settledRequestSize
         val cacheKey = "$imageUri#$cacheRevision@$requestWidthPx:$requestHeightPx"
         val model =
             remember(cacheKey) {
@@ -73,6 +93,7 @@ fun HeroFramedImage(
                     .size(Size(requestWidthPx, requestHeightPx))
                     .memoryCacheKey(cacheKey)
                     .diskCacheKey(cacheKey)
+                    .crossfade(200)
                     .build()
             }
         val painter = rememberAsyncImagePainter(model)

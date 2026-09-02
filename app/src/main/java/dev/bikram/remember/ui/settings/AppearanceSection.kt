@@ -559,7 +559,7 @@ private fun ThemeModeSegmentedRow(
         val compact = maxWidth < 340.dp
         val ultraCompact = maxWidth < 300.dp
         val colors =
-            ToggleButtonDefaults.toggleButtonColors(
+            ToggleButtonDefaults.colors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,

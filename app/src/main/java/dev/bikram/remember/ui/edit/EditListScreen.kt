@@ -38,6 +38,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -166,7 +167,10 @@ fun EditListRoute(
         }
     }
 
-    androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize()) {
+    // Matches the list card's clip (shapes.medium) so the shared-bounds overlay doesn't pop
+    // from rounded to square corners at the tail of the transition. See EditNoteScreen's
+    // equivalent Box for the full explanation.
+    androidx.compose.foundation.layout.Box(modifier = sharedModifier.fillMaxSize().clip(MaterialTheme.shapes.medium)) {
         if (loaded && !missingNote) {
             EditListScreen(
                 vm = vm,

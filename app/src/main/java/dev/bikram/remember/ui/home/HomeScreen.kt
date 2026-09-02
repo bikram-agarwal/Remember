@@ -1,8 +1,15 @@
 package dev.bikram.remember.ui.home
 
 import android.annotation.SuppressLint
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -22,8 +29,10 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.staggeredgrid.LazyStaggeredGridScope
 import androidx.compose.foundation.lazy.staggeredgrid.LazyVerticalStaggeredGrid
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridCells
 import androidx.compose.foundation.lazy.staggeredgrid.StaggeredGridItemSpan
@@ -65,7 +74,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -357,12 +368,21 @@ fun HomeScreen(
         }
     }
     val displayedItems = state.items
-    val visibleDisplayedItems by
-        remember(displayedItems, collapsedSectionKeys) {
+    val collapsibleSectionKeys by
+        remember(displayedItems) {
             derivedStateOf {
-                displayedItems.filterNot { item ->
-                    item is HomeListItem.NoteRow && item.groupKey in collapsedSectionKeys
-                }
+                displayedItems
+                    .filterIsInstance<HomeListItem.Header>()
+                    .filter { it.collapsible }
+                    .map { it.stableKey }
+                    .toSet()
+            }
+        }
+    val allSectionsCollapsed by
+        remember(collapsibleSectionKeys, collapsedSectionKeys) {
+            derivedStateOf {
+                collapsibleSectionKeys.isNotEmpty() &&
+                    collapsibleSectionKeys.all { it in collapsedSectionKeys }
             }
         }
     val selectableVisibleIds by
@@ -376,10 +396,10 @@ fun HomeScreen(
         onSelectableVisibleIdsChanged(selectableVisibleIds)
     }
     val bulkTagCoverage by
-        remember(visibleDisplayedItems, state.availableTags, state.selectedIds) {
+        remember(displayedItems, state.availableTags, state.selectedIds) {
             derivedStateOf {
                 val selectedTagsByNoteId = LinkedHashMap<Long, List<String>>()
-                visibleDisplayedItems.forEach { item ->
+                displayedItems.forEach { item ->
                     if (item is HomeListItem.NoteRow && item.card.id in state.selectedIds) {
                         selectedTagsByNoteId.putIfAbsent(item.card.id, item.note.note.tags)
                     }
@@ -523,86 +543,65 @@ fun HomeScreen(
         val itemFadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
         val itemFadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
         val itemPlacementSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntOffset>()
+        val itemSizeSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntSize>()
 
-        @Composable
-        fun HomeHeaderItem(
-            item: HomeListItem.Header,
-            modifier: Modifier = Modifier,
-        ) {
-            GroupHeader(
-                label = item.labelRes?.let { stringResource(it) } ?: item.label,
-                count = item.count,
-                collapsible = item.collapsible,
-                collapsed = item.stableKey in collapsedSectionKeys,
-                onToggle =
-                    if (item.collapsible) {
-                        {
-                            collapsedSectionKeys =
-                                if (item.stableKey in collapsedSectionKeys) {
-                                    collapsedSectionKeys - item.stableKey
-                                } else {
-                                    collapsedSectionKeys + item.stableKey
-                                }
-                        }
-                    } else {
-                        null
-                    },
-                // Bookend sections (Pinned and Overdue at top, Done at bottom) stay put when the
-                // user reverses sort or changes grouping. Each gets its own badge naming what it
-                // is; ordinary grouping sections get none, so the badge itself also reads as
-                // "this one is fixed".
-                badgeSymbolName = item.bookendBadgeSymbol(),
-                modifier = modifier,
+        // The mosaic (staggered grid) and list (LazyColumn) layouts render the exact same
+        // sequence of entries -- filter chips, pending-new-note placeholder, empty state
+        // or items/archive/trash -- but each scope (LazyStaggeredGridScope vs LazyListScope)
+        // has its own item()/items() DSL shape, so the population logic is written once per
+        // scope in the top-level mosaicListContent/linearListContent below (near
+        // homeListItemKey at the end of the file). Detekt's CyclomaticComplexMethod folds a
+        // *local* fun's branches into its enclosing function, so these -- and
+        // HomeHeaderItem/HomeNoteRowItem -- are genuine top-level functions instead; their
+        // shared HomeScreen state is threaded through via the small holder classes below.
+        val homeListDisplay =
+            HomeListDisplayState(
+                state = state,
+                activeNoteId = activeNoteId,
+                notificationsAllowed = notificationsAllowed,
+                showSelectionActionBar = showSelectionActionBar,
+                pendingNewNoteKind = pendingNewNoteKind,
+                displayedItems = displayedItems,
+                duplicatedRowNoteIds = duplicatedRowNoteIds,
             )
-        }
-
-        @Composable
-        fun HomeNoteRowItem(
-            item: HomeListItem.NoteRow,
-            modifier: Modifier = Modifier,
-        ) {
-            val noteId = item.card.id
-            val isSelected = noteId in state.selectedIds
-            val isActiveInDetailPane = !state.inSelectionMode && activeNoteId == noteId
-            var cardBounds by remember { mutableStateOf<Rect?>(null) }
-            SwipeableRememberNoteCard(
-                note = item.note,
-                model = item.card,
-                interaction = interaction,
-                onOpenNote = { note ->
-                    if (state.inSelectionMode) {
-                        onToggleSelection(note.note.id)
-                    } else {
-                        onOpenNote(note)
-                    }
-                },
+        val homeListActions =
+            HomeListActions(
+                onOpenNote = onOpenNote,
+                onToggleSelection = onToggleSelection,
                 onSwipeAction = onSwipeAction,
-                modifier =
-                    modifier.onGloballyPositioned { coordinates ->
-                        cardBounds = coordinates.boundsInRoot()
-                        if (revealedNoteCardId == noteId) {
-                            revealedNoteCardBounds = cardBounds
-                        }
-                    },
-                selected = isSelected,
-                activeInDetailPane = isActiveInDetailPane,
-                onLongClick = { onToggleSelection(noteId) },
-                activeRevealKey = revealedNoteCardId,
-                onRevealStarted = { revealedNoteId ->
-                    revealedNoteCardId = revealedNoteId
-                    revealedNoteCardBounds = cardBounds
-                },
-                onRevealClosed = { revealedNoteId ->
-                    if (revealedNoteCardId == revealedNoteId) {
-                        revealedNoteCardId = null
-                    }
-                },
-                // Swipes are meaningless during bulk-select and would visually fight the
-                // tap-to-toggle gesture.
-                swipeEnabled = !state.inSelectionMode,
-                reminderNotificationsAllowed = notificationsAllowed,
+                onCreateNote = onCreateNote,
+                onCreateList = onCreateList,
+                onFilterChange = onFilterChange,
+                onViewOptionsChange = onViewOptionsChange,
             )
-        }
+        val homeListSectionState =
+            HomeListSectionState(
+                filterControlScrollState = filterControlScrollState,
+                expandedFilterDropdown = expandedFilterDropdown,
+                onExpandedFilterDropdownChange = { dropdown -> expandedFilterDropdown = dropdown },
+                collapsedSectionKeys = collapsedSectionKeys,
+                onCollapsedSectionKeysChange = { newKeys -> collapsedSectionKeys = newKeys },
+                archiveSectionExpanded = archiveSectionExpanded,
+                onToggleArchiveSection = { archiveSectionExpanded = !archiveSectionExpanded },
+                trashSectionExpanded = trashSectionExpanded,
+                onToggleTrashSection = { trashSectionExpanded = !trashSectionExpanded },
+            )
+        val homeListReveal =
+            HomeListRevealState(
+                revealedNoteCardId = revealedNoteCardId,
+                onRevealStarted = { id, bounds ->
+                    revealedNoteCardId = id
+                    revealedNoteCardBounds = bounds
+                },
+                onRevealClosed = { revealedNoteCardId = null },
+            )
+        val homeListAnimSpecs =
+            HomeListAnimSpecs(
+                fadeIn = itemFadeInSpec,
+                fadeOut = itemFadeOutSpec,
+                placement = itemPlacementSpec,
+                size = itemSizeSpec,
+            )
 
         BoxWithConstraints(Modifier.fillMaxSize()) {
             // Height of the area actually visible between the list's top inset and the
@@ -638,207 +637,17 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalItemSpacing = 6.dp,
                 ) {
-                    if (showFilterControls) {
-                        item(
-                            key = "__chips__",
-                            contentType = "chips",
-                            span = StaggeredGridItemSpan.FullLine,
-                        ) {
-                            ActiveFilterChips(
-                                filter = state.filter,
-                                onChange = onFilterChange,
-                                viewOptions = state.viewOptions,
-                                onViewOptionsChange = onViewOptionsChange,
-                                availableTags = state.availableTags,
-                                scrollState = filterControlScrollState,
-                                expandedDropdown = expandedFilterDropdown,
-                                onExpandedDropdownChange = { dropdown -> expandedFilterDropdown = dropdown },
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .animateItem(
-                                            fadeInSpec = itemFadeInSpec,
-                                            placementSpec = itemPlacementSpec,
-                                            fadeOutSpec = itemFadeOutSpec,
-                                        ),
-                            )
-                        }
-                    }
-                    if (pendingNewNoteKind != null) {
-                        item(
-                            key = "__pending_new_note__",
-                            contentType = "pendingNewNote",
-                            span = StaggeredGridItemSpan.FullLine,
-                        ) {
-                            PendingNewNoteCard(
-                                kind = pendingNewNoteKind,
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .animateItem(
-                                            fadeInSpec = itemFadeInSpec,
-                                            placementSpec = itemPlacementSpec,
-                                            fadeOutSpec = itemFadeOutSpec,
-                                        ),
-                            )
-                        }
-                    }
-                    if (showEmptyState) {
-                        item(
-                            key = "__empty_state__",
-                            contentType = "emptyState",
-                            span = StaggeredGridItemSpan.FullLine,
-                        ) {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .heightIn(min = emptyStateMinHeight)
-                                        .fillMaxWidth(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                NotesEmptyState(
-                                    filter = state.filter,
-                                    totalUnfilteredNotes = state.totalActive,
-                                    onCreateNote = onCreateNote,
-                                    onCreateList = onCreateList,
-                                    showCreateActions = showSelectionActionBar,
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 8.dp, vertical = 24.dp),
-                                )
-                            }
-                        }
-                    } else {
-                        visibleDisplayedItems.forEach { item ->
-                            item(
-                                key = homeListItemKey(item, duplicatedRowNoteIds),
-                                contentType =
-                                    when (item) {
-                                        is HomeListItem.Header -> "header"
-                                        is HomeListItem.NoteRow -> "noteRow"
-                                    },
-                                span =
-                                    if (item is HomeListItem.Header) {
-                                        StaggeredGridItemSpan.FullLine
-                                    } else {
-                                        null
-                                    },
-                            ) {
-                                when (item) {
-                                    is HomeListItem.Header ->
-                                        HomeHeaderItem(
-                                            item = item,
-                                            modifier =
-                                                Modifier.animateItem(
-                                                    fadeInSpec = itemFadeInSpec,
-                                                    placementSpec = itemPlacementSpec,
-                                                    fadeOutSpec = itemFadeOutSpec,
-                                                ),
-                                        )
-
-                                    is HomeListItem.NoteRow ->
-                                        HomeNoteRowItem(
-                                            item = item,
-                                            modifier =
-                                                Modifier
-                                                    .fillMaxWidth()
-                                                    .animateItem(
-                                                        fadeInSpec = itemFadeInSpec,
-                                                        placementSpec = itemPlacementSpec,
-                                                        fadeOutSpec = itemFadeOutSpec,
-                                                    ),
-                                        )
-                                }
-                            }
-                        }
-                        if (state.archivedMatches.isNotEmpty()) {
-                            item(
-                                key = "__archive_divider__",
-                                contentType = "sectionDivider",
-                                span = StaggeredGridItemSpan.FullLine,
-                            ) {
-                                SearchSectionPillDivider(
-                                    label = stringResource(R.string.home_search_section_archive),
-                                    count = state.archivedMatches.size,
-                                    expanded = archiveSectionExpanded,
-                                    onToggle = { archiveSectionExpanded = !archiveSectionExpanded },
-                                    muted = false,
-                                    modifier =
-                                        Modifier.animateItem(
-                                            fadeInSpec = itemFadeInSpec,
-                                            placementSpec = itemPlacementSpec,
-                                            fadeOutSpec = itemFadeOutSpec,
-                                        ),
-                                )
-                            }
-                            if (archiveSectionExpanded) {
-                                state.archivedMatches.forEach { note ->
-                                    item(key = "arch:${note.note.id}", contentType = "archivedRow") {
-                                        StateBadgedNoteCard(
-                                            note = note,
-                                            model = remember(note) { note.toNoteCardUiModel() },
-                                            interaction = interaction,
-                                            onOpen = onOpenNote,
-                                            onSwipeAction = onSwipeAction,
-                                            badgeText = stringResource(R.string.home_search_section_badge_archive),
-                                            badgeStyle = SectionBadgeStyle.ARCHIVE,
-                                            reminderNotificationsAllowed = notificationsAllowed,
-                                            modifier =
-                                                Modifier.animateItem(
-                                                    fadeInSpec = itemFadeInSpec,
-                                                    placementSpec = itemPlacementSpec,
-                                                    fadeOutSpec = itemFadeOutSpec,
-                                                ),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                        if (state.trashedMatches.isNotEmpty()) {
-                            item(
-                                key = "__trash_divider__",
-                                contentType = "sectionDivider",
-                                span = StaggeredGridItemSpan.FullLine,
-                            ) {
-                                SearchSectionPillDivider(
-                                    label = stringResource(R.string.home_search_section_trash),
-                                    count = state.trashedMatches.size,
-                                    expanded = trashSectionExpanded,
-                                    onToggle = { trashSectionExpanded = !trashSectionExpanded },
-                                    muted = true,
-                                    modifier =
-                                        Modifier.animateItem(
-                                            fadeInSpec = itemFadeInSpec,
-                                            placementSpec = itemPlacementSpec,
-                                            fadeOutSpec = itemFadeOutSpec,
-                                        ),
-                                )
-                            }
-                            if (trashSectionExpanded) {
-                                state.trashedMatches.forEach { note ->
-                                    item(key = "trash:${note.note.id}", contentType = "trashedRow") {
-                                        StateBadgedNoteCard(
-                                            note = note,
-                                            model = remember(note) { note.toNoteCardUiModel() },
-                                            interaction = interaction,
-                                            onOpen = onOpenNote,
-                                            onSwipeAction = onSwipeAction,
-                                            badgeText = stringResource(R.string.home_search_section_badge_trash),
-                                            badgeStyle = SectionBadgeStyle.TRASH,
-                                            reminderNotificationsAllowed = notificationsAllowed,
-                                            modifier =
-                                                Modifier.animateItem(
-                                                    fadeInSpec = itemFadeInSpec,
-                                                    placementSpec = itemPlacementSpec,
-                                                    fadeOutSpec = itemFadeOutSpec,
-                                                ),
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    mosaicListContent(
+                        homeListDisplay,
+                        homeListActions,
+                        homeListSectionState,
+                        homeListReveal,
+                        homeListAnimSpecs,
+                        interaction,
+                        showFilterControls,
+                        showEmptyState,
+                        emptyStateMinHeight,
+                    )
                 }
             } else {
                 LazyColumn(
@@ -857,192 +666,17 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                     userScrollEnabled = listScrollEnabled,
                 ) {
-                    if (showFilterControls) {
-                        item(key = "__chips__", contentType = "chips") {
-                            ActiveFilterChips(
-                                filter = state.filter,
-                                onChange = onFilterChange,
-                                viewOptions = state.viewOptions,
-                                onViewOptionsChange = onViewOptionsChange,
-                                availableTags = state.availableTags,
-                                scrollState = filterControlScrollState,
-                                expandedDropdown = expandedFilterDropdown,
-                                onExpandedDropdownChange = { dropdown -> expandedFilterDropdown = dropdown },
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .animateItem(
-                                            fadeInSpec = itemFadeInSpec,
-                                            placementSpec = itemPlacementSpec,
-                                            fadeOutSpec = itemFadeOutSpec,
-                                        ),
-                            )
-                        }
-                    }
-                    // After the chips: the placeholder for a pane-mode new note belongs under
-                    // the filter row, like any other list entry.
-                    if (pendingNewNoteKind != null) {
-                        item(key = "__pending_new_note__", contentType = "pendingNewNote") {
-                            PendingNewNoteCard(
-                                kind = pendingNewNoteKind,
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .animateItem(
-                                            fadeInSpec = itemFadeInSpec,
-                                            placementSpec = itemPlacementSpec,
-                                            fadeOutSpec = itemFadeOutSpec,
-                                        ),
-                            )
-                        }
-                    }
-                    if (showEmptyState) {
-                        item(key = "__empty_state__", contentType = "emptyState") {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .heightIn(min = emptyStateMinHeight)
-                                        .fillMaxWidth(),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                NotesEmptyState(
-                                    filter = state.filter,
-                                    totalUnfilteredNotes = state.totalActive,
-                                    onCreateNote = onCreateNote,
-                                    onCreateList = onCreateList,
-                                    showCreateActions = showSelectionActionBar,
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 8.dp, vertical = 24.dp),
-                                )
-                            }
-                        }
-                    } else {
-                        items(
-                            items = visibleDisplayedItems,
-                            key = { item -> homeListItemKey(item, duplicatedRowNoteIds) },
-                            contentType = { item ->
-                                when (item) {
-                                    is HomeListItem.Header -> "header"
-                                    is HomeListItem.NoteRow -> "noteRow"
-                                }
-                            },
-                        ) { item ->
-                            when (item) {
-                                is HomeListItem.Header ->
-                                    HomeHeaderItem(
-                                        item = item,
-                                        modifier =
-                                            Modifier.animateItem(
-                                                fadeInSpec = itemFadeInSpec,
-                                                placementSpec = itemPlacementSpec,
-                                                fadeOutSpec = itemFadeOutSpec,
-                                            ),
-                                    )
-
-                                is HomeListItem.NoteRow ->
-                                    HomeNoteRowItem(
-                                        item = item,
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .animateItem(
-                                                    fadeInSpec = itemFadeInSpec,
-                                                    placementSpec = itemPlacementSpec,
-                                                    fadeOutSpec = itemFadeOutSpec,
-                                                ),
-                                    )
-                            }
-                        }
-                        // Archive section: collapsed pill divider, expands in place to reveal dimmed
-                        // cards tagged with an ARCHIVE badge. Only appears while a search is running
-                        // and archived notes match the query.
-                        if (state.archivedMatches.isNotEmpty()) {
-                            item(key = "__archive_divider__", contentType = "sectionDivider") {
-                                SearchSectionPillDivider(
-                                    label = stringResource(R.string.home_search_section_archive),
-                                    count = state.archivedMatches.size,
-                                    expanded = archiveSectionExpanded,
-                                    onToggle = { archiveSectionExpanded = !archiveSectionExpanded },
-                                    muted = false,
-                                    modifier =
-                                        Modifier.animateItem(
-                                            fadeInSpec = itemFadeInSpec,
-                                            placementSpec = itemPlacementSpec,
-                                            fadeOutSpec = itemFadeOutSpec,
-                                        ),
-                                )
-                            }
-                            if (archiveSectionExpanded) {
-                                items(
-                                    items = state.archivedMatches,
-                                    key = { note -> "arch:${note.note.id}" },
-                                    contentType = { "archivedRow" },
-                                ) { note ->
-                                    StateBadgedNoteCard(
-                                        note = note,
-                                        model = remember(note) { note.toNoteCardUiModel() },
-                                        interaction = interaction,
-                                        onOpen = onOpenNote,
-                                        onSwipeAction = onSwipeAction,
-                                        badgeText = stringResource(R.string.home_search_section_badge_archive),
-                                        badgeStyle = SectionBadgeStyle.ARCHIVE,
-                                        reminderNotificationsAllowed = notificationsAllowed,
-                                        modifier =
-                                            Modifier.animateItem(
-                                                fadeInSpec = itemFadeInSpec,
-                                                placementSpec = itemPlacementSpec,
-                                                fadeOutSpec = itemFadeOutSpec,
-                                            ),
-                                    )
-                                }
-                            }
-                        }
-                        // Trash section: same pattern as Archive but rendered a shade quieter because
-                        // these notes are already on their way out.
-                        if (state.trashedMatches.isNotEmpty()) {
-                            item(key = "__trash_divider__", contentType = "sectionDivider") {
-                                SearchSectionPillDivider(
-                                    label = stringResource(R.string.home_search_section_trash),
-                                    count = state.trashedMatches.size,
-                                    expanded = trashSectionExpanded,
-                                    onToggle = { trashSectionExpanded = !trashSectionExpanded },
-                                    muted = true,
-                                    modifier =
-                                        Modifier.animateItem(
-                                            fadeInSpec = itemFadeInSpec,
-                                            placementSpec = itemPlacementSpec,
-                                            fadeOutSpec = itemFadeOutSpec,
-                                        ),
-                                )
-                            }
-                            if (trashSectionExpanded) {
-                                items(
-                                    items = state.trashedMatches,
-                                    key = { note -> "trash:${note.note.id}" },
-                                    contentType = { "trashedRow" },
-                                ) { note ->
-                                    StateBadgedNoteCard(
-                                        note = note,
-                                        model = remember(note) { note.toNoteCardUiModel() },
-                                        interaction = interaction,
-                                        onOpen = onOpenNote,
-                                        onSwipeAction = onSwipeAction,
-                                        badgeText = stringResource(R.string.home_search_section_badge_trash),
-                                        badgeStyle = SectionBadgeStyle.TRASH,
-                                        reminderNotificationsAllowed = notificationsAllowed,
-                                        modifier =
-                                            Modifier.animateItem(
-                                                fadeInSpec = itemFadeInSpec,
-                                                placementSpec = itemPlacementSpec,
-                                                fadeOutSpec = itemFadeOutSpec,
-                                            ),
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    linearListContent(
+                        homeListDisplay,
+                        homeListActions,
+                        homeListSectionState,
+                        homeListReveal,
+                        homeListAnimSpecs,
+                        interaction,
+                        showFilterControls,
+                        showEmptyState,
+                        emptyStateMinHeight,
+                    )
                 }
             }
             Box(
@@ -1065,6 +699,8 @@ fun HomeScreen(
                         noteLayoutMode = effectiveNoteLayoutMode,
                         showLayoutToggle = true,
                         layoutToggleEnabled = layoutToggleEnabled,
+                        showExpandCollapseAllToggle = collapsibleSectionKeys.isNotEmpty(),
+                        allSectionsCollapsed = allSectionsCollapsed,
                         onQueryChange = onQueryChange,
                         onSearchFocusRequested = { searchShouldRequestFocus = false },
                         onToggleLayout = {
@@ -1078,6 +714,14 @@ fun HomeScreen(
                                         },
                                 ),
                             )
+                        },
+                        onToggleExpandCollapseAll = {
+                            collapsedSectionKeys =
+                                if (allSectionsCollapsed) {
+                                    collapsedSectionKeys - collapsibleSectionKeys
+                                } else {
+                                    collapsedSectionKeys + collapsibleSectionKeys
+                                }
                         },
                         onToggleSearch = {
                             if (searchOpen && state.filter.text.isNotEmpty()) {
@@ -1167,3 +811,577 @@ private fun homeListItemKey(
                 item.card.id
             }
     }
+
+// Grouped HomeScreen state/callbacks threaded into the top-level list-content and
+// item composables below. Each holder stays under detekt's constructor parameter cap
+// on its own; HomeScreen assembles them once per recomposition and passes them down.
+private class HomeListDisplayState(
+    val state: HomeState,
+    val activeNoteId: Long?,
+    val notificationsAllowed: Boolean,
+    val showSelectionActionBar: Boolean,
+    val pendingNewNoteKind: NoteKind?,
+    val displayedItems: List<HomeListItem>,
+    val duplicatedRowNoteIds: Set<Long>,
+)
+
+private class HomeListActions(
+    val onOpenNote: (NoteWithItems) -> Unit,
+    val onToggleSelection: (Long) -> Unit,
+    val onSwipeAction: (NoteWithItems, NoteSwipeAction) -> Unit,
+    val onCreateNote: () -> Unit,
+    val onCreateList: () -> Unit,
+    val onFilterChange: (NotesFilter) -> Unit,
+    val onViewOptionsChange: (ViewOptions) -> Unit,
+)
+
+private class HomeListSectionState(
+    val filterControlScrollState: ScrollState,
+    val expandedFilterDropdown: ActiveFilterDropdown?,
+    val onExpandedFilterDropdownChange: (ActiveFilterDropdown?) -> Unit,
+    val collapsedSectionKeys: Set<String>,
+    val onCollapsedSectionKeysChange: (Set<String>) -> Unit,
+    val archiveSectionExpanded: Boolean,
+    val onToggleArchiveSection: () -> Unit,
+    val trashSectionExpanded: Boolean,
+    val onToggleTrashSection: () -> Unit,
+)
+
+private class HomeListRevealState(
+    val revealedNoteCardId: Long?,
+    val onRevealStarted: (Long?, Rect?) -> Unit,
+    val onRevealClosed: () -> Unit,
+)
+
+private class HomeListAnimSpecs(
+    val fadeIn: FiniteAnimationSpec<Float>,
+    val fadeOut: FiniteAnimationSpec<Float>,
+    val placement: FiniteAnimationSpec<IntOffset>,
+    val size: FiniteAnimationSpec<IntSize>,
+)
+
+@Composable
+private fun HomeHeaderItem(
+    item: HomeListItem.Header,
+    collapsedSectionKeys: Set<String>,
+    onCollapsedSectionKeysChange: (Set<String>) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    GroupHeader(
+        label = item.labelRes?.let { stringResource(it) } ?: item.label,
+        count = item.count,
+        collapsible = item.collapsible,
+        collapsed = item.stableKey in collapsedSectionKeys,
+        onToggle =
+            if (item.collapsible) {
+                {
+                    onCollapsedSectionKeysChange(
+                        if (item.stableKey in collapsedSectionKeys) {
+                            collapsedSectionKeys - item.stableKey
+                        } else {
+                            collapsedSectionKeys + item.stableKey
+                        },
+                    )
+                }
+            } else {
+                null
+            },
+        // Bookend sections (Pinned and Overdue at top, Done at bottom) stay put when the
+        // user reverses sort or changes grouping. Each gets its own badge naming what it
+        // is; ordinary grouping sections get none, so the badge itself also reads as
+        // "this one is fixed".
+        badgeSymbolName = item.bookendBadgeSymbol(),
+        modifier = modifier,
+    )
+}
+
+@Composable
+private fun HomeNoteRowItem(
+    item: HomeListItem.NoteRow,
+    display: HomeListDisplayState,
+    actions: HomeListActions,
+    reveal: HomeListRevealState,
+    interaction: InteractionState,
+    collapsedSectionKeys: Set<String>,
+    animSpecs: HomeListAnimSpecs,
+    modifier: Modifier = Modifier,
+) {
+    val noteId = item.card.id
+    val isSelected = noteId in display.state.selectedIds
+    val isActiveInDetailPane = !display.state.inSelectionMode && display.activeNoteId == noteId
+    var cardBounds by remember { mutableStateOf<Rect?>(null) }
+    // Rows for a collapsed group stay in the lazy list (see displayedItems in HomeScreen)
+    // instead of being filtered out, so this AnimatedVisibility can play a real grow/shrink
+    // from the header -- matching Settings' collapsible sections -- rather than the row
+    // just popping in/out with no size animation the way LazyColumn add/remove renders it.
+    AnimatedVisibility(
+        visible = item.groupKey !in collapsedSectionKeys,
+        enter = expandVertically(animationSpec = animSpecs.size, expandFrom = Alignment.Top) + fadeIn(animSpecs.fadeIn),
+        exit = shrinkVertically(animationSpec = animSpecs.size, shrinkTowards = Alignment.Top) + fadeOut(animSpecs.fadeOut),
+        modifier = modifier,
+    ) {
+        SwipeableRememberNoteCard(
+            note = item.note,
+            model = item.card,
+            interaction = interaction,
+            onOpenNote = { note ->
+                if (display.state.inSelectionMode) {
+                    actions.onToggleSelection(note.note.id)
+                } else {
+                    actions.onOpenNote(note)
+                }
+            },
+            onSwipeAction = actions.onSwipeAction,
+            modifier =
+                Modifier.fillMaxWidth().onGloballyPositioned { coordinates ->
+                    cardBounds = coordinates.boundsInRoot()
+                    if (reveal.revealedNoteCardId == noteId) {
+                        reveal.onRevealStarted(noteId, cardBounds)
+                    }
+                },
+            selected = isSelected,
+            activeInDetailPane = isActiveInDetailPane,
+            onLongClick = { actions.onToggleSelection(noteId) },
+            activeRevealKey = reveal.revealedNoteCardId,
+            onRevealStarted = { revealedNoteId -> reveal.onRevealStarted(revealedNoteId, cardBounds) },
+            onRevealClosed = { revealedNoteId ->
+                if (reveal.revealedNoteCardId == revealedNoteId) {
+                    reveal.onRevealClosed()
+                }
+            },
+            // Swipes are meaningless during bulk-select and would visually fight the
+            // tap-to-toggle gesture.
+            swipeEnabled = !display.state.inSelectionMode,
+            reminderNotificationsAllowed = display.notificationsAllowed,
+        )
+    }
+}
+
+private fun LazyStaggeredGridScope.mosaicListContent(
+    display: HomeListDisplayState,
+    actions: HomeListActions,
+    sectionState: HomeListSectionState,
+    reveal: HomeListRevealState,
+    animSpecs: HomeListAnimSpecs,
+    interaction: InteractionState,
+    showFilterControls: Boolean,
+    showEmptyState: Boolean,
+    emptyStateMinHeight: Dp,
+) {
+    if (showFilterControls) {
+        item(
+            key = "__chips__",
+            contentType = "chips",
+            span = StaggeredGridItemSpan.FullLine,
+        ) {
+            ActiveFilterChips(
+                filter = display.state.filter,
+                onChange = actions.onFilterChange,
+                viewOptions = display.state.viewOptions,
+                onViewOptionsChange = actions.onViewOptionsChange,
+                availableTags = display.state.availableTags,
+                scrollState = sectionState.filterControlScrollState,
+                expandedDropdown = sectionState.expandedFilterDropdown,
+                onExpandedDropdownChange = sectionState.onExpandedFilterDropdownChange,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .animateItem(
+                            fadeInSpec = animSpecs.fadeIn,
+                            placementSpec = animSpecs.placement,
+                            fadeOutSpec = animSpecs.fadeOut,
+                        ),
+            )
+        }
+    }
+    if (display.pendingNewNoteKind != null) {
+        item(
+            key = "__pending_new_note__",
+            contentType = "pendingNewNote",
+            span = StaggeredGridItemSpan.FullLine,
+        ) {
+            PendingNewNoteCard(
+                kind = display.pendingNewNoteKind,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .animateItem(
+                            fadeInSpec = animSpecs.fadeIn,
+                            placementSpec = animSpecs.placement,
+                            fadeOutSpec = animSpecs.fadeOut,
+                        ),
+            )
+        }
+    }
+    if (showEmptyState) {
+        item(
+            key = "__empty_state__",
+            contentType = "emptyState",
+            span = StaggeredGridItemSpan.FullLine,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .heightIn(min = emptyStateMinHeight)
+                        .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                NotesEmptyState(
+                    filter = display.state.filter,
+                    totalUnfilteredNotes = display.state.totalActive,
+                    onCreateNote = actions.onCreateNote,
+                    onCreateList = actions.onCreateList,
+                    showCreateActions = display.showSelectionActionBar,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 24.dp),
+                )
+            }
+        }
+        return
+    }
+    display.displayedItems.forEach { item ->
+        item(
+            key = homeListItemKey(item, display.duplicatedRowNoteIds),
+            contentType =
+                when (item) {
+                    is HomeListItem.Header -> "header"
+                    is HomeListItem.NoteRow -> "noteRow"
+                },
+            span =
+                if (item is HomeListItem.Header) {
+                    StaggeredGridItemSpan.FullLine
+                } else {
+                    null
+                },
+        ) {
+            when (item) {
+                is HomeListItem.Header ->
+                    HomeHeaderItem(
+                        item = item,
+                        collapsedSectionKeys = sectionState.collapsedSectionKeys,
+                        onCollapsedSectionKeysChange = sectionState.onCollapsedSectionKeysChange,
+                        modifier =
+                            Modifier.animateItem(
+                                fadeInSpec = animSpecs.fadeIn,
+                                placementSpec = animSpecs.placement,
+                                fadeOutSpec = animSpecs.fadeOut,
+                            ),
+                    )
+
+                is HomeListItem.NoteRow ->
+                    HomeNoteRowItem(
+                        item = item,
+                        display = display,
+                        actions = actions,
+                        reveal = reveal,
+                        interaction = interaction,
+                        collapsedSectionKeys = sectionState.collapsedSectionKeys,
+                        animSpecs = animSpecs,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .animateItem(
+                                    fadeInSpec = animSpecs.fadeIn,
+                                    placementSpec = animSpecs.placement,
+                                    fadeOutSpec = animSpecs.fadeOut,
+                                ),
+                    )
+            }
+        }
+    }
+    if (display.state.archivedMatches.isNotEmpty()) {
+        item(
+            key = "__archive_divider__",
+            contentType = "sectionDivider",
+            span = StaggeredGridItemSpan.FullLine,
+        ) {
+            SearchSectionPillDivider(
+                label = stringResource(R.string.home_search_section_archive),
+                count = display.state.archivedMatches.size,
+                expanded = sectionState.archiveSectionExpanded,
+                onToggle = sectionState.onToggleArchiveSection,
+                muted = false,
+                modifier =
+                    Modifier.animateItem(
+                        fadeInSpec = animSpecs.fadeIn,
+                        placementSpec = animSpecs.placement,
+                        fadeOutSpec = animSpecs.fadeOut,
+                    ),
+            )
+        }
+        if (sectionState.archiveSectionExpanded) {
+            display.state.archivedMatches.forEach { note ->
+                item(key = "arch:${note.note.id}", contentType = "archivedRow") {
+                    StateBadgedNoteCard(
+                        note = note,
+                        model = remember(note) { note.toNoteCardUiModel() },
+                        interaction = interaction,
+                        onOpen = actions.onOpenNote,
+                        onSwipeAction = actions.onSwipeAction,
+                        badgeText = stringResource(R.string.home_search_section_badge_archive),
+                        badgeStyle = SectionBadgeStyle.ARCHIVE,
+                        reminderNotificationsAllowed = display.notificationsAllowed,
+                        modifier =
+                            Modifier.animateItem(
+                                fadeInSpec = animSpecs.fadeIn,
+                                placementSpec = animSpecs.placement,
+                                fadeOutSpec = animSpecs.fadeOut,
+                            ),
+                    )
+                }
+            }
+        }
+    }
+    if (display.state.trashedMatches.isNotEmpty()) {
+        item(
+            key = "__trash_divider__",
+            contentType = "sectionDivider",
+            span = StaggeredGridItemSpan.FullLine,
+        ) {
+            SearchSectionPillDivider(
+                label = stringResource(R.string.home_search_section_trash),
+                count = display.state.trashedMatches.size,
+                expanded = sectionState.trashSectionExpanded,
+                onToggle = sectionState.onToggleTrashSection,
+                muted = true,
+                modifier =
+                    Modifier.animateItem(
+                        fadeInSpec = animSpecs.fadeIn,
+                        placementSpec = animSpecs.placement,
+                        fadeOutSpec = animSpecs.fadeOut,
+                    ),
+            )
+        }
+        if (sectionState.trashSectionExpanded) {
+            display.state.trashedMatches.forEach { note ->
+                item(key = "trash:${note.note.id}", contentType = "trashedRow") {
+                    StateBadgedNoteCard(
+                        note = note,
+                        model = remember(note) { note.toNoteCardUiModel() },
+                        interaction = interaction,
+                        onOpen = actions.onOpenNote,
+                        onSwipeAction = actions.onSwipeAction,
+                        badgeText = stringResource(R.string.home_search_section_badge_trash),
+                        badgeStyle = SectionBadgeStyle.TRASH,
+                        reminderNotificationsAllowed = display.notificationsAllowed,
+                        modifier =
+                            Modifier.animateItem(
+                                fadeInSpec = animSpecs.fadeIn,
+                                placementSpec = animSpecs.placement,
+                                fadeOutSpec = animSpecs.fadeOut,
+                            ),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun LazyListScope.linearListContent(
+    display: HomeListDisplayState,
+    actions: HomeListActions,
+    sectionState: HomeListSectionState,
+    reveal: HomeListRevealState,
+    animSpecs: HomeListAnimSpecs,
+    interaction: InteractionState,
+    showFilterControls: Boolean,
+    showEmptyState: Boolean,
+    emptyStateMinHeight: Dp,
+) {
+    if (showFilterControls) {
+        item(key = "__chips__", contentType = "chips") {
+            ActiveFilterChips(
+                filter = display.state.filter,
+                onChange = actions.onFilterChange,
+                viewOptions = display.state.viewOptions,
+                onViewOptionsChange = actions.onViewOptionsChange,
+                availableTags = display.state.availableTags,
+                scrollState = sectionState.filterControlScrollState,
+                expandedDropdown = sectionState.expandedFilterDropdown,
+                onExpandedDropdownChange = sectionState.onExpandedFilterDropdownChange,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .animateItem(
+                            fadeInSpec = animSpecs.fadeIn,
+                            placementSpec = animSpecs.placement,
+                            fadeOutSpec = animSpecs.fadeOut,
+                        ),
+            )
+        }
+    }
+    // After the chips: the placeholder for a pane-mode new note belongs under
+    // the filter row, like any other list entry.
+    if (display.pendingNewNoteKind != null) {
+        item(key = "__pending_new_note__", contentType = "pendingNewNote") {
+            PendingNewNoteCard(
+                kind = display.pendingNewNoteKind,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .animateItem(
+                            fadeInSpec = animSpecs.fadeIn,
+                            placementSpec = animSpecs.placement,
+                            fadeOutSpec = animSpecs.fadeOut,
+                        ),
+            )
+        }
+    }
+    if (showEmptyState) {
+        item(key = "__empty_state__", contentType = "emptyState") {
+            Box(
+                modifier =
+                    Modifier
+                        .heightIn(min = emptyStateMinHeight)
+                        .fillMaxWidth(),
+                contentAlignment = Alignment.Center,
+            ) {
+                NotesEmptyState(
+                    filter = display.state.filter,
+                    totalUnfilteredNotes = display.state.totalActive,
+                    onCreateNote = actions.onCreateNote,
+                    onCreateList = actions.onCreateList,
+                    showCreateActions = display.showSelectionActionBar,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp, vertical = 24.dp),
+                )
+            }
+        }
+        return
+    }
+    items(
+        items = display.displayedItems,
+        key = { item -> homeListItemKey(item, display.duplicatedRowNoteIds) },
+        contentType = { item ->
+            when (item) {
+                is HomeListItem.Header -> "header"
+                is HomeListItem.NoteRow -> "noteRow"
+            }
+        },
+    ) { item ->
+        when (item) {
+            is HomeListItem.Header ->
+                HomeHeaderItem(
+                    item = item,
+                    collapsedSectionKeys = sectionState.collapsedSectionKeys,
+                    onCollapsedSectionKeysChange = sectionState.onCollapsedSectionKeysChange,
+                    modifier =
+                        Modifier.animateItem(
+                            fadeInSpec = animSpecs.fadeIn,
+                            placementSpec = animSpecs.placement,
+                            fadeOutSpec = animSpecs.fadeOut,
+                        ),
+                )
+
+            is HomeListItem.NoteRow ->
+                HomeNoteRowItem(
+                    item = item,
+                    display = display,
+                    actions = actions,
+                    reveal = reveal,
+                    interaction = interaction,
+                    collapsedSectionKeys = sectionState.collapsedSectionKeys,
+                    animSpecs = animSpecs,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .animateItem(
+                                fadeInSpec = animSpecs.fadeIn,
+                                placementSpec = animSpecs.placement,
+                                fadeOutSpec = animSpecs.fadeOut,
+                            ),
+                )
+        }
+    }
+    // Archive section: collapsed pill divider, expands in place to reveal dimmed
+    // cards tagged with an ARCHIVE badge. Only appears while a search is running
+    // and archived notes match the query.
+    if (display.state.archivedMatches.isNotEmpty()) {
+        item(key = "__archive_divider__", contentType = "sectionDivider") {
+            SearchSectionPillDivider(
+                label = stringResource(R.string.home_search_section_archive),
+                count = display.state.archivedMatches.size,
+                expanded = sectionState.archiveSectionExpanded,
+                onToggle = sectionState.onToggleArchiveSection,
+                muted = false,
+                modifier =
+                    Modifier.animateItem(
+                        fadeInSpec = animSpecs.fadeIn,
+                        placementSpec = animSpecs.placement,
+                        fadeOutSpec = animSpecs.fadeOut,
+                    ),
+            )
+        }
+        if (sectionState.archiveSectionExpanded) {
+            items(
+                items = display.state.archivedMatches,
+                key = { note -> "arch:${note.note.id}" },
+                contentType = { "archivedRow" },
+            ) { note ->
+                StateBadgedNoteCard(
+                    note = note,
+                    model = remember(note) { note.toNoteCardUiModel() },
+                    interaction = interaction,
+                    onOpen = actions.onOpenNote,
+                    onSwipeAction = actions.onSwipeAction,
+                    badgeText = stringResource(R.string.home_search_section_badge_archive),
+                    badgeStyle = SectionBadgeStyle.ARCHIVE,
+                    reminderNotificationsAllowed = display.notificationsAllowed,
+                    modifier =
+                        Modifier.animateItem(
+                            fadeInSpec = animSpecs.fadeIn,
+                            placementSpec = animSpecs.placement,
+                            fadeOutSpec = animSpecs.fadeOut,
+                        ),
+                )
+            }
+        }
+    }
+    // Trash section: same pattern as Archive but rendered a shade quieter because
+    // these notes are already on their way out.
+    if (display.state.trashedMatches.isNotEmpty()) {
+        item(key = "__trash_divider__", contentType = "sectionDivider") {
+            SearchSectionPillDivider(
+                label = stringResource(R.string.home_search_section_trash),
+                count = display.state.trashedMatches.size,
+                expanded = sectionState.trashSectionExpanded,
+                onToggle = sectionState.onToggleTrashSection,
+                muted = true,
+                modifier =
+                    Modifier.animateItem(
+                        fadeInSpec = animSpecs.fadeIn,
+                        placementSpec = animSpecs.placement,
+                        fadeOutSpec = animSpecs.fadeOut,
+                    ),
+            )
+        }
+        if (sectionState.trashSectionExpanded) {
+            items(
+                items = display.state.trashedMatches,
+                key = { note -> "trash:${note.note.id}" },
+                contentType = { "trashedRow" },
+            ) { note ->
+                StateBadgedNoteCard(
+                    note = note,
+                    model = remember(note) { note.toNoteCardUiModel() },
+                    interaction = interaction,
+                    onOpen = actions.onOpenNote,
+                    onSwipeAction = actions.onSwipeAction,
+                    badgeText = stringResource(R.string.home_search_section_badge_trash),
+                    badgeStyle = SectionBadgeStyle.TRASH,
+                    reminderNotificationsAllowed = display.notificationsAllowed,
+                    modifier =
+                        Modifier.animateItem(
+                            fadeInSpec = animSpecs.fadeIn,
+                            placementSpec = animSpecs.placement,
+                            fadeOutSpec = animSpecs.fadeOut,
+                        ),
+                )
+            }
+        }
+    }
+}

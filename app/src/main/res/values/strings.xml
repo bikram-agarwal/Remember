@@ -163,6 +163,8 @@
     <string name="home_layout_switch_to_mosaic_cd">Switch to mosaic layout</string>
     <string name="home_group_state_collapsed">Collapsed</string>
     <string name="home_group_state_expanded">Expanded</string>
+    <string name="home_expand_all_sections_cd">Expand all sections</string>
+    <string name="home_collapse_all_sections_cd">Collapse all sections</string>
 
     <!-- Note cards -->
     <string name="notecard_starred_cd">Starred</string>

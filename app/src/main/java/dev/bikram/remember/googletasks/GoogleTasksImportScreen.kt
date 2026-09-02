@@ -567,7 +567,7 @@ private fun ImportMethodSelector(
             }
         }
     val colors =
-        ToggleButtonDefaults.toggleButtonColors(
+        ToggleButtonDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             contentColor = MaterialTheme.colorScheme.onSurface,
             checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,

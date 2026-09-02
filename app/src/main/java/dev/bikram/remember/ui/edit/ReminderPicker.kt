@@ -62,6 +62,7 @@ import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TimeInput
+import androidx.compose.material3.TimeInputDefaults
 import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TimePickerDefaults
 import androidx.compose.material3.TooltipAnchorPosition
@@ -1603,7 +1604,10 @@ internal fun ReminderTimePickerDialog(
                                         if (showDial) {
                                             TimePicker(state = timePickerState, colors = pickerColors)
                                         } else {
-                                            TimeInput(state = timePickerState, colors = pickerColors)
+                                            TimeInput(
+                                                state = timePickerState,
+                                                colors = TimeInputDefaults.colors(),
+                                            )
                                         }
                                     }
                                 }
@@ -1679,7 +1683,10 @@ internal fun ReminderTimePickerDialog(
                                         if (showDial) {
                                             TimePicker(state = timePickerState, colors = pickerColors)
                                         } else {
-                                            TimeInput(state = timePickerState, colors = pickerColors)
+                                            TimeInput(
+                                                state = timePickerState,
+                                                colors = TimeInputDefaults.colors(),
+                                            )
                                         }
                                     }
                                 }

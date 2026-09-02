@@ -494,11 +494,30 @@ fun RememberNavGraph(
         // Passed as a State, not an Int: NavHost keys its remembered graph on the builder lambda, so
         // capturing a value that changes on every tab tap would rebuild the whole graph mid-navigation.
         // A State has stable identity, and the .value read happens inside the tab content instead.
+        // Navigation 2.10.0 added a built-in scale/shrink default (scaleOut(0.7f)) for the
+        // predictive-back gesture preview when NavHost's predictivePop*Transition params aren't
+        // set, replacing the previous behavior where popEnterTransition/popExitTransition
+        // (mainTabEnterTransition/mainTabExitTransition below) doubled as that preview. Reuse the
+        // exact same tab-slide logic here instead, so predictive back looks the same as it did
+        // pre-2.10.0. Parity: FilePipe hit and fixed the same regression in AppNavigation.kt
+        // (primaryTabEnterTransition/primaryTabExitTransition), confirming plain
+        // navSpatialSpec/navFadeInSpec/navFadeOutSpec (spring-based, from MaterialTheme.motionScheme)
+        // scrub fine with the gesture there - an earlier attempt here to blame the spring for a
+        // missing-slide bug was wrong; the bug was simply a fadeIn()/fadeOut()-only override with
+        // no slideIn/slideOut at all.
         val navHostContent: @Composable (State<Int>) -> Unit = { closeNotesRevealRequest ->
             NavHost(
                 navController = navController,
                 startDestination = lockedStartDestination,
                 modifier = Modifier.fillMaxSize(),
+                predictivePopEnterTransition = {
+                    mainTabEnterTransition(reducedMotion, useDualPaneMode, navSpatialSpec, navFadeInSpec, pop = true)
+                        ?: (if (reducedMotion) EnterTransition.None else fadeIn(animationSpec = navFadeInSpec))
+                },
+                predictivePopExitTransition = {
+                    mainTabExitTransition(reducedMotion, useDualPaneMode, navSpatialSpec, navFadeOutSpec, pop = true)
+                        ?: (if (reducedMotion) ExitTransition.None else fadeOut(animationSpec = navFadeOutSpec))
+                },
             ) {
                 composable(
                     route = Routes.ONBOARDING_TITLE,
