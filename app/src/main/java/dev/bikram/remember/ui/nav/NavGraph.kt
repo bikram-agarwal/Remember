@@ -1,6 +1,5 @@
 package dev.bikram.remember.ui.nav
 
-import android.app.Activity
 import android.net.Uri
 import androidx.compose.animation.AnimatedContentScope
 import androidx.compose.animation.AnimatedContentTransitionScope
@@ -30,10 +29,12 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -73,11 +74,13 @@ import dev.bikram.remember.ui.settings.SettingsRoute
 import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 object Routes {
@@ -111,7 +114,6 @@ object Routes {
     const val ARG_TYPE = "type"
     const val ARG_PREFILL = "prefill"
     const val ARG_FORCE_EDIT = "forceEdit"
-    const val ARG_EXIT_ON_BACK = "exitOnBack"
     const val TYPE_NOTE = "note"
     const val TYPE_LIST = "checklist"
 
@@ -120,7 +122,6 @@ object Routes {
         type: NoteKind? = null,
         prefill: String = "",
         forceEdit: Boolean = false,
-        exitOnBack: Boolean = false,
     ): String {
         val t =
             type?.let { kind ->
@@ -132,34 +133,29 @@ object Routes {
             } ?: ""
         val p = if (prefill.isNotEmpty()) "&$ARG_PREFILL=${Uri.encode(prefill)}" else ""
         val f = if (forceEdit) "&$ARG_FORCE_EDIT=true" else ""
-        val e = if (exitOnBack) "&$ARG_EXIT_ON_BACK=true" else ""
-        return "$EDIT_CONTENT?${ARG_ID}=${id ?: -1L}$t$p$f$e"
+        return "$EDIT_CONTENT?${ARG_ID}=${id ?: -1L}$t$p$f"
     }
 
     fun editNote(
         id: Long?,
         prefill: String = "",
         forceEdit: Boolean = false,
-        exitOnBack: Boolean = false,
     ): String =
         editContent(
             id = id,
             type = NoteKind.NOTE,
             prefill = prefill,
             forceEdit = forceEdit,
-            exitOnBack = exitOnBack,
         )
 
     fun editList(
         id: Long?,
         forceEdit: Boolean = false,
-        exitOnBack: Boolean = false,
     ): String =
         editContent(
             id = id,
             type = NoteKind.LIST,
             forceEdit = forceEdit,
-            exitOnBack = exitOnBack,
         )
 
     fun noteKindFor(type: String?): NoteKind? =
@@ -408,7 +404,7 @@ fun RememberNavGraph(
         remember(launchFlow, currentOnboardingState.hasSeenIntro) {
             currentOnboardingState.hasSeenIntro &&
                 launchFlow?.value?.let { action ->
-                    action is LaunchAction.OpenNote && action.exitOnBack
+                    action is LaunchAction.OpenNote && action.externalLaunch
                 } == true
         }
     val lockedStartDestination =
@@ -446,37 +442,51 @@ fun RememberNavGraph(
         }
     }
 
-    LaunchedEffect(launchFlow, currentOnboardingState.hasSeenIntro) {
+    // Collected only while this activity is RESUMED. The launch action is an app-scoped flow, so an
+    // outgoing activity instance that is on its way out (an intent carrying FLAG_ACTIVITY_CLEAR_TASK
+    // finishes the running instance, and it is destroyed only after the replacement has resumed) would
+    // otherwise consume the action with its own doomed NavController, leaving the fresh instance with
+    // nothing pending and parked on the start destination.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    LaunchedEffect(launchFlow, currentOnboardingState.hasSeenIntro, lifecycleOwner) {
         if (!currentOnboardingState.hasSeenIntro) return@LaunchedEffect
-        launchFlow?.collectLatest { action ->
-            if (action == null) return@collectLatest
-            try {
-                when (action) {
-                    is LaunchAction.NewNote -> navController.navigate(Routes.editNote(null, action.prefill))
-                    LaunchAction.NewList -> navController.navigate(Routes.editList(null))
-                    is LaunchAction.OpenNote -> {
-                        val note = repository.get(action.id)
-                        if (note == null) {
-                            if (action.exitOnBack) {
-                                navController.navigate(Routes.NOTES) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        inclusive = true
+        lifecycleOwner.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            launchFlow?.collectLatest { action ->
+                if (action == null) return@collectLatest
+                var handled = false
+                try {
+                    when (action) {
+                        is LaunchAction.NewNote -> navController.navigate(Routes.editNote(null, action.prefill))
+                        LaunchAction.NewList -> navController.navigate(Routes.editList(null))
+                        is LaunchAction.OpenNote -> {
+                            val note = repository.get(action.id)
+                            if (note == null) {
+                                if (action.externalLaunch) {
+                                    navController.navigate(Routes.NOTES) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            inclusive = true
+                                        }
+                                        launchSingleTop = true
                                     }
-                                    launchSingleTop = true
                                 }
+                                handled = true
+                                return@collectLatest
                             }
-                            return@collectLatest
+                            navController.openEditRouteFor(note, externalLaunch = action.externalLaunch)
                         }
-                        navController.openEditRouteFor(note, exitOnBack = action.exitOnBack)
+                        LaunchAction.OpenSettingsUpdates -> {
+                            openSettingsRoot()
+                            openSettingsUpdatesRequest += 1
+                            updateVm.requestOpenSheet()
+                        }
                     }
-                    LaunchAction.OpenSettingsUpdates -> {
-                        openSettingsRoot()
-                        openSettingsUpdatesRequest += 1
-                        updateVm.requestOpenSheet()
-                    }
+                    handled = true
+                } finally {
+                    // Left pending when this collector is cancelled part-way through (the activity
+                    // stopped being resumed while the note was still being read), so the next resume
+                    // retries it. A genuine failure still clears it, so a bad action cannot loop.
+                    if (handled || currentCoroutineContext().isActive) launchFlow.value = null
                 }
-            } finally {
-                launchFlow.value = null
             }
         }
     }
@@ -738,7 +748,7 @@ fun RememberNavGraph(
                 }
 
                 composable(
-                    route = "${Routes.EDIT_CONTENT}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_TYPE}={${Routes.ARG_TYPE}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
+                    route = "${Routes.EDIT_CONTENT}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_TYPE}={${Routes.ARG_TYPE}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
                     arguments =
                         listOf(
                             navArgument(Routes.ARG_ID) {
@@ -757,17 +767,11 @@ fun RememberNavGraph(
                                 type = NavType.BoolType
                                 defaultValue = false
                             },
-                            navArgument(Routes.ARG_EXIT_ON_BACK) {
-                                type = NavType.BoolType
-                                defaultValue = false
-                            },
                         ),
                 ) { entry ->
-                    val context = LocalContext.current
                     val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
                     val requestedType = entry.arguments?.getString(Routes.ARG_TYPE).orEmpty()
                     val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
-                    val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
                     var resolvedKind by remember(id, requestedType) {
                         mutableStateOf(
                             Routes.noteKindFor(requestedType)
@@ -779,32 +783,12 @@ fun RememberNavGraph(
                             resolvedKind = repository.get(id)?.note?.kind ?: NoteKind.NOTE
                         }
                     }
-                    val onBack = {
-                        if (exitOnBack) {
-                            val activity = context as? Activity
-                            if (activity != null) {
-                                activity.finish()
-                            } else {
-                                navController.popBackStack()
-                                Unit
-                            }
-                        } else {
-                            navController.popBackStack()
-                            Unit
-                        }
-                    }
-                    val onNavigateUp = {
-                        if (exitOnBack) {
-                            navController.navigate(Routes.NOTES) {
-                                popUpTo(navController.graph.id) {
-                                    inclusive = true
-                                }
-                                launchSingleTop = true
-                            }
-                        } else {
-                            navController.popBackStack()
-                            Unit
-                        }
+                    // Back and up are the same plain pop, including for an editor opened from outside
+                    // the app: openEditRouteFor plants the Notes tab underneath such an editor, so
+                    // there is always something to pop to.
+                    val leaveEditor = {
+                        navController.popBackStack()
+                        Unit
                     }
                     androidx.compose.runtime.CompositionLocalProvider(
                         LocalSharedTransitionScope provides this@SharedTransitionLayout,
@@ -816,16 +800,16 @@ fun RememberNavGraph(
                                     appScope = appScope,
                                     noteId = id.takeIf { it > 0 },
                                     forceEdit = forceEdit,
-                                    onBack = onBack,
-                                    onNavigateUp = onNavigateUp,
+                                    onBack = leaveEditor,
+                                    onNavigateUp = leaveEditor,
                                 )
                             NoteKind.NOTE ->
                                 EditNoteRoute(
                                     appScope = appScope,
                                     noteId = id.takeIf { it > 0 },
                                     forceEdit = forceEdit,
-                                    onBack = onBack,
-                                    onNavigateUp = onNavigateUp,
+                                    onBack = leaveEditor,
+                                    onNavigateUp = leaveEditor,
                                 )
                             null -> Box(modifier = Modifier.fillMaxSize())
                         }
@@ -833,7 +817,7 @@ fun RememberNavGraph(
                 }
 
                 composable(
-                    route = "${Routes.EDIT_NOTE}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
+                    route = "${Routes.EDIT_NOTE}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
                     arguments =
                         listOf(
                             navArgument(Routes.ARG_ID) {
@@ -848,42 +832,16 @@ fun RememberNavGraph(
                                 type = NavType.BoolType
                                 defaultValue = false
                             },
-                            navArgument(Routes.ARG_EXIT_ON_BACK) {
-                                type = NavType.BoolType
-                                defaultValue = false
-                            },
                         ),
                 ) { entry ->
-                    val context = LocalContext.current
                     val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
                     val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
-                    val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
-                    val onBack = {
-                        if (exitOnBack) {
-                            val activity = context as? Activity
-                            if (activity != null) {
-                                activity.finish()
-                            } else {
-                                navController.popBackStack()
-                                Unit
-                            }
-                        } else {
-                            navController.popBackStack()
-                            Unit
-                        }
-                    }
-                    val onNavigateUp = {
-                        if (exitOnBack) {
-                            navController.navigate(Routes.NOTES) {
-                                popUpTo(navController.graph.id) {
-                                    inclusive = true
-                                }
-                                launchSingleTop = true
-                            }
-                        } else {
-                            navController.popBackStack()
-                            Unit
-                        }
+                    // Back and up are the same plain pop, including for an editor opened from outside
+                    // the app: openEditRouteFor plants the Notes tab underneath such an editor, so
+                    // there is always something to pop to.
+                    val leaveEditor = {
+                        navController.popBackStack()
+                        Unit
                     }
                     androidx.compose.runtime.CompositionLocalProvider(
                         LocalSharedTransitionScope provides this@SharedTransitionLayout,
@@ -893,8 +851,8 @@ fun RememberNavGraph(
                             appScope = appScope,
                             noteId = id.takeIf { it > 0 },
                             forceEdit = forceEdit,
-                            onBack = onBack,
-                            onNavigateUp = onNavigateUp,
+                            onBack = leaveEditor,
+                            onNavigateUp = leaveEditor,
                         )
                     }
                 }
@@ -1011,7 +969,7 @@ fun RememberNavGraph(
                 }
 
                 composable(
-                    route = "${Routes.EDIT_LIST}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
+                    route = "${Routes.EDIT_LIST}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
                     arguments =
                         listOf(
                             navArgument(Routes.ARG_ID) {
@@ -1022,42 +980,16 @@ fun RememberNavGraph(
                                 type = NavType.BoolType
                                 defaultValue = false
                             },
-                            navArgument(Routes.ARG_EXIT_ON_BACK) {
-                                type = NavType.BoolType
-                                defaultValue = false
-                            },
                         ),
                 ) { entry ->
-                    val context = LocalContext.current
                     val id = entry.arguments?.getLong(Routes.ARG_ID) ?: -1L
                     val forceEdit = entry.arguments?.getBoolean(Routes.ARG_FORCE_EDIT) ?: false
-                    val exitOnBack = entry.arguments?.getBoolean(Routes.ARG_EXIT_ON_BACK) ?: false
-                    val onBack = {
-                        if (exitOnBack) {
-                            val activity = context as? Activity
-                            if (activity != null) {
-                                activity.finish()
-                            } else {
-                                navController.popBackStack()
-                                Unit
-                            }
-                        } else {
-                            navController.popBackStack()
-                            Unit
-                        }
-                    }
-                    val onNavigateUp = {
-                        if (exitOnBack) {
-                            navController.navigate(Routes.NOTES) {
-                                popUpTo(navController.graph.id) {
-                                    inclusive = true
-                                }
-                                launchSingleTop = true
-                            }
-                        } else {
-                            navController.popBackStack()
-                            Unit
-                        }
+                    // Back and up are the same plain pop, including for an editor opened from outside
+                    // the app: openEditRouteFor plants the Notes tab underneath such an editor, so
+                    // there is always something to pop to.
+                    val leaveEditor = {
+                        navController.popBackStack()
+                        Unit
                     }
                     androidx.compose.runtime.CompositionLocalProvider(
                         LocalSharedTransitionScope provides this@SharedTransitionLayout,
@@ -1067,8 +999,8 @@ fun RememberNavGraph(
                             appScope = appScope,
                             noteId = id.takeIf { it > 0 },
                             forceEdit = forceEdit,
-                            onBack = onBack,
-                            onNavigateUp = onNavigateUp,
+                            onBack = leaveEditor,
+                            onNavigateUp = leaveEditor,
                         )
                     }
                 }
@@ -1120,22 +1052,32 @@ fun RememberNavGraph(
     }
 }
 
+/**
+ * [externalLaunch] means the editor is being opened from outside the app (a reminder notification or
+ * a widget) rather than from a list the user was already looking at. Such a launch replaces whatever
+ * was on the back stack with the Notes tab and then opens the editor on top of it, so the editor sits
+ * exactly where an in-app open would put it: leaving it is an ordinary pop that reveals the Notes tab
+ * beneath, instead of a forward navigation that flashes the tab chrome over the note on its way out.
+ */
 private fun NavController.openEditRouteFor(
     note: NoteWithItems,
     forceEdit: Boolean = false,
-    exitOnBack: Boolean = false,
+    externalLaunch: Boolean = false,
 ) {
-    val route =
-        when (note.note.kind) {
-            NoteKind.NOTE -> Routes.editNote(note.note.id, forceEdit = forceEdit, exitOnBack = exitOnBack)
-            NoteKind.LIST -> Routes.editList(note.note.id, forceEdit = forceEdit, exitOnBack = exitOnBack)
-        }
-    navigate(route) {
-        if (exitOnBack) {
+    if (externalLaunch) {
+        navigate(Routes.NOTES) {
             popUpTo(graph.id) {
                 inclusive = true
             }
+            launchSingleTop = true
         }
+    }
+    val route =
+        when (note.note.kind) {
+            NoteKind.NOTE -> Routes.editNote(note.note.id, forceEdit = forceEdit)
+            NoteKind.LIST -> Routes.editList(note.note.id, forceEdit = forceEdit)
+        }
+    navigate(route) {
         launchSingleTop = true
     }
 }

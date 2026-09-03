@@ -836,7 +836,7 @@ private fun NoteDetailPaneHost(
             startDestination = route,
         ) {
             composable(
-                route = "${Routes.EDIT_CONTENT}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_TYPE}={${Routes.ARG_TYPE}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}&${Routes.ARG_EXIT_ON_BACK}={${Routes.ARG_EXIT_ON_BACK}}",
+                route = "${Routes.EDIT_CONTENT}?${Routes.ARG_ID}={${Routes.ARG_ID}}&${Routes.ARG_TYPE}={${Routes.ARG_TYPE}}&${Routes.ARG_PREFILL}={${Routes.ARG_PREFILL}}&${Routes.ARG_FORCE_EDIT}={${Routes.ARG_FORCE_EDIT}}",
                 arguments =
                     listOf(
                         navArgument(Routes.ARG_ID) {
@@ -852,10 +852,6 @@ private fun NoteDetailPaneHost(
                             defaultValue = ""
                         },
                         navArgument(Routes.ARG_FORCE_EDIT) {
-                            type = NavType.BoolType
-                            defaultValue = false
-                        },
-                        navArgument(Routes.ARG_EXIT_ON_BACK) {
                             type = NavType.BoolType
                             defaultValue = false
                         },

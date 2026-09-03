@@ -1,8 +1,17 @@
-## v1.4.0 Bulk expand/collapse, UI Scale
+## v1.4.1 Bulk expand/collapse, UI Scale
 
 ### ✨ New Features
 - Expand or collapse every note group at once from the home toolbar. 
 - UI scale in Appearance settings (75% to 125%). Make the whole interface - Text, icons, and spacing - smaller or larger.
+
+### 🛠 Improved Features
+- Reminder notifications now display nested checklist items indented under their parent items, preserving the checklist structure.
+- Reminder notifications for notes without body text now appear cleanly without generic placeholder text.
+
+### 🐛 Bug Fixes
+- Fixed an issue where tapping a note from a home screen widget or reminder notification could fail to open the note and leave the app on the notes list.
+- Fixed a visual glitch in dual-pane landscape mode where switching tabs could cause note cards to slide across panes into the editor.
+- Several UI fixes for landscape / tablet layout, gesture vs 3-button navigation mode etc. 
 
 ---
 

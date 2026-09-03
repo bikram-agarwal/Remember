@@ -852,16 +852,20 @@ private fun openNoteIntent(
         action = Intent.ACTION_VIEW
         data = "remember://widget/open/$noteId".toUri()
         putExtra(MainActivity.EXTRA_OPEN_NOTE_ID, noteId)
-        putExtra(MainActivity.EXTRA_OPEN_NOTE_EXIT_ON_BACK, true)
-        addWidgetLaunchFlags(clearTask = true)
+        putExtra(MainActivity.EXTRA_OPEN_NOTE_EXTERNAL_LAUNCH, true)
+        addWidgetLaunchFlags()
     }
 
-private fun Intent.addWidgetLaunchFlags(clearTask: Boolean = false) {
-    var flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-    if (clearTask) {
-        flags = flags or Intent.FLAG_ACTIVITY_CLEAR_TASK
-    }
-    addFlags(flags)
+/**
+ * Deliberately without FLAG_ACTIVITY_CLEAR_TASK, which finishes the running MainActivity and starts
+ * a second one. The outgoing instance is destroyed only after the new one has resumed, so its
+ * still-live collector consumes the app-scoped launch action and the fresh instance opens on the
+ * Notes tab instead of the requested note. SINGLE_TOP/CLEAR_TOP hand the intent to the live activity
+ * through onNewIntent, and the editor is opened on a back stack of its own making (see
+ * openEditRouteFor), so nothing here needs the task cleared.
+ */
+private fun Intent.addWidgetLaunchFlags() {
+    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
 }
 
 @Composable

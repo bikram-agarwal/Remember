@@ -383,8 +383,6 @@
     <string name="widget_section_overdue">Overdue</string>
     <string name="widget_section_upcoming">Upcoming</string>
     <string name="widget_starred_title">Starred</string>
-    <string name="widget_empty_nothing_overdue">Nothing overdue</string>
-    <string name="widget_empty_nothing_upcoming">Nothing in next 7 days</string>
     <string name="widget_empty_nothing_due">Nothing due</string>
     <string name="widget_empty_no_due">No due</string>
     <string name="widget_empty_watermark">🎉</string>
@@ -549,7 +547,6 @@
     <string name="reminder_weekday_thursday_narrow">T</string>
     <string name="reminder_weekday_friday_narrow">F</string>
     <string name="reminder_weekday_saturday_narrow">S</string>
-    <string name="reminder_notification_fallback">Tap to open</string>
     <string name="reminder_notification_all_items_checked">All items checked</string>
     <string name="reminder_notification_hidden_title">Reminder</string>
     <string name="reminder_notification_hidden_body">Tap to view</string>

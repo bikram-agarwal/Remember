@@ -87,6 +87,13 @@ class ReminderReceiver : BroadcastReceiver() {
     companion object {
         private const val NOTIFICATION_HERO_WIDTH_PX = 1280
         private const val NOTIFICATION_HERO_HEIGHT_PX = 720
+
+        /**
+         * Indent for a nested checklist row in notification text. Plain leading spaces are not
+         * reliably preserved there, so the indent is built from non-breaking spaces and carries a
+         * bullet so the one supported nesting level stays readable at notification text sizes.
+         */
+        private const val NOTIFICATION_CHILD_ITEM_INDENT = "\u00A0\u00A0\u00A0\u2022\u00A0"
         private val notificationMarkdownHeadingRegex = Regex("""^\s*#{1,6}\s+""")
         private val notificationMarkdownChecklistRegex = Regex("""^\s*[-*+]\s+\[[ xX]\]\s+""")
         private val notificationMarkdownBulletRegex = Regex("""^\s*[-*+]\s+""")
@@ -124,12 +131,13 @@ class ReminderReceiver : BroadcastReceiver() {
                     Importance.DEFAULT -> ReminderScheduler.CHANNEL_ID_DEFAULT
                 }
 
+            val collapsedSummary = summary(context, note, items)
+            val expandedSummary = summary(context, note, items, expanded = true)
             val builder =
                 NotificationCompat
                     .Builder(context, channelId)
                     .setSmallIcon(R.drawable.ic_stat_remember)
                     .setContentTitle(notificationTitle(context, note))
-                    .setContentText(summary(context, note, items))
                     .setPriority(priorityFor(note.importance))
                     .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
                     .setVisibility(notificationVisibility(note))
@@ -140,6 +148,10 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(onlyAlertOnce)
 
+            if (collapsedSummary.isNotBlank()) {
+                builder.setContentText(collapsedSummary)
+            }
+
             val heroBitmap = if (note.visibility == Visibility.DEFAULT) decodeNotificationHeroBitmap(context, note) else null
             if (heroBitmap != null) {
                 val bigPictureStyle =
@@ -147,7 +159,9 @@ class ReminderReceiver : BroadcastReceiver() {
                         .BigPictureStyle()
                         .bigPicture(heroBitmap)
                         .setBigContentTitle(notificationTitle(context, note))
-                        .setSummaryText(summary(context, note, items, expanded = true))
+                if (expandedSummary.isNotBlank()) {
+                    bigPictureStyle.setSummaryText(expandedSummary)
+                }
                 bigPictureStyle.showBigPictureWhenCollapsed(true)
                 builder
                     .setStyle(
@@ -157,7 +171,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 builder.setStyle(
                     NotificationCompat
                         .BigTextStyle()
-                        .bigText(summary(context, note, items, expanded = true)),
+                        .bigText(expandedSummary),
                 )
             }
 
@@ -313,47 +327,60 @@ class ReminderReceiver : BroadcastReceiver() {
             }
 
             if (note.kind == NoteKind.LIST) {
-                val uncheckedItems =
-                    items
-                        .asSequence()
-                        .filterNot { it.checked }
-                        .sortedBy { it.sortOrder }
-                        .map { item ->
-                            val text =
-                                notificationPlainText(item.text)
-                                    .lineSequence()
-                                    .firstOrNull { line -> line.isNotBlank() }
-                                    ?.trim()
-                                    .orEmpty()
-                            if (item.depth > 0 && text.isNotBlank()) "  $text" else text
-                        }.filter { it.isNotBlank() }
-                        .toList()
+                val activeLines = checklistNotificationLines(items)
 
-                if (uncheckedItems.isEmpty()) {
+                if (activeLines.isEmpty()) {
                     return context.getString(R.string.reminder_notification_all_items_checked)
                 }
 
+                // The first line is never a child (a child is only nested once its parent has
+                // already been rendered above it), so the collapsed text needs no indent handling.
                 return if (expanded) {
-                    uncheckedItems.joinToString("\n")
+                    activeLines.joinToString("\n")
                 } else {
-                    uncheckedItems.first().take(120)
+                    activeLines.first().take(120)
                 }
             }
 
             val renderedBody = notificationPlainText(note.body)
-            return if (renderedBody.isNotBlank()) {
-                if (expanded) {
-                    renderedBody
-                } else {
-                    renderedBody
-                        .lineSequence()
-                        .firstOrNull { line -> line.isNotBlank() }
-                        ?.take(120)
-                        .orEmpty()
-                }
+            if (renderedBody.isBlank()) return ""
+            return if (expanded) {
+                renderedBody
             } else {
-                context.getString(R.string.reminder_notification_fallback)
+                renderedBody
+                    .lineSequence()
+                    .firstOrNull { line -> line.isNotBlank() }
+                    ?.take(120)
+                    .orEmpty()
             }
+        }
+
+        /**
+         * Unchecked checklist rows in the order the list screen shows them, with children indented
+         * under the parent they belong to. A child whose parent is checked - or whose parent has no
+         * text to render - has nothing to hang off in a flat text block, so it falls back to the top
+         * level instead of appearing nested under an unrelated row.
+         */
+        private fun checklistNotificationLines(items: List<ChecklistItemEntity>): List<String> {
+            val lines = mutableListOf<String>()
+            var lastRenderedParentId: Long? = null
+            items
+                .filterNot { item -> item.checked }
+                .sortedBy { item -> item.sortOrder }
+                .forEach { item ->
+                    val text =
+                        notificationPlainText(item.text)
+                            .lineSequence()
+                            .firstOrNull { line -> line.isNotBlank() }
+                            ?.trim()
+                            .orEmpty()
+                    if (text.isBlank()) return@forEach
+
+                    val nestedUnderRenderedParent = item.parentId != null && item.parentId == lastRenderedParentId
+                    lines += if (nestedUnderRenderedParent) "$NOTIFICATION_CHILD_ITEM_INDENT$text" else text
+                    if (item.parentId == null) lastRenderedParentId = item.id
+                }
+            return lines
         }
 
         private fun notificationPlainText(markdown: String): String {
@@ -456,20 +483,29 @@ class ReminderReceiver : BroadcastReceiver() {
                 Intent(context, MainActivity::class.java).apply {
                     action = Intent.ACTION_VIEW
                     data = "remember://notification/open/$noteId".toUri()
+                    // Deliberately no FLAG_ACTIVITY_CLEAR_TASK. It finishes the running MainActivity
+                    // and starts a second one, and the outgoing instance is destroyed only after the
+                    // new one has resumed - long enough for its still-live collector to consume the
+                    // app-scoped launch action, so the fresh instance found nothing pending and sat
+                    // on the Notes tab. SINGLE_TOP/CLEAR_TOP hand the intent to the live activity via
+                    // onNewIntent instead, and the editor is opened on a back stack of its own making
+                    // (see openEditRouteFor), so nothing here needs the task cleared.
                     addFlags(
                         Intent.FLAG_ACTIVITY_NEW_TASK or
-                            Intent.FLAG_ACTIVITY_CLEAR_TASK or
                             Intent.FLAG_ACTIVITY_SINGLE_TOP or
                             Intent.FLAG_ACTIVITY_CLEAR_TOP,
                     )
                     putExtra(MainActivity.EXTRA_OPEN_NOTE_ID, noteId)
-                    putExtra(MainActivity.EXTRA_OPEN_NOTE_EXIT_ON_BACK, true)
+                    putExtra(MainActivity.EXTRA_OPEN_NOTE_EXTERNAL_LAUNCH, true)
                 }
             return PendingIntent.getActivity(
                 context,
                 ReminderScheduler.pendingRequestCodeForNote(noteId),
                 open,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                // CANCEL_CURRENT rather than UPDATE_CURRENT: PendingIntent matching ignores intent
+                // flags, and UPDATE_CURRENT replaces only the extras of the record it matches, so a
+                // record left over from an older build would keep serving that build's launch flags.
+                PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
         }
 

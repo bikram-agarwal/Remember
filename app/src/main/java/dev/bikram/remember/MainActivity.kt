@@ -93,7 +93,13 @@ class MainActivity : FragmentActivity() {
         const val ACTION_SHORTCUT_NEW_NOTE = "dev.bikram.remember.action.SHORTCUT_NEW_NOTE"
         const val ACTION_SHORTCUT_NEW_LIST = "dev.bikram.remember.action.SHORTCUT_NEW_LIST"
         const val EXTRA_OPEN_NOTE_ID = "open_note_id"
-        const val EXTRA_OPEN_NOTE_EXIT_ON_BACK = "open_note_exit_on_back"
+
+        /**
+         * Marks an open-note request as coming from outside the app. The key string predates the name
+         * and is left alone on purpose: notifications and widget taps created by an older build are
+         * still in flight with it, and renaming the key would make them look like in-app navigation.
+         */
+        const val EXTRA_OPEN_NOTE_EXTERNAL_LAUNCH = "open_note_exit_on_back"
         const val EXTRA_OPEN_SETTINGS_UPDATES = "extra_open_settings_updates"
     }
 
@@ -181,17 +187,17 @@ class MainActivity : FragmentActivity() {
             Intent.ACTION_VIEW -> {
                 val shortcut = intent.getStringExtra("action")
                 val openId = intent.getLongExtra(EXTRA_OPEN_NOTE_ID, -1L)
-                val exitOnBack = intent.getBooleanExtra(EXTRA_OPEN_NOTE_EXIT_ON_BACK, false)
+                val externalLaunch = intent.getBooleanExtra(EXTRA_OPEN_NOTE_EXTERNAL_LAUNCH, false)
                 when {
                     shortcut == "new_note" -> pendingLaunch.value = LaunchAction.NewNote()
                     shortcut == "new_list" -> pendingLaunch.value = LaunchAction.NewList
-                    openId > 0L -> pendingLaunch.value = LaunchAction.OpenNote(openId, exitOnBack)
+                    openId > 0L -> pendingLaunch.value = LaunchAction.OpenNote(openId, externalLaunch)
                 }
             }
             else -> {
                 val openId = intent.getLongExtra(EXTRA_OPEN_NOTE_ID, -1L)
-                val exitOnBack = intent.getBooleanExtra(EXTRA_OPEN_NOTE_EXIT_ON_BACK, false)
-                if (openId > 0L) pendingLaunch.value = LaunchAction.OpenNote(openId, exitOnBack)
+                val externalLaunch = intent.getBooleanExtra(EXTRA_OPEN_NOTE_EXTERNAL_LAUNCH, false)
+                if (openId > 0L) pendingLaunch.value = LaunchAction.OpenNote(openId, externalLaunch)
             }
         }
     }
