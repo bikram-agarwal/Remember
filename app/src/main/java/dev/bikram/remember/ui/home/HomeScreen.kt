@@ -1,14 +1,11 @@
 package dev.bikram.remember.ui.home
 
 import android.annotation.SuppressLint
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.FiniteAnimationSpec
-import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -76,7 +73,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -543,7 +539,15 @@ fun HomeScreen(
         val itemFadeInSpec = MaterialTheme.motionScheme.defaultEffectsSpec<Float>()
         val itemFadeOutSpec = MaterialTheme.motionScheme.fastEffectsSpec<Float>()
         val itemPlacementSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntOffset>()
-        val itemSizeSpec = MaterialTheme.motionScheme.slowSpatialSpec<IntSize>()
+
+        val visibleItems by
+            remember(displayedItems, collapsedSectionKeys) {
+                derivedStateOf {
+                    displayedItems.filter { item ->
+                        item !is HomeListItem.NoteRow || item.groupKey !in collapsedSectionKeys
+                    }
+                }
+            }
 
         // The mosaic (staggered grid) and list (LazyColumn) layouts render the exact same
         // sequence of entries -- filter chips, pending-new-note placeholder, empty state
@@ -561,7 +565,7 @@ fun HomeScreen(
                 notificationsAllowed = notificationsAllowed,
                 showSelectionActionBar = showSelectionActionBar,
                 pendingNewNoteKind = pendingNewNoteKind,
-                displayedItems = displayedItems,
+                displayedItems = visibleItems,
                 duplicatedRowNoteIds = duplicatedRowNoteIds,
             )
         val homeListActions =
@@ -600,7 +604,6 @@ fun HomeScreen(
                 fadeIn = itemFadeInSpec,
                 fadeOut = itemFadeOutSpec,
                 placement = itemPlacementSpec,
-                size = itemSizeSpec,
             )
 
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -857,7 +860,6 @@ private class HomeListAnimSpecs(
     val fadeIn: FiniteAnimationSpec<Float>,
     val fadeOut: FiniteAnimationSpec<Float>,
     val placement: FiniteAnimationSpec<IntOffset>,
-    val size: FiniteAnimationSpec<IntSize>,
 )
 
 @Composable
@@ -902,59 +904,46 @@ private fun HomeNoteRowItem(
     actions: HomeListActions,
     reveal: HomeListRevealState,
     interaction: InteractionState,
-    collapsedSectionKeys: Set<String>,
-    animSpecs: HomeListAnimSpecs,
     modifier: Modifier = Modifier,
 ) {
     val noteId = item.card.id
     val isSelected = noteId in display.state.selectedIds
     val isActiveInDetailPane = !display.state.inSelectionMode && display.activeNoteId == noteId
     var cardBounds by remember { mutableStateOf<Rect?>(null) }
-    // Rows for a collapsed group stay in the lazy list (see displayedItems in HomeScreen)
-    // instead of being filtered out, so this AnimatedVisibility can play a real grow/shrink
-    // from the header -- matching Settings' collapsible sections -- rather than the row
-    // just popping in/out with no size animation the way LazyColumn add/remove renders it.
-    AnimatedVisibility(
-        visible = item.groupKey !in collapsedSectionKeys,
-        enter = expandVertically(animationSpec = animSpecs.size, expandFrom = Alignment.Top) + fadeIn(animSpecs.fadeIn),
-        exit = shrinkVertically(animationSpec = animSpecs.size, shrinkTowards = Alignment.Top) + fadeOut(animSpecs.fadeOut),
-        modifier = modifier,
-    ) {
-        SwipeableRememberNoteCard(
-            note = item.note,
-            model = item.card,
-            interaction = interaction,
-            onOpenNote = { note ->
-                if (display.state.inSelectionMode) {
-                    actions.onToggleSelection(note.note.id)
-                } else {
-                    actions.onOpenNote(note)
+    SwipeableRememberNoteCard(
+        note = item.note,
+        model = item.card,
+        interaction = interaction,
+        onOpenNote = { note ->
+            if (display.state.inSelectionMode) {
+                actions.onToggleSelection(note.note.id)
+            } else {
+                actions.onOpenNote(note)
+            }
+        },
+        onSwipeAction = actions.onSwipeAction,
+        modifier =
+            modifier.onGloballyPositioned { coordinates ->
+                cardBounds = coordinates.boundsInRoot()
+                if (reveal.revealedNoteCardId == noteId) {
+                    reveal.onRevealStarted(noteId, cardBounds)
                 }
             },
-            onSwipeAction = actions.onSwipeAction,
-            modifier =
-                Modifier.fillMaxWidth().onGloballyPositioned { coordinates ->
-                    cardBounds = coordinates.boundsInRoot()
-                    if (reveal.revealedNoteCardId == noteId) {
-                        reveal.onRevealStarted(noteId, cardBounds)
-                    }
-                },
-            selected = isSelected,
-            activeInDetailPane = isActiveInDetailPane,
-            onLongClick = { actions.onToggleSelection(noteId) },
-            activeRevealKey = reveal.revealedNoteCardId,
-            onRevealStarted = { revealedNoteId -> reveal.onRevealStarted(revealedNoteId, cardBounds) },
-            onRevealClosed = { revealedNoteId ->
-                if (reveal.revealedNoteCardId == revealedNoteId) {
-                    reveal.onRevealClosed()
-                }
-            },
-            // Swipes are meaningless during bulk-select and would visually fight the
-            // tap-to-toggle gesture.
-            swipeEnabled = !display.state.inSelectionMode,
-            reminderNotificationsAllowed = display.notificationsAllowed,
-        )
-    }
+        selected = isSelected,
+        activeInDetailPane = isActiveInDetailPane,
+        onLongClick = { actions.onToggleSelection(noteId) },
+        activeRevealKey = reveal.revealedNoteCardId,
+        onRevealStarted = { revealedNoteId -> reveal.onRevealStarted(revealedNoteId, cardBounds) },
+        onRevealClosed = { revealedNoteId ->
+            if (reveal.revealedNoteCardId == revealedNoteId) {
+                reveal.onRevealClosed()
+            }
+        },
+        // Swipes are meaningless during bulk-select and would visually fight the
+        // tap-to-toggle gesture.
+        swipeEnabled = !display.state.inSelectionMode,
+        reminderNotificationsAllowed = display.notificationsAllowed,
+    )
 }
 
 private fun LazyStaggeredGridScope.mosaicListContent(
@@ -1077,8 +1066,6 @@ private fun LazyStaggeredGridScope.mosaicListContent(
                         actions = actions,
                         reveal = reveal,
                         interaction = interaction,
-                        collapsedSectionKeys = sectionState.collapsedSectionKeys,
-                        animSpecs = animSpecs,
                         modifier =
                             Modifier
                                 .fillMaxWidth()
@@ -1284,8 +1271,6 @@ private fun LazyListScope.linearListContent(
                     actions = actions,
                     reveal = reveal,
                     interaction = interaction,
-                    collapsedSectionKeys = sectionState.collapsedSectionKeys,
-                    animSpecs = animSpecs,
                     modifier =
                         Modifier
                             .fillMaxWidth()

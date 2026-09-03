@@ -1,4 +1,4 @@
-## v1.4.1 Bulk expand/collapse, UI Scale
+## v1.4.2 Bulk expand/collapse, UI Scale
 
 ### ✨ New Features
 - Expand or collapse every note group at once from the home toolbar. 

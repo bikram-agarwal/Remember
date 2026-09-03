@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.onboarding
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -1002,6 +1003,7 @@ private fun notificationSettingsIntent(context: Context): Intent =
         putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
     }
 
+@SuppressLint("BatteryLife")
 private fun batteryOptimizationIntent(context: Context): Intent =
     Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
         data = "package:${context.packageName}".toUri()

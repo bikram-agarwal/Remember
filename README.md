@@ -21,7 +21,7 @@
   <br/>
   <!-- Distribution Badges -->
   <a href="https://github.com/bikram-agarwal/Remember/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/bikram-agarwal/Remember?color=a1168e&include_prereleases&logo=github&style=for-the-badge&labelColor=700f63"/></a>
-  <a href="https://play.google.com/store/apps/details?id=dev.bikram.remember"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v1.3.2-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
+  <a href="https://play.google.com/store/apps/details?id=dev.bikram.remember"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v1.4.2-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
   <a href="https://f-droid.org/packages/dev.bikram.remember.gh"><img alt="F-Droid" src="https://img.shields.io/f-droid/v/dev.bikram.remember.gh?color=a1168e&logo=FDROID&style=for-the-badge&labelColor=700f63"/></a>
   <br/>
   <a href="https://trendshift.io/repositories/72537" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/72537/daily?language=Kotlin" alt="bikram-agarwal%2FRemember | Trendshift" width="250" height="55"/></a>
