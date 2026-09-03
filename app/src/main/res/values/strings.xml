@@ -155,6 +155,8 @@
     <string name="view_options_sort_modified_newest">Modified newest</string>
     <string name="view_options_sort_created_oldest">Created oldest</string>
     <string name="view_options_sort_created_newest">Created newest</string>
+    <string name="view_options_sort_alphabetical_az">Note title (A to Z)</string>
+    <string name="view_options_sort_alphabetical_za">Note title (Z to A)</string>
     <string name="view_options_group_date">Date</string>
     <string name="view_options_group_none">None</string>
     <string name="view_options_group_tags">Tags</string>

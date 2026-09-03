@@ -2,7 +2,7 @@ package dev.bikram.remember.data
 
 import androidx.compose.runtime.Immutable
 
-enum class SortKey { LAST_MODIFIED, CREATED, REMINDER }
+enum class SortKey { LAST_MODIFIED, CREATED, REMINDER, ALPHABETICAL }
 
 enum class SortDir { ASC, DESC }
 

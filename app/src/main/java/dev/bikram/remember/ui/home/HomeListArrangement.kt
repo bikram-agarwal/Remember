@@ -391,12 +391,73 @@ internal fun sortNotes(
     opts: ViewOptions,
 ): List<NoteWithItems> = notes.sortedWith(buildComparator(opts))
 
+/**
+ * Strips leading whitespace, emojis, and symbols so alphabetical sorting orders by the
+ * first alphanumeric character (e.g. "📦 Amazon Prime" -> "Amazon Prime").
+ * If the title consists entirely of symbols/emojis, falls back to the trimmed original string.
+ */
+internal fun normalizeForAlphabeticalSort(rawTitle: String): String {
+    val trimmed = rawTitle.trim()
+    if (trimmed.isEmpty()) return ""
+
+    var startIndex = 0
+    val length = trimmed.length
+    while (startIndex < length) {
+        val codePoint = trimmed.codePointAt(startIndex)
+        if (Character.isLetterOrDigit(codePoint)) {
+            break
+        }
+        startIndex += Character.charCount(codePoint)
+    }
+
+    return if (startIndex < length) {
+        trimmed.substring(startIndex).trim()
+    } else {
+        trimmed
+    }
+}
+
+private fun compareAlphabetically(
+    firstNote: NoteWithItems,
+    secondNote: NoteWithItems,
+    sortDir: SortDir,
+    tieBreaker: Comparator<NoteWithItems>,
+): Int {
+    val firstRawTrimmed = firstNote.note.title.trim()
+    val secondRawTrimmed = secondNote.note.title.trim()
+    val firstIsBlank = firstRawTrimmed.isEmpty()
+    val secondIsBlank = secondRawTrimmed.isEmpty()
+    if (firstIsBlank && secondIsBlank) return tieBreaker.compare(firstNote, secondNote)
+    if (firstIsBlank) return 1
+    if (secondIsBlank) return -1
+
+    val firstSortKey = normalizeForAlphabeticalSort(firstRawTrimmed)
+    val secondSortKey = normalizeForAlphabeticalSort(secondRawTrimmed)
+
+    val primaryComp = firstSortKey.compareTo(secondSortKey, ignoreCase = true)
+    if (primaryComp != 0) return if (sortDir == SortDir.DESC) -primaryComp else primaryComp
+
+    val caseComp = firstSortKey.compareTo(secondSortKey)
+    if (caseComp != 0) return if (sortDir == SortDir.DESC) -caseComp else caseComp
+
+    val rawComp = firstRawTrimmed.compareTo(secondRawTrimmed, ignoreCase = true)
+    if (rawComp != 0) return if (sortDir == SortDir.DESC) -rawComp else rawComp
+
+    val rawCaseComp = firstRawTrimmed.compareTo(secondRawTrimmed)
+    if (rawCaseComp != 0) return if (sortDir == SortDir.DESC) -rawCaseComp else rawCaseComp
+
+    return tieBreaker.compare(firstNote, secondNote)
+}
+
 private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
     val ascendingBase: Comparator<NoteWithItems> =
         when (opts.sortKey) {
             SortKey.LAST_MODIFIED -> compareBy { noteWithItems -> noteWithItems.note.updatedAt }
             SortKey.CREATED -> compareBy { noteWithItems -> noteWithItems.note.createdAt }
             SortKey.REMINDER -> compareBy { noteWithItems -> noteWithItems.note.reminderAt ?: Long.MAX_VALUE }
+            SortKey.ALPHABETICAL -> compareBy(String.CASE_INSENSITIVE_ORDER) { noteWithItems ->
+                normalizeForAlphabeticalSort(noteWithItems.note.title)
+            }
         }
     val createdTieBreaker: Comparator<NoteWithItems> =
         compareBy<NoteWithItems> { noteWithItems -> noteWithItems.note.createdAt }
@@ -413,19 +474,22 @@ private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
         } else {
             ascendingBase
         }
-    return if (opts.sortKey == SortKey.REMINDER) {
-        Comparator { firstNote, secondNote ->
-
-            val firstHasNoReminder = firstNote.note.reminderAt == null
-            val secondHasNoReminder = secondNote.note.reminderAt == null
-            when {
-                firstHasNoReminder && secondHasNoReminder -> 0
-                firstHasNoReminder -> 1
-                secondHasNoReminder -> -1
-                else -> directed.compare(firstNote, secondNote)
+    return when (opts.sortKey) {
+        SortKey.REMINDER ->
+            Comparator { firstNote, secondNote ->
+                val firstHasNoReminder = firstNote.note.reminderAt == null
+                val secondHasNoReminder = secondNote.note.reminderAt == null
+                when {
+                    firstHasNoReminder && secondHasNoReminder -> 0
+                    firstHasNoReminder -> 1
+                    secondHasNoReminder -> -1
+                    else -> directed.compare(firstNote, secondNote)
+                }
             }
-        }
-    } else {
-        directed
+        SortKey.ALPHABETICAL ->
+            Comparator { firstNote, secondNote ->
+                compareAlphabetically(firstNote, secondNote, opts.sortDir, directedCreatedTieBreaker)
+            }
+        else -> directed
     }
 }

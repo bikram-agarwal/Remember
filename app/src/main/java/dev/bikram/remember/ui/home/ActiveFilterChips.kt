@@ -360,6 +360,12 @@ private fun sortLabel(
             } else {
                 stringResource(R.string.view_options_sort_created_newest)
             }
+        SortKey.ALPHABETICAL ->
+            if (sortDir == SortDir.ASC) {
+                stringResource(R.string.view_options_sort_alphabetical_az)
+            } else {
+                stringResource(R.string.view_options_sort_alphabetical_za)
+            }
     }
 
 @Composable
@@ -371,6 +377,8 @@ private fun sortOptions(): List<SortOption> =
         SortOption(SortKey.LAST_MODIFIED, SortDir.ASC, stringResource(R.string.view_options_sort_modified_oldest)),
         SortOption(SortKey.CREATED, SortDir.DESC, stringResource(R.string.view_options_sort_created_newest)),
         SortOption(SortKey.CREATED, SortDir.ASC, stringResource(R.string.view_options_sort_created_oldest)),
+        SortOption(SortKey.ALPHABETICAL, SortDir.ASC, stringResource(R.string.view_options_sort_alphabetical_az)),
+        SortOption(SortKey.ALPHABETICAL, SortDir.DESC, stringResource(R.string.view_options_sort_alphabetical_za)),
     )
 
 @Composable

@@ -142,6 +142,115 @@ class HomeListArrangementTest {
     }
 
     @Test
+    fun alphabetical_sort_orders_notes_case_insensitively_ascending_and_descending() {
+        val notes =
+            listOf(
+                note(id = 1L, title = "banana"),
+                note(id = 2L, title = "Apple"),
+                note(id = 3L, title = "Carrot"),
+            )
+
+        val ascending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.ASC))
+        val descending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.DESC))
+
+        assertEquals(listOf(2L, 1L, 3L), ascending.map { it.note.id })
+        assertEquals(listOf(3L, 1L, 2L), descending.map { it.note.id })
+    }
+
+    @Test
+    fun alphabetical_sort_places_blank_and_empty_titles_at_the_end_in_both_directions() {
+        val notes =
+            listOf(
+                note(id = 1L, title = "  "),
+                note(id = 2L, title = "Zebra"),
+                note(id = 3L, title = ""),
+                note(id = 4L, title = "Apple"),
+            )
+
+        val ascending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.ASC))
+        val descending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.DESC))
+
+        assertEquals(listOf(4L, 2L, 1L, 3L), ascending.map { it.note.id })
+        assertEquals(listOf(2L, 4L, 3L, 1L), descending.map { it.note.id })
+    }
+
+    @Test
+    fun alphabetical_sort_breaks_ties_between_identical_titles_using_created_order() {
+        val notes =
+            listOf(
+                note(id = 1L, title = "Task", createdAt = 100L),
+                note(id = 2L, title = "Task", createdAt = 300L),
+                note(id = 3L, title = "Task", createdAt = 200L),
+            )
+
+        val ascending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.ASC))
+        val descending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.DESC))
+
+        assertEquals(listOf(1L, 3L, 2L), ascending.map { it.note.id })
+        assertEquals(listOf(2L, 3L, 1L), descending.map { it.note.id })
+    }
+
+    @Test
+    fun alphabetical_sort_distinguishes_case_when_titles_match_case_insensitively() {
+        val notes =
+            listOf(
+                note(id = 1L, title = "apple"),
+                note(id = 2L, title = "Apple"),
+            )
+
+        val ascending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.ASC))
+        val descending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.DESC))
+
+        // "Apple" precedes "apple" in ASCII ('A' < 'a')
+        assertEquals(listOf(2L, 1L), ascending.map { it.note.id })
+        assertEquals(listOf(1L, 2L), descending.map { it.note.id })
+    }
+
+    @Test
+    fun alphabetical_sort_ignores_leading_emojis_and_symbols_when_ordering() {
+        val notes =
+            listOf(
+                note(id = 1L, title = "Send $30 phone bill to Gaurav"),
+                note(id = 2L, title = "🎮 HumbleBundle"),
+                note(id = 3L, title = "📦 Amazon Prime"),
+            )
+
+        val ascending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.ASC))
+        val descending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.DESC))
+
+        // Amazon Prime (A) -> HumbleBundle (H) -> Send (S)
+        assertEquals(listOf(3L, 2L, 1L), ascending.map { it.note.id })
+        assertEquals(listOf(1L, 2L, 3L), descending.map { it.note.id })
+    }
+
+    @Test
+    fun alphabetical_sort_handles_pure_emoji_and_symbol_titles() {
+        val notes =
+            listOf(
+                note(id = 1L, title = "📦"),
+                note(id = 2L, title = "🎮"),
+                note(id = 3L, title = "Apple"),
+            )
+
+        val ascending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.ASC))
+        val descending = sortNotes(notes, ViewOptions(sortKey = SortKey.ALPHABETICAL, sortDir = SortDir.DESC))
+
+        assertEquals(listOf(3L, 2L, 1L), ascending.map { it.note.id })
+        assertEquals(listOf(1L, 2L, 3L), descending.map { it.note.id })
+    }
+
+    @Test
+    fun alphabetical_sort_normalization_strips_leading_symbols_and_emojis() {
+        assertEquals("Amazon Prime", normalizeForAlphabeticalSort("📦 Amazon Prime"))
+        assertEquals("HumbleBundle", normalizeForAlphabeticalSort("🎮 HumbleBundle"))
+        assertEquals("hashtag", normalizeForAlphabeticalSort("#hashtag"))
+        assertEquals("Quoted Note\"", normalizeForAlphabeticalSort("\"Quoted Note\""))
+        assertEquals("Send", normalizeForAlphabeticalSort("Send"))
+        assertEquals("", normalizeForAlphabeticalSort("   "))
+        assertEquals("🎮", normalizeForAlphabeticalSort("🎮"))
+    }
+
+    @Test
     fun no_pinned_notes_means_no_pinned_header_at_all() {
         val items = arrangeItems(listOf(note(id = 1L), note(id = 2L)), ViewOptions())
 
@@ -239,6 +348,7 @@ class HomeListArrangementTest {
     @Suppress("ktlint:standard:function-expression-body")
     private fun note(
         id: Long,
+        title: String = "Note $id",
         pinned: Boolean = false,
         completedAt: Long? = null,
         reminderAt: Long? = null,
@@ -250,7 +360,7 @@ class HomeListArrangementTest {
                 NoteEntity(
                     id = id,
                     kind = NoteKind.NOTE,
-                    title = "Note $id",
+                    title = title,
                     body = "",
                     colorIndex = 0,
                     starred = false,
