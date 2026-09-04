@@ -1,5 +1,6 @@
 package dev.bikram.remember.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -34,6 +35,7 @@ import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
@@ -43,6 +45,7 @@ import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
+import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -63,8 +66,10 @@ import dev.bikram.remember.MainActivity
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.data.Visibility
+import dev.bikram.remember.data.pinned
 import dev.bikram.remember.di.NotesWidgetEntryPoint
 import dev.bikram.remember.ui.edit.DEFAULT_LIST_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
@@ -163,7 +168,7 @@ class QuickCaptureWidget : GlanceAppWidget() {
     }
 }
 
-class StarredWidget : GlanceAppWidget() {
+class SelectedWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode =
         SizeMode.Responsive(
             setOf(
@@ -181,18 +186,50 @@ class StarredWidget : GlanceAppWidget() {
         val viewOptionsPrefs = entryPoint.viewOptionsPrefs()
         val initialNotes = noteRepository.observeActive().first()
         val initialViewOptions = viewOptionsPrefs.state.first()
+        val appWidgetId =
+            runCatching {
+                GlanceAppWidgetManager(context).getAppWidgetId(id)
+            }.recoverCatching {
+                val field = id.javaClass.getDeclaredField("appWidgetId")
+                field.isAccessible = true
+                field.getInt(id)
+            }.getOrDefault(AppWidgetManager.INVALID_APPWIDGET_ID)
+
         provideContent {
             GlanceTheme {
                 val activeNotesFlow = remember(noteRepository) { noteRepository.observeActive() }
                 val activeNotes by activeNotesFlow.collectAsState(initial = initialNotes)
                 val viewOptionsFlow = remember(viewOptionsPrefs) { viewOptionsPrefs.state }
                 val viewOptions by viewOptionsFlow.collectAsState(initial = initialViewOptions)
-                val starred = starredWidgetItems(activeNotes, viewOptions)
-                StarredWidgetContent(starred = starred)
+
+                val glanceFilterType = currentState(KEY_SELECTED_NOTES_FILTER_TYPE)
+                val glanceTag = currentState(KEY_SELECTED_NOTES_TAG)
+                val config =
+                    if (glanceFilterType != null) {
+                        val filterType =
+                            runCatching {
+                                SelectedNotesFilterType.valueOf(glanceFilterType)
+                            }.getOrDefault(SelectedNotesFilterType.ALL)
+                        SelectedNotesWidgetConfig(filterType = filterType, tag = glanceTag.orEmpty())
+                    } else {
+                        SelectedNotesWidgetConfigStore.loadConfig(context, appWidgetId)
+                    }
+
+                val selectedItems =
+                    remember(activeNotes, config, viewOptions) {
+                        selectedNotesWidgetItems(activeNotes, config, viewOptions)
+                    }
+                SelectedNotesWidgetContent(
+                    items = selectedItems,
+                    config = config,
+                    appWidgetId = appWidgetId,
+                )
             }
         }
     }
 }
+
+typealias SelectedNotesWidget = SelectedWidget
 
 @Keep
 class WidgetMarkDoneAction : ActionCallback {
@@ -216,7 +253,7 @@ class WidgetRefreshAction : ActionCallback {
         val widgetKind = parameters[WidgetKindKey] ?: WIDGET_KIND_AGENDA
         when (widgetKind) {
             WIDGET_KIND_QUICK_CAPTURE -> QuickCaptureWidget().update(context, glanceId)
-            WIDGET_KIND_STARRED -> StarredWidget().update(context, glanceId)
+            WIDGET_KIND_SELECTED, WIDGET_KIND_SELECTED_NOTES -> SelectedWidget().update(context, glanceId)
             else -> NotesWidget().update(context, glanceId)
         }
     }
@@ -291,7 +328,11 @@ private fun AgendaWidgetContent(
 }
 
 @Composable
-private fun StarredWidgetContent(starred: List<NoteWithItems>) {
+private fun SelectedNotesWidgetContent(
+    items: List<NoteWithItems>,
+    config: SelectedNotesWidgetConfig,
+    appWidgetId: Int,
+) {
     val context = LocalContext.current
     val compact = LocalSize.current.width < 220.dp
     Column(
@@ -303,24 +344,25 @@ private fun StarredWidgetContent(starred: List<NoteWithItems>) {
                 .padding(if (compact) 10.dp else 12.dp),
     ) {
         WidgetHeader(
-            title = context.getString(R.string.widget_starred_title),
+            title = selectedNotesHeaderTitle(context, config),
             compact = compact,
             showActions = true,
-            widgetKind = WIDGET_KIND_STARRED,
+            widgetKind = WIDGET_KIND_SELECTED,
+            appWidgetId = appWidgetId,
         )
         Spacer(GlanceModifier.height(if (compact) 6.dp else 8.dp))
-        if (starred.isEmpty()) {
-            StarredEmptyState()
+        if (items.isEmpty()) {
+            SelectedNotesEmptyState(config = config, appWidgetId = appWidgetId)
         } else {
             LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
-                items(count = starred.size) { index ->
+                items(count = items.size) { index ->
                     Column {
-                        StarredCard(
-                            note = starred[index],
+                        SelectedNotesCard(
+                            note = items[index],
                             context = context,
                             compact = compact,
                         )
-                        if (index != starred.lastIndex) {
+                        if (index != items.lastIndex) {
                             Spacer(GlanceModifier.height(6.dp))
                         }
                     }
@@ -402,6 +444,7 @@ private fun WidgetHeader(
     showActions: Boolean,
     trailingText: String? = null,
     widgetKind: String,
+    appWidgetId: Int = AppWidgetManager.INVALID_APPWIDGET_ID,
 ) {
     val context = LocalContext.current
     Row(
@@ -434,6 +477,15 @@ private fun WidgetHeader(
             )
         }
         if (showActions) {
+            if ((widgetKind == WIDGET_KIND_SELECTED || widgetKind == WIDGET_KIND_SELECTED_NOTES) && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                WidgetIconButton(
+                    provider = ImageProvider(R.drawable.ic_widget_settings),
+                    contentDescription = context.getString(R.string.widget_configure_cd),
+                    action = actionStartActivity(selectedNotesConfigIntent(context, appWidgetId)),
+                    compact = compact,
+                )
+                Spacer(GlanceModifier.width(if (compact) 6.dp else 8.dp))
+            }
             RefreshHeaderAction(
                 compact = compact,
                 widgetKind = widgetKind,
@@ -445,13 +497,15 @@ private fun WidgetHeader(
                 action = actionStartActivity(newNoteIntent(context)),
                 compact = compact,
             )
-            Spacer(GlanceModifier.width(if (compact) 6.dp else 8.dp))
-            WidgetIconButton(
-                provider = ImageProvider(R.drawable.ic_widget_list_add),
-                contentDescription = context.getString(R.string.widget_create_new_list),
-                action = actionStartActivity(newListIntent(context)),
-                compact = compact,
-            )
+            if (!compact || (widgetKind != WIDGET_KIND_SELECTED && widgetKind != WIDGET_KIND_SELECTED_NOTES)) {
+                Spacer(GlanceModifier.width(if (compact) 6.dp else 8.dp))
+                WidgetIconButton(
+                    provider = ImageProvider(R.drawable.ic_widget_list_add),
+                    contentDescription = context.getString(R.string.widget_create_new_list),
+                    action = actionStartActivity(newListIntent(context)),
+                    compact = compact,
+                )
+            }
         }
     }
 }
@@ -579,15 +633,44 @@ private fun AgendaEmptyState() {
 }
 
 @Composable
-private fun StarredEmptyState() {
+private fun SelectedNotesEmptyState(
+    config: SelectedNotesWidgetConfig,
+    appWidgetId: Int,
+) {
     val context = LocalContext.current
+    val watermark =
+        when (config.filterType) {
+            SelectedNotesFilterType.ALL -> context.getString(R.string.widget_empty_all_watermark)
+            SelectedNotesFilterType.STARRED -> context.getString(R.string.widget_empty_starred_watermark)
+            SelectedNotesFilterType.PINNED -> context.getString(R.string.widget_empty_pinned_watermark)
+            SelectedNotesFilterType.TAG -> context.getString(R.string.widget_empty_tag_watermark)
+        }
+    val message =
+        when (config.filterType) {
+            SelectedNotesFilterType.ALL -> context.getString(R.string.widget_empty_all)
+            SelectedNotesFilterType.STARRED -> context.getString(R.string.widget_empty_starred)
+            SelectedNotesFilterType.PINNED -> context.getString(R.string.widget_empty_pinned)
+            SelectedNotesFilterType.TAG ->
+                if (config.tag.isNotBlank()) {
+                    context.getString(R.string.widget_empty_tag)
+                } else {
+                    context.getString(R.string.widget_empty_all)
+                }
+        }
+    val emptyClickAction =
+        if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+            actionStartActivity(selectedNotesConfigIntent(context, appWidgetId))
+        } else {
+            actionStartActivity(openNotesIntent(context))
+        }
+
     Box(
-        modifier = GlanceModifier.fillMaxSize(),
+        modifier = GlanceModifier.fillMaxSize().clickable(emptyClickAction),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = context.getString(R.string.widget_empty_starred_watermark),
+                text = watermark,
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.primaryContainer,
@@ -596,7 +679,7 @@ private fun StarredEmptyState() {
             )
             Spacer(GlanceModifier.height(6.dp))
             Text(
-                text = context.getString(R.string.widget_empty_starred),
+                text = message,
                 style =
                     TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
@@ -693,7 +776,7 @@ private fun ReminderCard(
 }
 
 @Composable
-private fun StarredCard(
+private fun SelectedNotesCard(
     note: NoteWithItems,
     context: Context,
     compact: Boolean,
@@ -811,17 +894,53 @@ private fun quickCaptureWidgetCounts(
     )
 }
 
-private fun starredWidgetItems(
+private fun selectedNotesHeaderTitle(
+    context: Context,
+    config: SelectedNotesWidgetConfig,
+): String =
+    when (config.filterType) {
+        SelectedNotesFilterType.ALL -> context.getString(R.string.widget_filter_all_notes)
+        SelectedNotesFilterType.STARRED -> context.getString(R.string.widget_filter_starred)
+        SelectedNotesFilterType.PINNED -> context.getString(R.string.widget_filter_pinned)
+        SelectedNotesFilterType.TAG -> config.tag.ifBlank { context.getString(R.string.widget_selected_label) }
+    }
+
+internal fun selectedNotesWidgetItems(
     notes: List<NoteWithItems>,
+    config: SelectedNotesWidgetConfig,
     viewOptions: ViewOptions,
-): List<NoteWithItems> =
-    sortNotes(
-        notes =
-            notes
-                .filter { it.note.visibility != Visibility.SECRET }
-                .filter { it.note.starred },
-        opts = viewOptions,
-    )
+): List<NoteWithItems> {
+    val uncompletedActive =
+        notes
+            .filter { it.note.visibility != Visibility.SECRET }
+            .filter { it.note.completedAt == null }
+
+    val filtered =
+        when (config.filterType) {
+            SelectedNotesFilterType.ALL -> uncompletedActive
+            SelectedNotesFilterType.STARRED ->
+                uncompletedActive.filter { it.note.starred || it.note.tags.contains(RememberReservedTags.STARRED) }
+            SelectedNotesFilterType.PINNED ->
+                uncompletedActive.filter { it.note.pinned }
+            SelectedNotesFilterType.TAG ->
+                uncompletedActive.filter { noteWithItems ->
+                    RememberReservedTags
+                        .userVisibleTags(noteWithItems.note.tags)
+                        .any { tagName -> tagName.equals(config.tag, ignoreCase = true) }
+                }
+        }
+    return sortNotes(filtered, viewOptions)
+}
+
+fun selectedNotesConfigIntent(
+    context: Context,
+    appWidgetId: Int,
+): Intent =
+    Intent(context, SelectedNotesWidgetConfigActivity::class.java).apply {
+        action = AppWidgetManager.ACTION_APPWIDGET_CONFIGURE
+        putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+    }
 
 private fun openNotesIntent(context: Context): Intent =
     Intent(context, MainActivity::class.java).apply {
@@ -1186,7 +1305,8 @@ private const val DAY_MILLIS = 24L * HOUR_MILLIS
 private const val UPCOMING_WINDOW_MILLIS = 7L * DAY_MILLIS
 private const val WIDGET_KIND_AGENDA = "agenda"
 private const val WIDGET_KIND_QUICK_CAPTURE = "quick_capture"
-private const val WIDGET_KIND_STARRED = "starred"
+private const val WIDGET_KIND_SELECTED = "selected"
+private const val WIDGET_KIND_SELECTED_NOTES = "selected_notes"
 private const val WIDGET_SYMBOL_BITMAP_SIZE_PX = 64
 private const val WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX = 192
 private const val WIDGET_SYMBOL_TEXT_SIZE_PX = 144f

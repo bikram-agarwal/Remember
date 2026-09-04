@@ -1,3 +1,14 @@
+## v1.5.0 Title sort, selected notes widget
+
+### ✨ New Features
+- **Selected notes widget**: Display notes and lists on your home screen by category - choose from all notes, starred, pinned, or any specific tag. Multiple widgets can be added to your home screen with independent filters.
+- **In-widget filter switcher**: Switch between all, starred, pinned, or tag collections at any time by tapping the new settings gear icon directly in the widget header.
+
+## 🛠 Improved Features
+- **Alphabetical sorting**: Sort notes and lists based on Title, A to Z or Z to A.
+
+---
+
 ## v1.4.2 Bulk expand/collapse, UI Scale
 
 ### ✨ New Features

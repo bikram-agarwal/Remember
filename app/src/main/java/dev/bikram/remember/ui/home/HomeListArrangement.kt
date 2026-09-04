@@ -455,9 +455,10 @@ private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
             SortKey.LAST_MODIFIED -> compareBy { noteWithItems -> noteWithItems.note.updatedAt }
             SortKey.CREATED -> compareBy { noteWithItems -> noteWithItems.note.createdAt }
             SortKey.REMINDER -> compareBy { noteWithItems -> noteWithItems.note.reminderAt ?: Long.MAX_VALUE }
-            SortKey.ALPHABETICAL -> compareBy(String.CASE_INSENSITIVE_ORDER) { noteWithItems ->
-                normalizeForAlphabeticalSort(noteWithItems.note.title)
-            }
+            SortKey.ALPHABETICAL ->
+                compareBy(String.CASE_INSENSITIVE_ORDER) { noteWithItems ->
+                    normalizeForAlphabeticalSort(noteWithItems.note.title)
+                }
         }
     val createdTieBreaker: Comparator<NoteWithItems> =
         compareBy<NoteWithItems> { noteWithItems -> noteWithItems.note.createdAt }

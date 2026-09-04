@@ -27,7 +27,7 @@ import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.UpdatePrefs
 import dev.bikram.remember.widget.NotesWidgetReceiver
 import dev.bikram.remember.widget.QuickCaptureWidgetReceiver
-import dev.bikram.remember.widget.StarredWidgetReceiver
+import dev.bikram.remember.widget.SelectedWidgetReceiver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
@@ -329,7 +329,7 @@ object DiagnosticLog {
             listOf(
                 R.string.widget_agenda_label to NotesWidgetReceiver::class.java,
                 R.string.widget_quick_capture_label to QuickCaptureWidgetReceiver::class.java,
-                R.string.widget_starred_label to StarredWidgetReceiver::class.java,
+                R.string.widget_selected_label to SelectedWidgetReceiver::class.java,
             )
         appendDiagnosticSection(context.getString(R.string.diagnostics_section_widget_options))
         var widgetCount = 0

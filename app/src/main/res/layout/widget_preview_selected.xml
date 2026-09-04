@@ -20,7 +20,7 @@
             android:layout_weight="1"
             android:ellipsize="end"
             android:singleLine="true"
-            android:text="@string/widget_starred_label"
+            android:text="@string/widget_selected_label"
             android:textColor="@color/widget_preview_primary"
             android:textSize="11sp"
             android:textStyle="bold" />
@@ -28,6 +28,16 @@
         <ImageView
             android:layout_width="20dp"
             android:layout_height="20dp"
+            android:background="@drawable/widget_preview_small_action"
+            android:contentDescription="@string/widget_configure_cd"
+            android:padding="3.5dp"
+            android:src="@drawable/ic_widget_settings"
+            android:tint="@color/widget_preview_on_surface" />
+
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="5dp"
             android:background="@drawable/widget_preview_small_action"
             android:contentDescription="@string/widget_refresh_cd"
             android:padding="4dp"

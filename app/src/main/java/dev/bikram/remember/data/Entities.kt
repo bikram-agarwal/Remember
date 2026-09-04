@@ -158,7 +158,7 @@ data class NoteEntity(
      *
      * Pinning is purely an *ordering* concern - it hoists the note into the top-pinned
      * "Pinned" section on Home regardless of the active grouping or sort. It is deliberately
-     * distinct from [starred], which marks a favorite (own filter chip + home-screen widget)
+     * distinct from [starred], which marks a favorite (own filter chip)
      * and does not affect placement.
      *
      * The flag is inert while the note is archived or trashed, and it loses to Done: a pinned

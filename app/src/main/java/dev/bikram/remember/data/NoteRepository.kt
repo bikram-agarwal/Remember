@@ -1307,8 +1307,6 @@ class NoteRepository(
 
     suspend fun reminderSummaryItems(now: Long = clock()): List<NoteWithItems> = noteDao.activeRemindersUntil(now + REMINDER_SUMMARY_WINDOW_MILLIS)
 
-    suspend fun starredWidgetItems(): List<NoteWithItems> = noteDao.activeStarred()
-
     /**
      * Consume the currently due recurring occurrence after the user marks it done. Merely
      * firing the notification must not call this: until completion, the card should keep

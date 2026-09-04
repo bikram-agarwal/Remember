@@ -124,7 +124,8 @@ widget not showing -> Troubleshooting widgets
 widget empty -> Troubleshooting widgets
 home screen widget -> Available widgets | Quick capture notification
 agenda widget -> Available widgets
-starred widget -> Available widgets
+selected widget -> Available widgets
+selected notes widget -> Available widgets
 quick note -> Quick capture notification
 capture shortcut -> Quick capture notification
 

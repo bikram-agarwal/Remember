@@ -44,7 +44,7 @@ Lists contain checkable items you can reorder, and supports one level of nesting
 ### Tags, stars, pins, archive, and trash
 
 - **Tags** group related notes and lists for quick filtering.
-- **Star** marks important items so they surface easily. Starred items also feed the Starred widget.
+- **Star** marks important items so they surface easily.
 - **Pin** keeps an item at the very top of the Notes tab. See [Pinning](#pinning) below.
 - **Archive** removes items from the active list without deleting them.
 - **Trash** is for items you intend to remove.
@@ -147,7 +147,7 @@ Some actions hand off to another app — calls may open the phone app, direction
 ### Available widgets
 
 - **Agenda widget** — shows overdue and upcoming reminders.
-- **Starred widget** — shows starred notes and lists.
+- **Selected notes widget** - showing notes and lists you choose: all, starred, pinned, or selected tag. 
 - **Quick capture widget** — buttons to create a new note or list directly from the home screen.
 
 ### Quick capture notification

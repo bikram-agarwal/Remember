@@ -93,10 +93,10 @@
     <string name="shortcut_new_list_long">New list</string>
     <string name="widget_agenda_label">Due &amp; upcoming</string>
     <string name="widget_quick_capture_label">Quick capture</string>
-    <string name="widget_starred_label">Starred</string>
+    <string name="widget_selected_label">Selected notes</string>
     <string name="widget_agenda_description">Track overdue reminders and what is coming up in the next 7 days.</string>
     <string name="widget_quick_capture_description">Create a new note or list from your home screen, with a tiny due-today status.</string>
-    <string name="widget_starred_description">Keep starred notes and lists close, even after they are marked done.</string>
+    <string name="widget_selected_description">Display all, starred, pinned, or tagged notes and lists.</string>
     <string name="widget_header_title">Remember</string>
 
     <!-- Lock and PIN -->
@@ -384,12 +384,26 @@
     <!-- Widget additions -->
     <string name="widget_section_overdue">Overdue</string>
     <string name="widget_section_upcoming">Upcoming</string>
-    <string name="widget_starred_title">Starred</string>
+    <string name="widget_configure_cd">Configure widget</string>
+    <string name="widget_config_title">Choose notes</string>
+    <string name="widget_config_category_all">All notes</string>
+    <string name="widget_config_category_starred">Starred</string>
+    <string name="widget_config_category_pinned">Pinned</string>
+    <string name="widget_config_section_tags">Tags</string>
+    <string name="widget_filter_all_notes">All notes</string>
+    <string name="widget_filter_starred">Starred</string>
+    <string name="widget_filter_pinned">Pinned</string>
+    <string name="widget_empty_all">No notes yet</string>
+    <string name="widget_empty_all_watermark">📝</string>
     <string name="widget_empty_nothing_due">Nothing due</string>
     <string name="widget_empty_no_due">No due</string>
     <string name="widget_empty_watermark">🎉</string>
-    <string name="widget_empty_starred">It\'s lonely in here</string>
+    <string name="widget_empty_starred">No starred notes</string>
     <string name="widget_empty_starred_watermark">✨</string>
+    <string name="widget_empty_pinned">No pinned notes</string>
+    <string name="widget_empty_pinned_watermark">📌</string>
+    <string name="widget_empty_tag">No notes with this tag</string>
+    <string name="widget_empty_tag_watermark">🏷️</string>
     <string name="widget_refresh_cd">Refresh widget</string>
     <string name="widget_mark_done_cd">Mark done</string>
     <string name="widget_new_note">New note</string>

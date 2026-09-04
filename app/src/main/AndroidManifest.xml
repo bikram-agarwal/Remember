@@ -106,6 +106,18 @@
             android:launchMode="singleInstance"
             android:theme="@style/Theme.Remember.Translucent" />
 
+        <activity
+            android:name=".widget.SelectedNotesWidgetConfigActivity"
+            android:exported="true"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:autoRemoveFromRecents="true"
+            android:theme="@style/Theme.Remember">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".reminders.ReminderReceiver"
             android:exported="false" />
@@ -176,15 +188,15 @@
         </receiver>
 
         <receiver
-            android:name=".widget.StarredWidgetReceiver"
-            android:label="@string/widget_starred_label"
+            android:name=".widget.SelectedWidgetReceiver"
+            android:label="@string/widget_selected_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"
-                android:resource="@xml/starred_widget_info" />
+                android:resource="@xml/selected_widget_info" />
         </receiver>
 
         <provider
