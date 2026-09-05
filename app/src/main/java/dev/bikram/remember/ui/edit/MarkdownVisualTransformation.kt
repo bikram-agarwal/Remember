@@ -300,7 +300,7 @@ private class MarkdownPreviewTransformationBuilder(
             // plausible opening marker — otherwise, for plain text with no markdown syntax, every
             // character would trigger up to five full forward scans, making the whole pass O(n^2).
             if (source.startsWith("`", currentIndex) && source.isValidOpening(currentIndex, 1)) {
-                val inlineCodeClose = source.indexOfMarkdownClosingMarker("`", currentIndex + 1)
+                val inlineCodeClose = source.indexOfMarkdownClosingMarker("`", currentIndex + 1, allowTrailingWhitespace = true)
                 if (inlineCodeClose in (currentIndex + 1)..<endIndex) {
                     hiddenRanges.add(HiddenRange(currentIndex, currentIndex + 1))
                     hiddenRanges.add(HiddenRange(inlineCodeClose, inlineCodeClose + 1))
@@ -323,7 +323,7 @@ private class MarkdownPreviewTransformationBuilder(
             }
 
             if (source.startsWith("~~", currentIndex) && source.isValidOpening(currentIndex, 2)) {
-                val strikeClose = source.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
+                val strikeClose = source.indexOfMarkdownClosingMarker("~~", currentIndex + 2, allowTrailingWhitespace = true)
                 if (strikeClose in (currentIndex + 2)..<endIndex) {
                     hiddenRanges.add(HiddenRange(currentIndex, currentIndex + 2))
                     hiddenRanges.add(HiddenRange(strikeClose, strikeClose + 2))
@@ -335,7 +335,7 @@ private class MarkdownPreviewTransformationBuilder(
             }
 
             if (source.startsWith("***", currentIndex) && source.isValidOpening(currentIndex, 3)) {
-                val boldItalicClose = source.indexOfMarkdownClosingMarker("***", currentIndex + 3)
+                val boldItalicClose = source.indexOfMarkdownClosingMarker("***", currentIndex + 3, allowTrailingWhitespace = true)
                 if (boldItalicClose in (currentIndex + 3)..<endIndex) {
                     hiddenRanges.add(HiddenRange(currentIndex, currentIndex + 3))
                     hiddenRanges.add(HiddenRange(boldItalicClose, boldItalicClose + 3))
@@ -348,7 +348,7 @@ private class MarkdownPreviewTransformationBuilder(
             }
 
             if (source.startsWith("**", currentIndex) && source.isValidOpening(currentIndex, 2)) {
-                val boldClose = source.indexOfMarkdownClosingMarker("**", currentIndex + 2)
+                val boldClose = source.indexOfMarkdownClosingMarker("**", currentIndex + 2, allowTrailingWhitespace = true)
                 if (boldClose in (currentIndex + 2)..<endIndex) {
                     hiddenRanges.add(HiddenRange(currentIndex, currentIndex + 2))
                     hiddenRanges.add(HiddenRange(boldClose, boldClose + 2))
@@ -360,7 +360,7 @@ private class MarkdownPreviewTransformationBuilder(
             }
 
             if (source.startsWith("*", currentIndex) && source.isValidOpening(currentIndex, 1)) {
-                val italicClose = source.indexOfMarkdownClosingMarker("*", currentIndex + 1)
+                val italicClose = source.indexOfMarkdownClosingMarker("*", currentIndex + 1, allowTrailingWhitespace = true)
                 if (italicClose in (currentIndex + 1)..<endIndex) {
                     hiddenRanges.add(HiddenRange(currentIndex, currentIndex + 1))
                     hiddenRanges.add(HiddenRange(italicClose, italicClose + 1))

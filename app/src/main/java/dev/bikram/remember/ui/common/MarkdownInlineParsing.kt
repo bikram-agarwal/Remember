@@ -3,16 +3,18 @@ package dev.bikram.remember.ui.common
 internal fun String.indexOfMarkdownClosingMarker(
     marker: String,
     startIndex: Int,
+    allowTrailingWhitespace: Boolean = false,
 ): Int =
     if (marker[0] == '*') {
-        indexOfAsteriskClosingMarker(marker.length, startIndex)
+        indexOfAsteriskClosingMarker(marker.length, startIndex, allowTrailingWhitespace)
     } else {
-        indexOfNonAsteriskClosingMarker(marker, startIndex)
+        indexOfNonAsteriskClosingMarker(marker, startIndex, allowTrailingWhitespace)
     }
 
 private fun String.indexOfNonAsteriskClosingMarker(
     marker: String,
     startIndex: Int,
+    allowTrailingWhitespace: Boolean,
 ): Int {
     val markerChar = marker[0]
     var index = indexOf(marker, startIndex)
@@ -21,7 +23,8 @@ private fun String.indexOfNonAsteriskClosingMarker(
         val hasPrecedingMarkerChar = index > 0 && this[index - 1] == markerChar
         val hasFollowingMarkerChar = index + marker.length < length && this[index + marker.length] == markerChar
         val prevChar = getOrNull(index - 1)
-        if (prevChar != null && !prevChar.isWhitespace()) {
+        val editingClose = allowTrailingWhitespace && isEditingWhitespaceClose(index, index + marker.length)
+        if ((prevChar != null && !prevChar.isWhitespace()) || editingClose) {
             if (!hasPrecedingMarkerChar && !hasFollowingMarkerChar) {
                 return index
             }
@@ -43,6 +46,7 @@ private fun String.indexOfNonAsteriskClosingMarker(
 private fun String.indexOfAsteriskClosingMarker(
     markerLength: Int,
     startIndex: Int,
+    allowTrailingWhitespace: Boolean,
 ): Int {
     val openStack = mutableListOf<Int>()
     var gluedFallbackIndex = -1
@@ -61,8 +65,18 @@ private fun String.indexOfAsteriskClosingMarker(
         val runLength = runEnd - runStart
         val prevChar = getOrNull(runStart - 1)
         val nextChar = getOrNull(runEnd)
-        val canClose = prevChar != null && !prevChar.isWhitespace()
+        val editingClose = allowTrailingWhitespace && isEditingWhitespaceClose(runStart, runEnd)
+        val canClose = (prevChar != null && !prevChar.isWhitespace()) || editingClose
         val canOpen = nextChar != null && !nextChar.isWhitespace()
+
+        // The remainder of a leading run belongs to nested emphasis. For example, when
+        // trying bold at the start of ***one**two*, the third star opens italic and must
+        // consume a closer before bold can close. Empty symmetric wrappers stay eligible
+        // for the fallback below so toolbar scaffolding can still be rendered.
+        if (runStart == startIndex && getOrNull(startIndex - 1) == '*' && canOpen && runLength != markerLength) {
+            openStack.add(runLength)
+            continue
+        }
 
         if (canClose) {
             var remaining = runLength
@@ -98,6 +112,19 @@ private fun String.indexOfAsteriskClosingMarker(
         }
     }
     return gluedFallbackIndex
+}
+
+// While editing, a space before a closing delimiter is an intermediate typing state.
+// Keep that wrapper visible as formatting without accepting a later word's opening marker
+// as its close, or allowing emphasis to continue across a newline. Saved rendering stays strict.
+private fun String.isEditingWhitespaceClose(
+    markerStart: Int,
+    markerEnd: Int,
+): Boolean {
+    val preceding = getOrNull(markerStart - 1)
+    val following = getOrNull(markerEnd)
+    return (preceding == ' ' || preceding == '\t') &&
+        (following == null || following.isWhitespace() || following in "*~`" || startsWith("</u>", markerEnd, ignoreCase = true))
 }
 
 internal fun String.isValidOpening(

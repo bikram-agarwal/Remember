@@ -59,6 +59,12 @@ internal fun MarkdownToolbar(
     val isNumberedList = remember(selectionRevision) { state.isNumberedList }
     val isChecklist = remember(selectionRevision) { state.isChecklist }
     val isQuote = remember(selectionRevision) { state.isQuote }
+    val isBold = remember(selectionRevision) { state.isBold }
+    val isItalic = remember(selectionRevision) { state.isItalic }
+    val isUnderline = remember(selectionRevision) { state.isUnderline }
+    val isStrikethrough = remember(selectionRevision) { state.isStrikethrough }
+    val isInlineCode = remember(selectionRevision) { state.isInlineCode }
+    val isCodeBlock = remember(selectionRevision) { state.isCodeBlock }
 
     if (showLinkDialog) {
         MarkdownLinkDialog(
@@ -74,8 +80,8 @@ internal fun MarkdownToolbar(
         )
     val activeColors =
         IconButtonDefaults.iconButtonColors(
-            contentColor = MaterialTheme.colorScheme.primary,
-            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
         )
     val undoLabel = stringResource(R.string.common_undo)
     val redoLabel = stringResource(R.string.cd_redo)
@@ -136,25 +142,25 @@ internal fun MarkdownToolbar(
         markdownToolbarIconButton(
             symbolName = "format_bold",
             contentDescription = boldLabel,
-            colors = colors,
+            colors = if (isBold) activeColors else colors,
             onClick = state::toggleBold,
         )
         markdownToolbarIconButton(
             symbolName = "format_italic",
             contentDescription = italicLabel,
-            colors = colors,
+            colors = if (isItalic) activeColors else colors,
             onClick = state::toggleItalic,
         )
         markdownToolbarIconButton(
             symbolName = "format_underlined",
             contentDescription = underlineLabel,
-            colors = colors,
+            colors = if (isUnderline) activeColors else colors,
             onClick = state::toggleUnderline,
         )
         markdownToolbarIconButton(
             symbolName = "format_strikethrough",
             contentDescription = strikethroughLabel,
-            colors = colors,
+            colors = if (isStrikethrough) activeColors else colors,
             onClick = state::toggleStrikethrough,
         )
 
@@ -210,13 +216,13 @@ internal fun MarkdownToolbar(
         markdownToolbarIconButton(
             symbolName = "code",
             contentDescription = inlineCodeLabel,
-            colors = colors,
+            colors = if (isInlineCode) activeColors else colors,
             onClick = state::toggleInlineCode,
         )
         markdownToolbarTextButton(
             label = "```",
             contentDescription = codeBlockLabel,
-            colors = colors,
+            colors = if (isCodeBlock) activeColors else colors,
             onClick = state::applyCodeBlock,
             fontFamily = FontFamily.Monospace,
         )
