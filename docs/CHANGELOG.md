@@ -1,3 +1,14 @@
+## v1.5.1 Markdown fixes
+
+### 🛠 Improved Features
+- The formatting toolbar now highlights bold, italic, underline, strikethrough, inline code, and code block buttons whenever your cursor or selection is inside that formatting.
+
+### 🐛 Bug Fixes
+- Fixed formatting (bold, italic, underline, strikethrough, code) sometimes breaking or disappearing while typing a space right before its closing marker.
+- Fixed an issue where, after editing a note, tapping a note on the home screen would flash the keyboard instead of opening the note.
+
+---
+
 ## v1.5.0 Title sort, selected notes widget
 
 ### ✨ New Features

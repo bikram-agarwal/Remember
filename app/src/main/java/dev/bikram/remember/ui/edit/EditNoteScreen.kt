@@ -12,6 +12,7 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -25,9 +26,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
@@ -260,6 +266,31 @@ fun EditNoteScreen(
             fireNotification = vm::fireNotification,
             flushPendingEdits = bridge::flush,
         )
+
+    // Backstop for the IME teardown the editor actions already do on every explicit exit:
+    // pane hosts dispose this editor without routing through those actions, and a text
+    // field that still holds focus at that point strands an input connection in the
+    // InputMethodManager. The next home-screen tap then gets consumed reviving it instead
+    // of opening the note. Mirrors HomeScreen's observer.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+    DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_PAUSE) {
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        }
+    }
+
     // Use the regular BackHandler instead of PredictiveBackHandler. The predictive
     // version suspends on `progress.collect { }` until the gesture's flow completes,
     // so popBackStack does not fire until after the system's predictive preview has

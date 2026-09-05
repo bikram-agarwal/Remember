@@ -5,6 +5,8 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import dev.bikram.remember.R
@@ -55,6 +57,13 @@ internal fun rememberEditorActionHandlers(
 ): EditorActionHandlers {
     val context = LocalContext.current
     val snackbarHostState = LocalSnackbarHostState.current
+    // Every handler below that leaves the editor tears the IME down first. Popping the
+    // back stack while a BasicTextField still owns focus leaves the InputMethodManager
+    // holding a suspended input connection for a destroyed field, and the next tap on the
+    // home screen gets spent waking that stale connection - the keyboard flashes up and
+    // collapses instead of the tapped note opening.
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     val changesSavedMsg = stringResource(R.string.changes_saved)
     val undoMsg = stringResource(R.string.common_undo)
     val msgArchived = pluralStringResource(R.plurals.bulk_action_archived, 1, 1)
@@ -93,6 +102,8 @@ internal fun rememberEditorActionHandlers(
             }
         },
         saveAndBack = {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
             flushThenSaveAndNavigate(
                 flushPendingEdits = flushPendingEdits,
                 launchSave = { appScope.launch { showUndoableSave() } },
@@ -100,6 +111,8 @@ internal fun rememberEditorActionHandlers(
             )
         },
         saveAndNavigateUp = {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
             flushThenSaveAndNavigate(
                 flushPendingEdits = flushPendingEdits,
                 launchSave = { appScope.launch { showUndoableSave() } },
@@ -107,6 +120,8 @@ internal fun rememberEditorActionHandlers(
             )
         },
         archiveAndBack = {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
             flushPendingEdits()
             val archiveStartedFromTrash = trashed
             appScope.launch {
@@ -152,6 +167,8 @@ internal fun rememberEditorActionHandlers(
             }
         },
         trashAndBack = {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
             val trashStartedFromArchive = archived
             appScope.launch {
                 trashCurrent()
@@ -188,6 +205,8 @@ internal fun rememberEditorActionHandlers(
             }
         },
         deleteForeverAndBack = {
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
             appScope.launch { deleteForeverCurrent() }
             onBack()
         },

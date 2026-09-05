@@ -49,6 +49,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -284,6 +285,29 @@ fun EditListScreen(
     }
 
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    // Backstop for the IME teardown the editor actions already do on every explicit exit:
+    // pane hosts dispose this editor without routing through those actions, and a text
+    // field that still holds focus at that point strands an input connection in the
+    // InputMethodManager. The next home-screen tap then gets consumed reviving it instead
+    // of opening the note. Mirrors HomeScreen's observer.
+    val focusManager = LocalFocusManager.current
+    val editorLifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(editorLifecycleOwner, focusManager, keyboardController) {
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_PAUSE) {
+                    focusManager.clearFocus(force = true)
+                    keyboardController?.hide()
+                }
+            }
+        editorLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            editorLifecycleOwner.lifecycle.removeObserver(observer)
+            focusManager.clearFocus(force = true)
+            keyboardController?.hide()
+        }
+    }
 
     val lazyListState = rememberLazyListState()
     var bottomBarVisible by remember { mutableStateOf(true) }
