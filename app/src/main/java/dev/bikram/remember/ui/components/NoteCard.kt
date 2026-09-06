@@ -1,6 +1,5 @@
 package dev.bikram.remember.ui.components
 
-import androidx.compose.animation.BoundsTransform
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -31,11 +30,11 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asAndroidColorFilter
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.compositeOver
@@ -65,6 +64,7 @@ import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
 import dev.bikram.remember.ui.edit.NoteIcon
 import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.feedback.appCombinedClickable
+import dev.bikram.remember.ui.nav.noteMorphContainer
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.elevatedCardColors
@@ -186,22 +186,7 @@ fun NoteCard(
             }.joinToString(cdSeparator)
         }
 
-    val sharedScope = dev.bikram.remember.ui.nav.LocalSharedTransitionScope.current
-    val navScope = dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope.current
-    val sharedBoundsSpec = MaterialTheme.motionScheme.defaultSpatialSpec<Rect>()
-    val sharedBoundsTransform = BoundsTransform { _, _ -> sharedBoundsSpec }
-    val sharedModifier =
-        if (sharedScope != null && navScope != null) {
-            with(sharedScope) {
-                Modifier.sharedBounds(
-                    sharedContentState = rememberSharedContentState(key = "note-card-${model.id}"),
-                    animatedVisibilityScope = navScope,
-                    boundsTransform = sharedBoundsTransform,
-                )
-            }
-        } else {
-            Modifier
-        }
+    val sharedModifier = Modifier.noteMorphContainer(model.id)
 
     // Selection and Completed progresses are both Animatables (initialized at 0 +
     // LaunchedEffect that animates to the current target) instead of
@@ -334,6 +319,7 @@ fun NoteCard(
                     cacheRevision = model.pictureCacheRevision,
                     scrimTop = heroScrimColor.copy(alpha = 0.28f),
                     scrimBottom = heroScrimColor.copy(alpha = 0.56f),
+                    shape = cardShape,
                 )
             }
             // Watermark star for starred cards. Tilted ~-15deg, low alpha, parked at
@@ -579,20 +565,29 @@ private fun BoxScope.HeroBackground(
     cacheRevision: Long,
     scrimTop: Color,
     scrimBottom: Color,
+    shape: Shape,
 ) {
-    HeroFramedImage(
-        imageUri = uri,
-        framing = framing,
-        cacheRevision = cacheRevision,
-        imageAlpha = 1f,
-        modifier = Modifier.matchParentSize(),
-    )
+    // Cover and scrim stay inside the card's shared container, beneath its text.
     Box(
         modifier =
             Modifier
                 .matchParentSize()
-                .background(Brush.verticalGradient(colors = listOf(scrimTop, scrimBottom))),
-    )
+                .clip(shape),
+    ) {
+        HeroFramedImage(
+            imageUri = uri,
+            framing = framing,
+            cacheRevision = cacheRevision,
+            imageAlpha = 1f,
+            modifier = Modifier.matchParentSize(),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .matchParentSize()
+                    .background(Brush.verticalGradient(colors = listOf(scrimTop, scrimBottom))),
+        )
+    }
 }
 
 @Composable
