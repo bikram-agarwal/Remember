@@ -401,32 +401,63 @@ fun EditListScreen(
     val activeEntries = remember(items) { buildActiveEntries(activeItems, activeParents, checkedParents) }
     val completedEntries = remember(items) { buildCompletedEntries(completedItems, activeParents, checkedParents) }
 
+    var collapsedActiveParentIds by rememberSaveable { mutableStateOf(emptyList<Long>()) }
+    var collapsedCompletedParentIds by rememberSaveable { mutableStateOf(emptyList<Long>()) }
+    val collapsedActiveParentIdSet = collapsedActiveParentIds.toSet()
+    val collapsedCompletedParentIdSet = collapsedCompletedParentIds.toSet()
+    val parentIdsWithActiveChildren =
+        remember(items) {
+            items
+                .filter { childItem -> !childItem.checked }
+                .mapNotNull { childItem -> childItem.parentLocalId }
+                .toSet()
+        }
+    val parentIdsWithCompletedChildren =
+        remember(items) {
+            items
+                .filter { childItem -> childItem.checked }
+                .mapNotNull { childItem -> childItem.parentLocalId }
+                .toSet()
+        }
+
+    fun toggleActiveParentChildrenCollapsed(parentId: Long) {
+        collapsedActiveParentIds =
+            if (parentId in collapsedActiveParentIdSet) {
+                collapsedActiveParentIds.filter { storedId -> storedId != parentId }
+            } else {
+                collapsedActiveParentIds + parentId
+            }
+    }
+
+    fun toggleCompletedParentChildrenCollapsed(parentId: Long) {
+        collapsedCompletedParentIds =
+            if (parentId in collapsedCompletedParentIdSet) {
+                collapsedCompletedParentIds.filter { storedId -> storedId != parentId }
+            } else {
+                collapsedCompletedParentIds + parentId
+            }
+    }
+
+    fun expandActiveParentChildren(parentId: Long) {
+        if (parentId in collapsedActiveParentIdSet) {
+            collapsedActiveParentIds = collapsedActiveParentIds.filter { storedId -> storedId != parentId }
+        }
+    }
+
+    fun expandCompletedParentChildren(parentId: Long) {
+        if (parentId in collapsedCompletedParentIdSet) {
+            collapsedCompletedParentIds = collapsedCompletedParentIds.filter { storedId -> storedId != parentId }
+        }
+    }
+
     var draggingParentLocalId by remember { mutableStateOf<Long?>(null) }
     val visibleActiveEntries =
-        remember(activeEntries, draggingParentLocalId) {
-            if (draggingParentLocalId == null) {
-                activeEntries
-            } else {
-                activeEntries.filter { entry ->
-                    when (entry) {
-                        is ActiveEntry.Ghost -> entry.header.realParentLocalId != draggingParentLocalId
-                        is ActiveEntry.Row -> entry.item.localId == draggingParentLocalId || entry.item.parentLocalId != draggingParentLocalId
-                    }
-                }
-            }
+        remember(activeEntries, collapsedActiveParentIdSet, draggingParentLocalId) {
+            filterVisibleActiveEntries(activeEntries, collapsedActiveParentIdSet, draggingParentLocalId)
         }
     val visibleCompletedEntries =
-        remember(completedEntries, draggingParentLocalId) {
-            if (draggingParentLocalId == null) {
-                completedEntries
-            } else {
-                completedEntries.filter { entry ->
-                    when (entry) {
-                        is CompletedEntry.Ghost -> entry.header.realParentLocalId != draggingParentLocalId
-                        is CompletedEntry.Row -> entry.item.parentLocalId != draggingParentLocalId
-                    }
-                }
-            }
+        remember(completedEntries, collapsedCompletedParentIdSet, draggingParentLocalId) {
+            filterVisibleCompletedEntries(completedEntries, collapsedCompletedParentIdSet, draggingParentLocalId)
         }
 
     val titleFocusRequesters = remember { mutableStateMapOf<Long, FocusRequester>() }
@@ -623,6 +654,10 @@ fun EditListScreen(
                                     // Active rows draw a drag-handle gutter while in edit mode; the ghost
                                     // has to mirror that so its checkbox lines up with the rows below.
                                     showDragHandleGutter = isEditMode,
+                                    childrenExpanded = entry.header.realParentLocalId !in collapsedActiveParentIdSet,
+                                    onToggleChildren = {
+                                        toggleActiveParentChildrenCollapsed(entry.header.realParentLocalId)
+                                    },
                                     modifier =
                                         Modifier.animateItem(
                                             placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
@@ -693,6 +728,9 @@ fun EditListScreen(
                                                 (
                                                     {
                                                         pendingFocusItemId = vm.addItemAfter(item.localId)
+                                                        item.parentLocalId?.let { parentId ->
+                                                            expandActiveParentChildren(parentId)
+                                                        }
                                                         pendingFocusField = FocusField.TITLE
                                                         isEditMode = true
                                                     }
@@ -727,12 +765,32 @@ fun EditListScreen(
                                                 (
                                                     { deltaDepth ->
                                                         if (deltaDepth > 0) {
+                                                            val activeUnchecked = items.filter { uncheckedItem -> !uncheckedItem.checked }
+                                                            val itemIndex =
+                                                                activeUnchecked.indexOfFirst { uncheckedItem ->
+                                                                    uncheckedItem.localId == item.localId
+                                                                }
+                                                            val indentParent =
+                                                                activeUnchecked
+                                                                    .take(itemIndex)
+                                                                    .lastOrNull { uncheckedItem -> uncheckedItem.depth == 0 }
                                                             vm.indent(item.localId)
+                                                            indentParent?.localId?.let { parentId ->
+                                                                expandActiveParentChildren(parentId)
+                                                            }
                                                         } else if (deltaDepth < 0) {
                                                             vm.outdent(item.localId)
                                                         }
                                                     }
                                                 )
+                                            },
+                                        hasChildren = item.localId in parentIdsWithActiveChildren,
+                                        childrenExpanded = item.localId !in collapsedActiveParentIdSet,
+                                        onToggleChildren =
+                                            if (item.localId in parentIdsWithActiveChildren) {
+                                                { toggleActiveParentChildrenCollapsed(item.localId) }
+                                            } else {
+                                                null
                                             },
                                     )
                                 }
@@ -817,6 +875,10 @@ fun EditListScreen(
                                             // Completed rows never render a drag handle, so the ghost in
                                             // the checked section never reserves a gutter either.
                                             showDragHandleGutter = false,
+                                            childrenExpanded = entry.header.realParentLocalId !in collapsedCompletedParentIdSet,
+                                            onToggleChildren = {
+                                                toggleCompletedParentChildrenCollapsed(entry.header.realParentLocalId)
+                                            },
                                             modifier =
                                                 Modifier.animateItem(
                                                     placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
@@ -863,6 +925,9 @@ fun EditListScreen(
                                                     (
                                                         {
                                                             pendingFocusItemId = vm.addItemAfter(item.localId)
+                                                            item.parentLocalId?.let { parentId ->
+                                                                expandCompletedParentChildren(parentId)
+                                                            }
                                                             pendingFocusField = FocusField.TITLE
                                                             isEditMode = true
                                                         }
@@ -891,6 +956,14 @@ fun EditListScreen(
                                                     }
                                                 },
                                             onIndentChange = null,
+                                            hasChildren = item.localId in parentIdsWithCompletedChildren,
+                                            childrenExpanded = item.localId !in collapsedCompletedParentIdSet,
+                                            onToggleChildren =
+                                                if (item.localId in parentIdsWithCompletedChildren) {
+                                                    { toggleCompletedParentChildrenCollapsed(item.localId) }
+                                                } else {
+                                                    null
+                                                },
                                             modifier =
                                                 Modifier.animateItem(
                                                     placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),

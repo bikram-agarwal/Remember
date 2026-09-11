@@ -65,7 +65,8 @@ tasks.register<Exec>("checkDependencyUpdates") {
 
 versionCatalogUpdate {
     keep {
-        // Keep only "java" even if it doesn't appear in libraries/plugins
+        // Keep versions that are read directly from Gradle scripts instead of libraries/plugins.
         versions.add("java")
+        versions.add("ktlint")
     }
 }

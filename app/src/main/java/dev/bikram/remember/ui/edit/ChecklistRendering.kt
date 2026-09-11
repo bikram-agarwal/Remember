@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -54,6 +56,7 @@ import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.feedback.performSwipeThresholdHaptic
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
  * A synthetic, non-persisted header that stands in for the real parent row when a child has been
@@ -140,6 +143,9 @@ internal fun ChecklistRow(
      * completed section where hierarchy is frozen.
      */
     onIndentChange: ((Int) -> Unit)? = null,
+    hasChildren: Boolean = false,
+    childrenExpanded: Boolean = true,
+    onToggleChildren: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val scale by androidx.compose.animation.core
@@ -439,6 +445,12 @@ internal fun ChecklistRow(
                         inner()
                     },
                 )
+                if (hasChildren && onToggleChildren != null) {
+                    ChecklistChildrenExpandButton(
+                        expanded = childrenExpanded,
+                        onClick = onToggleChildren,
+                    )
+                }
                 if (showDetailsAffordance) {
                     RememberIconButton(
                         onClick = { detailsExpanded = !detailsExpanded },
@@ -496,6 +508,12 @@ internal fun ChecklistRow(
                             Modifier.weight(1f)
                         },
                 )
+                if (hasChildren && onToggleChildren != null) {
+                    ChecklistChildrenExpandButton(
+                        expanded = childrenExpanded,
+                        onClick = onToggleChildren,
+                    )
+                }
                 if (showDetailsAffordance) {
                     RememberIconButton(
                         onClick = { detailsExpanded = !detailsExpanded },
@@ -620,6 +638,8 @@ internal fun GhostParentHeaderRow(
      * false and sit flush at depth 0.
      */
     showDragHandleGutter: Boolean,
+    childrenExpanded: Boolean,
+    onToggleChildren: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -659,7 +679,113 @@ internal fun GhostParentHeaderRow(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
+        ChecklistChildrenExpandButton(
+            expanded = childrenExpanded,
+            onClick = onToggleChildren,
+        )
     }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun ChecklistChildrenExpandButton(
+    expanded: Boolean,
+    onClick: () -> Unit,
+) {
+    val rotation by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
+        label = "checklist_children_chevron_rotation",
+    )
+    val tooltipLabel =
+        stringResource(
+            if (expanded) {
+                R.string.cd_checklist_collapse_children
+            } else {
+                R.string.cd_checklist_expand_children
+            },
+        )
+    RememberIconButton(
+        onClick = onClick,
+        tooltipLabel = tooltipLabel,
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = "chevron_right",
+            autoMirror = true,
+            modifier = Modifier.graphicsLayer { rotationZ = rotation },
+            size = 22.dp,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            weight = FontWeight.Medium,
+        )
+    }
+}
+
+internal fun filterVisibleActiveEntries(
+    entries: List<ActiveEntry>,
+    collapsedParentIds: Set<Long>,
+    draggingParentLocalId: Long?,
+): List<ActiveEntry> =
+    entries.filter { entry ->
+        isActiveEntryVisible(entry, collapsedParentIds, draggingParentLocalId)
+    }
+
+internal fun filterVisibleCompletedEntries(
+    entries: List<CompletedEntry>,
+    collapsedParentIds: Set<Long>,
+    draggingParentLocalId: Long?,
+): List<CompletedEntry> =
+    entries.filter { entry ->
+        isCompletedEntryVisible(entry, collapsedParentIds, draggingParentLocalId)
+    }
+
+internal fun isActiveEntryVisible(
+    entry: ActiveEntry,
+    collapsedParentIds: Set<Long>,
+    draggingParentLocalId: Long?,
+): Boolean {
+    when (entry) {
+        is ActiveEntry.Ghost -> {
+            val parentId = entry.header.realParentLocalId
+            // Ghost headers stay visible when collapsed so the section keeps an expand anchor.
+            if (draggingParentLocalId != null && parentId == draggingParentLocalId) {
+                return false
+            }
+        }
+        is ActiveEntry.Row -> {
+            entry.item.parentLocalId?.let { parentId ->
+                if (parentId in collapsedParentIds) {
+                    return false
+                }
+                if (draggingParentLocalId != null && parentId == draggingParentLocalId) {
+                    return false
+                }
+            }
+        }
+    }
+    return true
+}
+
+internal fun isCompletedEntryVisible(
+    entry: CompletedEntry,
+    collapsedParentIds: Set<Long>,
+    draggingParentLocalId: Long?,
+): Boolean {
+    when (entry) {
+        is CompletedEntry.Ghost -> {
+            // Ghost headers stay visible when collapsed so the section keeps an expand anchor.
+        }
+        is CompletedEntry.Row -> {
+            entry.item.parentLocalId?.let { parentId ->
+                if (parentId in collapsedParentIds) {
+                    return false
+                }
+                if (draggingParentLocalId != null && parentId == draggingParentLocalId) {
+                    return false
+                }
+            }
+        }
+    }
+    return true
 }
 
 /**
