@@ -842,17 +842,17 @@ fun EditListScreen(
                                         ).appClickable { showChecked = !showChecked }
                                         .padding(vertical = 8.dp),
                             ) {
+                                Text(
+                                    pluralStringResource(R.plurals.checked_items_count, completedItems.size, completedItems.size),
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.weight(1f),
+                                )
                                 RememberMaterialRoundedSymbol(
                                     name = if (showChecked) "expand_more" else "chevron_right",
                                     size = 24.dp,
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     weight = FontWeight.Medium,
-                                )
-                                Spacer(Modifier.width(12.dp))
-                                Text(
-                                    pluralStringResource(R.plurals.checked_items_count, completedItems.size, completedItems.size),
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
                         }

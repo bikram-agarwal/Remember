@@ -133,20 +133,28 @@ internal fun LazyListScope.editorContentHeaderItems(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 internal fun LazyListScope.editorContentOptionsItem(
     padding: PaddingValues,
     bottomExtra: Dp = 0.dp,
     optionsContent: @Composable () -> Unit,
 ) {
     item(key = "options_panel") {
-        optionsContent()
-        Spacer(
-            Modifier.height(
-                EditorContentBodyDefaults.BottomSpacing +
-                    editorBottomPaddingWithFloor(padding) +
-                    bottomExtra,
-            ),
-        )
+        Column(
+            modifier =
+                Modifier.animateItem(
+                    placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
+                ),
+        ) {
+            optionsContent()
+            Spacer(
+                Modifier.height(
+                    EditorContentBodyDefaults.BottomSpacing +
+                        editorBottomPaddingWithFloor(padding) +
+                        bottomExtra,
+                ),
+            )
+        }
     }
 }
 

@@ -12,7 +12,6 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,34 +22,19 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,6 +43,7 @@ import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.NoteLayoutMode
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.ui.common.RememberInlineSearchField
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.NoteCardUiModel
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
@@ -72,13 +57,10 @@ import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
  *
  *   [animated content area (weight 1)] [layout icon button] [expand/collapse-all icon button] [search/close icon button]
  *
- * The animated content area swaps between the app-name title and [InlineSearchField] via
- * a plain crossfade - it does not animate its own width. Only the layout/expand-collapse
- * button group owns a width-changing transition (`AnimatedVisibility`, below); as those
- * buttons shrink away, this weight-1 slot passively grows to fill the freed space each
- * frame. Two competing width animations in the same Row (one here, one on the button
- * group) used to fight over a moving target, producing an erratic, non-monotonic motion
- * instead of one clean slide - so width animation is deliberately owned by a single side.
+ * The animated content area crossfades between empty space and [RememberInlineSearchField].
+ * Only the layout/expand-collapse [AnimatedVisibility] below drives horizontal width
+ * changes; giving this slot its own expand/shrink as well used to fight that animation
+ * and made the search bar appear to slide in from inconsistent directions.
  *
  * Intended call site: the LargeTopAppBar's `title` slot. The `actions` slot is left
  * for selection-mode chrome only.
@@ -87,7 +69,7 @@ import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 @Composable
 internal fun SearchableTopBarTitle(
     searchOpen: Boolean,
-    requestSearchFocus: Boolean,
+    searchFocusRequestKey: Int,
     query: String,
     noteLayoutMode: NoteLayoutMode,
     showLayoutToggle: Boolean,
@@ -95,7 +77,6 @@ internal fun SearchableTopBarTitle(
     showExpandCollapseAllToggle: Boolean,
     allSectionsCollapsed: Boolean,
     onQueryChange: (String) -> Unit,
-    onSearchFocusRequested: () -> Unit,
     onToggleLayout: () -> Unit,
     onToggleExpandCollapseAll: () -> Unit,
     onToggleSearch: () -> Unit,
@@ -110,16 +91,9 @@ internal fun SearchableTopBarTitle(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Only the button group (below) drives the row's width animation - via its own
-        // single AnimatedVisibility Transition. This slot just crossfades its content
-        // (fadeIn/fadeOut, no expand/shrink of its own) and otherwise passively fills
-        // whatever width `weight(1f)` gives it that frame. Two independent transitions
-        // both trying to resize the same row - one here, one on the button group - used
-        // to fight over a moving target every frame, producing an erratic, non-monotonic
-        // "flying" motion instead of a single clean slide.
         AnimatedContent(
             targetState = searchOpen,
-            modifier = Modifier.weight(1f).height(rememberResponsiveActionButtonSize()),
+            modifier = Modifier.weight(1f),
             transitionSpec = {
                 (fadeIn(fadeInSpec) togetherWith fadeOut(fadeOutSpec))
                     .using(SizeTransform(clip = false))
@@ -127,11 +101,11 @@ internal fun SearchableTopBarTitle(
             label = "topBarTitleSearchExpand",
         ) { open ->
             if (open) {
-                InlineSearchField(
+                RememberInlineSearchField(
+                    focusRequestKey = searchFocusRequestKey,
                     query = query,
-                    requestFocus = requestSearchFocus,
                     onQueryChange = onQueryChange,
-                    onFocusRequested = onSearchFocusRequested,
+                    placeholderText = stringResource(R.string.home_search_placeholder),
                 )
             } else {
                 // Empty title placeholder to remove the big title
@@ -275,87 +249,6 @@ internal fun SearchableTopBarTitle(
             }
         }
         Spacer(Modifier.width(4.dp))
-    }
-}
-
-@Composable
-internal fun InlineSearchField(
-    query: String,
-    requestFocus: Boolean,
-    onQueryChange: (String) -> Unit,
-    onFocusRequested: () -> Unit,
-) {
-    val focusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    var searchFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(query, selection = TextRange(query.length)))
-    }
-    LaunchedEffect(query) {
-        if (query != searchFieldValue.text) {
-            searchFieldValue = TextFieldValue(query, selection = TextRange(query.length))
-        }
-    }
-    LaunchedEffect(requestFocus) {
-        if (requestFocus) {
-            focusRequester.requestFocus()
-            keyboardController?.show()
-            onFocusRequested()
-        }
-    }
-    val searchContentDescription = stringResource(R.string.cd_search)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .border(
-                    width = 1.dp,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    shape = MaterialTheme.shapes.extraLargeIncreased,
-                ).background(
-                    MaterialTheme.colorScheme.surfaceContainerHigh,
-                    MaterialTheme.shapes.extraLargeIncreased,
-                ).height(rememberResponsiveActionButtonSize())
-                .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RememberMaterialRoundedSymbol(
-            name = "search",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            weight = FontWeight.Medium,
-        )
-        Spacer(Modifier.width(10.dp))
-        BasicTextField(
-            value = searchFieldValue,
-            onValueChange = { newValue ->
-                searchFieldValue = newValue
-                if (newValue.text != query) onQueryChange(newValue.text)
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            textStyle =
-                MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                ),
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester)
-                    .semantics {
-                        contentDescription = searchContentDescription
-                    },
-            decorationBox = { innerTextField ->
-                if (searchFieldValue.text.isEmpty()) {
-                    Text(
-                        stringResource(R.string.home_search_placeholder),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                innerTextField()
-            },
-        )
     }
 }
 

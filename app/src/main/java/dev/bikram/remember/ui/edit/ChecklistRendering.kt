@@ -158,6 +158,13 @@ internal fun ChecklistRow(
     // Animate the indent so reparenting slides visibly instead of snapping.
     val animatedIndent by androidx.compose.animation.core
         .animateDpAsState(depthIndent, label = "checklistDepthIndent")
+    val checkedMutedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+    val checkboxTint =
+        if (item.checked) {
+            checkedMutedColor
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
 
     val hapticEnabled = LocalHapticEnabled.current
     val view = LocalView.current
@@ -357,7 +364,7 @@ internal fun ChecklistRow(
                     RememberMaterialRoundedSymbol(
                         name = if (item.checked) "check_box" else "check_box_outline_blank",
                         size = 24.dp,
-                        tint = if (item.checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = checkboxTint,
                         weight = FontWeight.Medium,
                     )
                 }
@@ -449,6 +456,7 @@ internal fun ChecklistRow(
                     ChecklistChildrenExpandButton(
                         expanded = childrenExpanded,
                         onClick = onToggleChildren,
+                        muted = item.checked,
                     )
                 }
                 if (showDetailsAffordance) {
@@ -512,6 +520,7 @@ internal fun ChecklistRow(
                     ChecklistChildrenExpandButton(
                         expanded = childrenExpanded,
                         onClick = onToggleChildren,
+                        muted = item.checked,
                     )
                 }
                 if (showDetailsAffordance) {
@@ -644,44 +653,52 @@ internal fun GhostParentHeaderRow(
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .alpha(0.45f),
+        modifier = modifier.fillMaxWidth(),
     ) {
-        if (showDragHandleGutter) {
-            Spacer(Modifier.width(40.dp))
-        }
-        // Static checkbox icon (no click behaviour). Using the Box + icon avoids the ripple and
-        // minSize guarantees of RememberIconButton so the ghost can't steal taps meant for a
-        // child below it.
-        Box(
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier =
                 Modifier
-                    .size(40.dp),
-            contentAlignment = Alignment.Center,
+                    .weight(1f)
+                    .alpha(0.45f),
         ) {
-            RememberMaterialRoundedSymbol(
-                name = if (isParentChecked) "check_box" else "check_box_outline_blank",
-                size = 24.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
+            if (showDragHandleGutter) {
+                Spacer(Modifier.width(40.dp))
+            }
+            // Static checkbox icon (no click behaviour). Using the Box + icon avoids the ripple and
+            // minSize guarantees of RememberIconButton so the ghost can't steal taps meant for a
+            // child below it.
+            Box(
+                modifier =
+                    Modifier
+                        .size(40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name = if (isParentChecked) "check_box" else "check_box_outline_blank",
+                    size = 24.dp,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    weight = FontWeight.Medium,
+                )
+            }
+            Text(
+                text = header.text.ifEmpty { stringResource(R.string.edit_list_new_item_placeholder) },
+                style =
+                    MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (isParentChecked) TextDecoration.LineThrough else TextDecoration.None,
+                    ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
         }
-        Text(
-            text = header.text.ifEmpty { stringResource(R.string.edit_list_new_item_placeholder) },
-            style =
-                MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (isParentChecked) TextDecoration.LineThrough else TextDecoration.None,
-                ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
-        )
+        // Keep the expand chevron at full strength so it matches real parent rows in this section.
+        // The ghost body stays faded; only the checkbox and title inherit the reduced opacity.
         ChecklistChildrenExpandButton(
             expanded = childrenExpanded,
             onClick = onToggleChildren,
+            muted = true,
         )
     }
 }
@@ -691,7 +708,14 @@ internal fun GhostParentHeaderRow(
 private fun ChecklistChildrenExpandButton(
     expanded: Boolean,
     onClick: () -> Unit,
+    muted: Boolean = false,
 ) {
+    val chevronTint =
+        if (muted) {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
     val rotation by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (expanded) 90f else 0f,
         animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
@@ -714,7 +738,7 @@ private fun ChecklistChildrenExpandButton(
             autoMirror = true,
             modifier = Modifier.graphicsLayer { rotationZ = rotation },
             size = 22.dp,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = chevronTint,
             weight = FontWeight.Medium,
         )
     }

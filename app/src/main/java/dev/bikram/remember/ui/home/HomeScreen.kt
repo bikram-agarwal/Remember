@@ -49,6 +49,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -266,7 +267,7 @@ fun HomeScreen(
     onSelectableVisibleIdsChanged: (Set<Long>) -> Unit = {},
 ) {
     var searchOpen by rememberSaveable { mutableStateOf(false) }
-    var searchShouldRequestFocus by rememberSaveable { mutableStateOf(false) }
+    var searchFocusRequestKey by rememberSaveable { mutableIntStateOf(0) }
     var tagSheetOpen by rememberSaveable { mutableStateOf(false) }
     // Collapsed by default so the search results feel focused on active notes. Each section
     // remembers its own expansion state when the user switches away and comes back.
@@ -697,7 +698,7 @@ fun HomeScreen(
                 if (!state.inSelectionMode) {
                     SearchableTopBarTitle(
                         searchOpen = searchOpen,
-                        requestSearchFocus = searchShouldRequestFocus,
+                        searchFocusRequestKey = searchFocusRequestKey,
                         query = state.filter.text,
                         noteLayoutMode = effectiveNoteLayoutMode,
                         showLayoutToggle = true,
@@ -705,7 +706,6 @@ fun HomeScreen(
                         showExpandCollapseAllToggle = collapsibleSectionKeys.isNotEmpty(),
                         allSectionsCollapsed = allSectionsCollapsed,
                         onQueryChange = onQueryChange,
-                        onSearchFocusRequested = { searchShouldRequestFocus = false },
                         onToggleLayout = {
                             onViewOptionsChange(
                                 state.viewOptions.copy(
@@ -733,7 +733,7 @@ fun HomeScreen(
                             val nextSearchOpen = !searchOpen
                             searchOpen = nextSearchOpen
                             if (nextSearchOpen) {
-                                searchShouldRequestFocus = true
+                                searchFocusRequestKey += 1
                             }
                         },
                     )

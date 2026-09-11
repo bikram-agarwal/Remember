@@ -114,6 +114,7 @@ import dev.bikram.remember.data.ICON_PICKER_MAX_STARRED
 import dev.bikram.remember.data.IconPickerPrefs
 import dev.bikram.remember.data.IconPickerStarredState
 import dev.bikram.remember.ui.common.AppBottomSheet
+import dev.bikram.remember.ui.common.RememberInlineSearchField
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
@@ -210,31 +211,13 @@ fun IconPicker(
                 value = loadIconPickerAssets(resources)
             }
         }
-    if (pickerAssets == null) {
-        AppBottomSheet(
-            title = "",
-            onDismiss = onDismiss,
-            showTitleBar = false,
-            scrollable = false,
-            contentPadding = PaddingValues(vertical = 8.dp),
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(iconSheetContentHeight),
-                contentAlignment = Alignment.Center,
-            ) {
-                LoadingIndicator(modifier = Modifier.size(48.dp))
-            }
-        }
-        return
-    }
-    val loadedPickerAssets = pickerAssets ?: return
-    val emojis = loadedPickerAssets.emojis
-    val iconKeywords = loadedPickerAssets.iconKeywords
-    val iconAliases = loadedPickerAssets.iconAliases
-    val emojiSkinToneIndex = loadedPickerAssets.emojiSkinToneIndex
+    val loadedPickerAssets = pickerAssets
+    val emojis = loadedPickerAssets?.emojis ?: emptyList()
+    val iconKeywords = loadedPickerAssets?.iconKeywords ?: emptyMap()
+    val iconAliases = loadedPickerAssets?.iconAliases ?: emptyMap()
+    val emojiSkinToneIndex =
+        loadedPickerAssets?.emojiSkinToneIndex
+            ?: EmojiSkinToneIndex(groups = emptyMap(), keyByEmoji = emptyMap())
     val selectedEmoji = current?.takeIf { it.startsWith(ICON_EMOJI_PREFIX) }?.removePrefix(ICON_EMOJI_PREFIX)
     var selectedEmojiCategoryKey by rememberSaveable {
         mutableStateOf(selectedEmojiCategoryKey(emojis, selectedEmoji))
@@ -413,126 +396,135 @@ fun IconPicker(
                     .fillMaxWidth()
                     .height(iconSheetContentHeight),
         ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = IconPickerActionToolbarHeight),
-            ) {
-                IconPickerSearchTitleRow(
-                    searchExpanded = searchExpanded,
-                    focusRequestKey = searchFocusRequestKey,
-                    title = stringResource(titleRes),
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    symbolStyle = symbolStyle,
-                    showSymbolStyleToggle = selectedTab == IconPickerTab.ICONS && !starredModeActive,
-                    onToggleSymbolStyle = { symbolStyle = symbolStyle.toggled() },
-                    onToggleSearch = {
-                        if (searchExpanded && searchQuery.isNotEmpty()) {
-                            searchQuery = ""
-                        }
-                        val nextSearchExpanded = !searchExpanded
-                        searchExpanded = nextSearchExpanded
-                        if (nextSearchExpanded) {
-                            searchFocusRequestKey += 1
-                        }
-                    },
+            if (loadedPickerAssets == null) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    LoadingIndicator(modifier = Modifier.size(48.dp))
+                }
+            } else {
+                Column(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 20.dp)
-                            .padding(bottom = 10.dp),
-                )
+                            .padding(bottom = IconPickerActionToolbarHeight),
+                ) {
+                    IconPickerSearchTitleRow(
+                        searchExpanded = searchExpanded,
+                        focusRequestKey = searchFocusRequestKey,
+                        title = stringResource(titleRes),
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        symbolStyle = symbolStyle,
+                        showSymbolStyleToggle = selectedTab == IconPickerTab.ICONS && !starredModeActive,
+                        onToggleSymbolStyle = { symbolStyle = symbolStyle.toggled() },
+                        onToggleSearch = {
+                            if (searchExpanded && searchQuery.isNotEmpty()) {
+                                searchQuery = ""
+                            }
+                            val nextSearchExpanded = !searchExpanded
+                            searchExpanded = nextSearchExpanded
+                            if (nextSearchExpanded) {
+                                searchFocusRequestKey += 1
+                            }
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp)
+                                .padding(bottom = 10.dp),
+                    )
 
-                IconPickerTabRow(
-                    selectedTab = selectedTab,
-                    onTabSelected = { tab ->
-                        if (!starredModeActive) {
-                            selectedTab = tab
-                        }
-                    },
-                    enabled = !starredModeActive,
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 8.dp),
-                )
+                    IconPickerTabRow(
+                        selectedTab = selectedTab,
+                        onTabSelected = { tab ->
+                            if (!starredModeActive) {
+                                selectedTab = tab
+                            }
+                        },
+                        enabled = !starredModeActive,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 8.dp),
+                    )
 
-                // Slide horizontally in the natural reading direction of the tab order +
-                // a soft fade. Specs come from M3 Expressive's MotionScheme so the curve
-                // matches every other transition in the app (NoteActionBottomBar etc.).
-                val tabSpatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
-                val tabEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
-                AnimatedContent(
-                    targetState = selectedTab,
-                    label = "iconPickerTabContent",
-                    transitionSpec = {
-                        val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
-                        (
-                            slideInHorizontally(animationSpec = tabSpatialSpec) { fullWidth ->
-                                direction * fullWidth / 6
-                            } + fadeIn(animationSpec = tabEffectsSpec)
-                        ).togetherWith(
-                            slideOutHorizontally(animationSpec = tabSpatialSpec) { fullWidth ->
-                                -direction * fullWidth / 6
-                            } + fadeOut(animationSpec = tabEffectsSpec),
-                        )
-                    },
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                ) { tab ->
-                    when (tab) {
-                        IconPickerTab.ICONS ->
-                            IconPickerIconsContent(
-                                trimmedQuery = trimmedQuery,
-                                filteredOrdered = filteredOrdered,
-                                defaultCatalogKey = defaultCatalogKey,
-                                selectionKey = selectionKey,
-                                starredIconKeys = starredState.iconKeys,
-                                pendingStarredIconKeys = pendingStarredIconKeys,
-                                starredSelectionActive = starredSelectionTab == IconPickerTab.ICONS,
-                                symbolStyle = symbolStyle,
-                                selectedGridIndex = selectedIconGridIndex(selectionKey, starredState.iconKeys),
-                                onStartStarredSelection = { beginStarredSelection(IconPickerTab.ICONS) },
-                                onToggleStarIcon = ::togglePendingStarredIcon,
-                                onToggleSavedStarIcon = ::toggleSavedStarredIcon,
-                                onPick = onPick,
+                    // Slide horizontally in the natural reading direction of the tab order +
+                    // a soft fade. Specs come from M3 Expressive's MotionScheme so the curve
+                    // matches every other transition in the app (NoteActionBottomBar etc.).
+                    val tabSpatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
+                    val tabEffectsSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        label = "iconPickerTabContent",
+                        transitionSpec = {
+                            val direction = if (targetState.ordinal > initialState.ordinal) 1 else -1
+                            (
+                                slideInHorizontally(animationSpec = tabSpatialSpec) { fullWidth ->
+                                    direction * fullWidth / 6
+                                } + fadeIn(animationSpec = tabEffectsSpec)
+                            ).togetherWith(
+                                slideOutHorizontally(animationSpec = tabSpatialSpec) { fullWidth ->
+                                    -direction * fullWidth / 6
+                                } + fadeOut(animationSpec = tabEffectsSpec),
                             )
-                        IconPickerTab.EMOJIS ->
-                            IconPickerEmojiContent(
-                                trimmedQuery = trimmedQuery,
-                                filteredEmojis = filteredEmojis,
-                                emojiSkinToneIndex = emojiSkinToneIndex,
-                                selectedCategoryKey = selectedEmojiCategoryKey,
-                                selectedEmoji = selectedEmoji,
-                                starredEmojis = starredState.emojis,
-                                pendingStarredEmojis = pendingStarredEmojis,
-                                starredSelectionActive = starredSelectionTab == IconPickerTab.EMOJIS,
-                                onCategorySelected = { selectedEmojiCategoryKey = it },
-                                onStartStarredSelection = { beginStarredSelection(IconPickerTab.EMOJIS) },
-                                onToggleStarEmoji = ::togglePendingStarredEmoji,
-                                onToggleSavedStarEmoji = ::toggleSavedStarredEmoji,
-                                onEmojiSelected = { emoji -> onPick("$ICON_EMOJI_PREFIX$emoji") },
-                            )
+                        },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                    ) { tab ->
+                        when (tab) {
+                            IconPickerTab.ICONS ->
+                                IconPickerIconsContent(
+                                    trimmedQuery = trimmedQuery,
+                                    filteredOrdered = filteredOrdered,
+                                    defaultCatalogKey = defaultCatalogKey,
+                                    selectionKey = selectionKey,
+                                    starredIconKeys = starredState.iconKeys,
+                                    pendingStarredIconKeys = pendingStarredIconKeys,
+                                    starredSelectionActive = starredSelectionTab == IconPickerTab.ICONS,
+                                    symbolStyle = symbolStyle,
+                                    selectedGridIndex = selectedIconGridIndex(selectionKey, starredState.iconKeys),
+                                    onStartStarredSelection = { beginStarredSelection(IconPickerTab.ICONS) },
+                                    onToggleStarIcon = ::togglePendingStarredIcon,
+                                    onToggleSavedStarIcon = ::toggleSavedStarredIcon,
+                                    onPick = onPick,
+                                )
+                            IconPickerTab.EMOJIS ->
+                                IconPickerEmojiContent(
+                                    trimmedQuery = trimmedQuery,
+                                    filteredEmojis = filteredEmojis,
+                                    emojiSkinToneIndex = emojiSkinToneIndex,
+                                    selectedCategoryKey = selectedEmojiCategoryKey,
+                                    selectedEmoji = selectedEmoji,
+                                    starredEmojis = starredState.emojis,
+                                    pendingStarredEmojis = pendingStarredEmojis,
+                                    starredSelectionActive = starredSelectionTab == IconPickerTab.EMOJIS,
+                                    onCategorySelected = { selectedEmojiCategoryKey = it },
+                                    onStartStarredSelection = { beginStarredSelection(IconPickerTab.EMOJIS) },
+                                    onToggleStarEmoji = ::togglePendingStarredEmoji,
+                                    onToggleSavedStarEmoji = ::toggleSavedStarredEmoji,
+                                    onEmojiSelected = { emoji -> onPick("$ICON_EMOJI_PREFIX$emoji") },
+                                )
+                        }
                     }
                 }
+                IconPickerActionToolbar(
+                    starredModeActive = starredModeActive,
+                    pendingStarredCount = pendingStarredCount,
+                    current = current,
+                    onCancelStarredSelection = ::cancelStarredSelection,
+                    onSaveStarredSelection = ::saveStarredSelection,
+                    onRemove = { onPick(null) },
+                    onDismiss = onDismiss,
+                    modifier =
+                        Modifier
+                            .align(Alignment.BottomEnd)
+                            .imePadding(),
+                )
             }
-            IconPickerActionToolbar(
-                starredModeActive = starredModeActive,
-                pendingStarredCount = pendingStarredCount,
-                current = current,
-                onCancelStarredSelection = ::cancelStarredSelection,
-                onSaveStarredSelection = ::saveStarredSelection,
-                onRemove = { onPick(null) },
-                onDismiss = onDismiss,
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .imePadding(),
-            )
         }
     }
 }
@@ -620,10 +612,11 @@ private fun IconPickerSearchTitleRow(
             label = "iconPickerSearchExpand",
         ) { expanded ->
             if (expanded) {
-                IconPickerInlineSearchField(
+                RememberInlineSearchField(
                     focusRequestKey = focusRequestKey,
                     query = query,
                     onQueryChange = onQueryChange,
+                    placeholderText = stringResource(R.string.icon_picker_search_hint),
                 )
             } else {
                 Text(
@@ -688,81 +681,6 @@ private fun IconPickerSearchTitleRow(
             }
         }
         Spacer(Modifier.width(4.dp))
-    }
-}
-
-@Composable
-private fun IconPickerInlineSearchField(
-    focusRequestKey: Int,
-    query: String,
-    onQueryChange: (String) -> Unit,
-) {
-    val focusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    var searchFieldValue by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-        mutableStateOf(TextFieldValue(query, selection = TextRange(query.length)))
-    }
-    LaunchedEffect(query) {
-        if (query != searchFieldValue.text) {
-            searchFieldValue = TextFieldValue(query, selection = TextRange(query.length))
-        }
-    }
-    LaunchedEffect(focusRequestKey) {
-        focusRequester.requestFocus()
-        keyboardController?.show()
-    }
-
-    val searchContentDescription = stringResource(R.string.cd_search)
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    MaterialTheme.colorScheme.surfaceContainerHigh,
-                    MaterialTheme.shapes.extraLargeIncreased,
-                ).padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        RememberMaterialRoundedSymbol(
-            name = "search",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            weight = FontWeight.Medium,
-        )
-        Spacer(Modifier.width(10.dp))
-        BasicTextField(
-            value = searchFieldValue,
-            onValueChange = { newValue ->
-                searchFieldValue = newValue
-                if (newValue.text != query) {
-                    onQueryChange(newValue.text)
-                }
-            },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(onSearch = { keyboardController?.hide() }),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            textStyle =
-                MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                ),
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .focusRequester(focusRequester)
-                    .semantics {
-                        contentDescription = searchContentDescription
-                    },
-            decorationBox = { innerTextField ->
-                if (searchFieldValue.text.isEmpty()) {
-                    Text(
-                        text = stringResource(R.string.icon_picker_search_hint),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                innerTextField()
-            },
-        )
     }
 }
 
