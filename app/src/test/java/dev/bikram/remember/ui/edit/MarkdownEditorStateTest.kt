@@ -3,6 +3,8 @@ package dev.bikram.remember.ui.edit
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MarkdownEditorStateTest {
@@ -713,5 +715,97 @@ class MarkdownEditorStateTest {
 
         assertEquals("1. item\n\n", state.markdown)
         assertEquals(TextRange(9), state.textFieldValue.selection)
+    }
+
+    @Test
+    fun boldActiveStateReflectsToggledEmptyWrapperAndTypingInside() {
+        val state = MarkdownEditorState()
+        assertFalse(state.isBold)
+
+        state.toggleBold()
+        assertEquals("****", state.markdown)
+        assertEquals(TextRange(2), state.textFieldValue.selection)
+        assertTrue(state.isBold)
+
+        state.update(TextFieldValue("**hello**", selection = TextRange(4)))
+        assertTrue(state.isBold)
+
+        // Cursor at the close marker boundary
+        state.update(TextFieldValue("**hello**", selection = TextRange(7)))
+        assertTrue(state.isBold)
+
+        // Cursor past the close marker is outside bold
+        state.update(TextFieldValue("**hello**", selection = TextRange(9)))
+        assertFalse(state.isBold)
+    }
+
+    @Test
+    fun formattingActiveStatesDetectSelectionAndDelimiters() {
+        val state = MarkdownEditorState("**bold** and *italic*")
+
+        // Inside bold
+        state.update(TextFieldValue("**bold** and *italic*", selection = TextRange(2, 6)))
+        assertTrue(state.isBold)
+        assertFalse(state.isItalic)
+
+        // Exact match with delimiters
+        state.update(TextFieldValue("**bold** and *italic*", selection = TextRange(0, 8)))
+        assertTrue(state.isBold)
+
+        // Inside italic
+        state.update(TextFieldValue("**bold** and *italic*", selection = TextRange(15)))
+        assertFalse(state.isBold)
+        assertTrue(state.isItalic)
+
+        // Outside formatting
+        state.update(TextFieldValue("**bold** and *italic*", selection = TextRange(9, 12)))
+        assertFalse(state.isBold)
+        assertFalse(state.isItalic)
+    }
+
+    @Test
+    fun boldItalicActiveStateActivatesBothBoldAndItalic() {
+        val state = MarkdownEditorState("***bold-italic***")
+        state.update(TextFieldValue("***bold-italic***", selection = TextRange(5)))
+
+        assertTrue(state.isBold)
+        assertTrue(state.isItalic)
+    }
+
+    @Test
+    fun underlineStrikethroughAndInlineCodeActiveStatesWorkCorrectly() {
+        val state = MarkdownEditorState("<u>under</u> ~~strike~~ `code`")
+
+        state.update(TextFieldValue("<u>under</u> ~~strike~~ `code`", selection = TextRange(5)))
+        assertTrue(state.isUnderline)
+        assertFalse(state.isStrikethrough)
+        assertFalse(state.isInlineCode)
+
+        state.update(TextFieldValue("<u>under</u> ~~strike~~ `code`", selection = TextRange(16)))
+        assertFalse(state.isUnderline)
+        assertTrue(state.isStrikethrough)
+        assertFalse(state.isInlineCode)
+
+        state.update(TextFieldValue("<u>under</u> ~~strike~~ `code`", selection = TextRange(26)))
+        assertFalse(state.isUnderline)
+        assertFalse(state.isStrikethrough)
+        assertTrue(state.isInlineCode)
+    }
+
+    @Test
+    fun codeBlockActiveStateDetectsCursorAndLinesInsideFence() {
+        val state = MarkdownEditorState("intro\n```\nval x = 1\n```\noutro")
+
+        // Cursor in intro (outside code block)
+        state.update(TextFieldValue("intro\n```\nval x = 1\n```\noutro", selection = TextRange(2)))
+        assertFalse(state.isCodeBlock)
+
+        // Cursor inside code block
+        state.update(TextFieldValue("intro\n```\nval x = 1\n```\noutro", selection = TextRange(12)))
+        assertTrue(state.isCodeBlock)
+
+        // Cursor in outro (outside code block)
+        state.update(TextFieldValue("intro\n```\nval x = 1\n```\noutro", selection = TextRange(24)))
+        assertFalse(state.isCodeBlock)
     }
 }

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.bikram.remember.ui.common.MarkdownCodeFenceLineRegex
 import dev.bikram.remember.ui.common.MarkdownHorizontalRuleLineRegex
 import dev.bikram.remember.ui.common.indexOfMarkdownClosingMarker
 import dev.bikram.remember.ui.common.isValidOpening
@@ -29,6 +30,7 @@ private val MarkdownBulletContinuationRegex = Regex("""^(\s*)([-*+]\s+)(.*)$""")
 private val MarkdownTopLevelNumberedRegex = Regex("""^(\d+)[.)]\s+.*$""")
 private val MarkdownEmptyInlineWrappers =
     listOf(
+        "***" to "***",
         "**" to "**",
         "<u>" to "</u>",
         "~~" to "~~",
@@ -66,6 +68,43 @@ internal class MarkdownEditorState(
 
     val hasSelection: Boolean
         get() = !textFieldValue.selection.collapsed
+
+    private var parsedMarkdown: String? = null
+    private var parsedSpans: List<MarkdownWrapperRange> = emptyList()
+
+    private fun formatSpans(): List<MarkdownWrapperRange> {
+        if (parsedMarkdown != markdown) {
+            parsedSpans = formatSpans(markdown)
+            parsedMarkdown = markdown
+        }
+        return parsedSpans
+    }
+
+    private fun formatSpans(source: String): List<MarkdownWrapperRange> {
+        val spans = mutableListOf<MarkdownWrapperRange>()
+        var lineStart = 0
+        var inCodeBlock = false
+        source.splitToSequence('\n').forEach { line ->
+            if (MarkdownCodeFenceLineRegex.matches(line)) {
+                inCodeBlock = !inCodeBlock
+            } else if (!inCodeBlock) {
+                val lineSpans = mutableListOf<MarkdownWrapperRange>()
+                collectFormatSpans(line, 0, line.length, lineSpans)
+                spans.addAll(
+                    lineSpans.map { span ->
+                        span.copy(
+                            openStart = span.openStart + lineStart,
+                            openEnd = span.openEnd + lineStart,
+                            closeStart = span.closeStart + lineStart,
+                            closeEnd = span.closeEnd + lineStart,
+                        )
+                    },
+                )
+            }
+            lineStart += line.length + 1
+        }
+        return spans
+    }
 
     val headingLevel: Int
         get() {
@@ -116,6 +155,54 @@ internal class MarkdownEditorState(
                 lines.all { line ->
                     MarkdownQuotePrefixRegex.containsMatchIn(line.text)
                 }
+        }
+
+    val isBold: Boolean
+        get() = isFormatActive(MarkdownInlineFormat.BOLD)
+
+    val isItalic: Boolean
+        get() = isFormatActive(MarkdownInlineFormat.ITALIC)
+
+    val isUnderline: Boolean
+        get() = isFormatActive(MarkdownInlineFormat.UNDERLINE)
+
+    val isStrikethrough: Boolean
+        get() = isFormatActive(MarkdownInlineFormat.STRIKETHROUGH)
+
+    val isInlineCode: Boolean
+        get() = isFormatActive(MarkdownInlineFormat.INLINE_CODE)
+
+    val isCodeBlock: Boolean
+        get() {
+            val lines = selectedLines()
+            if (lines.isEmpty()) {
+                return false
+            }
+            var insideBlock = false
+            var lineStartIndex = 0
+            while (lineStartIndex <= markdown.length) {
+                val lineEndIndex =
+                    markdown.indexOf('\n', lineStartIndex).let { newlineIndex ->
+                        if (newlineIndex < 0) markdown.length else newlineIndex
+                    }
+                val currentLineText = markdown.substring(lineStartIndex, lineEndIndex)
+                val matchesFence = MarkdownCodeFenceLineRegex.matches(currentLineText)
+                if (matchesFence) {
+                    insideBlock = !insideBlock
+                    if (lines.any { selectedLine -> selectedLine.start == lineStartIndex }) {
+                        return true
+                    }
+                } else if (insideBlock) {
+                    if (lines.any { selectedLine -> selectedLine.start == lineStartIndex }) {
+                        return true
+                    }
+                }
+                if (lineEndIndex == markdown.length) {
+                    break
+                }
+                lineStartIndex = lineEndIndex + 1
+            }
+            return false
         }
 
     val selectedLinkUrl: String?
@@ -387,6 +474,44 @@ internal class MarkdownEditorState(
         val adjustedRange = adjustSelectionBoundaries(rawStart, rawEnd)
         val start = adjustedRange.start
         val end = adjustedRange.end
+        // A triple delimiter represents two independently toggleable formats. Removing one
+        // must preserve the other's markers, including when the wrapper is still empty.
+        val combined =
+            formatSpans().firstOrNull { span ->
+                span.openEnd - span.openStart == 3 &&
+                    markdown.startsWith("***", span.openStart) &&
+                    (
+                        (start == span.openEnd && end == span.closeStart) ||
+                            (start == span.openStart && end == span.closeEnd)
+                    )
+            }
+        if ((open == "*" || open == "**") && combined != null) {
+            val remaining = "*".repeat(3 - open.length)
+            val content = markdown.substring(combined.openEnd, combined.closeStart)
+            val updatedText = markdown.replaceRange(combined.openStart, combined.closeEnd, remaining + content + remaining)
+            val contentStart = combined.openStart + remaining.length
+            textFieldValue = TextFieldValue(updatedText, TextRange(contentStart, contentStart + content.length))
+            selectionRevision++
+            return
+        }
+        val emptyEnclosingWrapper =
+            formatSpans().firstOrNull { span ->
+                start == end && start in span.openEnd..span.closeStart &&
+                    markdown.substring(span.openStart, span.openEnd) == open &&
+                    TextFieldValue(
+                        markdown.substring(span.openEnd, span.closeStart),
+                        TextRange(start - span.openEnd),
+                    ).withCompleteEmptyWrappersRemoved().text.isEmpty()
+            }
+        if (emptyEnclosingWrapper != null) {
+            val updatedText =
+                markdown
+                    .removeRange(emptyEnclosingWrapper.closeStart, emptyEnclosingWrapper.closeEnd)
+                    .removeRange(emptyEnclosingWrapper.openStart, emptyEnclosingWrapper.openEnd)
+            textFieldValue = TextFieldValue(updatedText, TextRange(start - open.length))
+            selectionRevision++
+            return
+        }
         val externalWrapper = externalWrapperRange(start = start, end = end, open = open, close = close)
         if (externalWrapper != null) {
             val updatedText =
@@ -411,7 +536,21 @@ internal class MarkdownEditorState(
         if (start == end && markdown.startsWith(close, start)) {
             val lineStart = markdown.lineStartBefore(start)
             val lineBeforeCursor = markdown.substring(lineStart, start)
-            if (lineBeforeCursor.contains(open)) {
+            val trimmedLength = lineBeforeCursor.length - lineBeforeCursor.trimEnd().length
+            val normalizedSource = markdown.removeRange(start - trimmedLength, start)
+            val closingSpan =
+                formatSpans(normalizedSource).firstOrNull { span ->
+                    span.closeStart == start - trimmedLength &&
+                        when (open) {
+                            "**" -> span.format == MarkdownInlineFormat.BOLD
+                            "*" -> span.format == MarkdownInlineFormat.ITALIC
+                            "<u>" -> span.format == MarkdownInlineFormat.UNDERLINE
+                            "~~" -> span.format == MarkdownInlineFormat.STRIKETHROUGH
+                            "`" -> span.format == MarkdownInlineFormat.INLINE_CODE
+                            else -> false
+                        }
+                }
+            if (closingSpan != null) {
                 val contentEnd = start - (lineBeforeCursor.length - lineBeforeCursor.trimEnd().length)
                 val updatedText =
                     markdown.substring(0, contentEnd) +
@@ -487,8 +626,7 @@ internal class MarkdownEditorState(
             return true
         }
         return markdown.getOrNull(openStart - 1) != '*' &&
-            markdown.getOrNull(openEnd) != '*' &&
-            markdown.getOrNull(closeStart - 1) != '*' &&
+            (openEnd == closeStart || (markdown.getOrNull(openEnd) != '*' && markdown.getOrNull(closeStart - 1) != '*')) &&
             markdown.getOrNull(closeEnd) != '*'
     }
 
@@ -617,16 +755,13 @@ internal class MarkdownEditorState(
             return this
         }
 
-        MarkdownEmptyInlineWrappers.forEach { (open, close) ->
-            if (!previousValue.text.startsWith(close, previousCursor)) {
-                return@forEach
-            }
-            val lineStart = previousValue.text.lineStartBefore(previousCursor)
-            if (previousValue.text.substring(lineStart, previousCursor).lastIndexOf(open) < 0) {
-                return@forEach
-            }
-
-            val adjustedNewlineIndex = previousCursor + close.length
+        val spans = formatSpans(previousValue.text)
+        var adjustedNewlineIndex = previousCursor
+        while (true) {
+            val closing = spans.filter { it.closeStart == adjustedNewlineIndex }.maxByOrNull { it.closeEnd } ?: break
+            adjustedNewlineIndex = closing.closeEnd
+        }
+        if (adjustedNewlineIndex > previousCursor) {
             val updatedText =
                 previousValue.text.replaceRange(
                     startIndex = adjustedNewlineIndex,
@@ -648,10 +783,24 @@ internal class MarkdownEditorState(
             return this
         }
         val cursor = selection.start.coerceIn(0, text.length)
+        val previousCursor = previousValue.selection.start.coerceIn(0, previousValue.text.length)
+        if (previousValue.selection.collapsed && previousCursor > 0 &&
+            text == previousValue.text.removeRange(previousCursor - 1, previousCursor)
+        ) {
+            val emptyWrapperRemoved = previousValue.withCompleteEmptyWrappersRemoved()
+            if (emptyWrapperRemoved != previousValue) {
+                return emptyWrapperRemoved
+            }
+        }
+        // Remove complete empty wrappers from the inside out before interpreting a deletion
+        // as damage to a hidden closing marker. This also handles mixed nested formats.
+        val emptyWrappersRemoved = withCompleteEmptyWrappersRemoved()
+        if (emptyWrappersRemoved != this) {
+            return emptyWrappersRemoved
+        }
         val previousSelection = previousValue.selection
         if (previousSelection.collapsed) {
             val removedCharacterCount = previousValue.text.length - text.length
-            val previousCursor = previousSelection.start.coerceIn(0, previousValue.text.length)
             MarkdownEmptyInlineWrappers.forEach { (open, close) ->
                 var closeStart = previousValue.text.indexOf(close)
                 while (closeStart >= 0) {
@@ -1139,12 +1288,48 @@ internal class MarkdownEditorState(
         return updatedText
     }
 
+    private fun TextFieldValue.withCompleteEmptyWrappersRemoved(): TextFieldValue {
+        var cleanedText = text
+        var cleanedCursor = selection.start.coerceIn(0, text.length)
+        while (true) {
+            val wrapper =
+                MarkdownEmptyInlineWrappers.firstOrNull { (open, close) ->
+                    cleanedCursor >= open.length &&
+                        cleanedText.substring(cleanedCursor - open.length, cleanedCursor) == open &&
+                        cleanedText.startsWith(close, cleanedCursor)
+                } ?: break
+            cleanedText = cleanedText.removeRange(cleanedCursor - wrapper.first.length, cleanedCursor + wrapper.second.length)
+            cleanedCursor -= wrapper.first.length
+        }
+        return if (cleanedText == text) this else copy(text = cleanedText, selection = TextRange(cleanedCursor), composition = null)
+    }
+
+    private fun isFormatActive(format: MarkdownInlineFormat): Boolean {
+        val selection = textFieldValue.selection
+        val selectionStart = selection.min.coerceIn(0, markdown.length)
+        val selectionEnd = selection.max.coerceIn(selectionStart, markdown.length)
+
+        val spans = formatSpans()
+
+        return if (selectionStart == selectionEnd) {
+            spans.any { span ->
+                span.format == format && selectionStart in span.openEnd..span.closeStart
+            }
+        } else {
+            spans.any { span ->
+                span.format == format && (
+                    (selectionStart >= span.openEnd && selectionEnd <= span.closeStart) ||
+                        (selectionStart == span.openStart && selectionEnd == span.closeEnd)
+                )
+            }
+        }
+    }
+
     private fun adjustSelectionBoundaries(
         start: Int,
         end: Int,
     ): TextRange {
-        val spans = mutableListOf<MarkdownWrapperRange>()
-        collectFormatSpans(markdown, 0, markdown.length, spans)
+        val spans = formatSpans()
 
         var adjustedStart = start
         var adjustedEnd = end
@@ -1173,14 +1358,26 @@ internal class MarkdownEditorState(
         while (currentIndex < endIndex) {
             val linkMatch = MarkdownLinkRegex.find(text, currentIndex)
             if (linkMatch != null && linkMatch.range.first == currentIndex && linkMatch.range.last < endIndex) {
+                val label = linkMatch.groups[1]
+                if (label != null) {
+                    collectFormatSpans(text, label.range.first, label.range.last + 1, spans)
+                }
                 currentIndex = linkMatch.range.last + 1
                 continue
             }
 
             if (text.startsWith("`", currentIndex) && text.isValidOpening(currentIndex, 1)) {
-                val close = text.indexOfMarkdownClosingMarker("`", currentIndex + 1)
+                val close = text.indexOfMarkdownClosingMarker("`", currentIndex + 1, allowTrailingWhitespace = true)
                 if (close in (currentIndex + 1)..<endIndex) {
-                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 1, close, close + 1))
+                    spans.add(
+                        MarkdownWrapperRange(
+                            openStart = currentIndex,
+                            openEnd = currentIndex + 1,
+                            closeStart = close,
+                            closeEnd = close + 1,
+                            format = MarkdownInlineFormat.INLINE_CODE,
+                        ),
+                    )
                     currentIndex = close + 1
                     continue
                 }
@@ -1189,7 +1386,15 @@ internal class MarkdownEditorState(
             if (text.startsWith("<u>", currentIndex, ignoreCase = true)) {
                 val close = text.indexOf("</u>", currentIndex + 3, ignoreCase = true)
                 if (close in (currentIndex + 3)..<endIndex) {
-                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 3, close, close + 4))
+                    spans.add(
+                        MarkdownWrapperRange(
+                            openStart = currentIndex,
+                            openEnd = currentIndex + 3,
+                            closeStart = close,
+                            closeEnd = close + 4,
+                            format = MarkdownInlineFormat.UNDERLINE,
+                        ),
+                    )
                     collectFormatSpans(text, currentIndex + 3, close, spans)
                     currentIndex = close + 4
                     continue
@@ -1197,9 +1402,17 @@ internal class MarkdownEditorState(
             }
 
             if (text.startsWith("~~", currentIndex) && text.isValidOpening(currentIndex, 2)) {
-                val close = text.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
+                val close = text.indexOfMarkdownClosingMarker("~~", currentIndex + 2, allowTrailingWhitespace = true)
                 if (close in (currentIndex + 2)..<endIndex) {
-                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 2, close, close + 2))
+                    spans.add(
+                        MarkdownWrapperRange(
+                            openStart = currentIndex,
+                            openEnd = currentIndex + 2,
+                            closeStart = close,
+                            closeEnd = close + 2,
+                            format = MarkdownInlineFormat.STRIKETHROUGH,
+                        ),
+                    )
                     collectFormatSpans(text, currentIndex + 2, close, spans)
                     currentIndex = close + 2
                     continue
@@ -1207,9 +1420,26 @@ internal class MarkdownEditorState(
             }
 
             if (text.startsWith("***", currentIndex) && text.isValidOpening(currentIndex, 3)) {
-                val close = text.indexOfMarkdownClosingMarker("***", currentIndex + 3)
+                val close = text.indexOfMarkdownClosingMarker("***", currentIndex + 3, allowTrailingWhitespace = true)
                 if (close in (currentIndex + 3)..<endIndex) {
-                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 3, close, close + 3))
+                    spans.add(
+                        MarkdownWrapperRange(
+                            openStart = currentIndex,
+                            openEnd = currentIndex + 3,
+                            closeStart = close,
+                            closeEnd = close + 3,
+                            format = MarkdownInlineFormat.BOLD,
+                        ),
+                    )
+                    spans.add(
+                        MarkdownWrapperRange(
+                            openStart = currentIndex,
+                            openEnd = currentIndex + 3,
+                            closeStart = close,
+                            closeEnd = close + 3,
+                            format = MarkdownInlineFormat.ITALIC,
+                        ),
+                    )
                     collectFormatSpans(text, currentIndex + 3, close, spans)
                     currentIndex = close + 3
                     continue
@@ -1217,9 +1447,17 @@ internal class MarkdownEditorState(
             }
 
             if (text.startsWith("**", currentIndex) && text.isValidOpening(currentIndex, 2)) {
-                val close = text.indexOfMarkdownClosingMarker("**", currentIndex + 2)
+                val close = text.indexOfMarkdownClosingMarker("**", currentIndex + 2, allowTrailingWhitespace = true)
                 if (close in (currentIndex + 2)..<endIndex) {
-                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 2, close, close + 2))
+                    spans.add(
+                        MarkdownWrapperRange(
+                            openStart = currentIndex,
+                            openEnd = currentIndex + 2,
+                            closeStart = close,
+                            closeEnd = close + 2,
+                            format = MarkdownInlineFormat.BOLD,
+                        ),
+                    )
                     collectFormatSpans(text, currentIndex + 2, close, spans)
                     currentIndex = close + 2
                     continue
@@ -1227,9 +1465,17 @@ internal class MarkdownEditorState(
             }
 
             if (text.startsWith("*", currentIndex) && text.isValidOpening(currentIndex, 1)) {
-                val close = text.indexOfMarkdownClosingMarker("*", currentIndex + 1)
+                val close = text.indexOfMarkdownClosingMarker("*", currentIndex + 1, allowTrailingWhitespace = true)
                 if (close in (currentIndex + 1)..<endIndex) {
-                    spans.add(MarkdownWrapperRange(currentIndex, currentIndex + 1, close, close + 1))
+                    spans.add(
+                        MarkdownWrapperRange(
+                            openStart = currentIndex,
+                            openEnd = currentIndex + 1,
+                            closeStart = close,
+                            closeEnd = close + 1,
+                            format = MarkdownInlineFormat.ITALIC,
+                        ),
+                    )
                     collectFormatSpans(text, currentIndex + 1, close, spans)
                     currentIndex = close + 1
                     continue
@@ -1259,11 +1505,20 @@ private data class NewlineInsertion(
     val index: Int,
 )
 
+internal enum class MarkdownInlineFormat {
+    BOLD,
+    ITALIC,
+    UNDERLINE,
+    STRIKETHROUGH,
+    INLINE_CODE,
+}
+
 private data class MarkdownWrapperRange(
     val openStart: Int,
     val openEnd: Int,
     val closeStart: Int,
     val closeEnd: Int,
+    val format: MarkdownInlineFormat? = null,
 )
 
 private data class ContinuationPrefix(

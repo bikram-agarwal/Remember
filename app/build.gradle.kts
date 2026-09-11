@@ -69,14 +69,19 @@ val previewVersionSuffix =
 extensions.configure<ApplicationExtension>("android") {
     val rememberApplicationId = "dev.bikram.remember"
     namespace = rememberApplicationId
-    compileSdk = 37
+    compileSdk {
+        version =
+            release(37) {
+                minorApiLevel = 2
+            }
+    }
 
     defaultConfig {
         applicationId = rememberApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 10500
-        versionName = "1.5.0"
+        versionCode = 10600
+        versionName = "1.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }

@@ -229,6 +229,8 @@
     <string name="cd_switch_to_live_preview">Switch to live preview</string>
     <string name="cd_switch_to_markdown_code">Switch to markdown code</string>
     <string name="cd_reorder_drag_handle">Reorder</string>
+    <string name="cd_checklist_expand_children">Expand sub-items</string>
+    <string name="cd_checklist_collapse_children">Collapse sub-items</string>
     <string name="edit_remove_picture_cd">Remove picture</string>
     <string name="edit_link_actions_title">Link</string>
     <string name="edit_link_action_open">Open</string>

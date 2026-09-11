@@ -1,3 +1,20 @@
+## v1.6.0 Checklist collapse, Markdown fixes
+
+### ✨ New Features
+- Checklists: collapse or expand a parent item's sub-items with a new chevron button, so long nested checklists stay tidy.
+
+### 🛠 Improved Features
+- The formatting toolbar now highlights format buttons whenever your cursor or selection is inside that formatting.
+- Added 8 new brand icons to choose from: Capital One, Citi, E-Trade, Fidelity, Amazon Luna, Xbox, T-Mobile, and Walmart.
+- Refined the search bar's look for a cleaner, more consistent style across Home and the icon picker.
+
+### 🐛 Bug Fixes
+- Fixed formatting (bold, italic, underline, strikethrough, code) sometimes breaking or disappearing while typing a space right before its closing marker.
+- Fixed an issue where, after editing a note, tapping a note on the home screen would flash the keyboard instead of opening the note.
+- Fixed a glitch where a note's picture could flicker or its corners could snap from rounded to square while opening or closing the full-image view.
+
+---
+
 ## v1.5.0 Title sort, selected notes widget
 
 ### ✨ New Features

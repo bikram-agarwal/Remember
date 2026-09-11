@@ -6,30 +6,27 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.IntOffset
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImagePainter
 import coil3.compose.rememberAsyncImagePainter
-import coil3.request.ImageRequest
-import coil3.request.crossfade
-import coil3.size.Size
-import kotlinx.coroutines.delay
 import kotlin.math.max
 import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.Size as ComposeSize
 
 /** Must match [HeroFramingEditor] mask so saved focal maps to cards. */
 const val HERO_MASK_ASPECT_RATIO: Float = 16f / 9f
+
+/** Decode widths are rounded up to this step so near-equal window widths share one cache entry. */
+private const val HERO_DECODE_BUCKET_PX = 512
+
+private const val HERO_DECODE_MAX_SIDE_PX = 2048
 
 @Composable
 fun HeroFramedImage(
@@ -39,7 +36,6 @@ fun HeroFramedImage(
     modifier: Modifier = Modifier,
     imageAlpha: Float = 1f,
 ) {
-    val context = LocalContext.current
     val density = LocalDensity.current
     BoxWithConstraints(modifier = modifier) {
         val containerW =
@@ -67,36 +63,18 @@ fun HeroFramedImage(
             viewportW = containerW
             viewportH = containerH
         }
-        val liveRequestWidthPx = (viewportW * 2f).coerceIn(1f, 2048f).roundToInt()
-        val liveRequestHeightPx = (viewportH * 2f).coerceIn(1f, 2048f).roundToInt()
-
-        // The container is resized on every animation frame during the card <-> editor
-        // shared-bounds morph, so liveRequestWidthPx/Height changes every frame too. If
-        // the Coil request tracked that directly, remember(cacheKey) would rebuild a new
-        // ImageRequest each frame and restart the crossfade dozens of times mid-morph,
-        // reading as a continuous fade instead of a smooth resize. Debounce the *decode*
-        // size so it only updates once the size has settled; the crop/scale math below
-        // still uses the live viewport size every frame, so on-screen positioning stays
-        // smooth throughout.
-        var settledRequestSize by remember { mutableStateOf(liveRequestWidthPx to liveRequestHeightPx) }
-        LaunchedEffect(liveRequestWidthPx, liveRequestHeightPx) {
-            delay(120)
-            settledRequestSize = liveRequestWidthPx to liveRequestHeightPx
-        }
-        val (requestWidthPx, requestHeightPx) = settledRequestSize
-        val cacheKey = "$imageUri#$cacheRevision@$requestWidthPx:$requestHeightPx"
-        val model =
-            remember(cacheKey) {
-                ImageRequest
-                    .Builder(context)
-                    .data(imageUri)
-                    .size(Size(requestWidthPx, requestHeightPx))
-                    .memoryCacheKey(cacheKey)
-                    .diskCacheKey(cacheKey)
-                    .crossfade(200)
-                    .build()
-            }
-        val painter = rememberAsyncImagePainter(model)
+        // The decode size is derived from the window, not from this container. The card <-> editor
+        // morph remeasures the container every frame, and a request's cache key embeds its size,
+        // so a container-derived size gives the card and the editor separate cache entries: the
+        // editor's copy is then a guaranteed miss on open and fades in over the top of the morph.
+        // One window-width entry per photo is shared by the card, the editor and every frame in
+        // between, which is also fewer bitmaps than the old per-container-size keys held.
+        // A hero is never wider than the window, so this never upscales.
+        val windowWidthPx = LocalWindowInfo.current.containerSize.width
+        val requestMaxSidePx =
+            (((windowWidthPx + HERO_DECODE_BUCKET_PX - 1) / HERO_DECODE_BUCKET_PX) * HERO_DECODE_BUCKET_PX)
+                .coerceIn(HERO_DECODE_BUCKET_PX, HERO_DECODE_MAX_SIDE_PX)
+        val painter = rememberAsyncImagePainter(rememberHeroImageRequest(imageUri, cacheRevision, requestMaxSidePx))
         val loadState by painter.state.collectAsStateWithLifecycle()
         val intrinsic: ComposeSize = painter.intrinsicSize
         val ready =

@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,6 +30,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -54,6 +56,7 @@ import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.feedback.performSwipeThresholdHaptic
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
 /**
  * A synthetic, non-persisted header that stands in for the real parent row when a child has been
@@ -140,6 +143,9 @@ internal fun ChecklistRow(
      * completed section where hierarchy is frozen.
      */
     onIndentChange: ((Int) -> Unit)? = null,
+    hasChildren: Boolean = false,
+    childrenExpanded: Boolean = true,
+    onToggleChildren: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val scale by androidx.compose.animation.core
@@ -152,6 +158,13 @@ internal fun ChecklistRow(
     // Animate the indent so reparenting slides visibly instead of snapping.
     val animatedIndent by androidx.compose.animation.core
         .animateDpAsState(depthIndent, label = "checklistDepthIndent")
+    val checkedMutedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+    val checkboxTint =
+        if (item.checked) {
+            checkedMutedColor
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
 
     val hapticEnabled = LocalHapticEnabled.current
     val view = LocalView.current
@@ -351,7 +364,7 @@ internal fun ChecklistRow(
                     RememberMaterialRoundedSymbol(
                         name = if (item.checked) "check_box" else "check_box_outline_blank",
                         size = 24.dp,
-                        tint = if (item.checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        tint = checkboxTint,
                         weight = FontWeight.Medium,
                     )
                 }
@@ -439,6 +452,13 @@ internal fun ChecklistRow(
                         inner()
                     },
                 )
+                if (hasChildren && onToggleChildren != null) {
+                    ChecklistChildrenExpandButton(
+                        expanded = childrenExpanded,
+                        onClick = onToggleChildren,
+                        muted = item.checked,
+                    )
+                }
                 if (showDetailsAffordance) {
                     RememberIconButton(
                         onClick = { detailsExpanded = !detailsExpanded },
@@ -496,6 +516,13 @@ internal fun ChecklistRow(
                             Modifier.weight(1f)
                         },
                 )
+                if (hasChildren && onToggleChildren != null) {
+                    ChecklistChildrenExpandButton(
+                        expanded = childrenExpanded,
+                        onClick = onToggleChildren,
+                        muted = item.checked,
+                    )
+                }
                 if (showDetailsAffordance) {
                     RememberIconButton(
                         onClick = { detailsExpanded = !detailsExpanded },
@@ -620,46 +647,169 @@ internal fun GhostParentHeaderRow(
      * false and sit flush at depth 0.
      */
     showDragHandleGutter: Boolean,
+    childrenExpanded: Boolean,
+    onToggleChildren: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .alpha(0.45f),
+        modifier = modifier.fillMaxWidth(),
     ) {
-        if (showDragHandleGutter) {
-            Spacer(Modifier.width(40.dp))
-        }
-        // Static checkbox icon (no click behaviour). Using the Box + icon avoids the ripple and
-        // minSize guarantees of RememberIconButton so the ghost can't steal taps meant for a
-        // child below it.
-        Box(
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier =
                 Modifier
-                    .size(40.dp),
-            contentAlignment = Alignment.Center,
+                    .weight(1f)
+                    .alpha(0.45f),
         ) {
-            RememberMaterialRoundedSymbol(
-                name = if (isParentChecked) "check_box" else "check_box_outline_blank",
-                size = 24.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
+            if (showDragHandleGutter) {
+                Spacer(Modifier.width(40.dp))
+            }
+            // Static checkbox icon (no click behaviour). Using the Box + icon avoids the ripple and
+            // minSize guarantees of RememberIconButton so the ghost can't steal taps meant for a
+            // child below it.
+            Box(
+                modifier =
+                    Modifier
+                        .size(40.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                RememberMaterialRoundedSymbol(
+                    name = if (isParentChecked) "check_box" else "check_box_outline_blank",
+                    size = 24.dp,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    weight = FontWeight.Medium,
+                )
+            }
+            Text(
+                text = header.text.ifEmpty { stringResource(R.string.edit_list_new_item_placeholder) },
+                style =
+                    MaterialTheme.typography.bodyLarge.copy(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textDecoration = if (isParentChecked) TextDecoration.LineThrough else TextDecoration.None,
+                    ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
             )
         }
-        Text(
-            text = header.text.ifEmpty { stringResource(R.string.edit_list_new_item_placeholder) },
-            style =
-                MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textDecoration = if (isParentChecked) TextDecoration.LineThrough else TextDecoration.None,
-                ),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
+        // Keep the expand chevron at full strength so it matches real parent rows in this section.
+        // The ghost body stays faded; only the checkbox and title inherit the reduced opacity.
+        ChecklistChildrenExpandButton(
+            expanded = childrenExpanded,
+            onClick = onToggleChildren,
+            muted = true,
         )
     }
+}
+
+@Composable
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+private fun ChecklistChildrenExpandButton(
+    expanded: Boolean,
+    onClick: () -> Unit,
+    muted: Boolean = false,
+) {
+    val chevronTint =
+        if (muted) {
+            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+        } else {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        }
+    val rotation by androidx.compose.animation.core.animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        animationSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<Float>()),
+        label = "checklist_children_chevron_rotation",
+    )
+    val tooltipLabel =
+        stringResource(
+            if (expanded) {
+                R.string.cd_checklist_collapse_children
+            } else {
+                R.string.cd_checklist_expand_children
+            },
+        )
+    RememberIconButton(
+        onClick = onClick,
+        tooltipLabel = tooltipLabel,
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = "chevron_right",
+            autoMirror = true,
+            modifier = Modifier.graphicsLayer { rotationZ = rotation },
+            size = 22.dp,
+            tint = chevronTint,
+            weight = FontWeight.Medium,
+        )
+    }
+}
+
+internal fun filterVisibleActiveEntries(
+    entries: List<ActiveEntry>,
+    collapsedParentIds: Set<Long>,
+    draggingParentLocalId: Long?,
+): List<ActiveEntry> =
+    entries.filter { entry ->
+        isActiveEntryVisible(entry, collapsedParentIds, draggingParentLocalId)
+    }
+
+internal fun filterVisibleCompletedEntries(
+    entries: List<CompletedEntry>,
+    collapsedParentIds: Set<Long>,
+    draggingParentLocalId: Long?,
+): List<CompletedEntry> =
+    entries.filter { entry ->
+        isCompletedEntryVisible(entry, collapsedParentIds, draggingParentLocalId)
+    }
+
+internal fun isActiveEntryVisible(
+    entry: ActiveEntry,
+    collapsedParentIds: Set<Long>,
+    draggingParentLocalId: Long?,
+): Boolean {
+    when (entry) {
+        is ActiveEntry.Ghost -> {
+            val parentId = entry.header.realParentLocalId
+            // Ghost headers stay visible when collapsed so the section keeps an expand anchor.
+            if (draggingParentLocalId != null && parentId == draggingParentLocalId) {
+                return false
+            }
+        }
+        is ActiveEntry.Row -> {
+            entry.item.parentLocalId?.let { parentId ->
+                if (parentId in collapsedParentIds) {
+                    return false
+                }
+                if (draggingParentLocalId != null && parentId == draggingParentLocalId) {
+                    return false
+                }
+            }
+        }
+    }
+    return true
+}
+
+internal fun isCompletedEntryVisible(
+    entry: CompletedEntry,
+    collapsedParentIds: Set<Long>,
+    draggingParentLocalId: Long?,
+): Boolean {
+    when (entry) {
+        is CompletedEntry.Ghost -> {
+            // Ghost headers stay visible when collapsed so the section keeps an expand anchor.
+        }
+        is CompletedEntry.Row -> {
+            entry.item.parentLocalId?.let { parentId ->
+                if (parentId in collapsedParentIds) {
+                    return false
+                }
+                if (draggingParentLocalId != null && parentId == draggingParentLocalId) {
+                    return false
+                }
+            }
+        }
+    }
+    return true
 }
 
 /**

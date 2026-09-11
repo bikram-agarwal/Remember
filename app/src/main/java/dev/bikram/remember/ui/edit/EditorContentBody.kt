@@ -133,20 +133,28 @@ internal fun LazyListScope.editorContentHeaderItems(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3ExpressiveApi::class)
 internal fun LazyListScope.editorContentOptionsItem(
     padding: PaddingValues,
     bottomExtra: Dp = 0.dp,
     optionsContent: @Composable () -> Unit,
 ) {
     item(key = "options_panel") {
-        optionsContent()
-        Spacer(
-            Modifier.height(
-                EditorContentBodyDefaults.BottomSpacing +
-                    editorBottomPaddingWithFloor(padding) +
-                    bottomExtra,
-            ),
-        )
+        Column(
+            modifier =
+                Modifier.animateItem(
+                    placementSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec()),
+                ),
+        ) {
+            optionsContent()
+            Spacer(
+                Modifier.height(
+                    EditorContentBodyDefaults.BottomSpacing +
+                        editorBottomPaddingWithFloor(padding) +
+                        bottomExtra,
+                ),
+            )
+        }
     }
 }
 
@@ -192,12 +200,16 @@ internal fun EditorContentPictureHero(
             enter = fadeIn(animationSpec = heroFadeInSpec),
             exit = fadeOut(animationSpec = heroFadeOutSpec),
         ) {
-            val sharedModifier =
+            // Only lift the photo out of the editor when the full-screen viewer has a match.
+            // During note navigation it must inherit the editor container's scale and fade.
+            val viewerSharedModifier =
                 if (sharedScope != null) {
                     with(sharedScope) {
+                        val viewerSharedState = rememberSharedContentState(key = "hero-image-$uri")
                         Modifier.sharedBounds(
-                            sharedContentState = rememberSharedContentState(key = "hero-image-$uri"),
+                            sharedContentState = viewerSharedState,
                             animatedVisibilityScope = this@AnimatedVisibility,
+                            renderInOverlayDuringTransition = viewerSharedState.isMatchFound,
                         )
                     }
                 } else {
@@ -208,7 +220,7 @@ internal fun EditorContentPictureHero(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .then(sharedModifier)
+                        .then(viewerSharedModifier)
                         .clip(MaterialTheme.shapes.large)
                         .background(MaterialTheme.colorScheme.surfaceContainer)
                         .appClickable(onClick = onOpenFull),

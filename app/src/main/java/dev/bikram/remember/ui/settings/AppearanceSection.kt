@@ -45,10 +45,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.SliderState
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButtonDefaults
+import androidx.compose.material3.rememberSliderState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -1395,15 +1397,20 @@ private fun UiScaleSlider(
     onValueChangeFinished: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var sliderValue by remember { mutableFloatStateOf(scale.roundToUiScaleStep()) }
     val interactionSource = remember { MutableInteractionSource() }
     val isDragged by interactionSource.collectIsDraggedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
     val interacting = isDragged || isPressed
+    val sliderState =
+        rememberSliderState(
+            value = scale.roundToUiScaleStep(),
+            steps = UiScaleSliderStepCount,
+            trackRange = UI_SCALE_MIN..UI_SCALE_MAX,
+        )
 
     LaunchedEffect(scale, interacting) {
         if (!interacting) {
-            sliderValue = scale.roundToUiScaleStep()
+            sliderState.value = scale.roundToUiScaleStep()
         }
     }
 
@@ -1411,17 +1418,16 @@ private fun UiScaleSlider(
     // dead space between the row title and the track. The thumb stays a full-width drag target.
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
         Slider(
-            value = sliderValue,
-            onValueChange = { rawValue ->
-                sliderValue = rawValue.roundToUiScaleStep()
+            state = sliderState,
+            modifier = modifier.fillMaxWidth(),
+            onValueChange = { rawValue: Float ->
+                sliderState.value = rawValue.roundToUiScaleStep()
             },
             onValueChangeFinished = {
-                onValueChangeFinished(sliderValue)
+                onValueChangeFinished(sliderState.value.roundToUiScaleStep())
             },
-            valueRange = UI_SCALE_MIN..UI_SCALE_MAX,
-            steps = UiScaleSliderStepCount,
             interactionSource = interactionSource,
-            thumb = {
+            thumb = { state: SliderState ->
                 Label(
                     label = {
                         PlainTooltip(
@@ -1432,7 +1438,7 @@ private fun UiScaleSlider(
                                         minHeight = ShadingSliderLabelMinHeight,
                                     ).wrapContentWidth(),
                         ) {
-                            Text(getUiScaleLabel(sliderValue))
+                            Text(getUiScaleLabel(state.value.roundToUiScaleStep()))
                         }
                     },
                     interactionSource = interactionSource,
@@ -1444,7 +1450,6 @@ private fun UiScaleSlider(
                     )
                 }
             },
-            modifier = modifier.fillMaxWidth(),
         )
     }
 }
@@ -1471,35 +1476,39 @@ private fun ShadingIntensitySlider(
     onValueChange: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    var sliderValue by remember { mutableFloatStateOf(intensity.roundToShadingStep()) }
     val interactionSource = remember { MutableInteractionSource() }
     val isDragged by interactionSource.collectIsDraggedAsState()
     val isPressed by interactionSource.collectIsPressedAsState()
     val interacting = isDragged || isPressed
+    val sliderState =
+        rememberSliderState(
+            value = intensity.roundToShadingStep(),
+            steps = 19,
+            trackRange = 0f..2f,
+        )
 
     LaunchedEffect(intensity, interacting) {
         if (!interacting) {
-            sliderValue = intensity.roundToShadingStep()
+            sliderState.value = intensity.roundToShadingStep()
         }
     }
 
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
         Slider(
-            value = sliderValue,
-            onValueChange = { rawValue ->
+            state = sliderState,
+            modifier = modifier.fillMaxWidth(),
+            enabled = enabled,
+            onValueChange = { rawValue: Float ->
                 if (enabled) {
                     val steppedValue = rawValue.roundToShadingStep()
-                    if (steppedValue != sliderValue) {
-                        sliderValue = steppedValue
+                    if (steppedValue != sliderState.value) {
+                        sliderState.value = steppedValue
                         onValueChange(steppedValue)
                     }
                 }
             },
-            valueRange = 0f..2f,
-            steps = 19,
-            enabled = enabled,
             interactionSource = interactionSource,
-            thumb = {
+            thumb = { state: SliderState ->
                 Label(
                     label = {
                         PlainTooltip(
@@ -1510,7 +1519,7 @@ private fun ShadingIntensitySlider(
                                         minHeight = ShadingSliderLabelMinHeight,
                                     ).wrapContentWidth(),
                         ) {
-                            Text(getShadingLabel(sliderValue))
+                            Text(getShadingLabel(state.value.roundToShadingStep()))
                         }
                     },
                     interactionSource = interactionSource,
@@ -1523,7 +1532,6 @@ private fun ShadingIntensitySlider(
                     )
                 }
             },
-            modifier = modifier.fillMaxWidth(),
         )
     }
 }

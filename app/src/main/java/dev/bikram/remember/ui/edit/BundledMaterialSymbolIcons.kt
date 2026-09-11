@@ -2301,6 +2301,30 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         label = "Cash App",
                     ),
                     IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_capitalone",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_capitalone,
+                        label = "Capital One",
+                    ),
+                    IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_citi",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_citi,
+                        label = "Citi",
+                    ),
+                    IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_etrade",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_etrade,
+                        label = "E-Trade",
+                    ),
+                    IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_fidelity",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_fidelity,
+                        label = "Fidelity",
+                    ),
+                    IconChoice(
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_hdfcbank",
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_hdfcbank,
@@ -2583,6 +2607,12 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         label = "Apple Arcade",
                     ),
                     IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_amazonluna",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_amazonluna,
+                        label = "Amazon Luna",
+                    ),
+                    IconChoice(
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_ea",
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_ea,
@@ -2635,6 +2665,12 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_ubisoft,
                         label = "Ubisoft",
+                    ),
+                    IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_xbox",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_xbox,
+                        label = "Xbox",
                     ),
                 ),
         ),
@@ -2937,6 +2973,12 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         label = "Target",
                     ),
                     IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_tmobile",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_tmobile,
+                        label = "T-Mobile",
+                    ),
+                    IconChoice(
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_ticktick",
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_ticktick,
@@ -2959,6 +3001,12 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_unitedairlines,
                         label = "Unitedairlines",
+                    ),
+                    IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_walmart",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_walmart,
+                        label = "Walmart",
                     ),
                     IconChoice(
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_wemo",
