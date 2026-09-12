@@ -470,11 +470,16 @@ fun ReminderPickerSheet(
     var nextDraftKey by rememberSaveable { mutableLongStateOf(drafts.size.toLong()) }
     var enteringExpandedDraftKey by remember { mutableLongStateOf(Long.MIN_VALUE) }
 
+    // Compared against the initial reminders put through the same draft round trip rather than
+    // against the stored values: the picker only edits down to the minute, so a stored reminder
+    // carrying seconds or millis (snoozes, imported due dates) would otherwise read as edited the
+    // instant the sheet opened, and cancelling would ask about changes the user never made.
+    val initialAsEdited = remember(initialReminders, now) { initialReminders.map { it.toDraft().toReminder(now) } }
     val hasChanges =
         if (initialReminders.isEmpty()) {
             drafts.any { it.reminderDateExplicit || it.reminderTimeExplicit }
         } else {
-            drafts.map { it.toReminder(now) } != initialReminders
+            drafts.map { it.toReminder(now) } != initialAsEdited
         }
     val currentHasChanges = rememberUpdatedState(hasChanges)
     var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }

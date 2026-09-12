@@ -2571,6 +2571,12 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         label = "Twitter",
                     ),
                     IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_viber",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_viber,
+                        label = "Viber",
+                    ),
+                    IconChoice(
                         key = "${ICON_DRAWABLE_PREFIX}ic_stat_vine",
                         symbolName = null,
                         drawableRes = R.drawable.ic_stat_vine,

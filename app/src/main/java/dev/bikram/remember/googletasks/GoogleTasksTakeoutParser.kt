@@ -14,6 +14,7 @@ data class GoogleTasksTakeoutImport(
     val taskLists: List<GoogleTaskList>,
     val tasks: List<TaskToImport>,
     val stats: GoogleTasksTakeoutStats,
+    val source: ManualTaskImportSource = ManualTaskImportSource.GOOGLE_TAKEOUT,
 )
 
 data class GoogleTasksTakeoutStats(
@@ -28,7 +29,11 @@ class GoogleTasksTakeoutParser(
     private val now: () -> Instant = Instant::now,
 ) {
     fun parse(text: String): GoogleTasksTakeoutImport {
-        val root = json.parseToJsonElement(text)
+        require(text.isNotBlank()) { "The selected file is empty" }
+        return parse(json.parseToJsonElement(text))
+    }
+
+    internal fun parse(root: JsonElement): GoogleTasksTakeoutImport {
         val listObjects = findListObjects(root)
         if (listObjects.isNotEmpty()) {
             return parseListObjects(listObjects)

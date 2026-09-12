@@ -50,6 +50,7 @@ import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -122,6 +123,14 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+
+/**
+ * Share of the window given to the method rail in the landscape two-pane layout. Matches the
+ * proportion `rememberFlatScreenBalancedPaneExpansionState` hands the list pane on every other
+ * two-pane screen, so this screen's panes line up with the rest of the app rather than sitting at
+ * their own hand-picked width.
+ */
+private const val LIST_PANE_PROPORTION = 0.4f
 
 /**
  * Top-level destination for the Google Tasks import flow.
@@ -202,7 +211,7 @@ fun GoogleTasksImportRoute(
         rememberLauncherForActivityResult(
             ActivityResultContracts.OpenDocument(),
         ) { uri ->
-            if (uri != null) vm.loadTakeoutJson(uri)
+            if (uri != null) vm.loadManualImportJson(uri)
         }
 
     LaunchedEffect(effect) {
@@ -366,9 +375,6 @@ fun GoogleTasksImportRoute(
             )
         }
         Column(
-            // Cap the content width on wide windows (landscape/tablet) so the method
-            // pill, panels, and task list don't stretch edge-to-edge. The two-pane layout
-            // gets a wider cap so the rail + detail have room to breathe.
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -379,8 +385,20 @@ fun GoogleTasksImportRoute(
                     .padding(
                         top = if (twoPane) 0.dp else padding.calculateTopPadding(),
                         bottom = if (twoPane) 0.dp else padding.calculateBottomPadding(),
-                    ).wrapContentWidth(Alignment.CenterHorizontally)
-                    .widthIn(max = if (twoPane) 900.dp else 720.dp),
+                    ).then(
+                        if (twoPane) {
+                            // Two-pane fills the window the way every other two-pane screen does,
+                            // so [LIST_PANE_PROPORTION] lands on the same pane widths as the rest
+                            // of the app instead of a narrower centred block.
+                            Modifier
+                        } else {
+                            // Single pane caps the reading width on wide windows so the method
+                            // pill, panels, and task list don't stretch edge-to-edge.
+                            Modifier
+                                .wrapContentWidth(Alignment.CenterHorizontally)
+                                .widthIn(max = 720.dp)
+                        },
+                    ),
         ) {
             if (twoPane) {
                 Row(
@@ -395,7 +413,7 @@ fun GoogleTasksImportRoute(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Column(
-                        modifier = Modifier.width(240.dp),
+                        modifier = Modifier.weight(LIST_PANE_PROPORTION),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         // The Scaffold top app bar is hidden in two-pane; back + title live here
@@ -432,7 +450,7 @@ fun GoogleTasksImportRoute(
                             modifier = Modifier.fillMaxWidth(),
                         )
                     }
-                    detailPanel(Modifier.weight(1f))
+                    detailPanel(Modifier.weight(1f - LIST_PANE_PROPORTION))
                 }
             } else {
                 // The Connect Google / Manual import segmented pill is a SETUP-time choice. Once
@@ -862,15 +880,28 @@ private fun TakeoutImportPanel(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.google_tasks_import_takeout_step_1),
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = stringResource(R.string.google_tasks_import_steps_google_heading),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                InstructionBullet(stringResource(R.string.google_tasks_import_takeout_step_1))
+                InstructionBullet(stringResource(R.string.google_tasks_import_takeout_step_2))
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
                 )
                 Text(
-                    text = stringResource(R.string.google_tasks_import_takeout_step_2),
-                    style = MaterialTheme.typography.bodyMedium,
+                    text = stringResource(R.string.google_tasks_import_steps_tasks_org_heading),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                InstructionBullet(stringResource(R.string.google_tasks_import_tasks_org_step_1))
+                HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
                 )
                 Text(
-                    text = stringResource(R.string.google_tasks_import_takeout_step_3),
+                    text = stringResource(R.string.google_tasks_import_choose_json_step),
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -883,6 +914,26 @@ private fun TakeoutImportPanel(
         RememberButton(onClick = onPickJson, modifier = Modifier.fillMaxWidth()) {
             Text(stringResource(R.string.google_tasks_import_takeout_pick_json))
         }
+    }
+}
+
+/**
+ * One instruction step. The bullet sits in its own slot so a step that wraps stays indented past
+ * the bullet instead of running back under it.
+ */
+@Composable
+private fun InstructionBullet(text: String) {
+    Row(verticalAlignment = Alignment.Top) {
+        Text(
+            text = "\u2022",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
     }
 }
 
@@ -1024,6 +1075,7 @@ private fun LoadedPanel(
                 ImportHeroCard(
                     selectedCount = totalSelected,
                     totalCount = state.tasks.size,
+                    showGoogleDueTimeCaveat = state.manualImportSource != ManualTaskImportSource.TASKS_ORG,
                 )
             }
             item(key = "search") {
@@ -1222,6 +1274,7 @@ private fun groupVisibleTasks(
 private fun ImportHeroCard(
     selectedCount: Int,
     totalCount: Int,
+    showGoogleDueTimeCaveat: Boolean,
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -1245,11 +1298,13 @@ private fun ImportHeroCard(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
-                Text(
-                    text = stringResource(R.string.google_tasks_import_hero_caveat_compact),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
-                )
+                if (showGoogleDueTimeCaveat) {
+                    Text(
+                        text = stringResource(R.string.google_tasks_import_hero_caveat_compact),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f),
+                    )
+                }
             }
         }
     }
@@ -1841,7 +1896,10 @@ private fun SourceIdentityCard(state: GoogleTasksImportUiState) {
         if (isGoogle) {
             state.accountEmail.orEmpty().ifBlank { stringResource(R.string.google_tasks_import_signed_in_unknown_email) }
         } else {
-            stringResource(R.string.google_tasks_import_source_takeout_title)
+            when (state.manualImportSource) {
+                ManualTaskImportSource.TASKS_ORG -> stringResource(R.string.google_tasks_import_source_tasks_org_title)
+                else -> stringResource(R.string.google_tasks_import_source_takeout_title)
+            }
         }
     val subtitle =
         stringResource(

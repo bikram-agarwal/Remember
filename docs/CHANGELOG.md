@@ -1,3 +1,17 @@
+## v1.7.0 Import Tasks.org
+
+### ✨ New Features
+- You can now import your tasks from Tasks.org app. Descriptions, tags, due times, recurrence, and nested subtasks come through with the tasks.
+
+### 🛠 Improved Features
+- Added a Viber brand icon in the icon picker.
+
+### 🐛 Bug Fixes
+- In landscape, the import screen's two panes now match the rest of the app (40/60 split, full width).
+- Skip imported / Overwrite now treat trashed notes as gone, so deleting imported notes and importing again creates new notes instead of skipping or rewriting the trash.
+
+---
+
 ## v1.6.0 Checklist collapse, Markdown fixes
 
 ### ✨ New Features

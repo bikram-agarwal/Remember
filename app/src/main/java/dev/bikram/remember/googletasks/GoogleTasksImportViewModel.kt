@@ -51,7 +51,7 @@ class GoogleTasksImportViewModel
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
     ) : ViewModel() {
         private val auth: GoogleTasksAuthDelegate = DefaultGoogleTasksAuthDelegate
-        private val takeoutParser = GoogleTasksTakeoutParser()
+        private val manualImportParser = ManualTaskImportParser()
 
         private val _state = MutableStateFlow(GoogleTasksImportUiState())
         val state: StateFlow<GoogleTasksImportUiState> = _state.asStateFlow()
@@ -126,7 +126,7 @@ class GoogleTasksImportViewModel
             }
         }
 
-        fun loadTakeoutJson(uri: Uri) {
+        fun loadManualImportJson(uri: Uri) {
             viewModelScope.launch {
                 _state.update {
                     it.copy(
@@ -138,6 +138,7 @@ class GoogleTasksImportViewModel
                         tasks = emptyList(),
                         selectedTaskIds = emptySet(),
                         takeoutStats = null,
+                        manualImportSource = null,
                     )
                 }
                 val parsed =
@@ -148,11 +149,11 @@ class GoogleTasksImportViewModel
                                     inputStream.reader(Charsets.UTF_8).readText()
                                 } ?: throw IllegalArgumentException("Could not open selected file")
                             }
-                        takeoutParser.parse(text)
+                        manualImportParser.parse(text)
                     }
                 parsed
                     .onSuccess { importData ->
-                        val alreadyImported = refreshedImportedMap(GOOGLE_TASKS_TAKEOUT_SOURCE_KEY)
+                        val alreadyImported = refreshedImportedMap(importData.source.sourceKey)
                         _state.update {
                             it.copy(
                                 selectedMethod = ImportMethod.ManualImport,
@@ -162,6 +163,7 @@ class GoogleTasksImportViewModel
                                 taskLists = importData.taskLists,
                                 tasks = importData.tasks,
                                 takeoutStats = importData.stats,
+                                manualImportSource = importData.source,
                                 alreadyImportedIds = alreadyImported.keys,
                                 selectedTaskIds = emptySet(),
                                 listFilterId = null,
@@ -516,7 +518,9 @@ class GoogleTasksImportViewModel
                 importedMap.values
                     .distinct()
                     .filterTo(mutableSetOf()) { noteId ->
-                        noteRepository.get(noteId) != null
+                        // Trashed notes are gone as far as the user is concerned, so their tasks
+                        // must stop counting as already imported and drop out of the map.
+                        noteRepository.get(noteId)?.note?.trashed == false
                     }
             prefs.pruneMissing(sourceKey, existingNoteIds)
             return importedMap.filterValues { noteId -> noteId in existingNoteIds }
@@ -546,6 +550,7 @@ data class GoogleTasksImportUiState(
     val taskLists: List<GoogleTaskList> = emptyList(),
     val tasks: List<TaskToImport> = emptyList(),
     val takeoutStats: GoogleTasksTakeoutStats? = null,
+    val manualImportSource: ManualTaskImportSource? = null,
     val selectedTaskIds: Set<String> = emptySet(),
     val alreadyImportedIds: Set<String> = emptySet(),
     val listFilterId: String? = null,
@@ -578,13 +583,20 @@ data class GoogleTasksImportUiState(
 
     fun importedSourceKey(): String =
         if (selectedMethod == ImportMethod.ManualImport) {
-            GOOGLE_TASKS_TAKEOUT_SOURCE_KEY
+            manualImportSource?.sourceKey ?: GOOGLE_TASKS_TAKEOUT_SOURCE_KEY
         } else {
             accountEmail.sourceKey()
         }
 }
 
 private const val GOOGLE_TASKS_TAKEOUT_SOURCE_KEY = "manual:takeout"
+
+private val ManualTaskImportSource.sourceKey: String
+    get() =
+        when (this) {
+            ManualTaskImportSource.GOOGLE_TAKEOUT -> GOOGLE_TASKS_TAKEOUT_SOURCE_KEY
+            ManualTaskImportSource.TASKS_ORG -> "manual:tasks-org"
+        }
 
 private fun String?.sourceKey(): String =
     "google:" + (
