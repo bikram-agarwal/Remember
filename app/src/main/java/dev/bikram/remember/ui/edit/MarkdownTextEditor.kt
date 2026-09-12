@@ -60,6 +60,10 @@ internal enum class MarkdownEditorDisplayMode { MarkdownCode, LivePreview }
 
 private const val LIVE_PREVIEW_DEBOUNCE_DELAY_MS = 250L
 
+// Uses the deprecated value/onValueChange BasicTextField + VisualTransformation - see the
+// @Suppress comment on MarkdownVisualTransformation for why this hasn't been migrated to
+// TextFieldState/OutputTransformation yet.
+@Suppress("DEPRECATION")
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun MarkdownTextEditor(

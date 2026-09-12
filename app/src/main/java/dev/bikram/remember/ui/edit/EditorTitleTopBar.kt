@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.rememberLocalTextFieldValueState
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
@@ -260,12 +262,12 @@ internal fun EditorTitleTopBar(
                 BoxWithConstraints(modifier = Modifier.weight(1f)) {
                     val textMeasurer = rememberTextMeasurer()
                     val titleTextWidth = constraints.maxWidth
-                    if (titleEditable) {
-                        BasicTextField(
+                    val titleTextFieldState =
+                        rememberLocalTextFieldValueState(
                             value = titleFieldValue,
-                            onValueChange = {
-                                val nextText = sanitizeEditorTitle(it.text)
-                                val nextValue = it.withEditorTitleText(nextText)
+                            onValueChange = { updatedValue ->
+                                val nextText = sanitizeEditorTitle(updatedValue.text)
+                                val nextValue = updatedValue.withEditorTitleText(nextText)
                                 val fullTextFits =
                                     titleFitsEditorHeader(
                                         text = nextText,
@@ -310,6 +312,10 @@ internal fun EditorTitleTopBar(
                                     }
                                 }
                             },
+                        )
+                    if (titleEditable) {
+                        BasicTextField(
+                            state = titleTextFieldState,
                             textStyle = titleStyle,
                             enabled = !readOnly,
                             keyboardOptions =
@@ -317,8 +323,7 @@ internal fun EditorTitleTopBar(
                                     capitalization = KeyboardCapitalization.Sentences,
                                     imeAction = ImeAction.Next,
                                 ),
-                            singleLine = false,
-                            maxLines = EDITOR_TITLE_MAX_LINES,
+                            lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = EDITOR_TITLE_MAX_LINES),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             modifier =
                                 Modifier
@@ -328,7 +333,7 @@ internal fun EditorTitleTopBar(
                                     .graphicsLayer {
                                         translationX = titleBoundaryOffset.value
                                     },
-                            decorationBox = { inner ->
+                            decorator = { innerTextField ->
                                 if (title.isEmpty()) {
                                     Text(
                                         text = titlePlaceholder,
@@ -340,7 +345,7 @@ internal fun EditorTitleTopBar(
                                         overflow = TextOverflow.Ellipsis,
                                     )
                                 }
-                                inner()
+                                innerTextField()
                             },
                         )
                     } else {

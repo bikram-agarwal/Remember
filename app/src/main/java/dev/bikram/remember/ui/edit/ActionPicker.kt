@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +56,7 @@ import dev.bikram.remember.data.toNoteActionIconDrawable
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
+import dev.bikram.remember.ui.common.rememberHoistedStringTextFieldState
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
@@ -653,6 +655,7 @@ private fun ActionEditableRow(
     onTrailingClick: (() -> Unit)? = null,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val textFieldState = rememberHoistedStringTextFieldState(text = value, onTextChange = onValueChange)
     Column(Modifier.fillMaxWidth()) {
         Surface(
             color = scheme.surfaceContainerHigh,
@@ -676,9 +679,8 @@ private fun ActionEditableRow(
                         maxLines = 1,
                     )
                     BasicTextField(
-                        value = value,
-                        onValueChange = onValueChange,
-                        singleLine = true,
+                        state = textFieldState,
+                        lineLimits = TextFieldLineLimits.SingleLine,
                         keyboardOptions = keyboardOptions,
                         textStyle =
                             MaterialTheme.typography.titleMedium.copy(
@@ -691,8 +693,8 @@ private fun ActionEditableRow(
                             ),
                         cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                         modifier = Modifier.fillMaxWidth(),
-                        decorationBox = { innerTextField ->
-                            if (value.isBlank()) {
+                        decorator = { innerTextField ->
+                            if (textFieldState.text.isEmpty()) {
                                 Text(
                                     placeholder,
                                     style = MaterialTheme.typography.titleMedium,

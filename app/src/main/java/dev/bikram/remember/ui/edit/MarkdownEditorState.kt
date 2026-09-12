@@ -923,7 +923,52 @@ internal class MarkdownEditorState(
                 composition = null,
             )
         }
-        return this
+        return withBackspaceRedirectedOffMarkerCharacter(previousValue = previousValue)
+    }
+
+    // Live preview hides format markers, so the cursor commonly ends up positioned right after a
+    // whole run of them (e.g. right after closed bold+italic markers at the end of a line, or
+    // after Enter jumps the cursor past them - see withInlineWrapperEnterAdjusted). A plain
+    // single-character backspace there deletes one raw marker character instead of the visible
+    // character the user is looking at, which can leave a marker run one character short of what
+    // it needs to close (see collectFormatSpans' fallback, which then misreads the whole run).
+    // Redirect: if the character backspace just removed was itself part of a format marker, put it
+    // back and instead remove the nearest actually-visible character before it, leaving every
+    // marker character untouched.
+    private fun TextFieldValue.withBackspaceRedirectedOffMarkerCharacter(previousValue: TextFieldValue): TextFieldValue {
+        if (!selection.collapsed || !previousValue.selection.collapsed) {
+            return this
+        }
+        val previousCursor = previousValue.selection.start.coerceIn(0, previousValue.text.length)
+        if (previousCursor == 0 ||
+            text.length != previousValue.text.length - 1 ||
+            text != previousValue.text.removeRange(previousCursor - 1, previousCursor)
+        ) {
+            return this
+        }
+        val deletedIndex = previousCursor - 1
+        val spans = formatSpans()
+
+        fun isMarkerCharacter(index: Int) =
+            spans.any { span ->
+                (index >= span.openStart && index < span.openEnd) || (index >= span.closeStart && index < span.closeEnd)
+            }
+        if (!isMarkerCharacter(deletedIndex)) {
+            return this
+        }
+        var visibleCharIndex = deletedIndex - 1
+        while (visibleCharIndex >= 0 && isMarkerCharacter(visibleCharIndex)) {
+            visibleCharIndex--
+        }
+        if (visibleCharIndex < 0) {
+            return this
+        }
+        val updatedText = previousValue.text.removeRange(visibleCharIndex, visibleCharIndex + 1)
+        return copy(
+            text = updatedText,
+            selection = TextRange(visibleCharIndex.coerceIn(0, updatedText.length)),
+            composition = null,
+        )
     }
 
     private fun isSentenceStartBefore(index: Int): Boolean {
@@ -1309,8 +1354,34 @@ internal class MarkdownEditorState(
         val selectionStart = selection.min.coerceIn(0, markdown.length)
         val selectionEnd = selection.max.coerceIn(selectionStart, markdown.length)
 
-        val spans = formatSpans()
+        if (isFormatActiveIn(markdown, selectionStart, selectionEnd, format)) {
+            return true
+        }
+        // A collapsed cursor landing inside a bare run of asterisks - e.g. right after toggling a
+        // second asterisk-based format while the cursor sat at another format's own closing marker
+        // (bold "**word **", then toggling italic glues an empty "*"+"*" onto that close) - is
+        // genuinely ambiguous from the raw characters alone: the very next keystroke resolves it
+        // cleanly (indexOfAsteriskClosingMarker can then tell the runs apart), but until then the
+        // run reads as closing one span rather than opening an empty nested one. Probe with a
+        // placeholder character inserted at the cursor, mirroring what typing would resolve to, so
+        // the toolbar doesn't flicker off in the gap.
+        if (selectionStart == selectionEnd &&
+            markdown.getOrNull(selectionStart - 1) == '*' &&
+            markdown.getOrNull(selectionStart) == '*'
+        ) {
+            val probeText = markdown.substring(0, selectionStart) + '\u0000' + markdown.substring(selectionStart)
+            return isFormatActiveIn(probeText, selectionStart, selectionStart, format)
+        }
+        return false
+    }
 
+    private fun isFormatActiveIn(
+        text: String,
+        selectionStart: Int,
+        selectionEnd: Int,
+        format: MarkdownInlineFormat,
+    ): Boolean {
+        val spans = formatSpans(text)
         return if (selectionStart == selectionEnd) {
             spans.any { span ->
                 span.format == format && selectionStart in span.openEnd..span.closeStart

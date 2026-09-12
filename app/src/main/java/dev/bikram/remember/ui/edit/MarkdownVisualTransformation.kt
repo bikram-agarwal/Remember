@@ -60,6 +60,14 @@ internal fun markdownHorizontalRuleLineStarts(source: String): List<Int> {
     return ruleLineStarts
 }
 
+// VisualTransformation/TransformedText/OffsetMapping are deprecated in favor of
+// OutputTransformation, which only works with the newer TextFieldState-backed BasicTextField.
+// Migrating this file requires migrating MarkdownTextEditor's BasicTextField and
+// MarkdownEditorState's TextFieldValue-based formatting-toolbar logic together - attempted once
+// and reverted after it produced several formatting-toolbar/undo-history regressions (stale
+// toolbar highlighting, resurrected deleted text, "back" undoing a toggle). Left as deprecated
+// until that state model can be migrated safely.
+@Suppress("DEPRECATION")
 internal class MarkdownVisualTransformation(
     private val styler: MarkdownStyler,
     private val settledSource: String = "",
@@ -376,6 +384,7 @@ private class MarkdownPreviewTransformationBuilder(
     }
 }
 
+@Suppress("DEPRECATION")
 private class MarkdownPreviewOffsetMapping(
     private val originalToTransformed: IntArray,
     private val transformedToOriginal: IntArray,
@@ -415,6 +424,7 @@ private data class MarkdownStyleRange(
     val style: androidx.compose.ui.text.SpanStyle,
 )
 
+@Suppress("DEPRECATION")
 private data class TransformedMarkdown(
     val text: AnnotatedString,
     val offsetMapping: OffsetMapping,

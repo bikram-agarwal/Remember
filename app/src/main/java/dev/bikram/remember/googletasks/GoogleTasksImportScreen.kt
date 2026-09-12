@@ -42,6 +42,7 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
@@ -104,6 +105,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.common.isLandscape
+import dev.bikram.remember.ui.common.rememberHoistedStringTextFieldState
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberCheckbox
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
@@ -1271,6 +1273,7 @@ private fun SearchPill(
     val textColor = MaterialTheme.colorScheme.onSurface
     val placeholderColor = MaterialTheme.colorScheme.onSurfaceVariant
     val cursorColor = MaterialTheme.colorScheme.primary
+    val textFieldState = rememberHoistedStringTextFieldState(text = query, onTextChange = onQueryChange)
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.extraLargeIncreased,
@@ -1290,20 +1293,22 @@ private fun SearchPill(
             Spacer(Modifier.width(10.dp))
             Box(modifier = Modifier.weight(1f)) {
                 BasicTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
-                    singleLine = true,
+                    state = textFieldState,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = textColor),
                     cursorBrush = SolidColor(cursorColor),
                     modifier = Modifier.fillMaxWidth(),
+                    decorator = { innerTextField ->
+                        if (textFieldState.text.isEmpty()) {
+                            Text(
+                                text = placeholder,
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = placeholderColor,
+                            )
+                        }
+                        innerTextField()
+                    },
                 )
-                if (query.isEmpty()) {
-                    Text(
-                        text = placeholder,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = placeholderColor,
-                    )
-                }
             }
             if (query.isNotEmpty()) {
                 Spacer(Modifier.width(6.dp))

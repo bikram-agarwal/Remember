@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.rememberLocalTextFieldValueState
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.feedback.LocalHapticEnabled
@@ -177,6 +179,28 @@ internal fun ChecklistRow(
     var detailsFieldValue by remember(item.localId) {
         mutableStateOf(TextFieldValue(text = item.details, selection = TextRange(item.details.length)))
     }
+    val titleTextFieldState =
+        rememberLocalTextFieldValueState(
+            value = titleFieldValue,
+            onValueChange = { newValue ->
+                val oldText = titleFieldValue.text
+                titleFieldValue = newValue
+                if (newValue.text != oldText) {
+                    onTextChange(newValue.text)
+                }
+            },
+        )
+    val detailsTextFieldState =
+        rememberLocalTextFieldValueState(
+            value = detailsFieldValue,
+            onValueChange = { newValue ->
+                val oldText = detailsFieldValue.text
+                detailsFieldValue = newValue
+                if (newValue.text != oldText) {
+                    onDetailsChange(newValue.text)
+                }
+            },
+        )
 
     LaunchedEffect(item.text) {
         if (item.text != titleFieldValue.text) {
@@ -409,14 +433,8 @@ internal fun ChecklistRow(
             }
             if (isEditMode) {
                 BasicTextField(
-                    value = titleFieldValue,
-                    onValueChange = { newValue ->
-                        val oldText = titleFieldValue.text
-                        titleFieldValue = newValue
-                        if (newValue.text != oldText) {
-                            onTextChange(newValue.text)
-                        }
-                    },
+                    state = titleTextFieldState,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     textStyle =
                         MaterialTheme.typography.bodyLarge.copy(
                             color =
@@ -432,16 +450,13 @@ internal fun ChecklistRow(
                             capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences,
                             imeAction = androidx.compose.ui.text.input.ImeAction.Next,
                         ),
-                    keyboardActions =
-                        androidx.compose.foundation.text.KeyboardActions(
-                            onNext = { onNext() },
-                        ),
+                    onKeyboardAction = { onNext() },
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     modifier =
                         Modifier
                             .weight(1f)
                             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
-                    decorationBox = { inner ->
+                    decorator = { innerTextField ->
                         if (item.text.isEmpty()) {
                             Text(
                                 stringResource(R.string.edit_list_new_item_placeholder),
@@ -449,7 +464,7 @@ internal fun ChecklistRow(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                             )
                         }
-                        inner()
+                        innerTextField()
                     },
                 )
                 if (hasChildren && onToggleChildren != null) {
@@ -543,14 +558,8 @@ internal fun ChecklistRow(
             val detailsStartPadding = (if (isEditMode && showDragHandle) 40.dp else 0.dp) + 40.dp
             if (isEditMode) {
                 BasicTextField(
-                    value = detailsFieldValue,
-                    onValueChange = { newValue ->
-                        val oldText = detailsFieldValue.text
-                        detailsFieldValue = newValue
-                        if (newValue.text != oldText) {
-                            onDetailsChange(newValue.text)
-                        }
-                    },
+                    state = detailsTextFieldState,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     textStyle =
                         MaterialTheme.typography.bodyMedium.copy(
                             color =
@@ -571,7 +580,7 @@ internal fun ChecklistRow(
                             .fillMaxWidth()
                             .padding(start = detailsStartPadding, end = 48.dp, bottom = 8.dp)
                             .then(if (detailsFocusRequester != null) Modifier.focusRequester(detailsFocusRequester) else Modifier),
-                    decorationBox = { inner ->
+                    decorator = { innerTextField ->
                         if (item.details.isEmpty()) {
                             Text(
                                 stringResource(R.string.edit_list_item_details_placeholder),
@@ -579,7 +588,7 @@ internal fun ChecklistRow(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                             )
                         }
-                        inner()
+                        innerTextField()
                     },
                 )
             } else {

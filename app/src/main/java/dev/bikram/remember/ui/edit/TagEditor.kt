@@ -28,8 +28,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
@@ -44,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -82,6 +84,7 @@ import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.HueColorSlider
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.colorHexFromHue
+import dev.bikram.remember.ui.common.rememberHoistedStringTextFieldState
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberIconButton
@@ -775,6 +778,7 @@ internal fun CompactOutlinedField(
 ) {
     val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
     val pillShape = MaterialTheme.shapes.medium
+    val textFieldState = rememberHoistedStringTextFieldState(text = value, onTextChange = onValueChange)
     Row(
         modifier =
             modifier
@@ -793,19 +797,18 @@ internal fun CompactOutlinedField(
             contentAlignment = Alignment.CenterStart,
         ) {
             BasicTextField(
-                value = value,
-                onValueChange = onValueChange,
-                singleLine = true,
+                state = textFieldState,
+                lineLimits = TextFieldLineLimits.SingleLine,
                 textStyle =
                     MaterialTheme.typography.bodyLarge.copy(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = {}),
+                onKeyboardAction = {},
                 modifier = Modifier.fillMaxWidth(),
-                decorationBox = { inner ->
-                    if (value.isEmpty()) {
+                decorator = { innerTextField ->
+                    if (textFieldState.text.isEmpty()) {
                         Text(
                             text = placeholder,
                             style = MaterialTheme.typography.bodyLarge,
@@ -814,7 +817,7 @@ internal fun CompactOutlinedField(
                             overflow = TextOverflow.Ellipsis,
                         )
                     }
-                    inner()
+                    innerTextField()
                 },
             )
         }
@@ -888,6 +891,39 @@ internal fun EditableTagHexChip(
     val hapticEnabled = LocalHapticEnabled.current
     val view = LocalView.current
     var hadFocus by remember(editing) { mutableStateOf(false) }
+    var displayDraft by remember(draft) { mutableStateOf(draft.toPrefixedTagHexFieldValue()) }
+    val hexTextFieldState =
+        rememberTextFieldState(
+            initialText = displayDraft.text,
+            initialSelection = displayDraft.selection,
+        )
+    LaunchedEffect(displayDraft) {
+        val currentValue = TextFieldValue(hexTextFieldState.text.toString(), hexTextFieldState.selection)
+        if (currentValue != displayDraft) {
+            hexTextFieldState.edit {
+                replace(0, length, displayDraft.text)
+                selection = displayDraft.selection
+            }
+        }
+    }
+    LaunchedEffect(hexTextFieldState) {
+        snapshotFlow { TextFieldValue(hexTextFieldState.text.toString(), hexTextFieldState.selection) }
+            .collect { updatedValue ->
+                val acceptedValue = updatedValue.acceptPrefixedTagHexInput()
+                if (acceptedValue != null) {
+                    displayDraft = updatedValue
+                    onDraftChange(acceptedValue)
+                } else {
+                    hexTextFieldState.edit {
+                        replace(0, length, displayDraft.text)
+                        selection = displayDraft.selection
+                    }
+                    if (hapticEnabled) {
+                        view.performRejectHaptic()
+                    }
+                }
+            }
+    }
 
     LaunchedEffect(editing) {
         if (editing) {
@@ -951,15 +987,8 @@ internal fun EditableTagHexChip(
         )
         Spacer(Modifier.width(6.dp))
         BasicTextField(
-            value = draft.toPrefixedTagHexFieldValue(),
-            onValueChange = { value ->
-                val acceptedValue = value.acceptPrefixedTagHexInput()
-                if (acceptedValue != null) {
-                    onDraftChange(acceptedValue)
-                } else {
-                    if (hapticEnabled) view.performRejectHaptic()
-                }
-            },
+            state = hexTextFieldState,
+            lineLimits = TextFieldLineLimits.SingleLine,
             modifier =
                 Modifier
                     .weight(1f)
@@ -971,7 +1000,6 @@ internal fun EditableTagHexChip(
                             onStopEditing()
                         }
                     },
-            singleLine = true,
             textStyle = textStyle,
             cursorBrush = SolidColor(contentColor),
             keyboardOptions =
@@ -980,7 +1008,7 @@ internal fun EditableTagHexChip(
                     keyboardType = KeyboardType.Ascii,
                     imeAction = ImeAction.Done,
                 ),
-            keyboardActions = KeyboardActions(onDone = { onStopEditing() }),
+            onKeyboardAction = { onStopEditing() },
         )
     }
 }

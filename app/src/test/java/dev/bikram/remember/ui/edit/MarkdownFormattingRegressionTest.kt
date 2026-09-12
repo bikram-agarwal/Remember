@@ -180,12 +180,90 @@ class MarkdownFormattingRegressionTest {
         assertTrue(state.isBold)
     }
 
+    // Regression: after closing nested bold+italic with Enter (which jumps the cursor past the
+    // hidden closing markers onto a fresh line - see withInlineWrapperEnterAdjusted) and then
+    // backspacing the newline back out, the cursor sits right after a whole run of hidden marker
+    // characters. A plain single-character backspace there used to delete one raw marker character
+    // (not the visible trailing space the user is looking at), corrupting the marker run - bold
+    // vanished entirely and a stray "*" appeared. See withBackspaceRedirectedOffMarkerCharacter.
+    @Test
+    fun backspaceRightAfterClosedNestedFormatsRemovesVisibleCharacterNotMarker() {
+        val state = MarkdownEditorState()
+        state.toggleBold()
+        type(state, "Bold ")
+        state.toggleItalic()
+        type(state, "Italic ")
+        type(state, "\n")
+        backspace(state)
+
+        backspace(state)
+
+        assertEquals("**Bold *Italic***", state.markdown)
+        assertRendered(state, "Bold Italic")
+        assertTrue(state.isBold)
+        assertTrue(state.isItalic)
+    }
+
+    // Regression: toggling a second asterisk-based format right where the cursor sits at an
+    // enclosing format's own closing marker (e.g. bold "**word **", cursor right before the
+    // closing "**") glues a new empty wrapper onto that closing run into one bare run of
+    // asterisks. Reading that run is ambiguous until the next keystroke lands, so both formats
+    // used to read as inactive for one toolbar render. Existing content must not gain the new
+    // format either - only text typed after the toggle should.
+    @Test
+    fun togglingSecondFormatRightBeforeEnclosingFormatsCloseKeepsBothActiveWithoutRetroactivelyFormattingExistingText() {
+        val state = MarkdownEditorState()
+        state.toggleBold()
+        type(state, "word ")
+        assertEquals("**word **", state.markdown)
+        assertTrue(state.isBold)
+
+        state.toggleItalic()
+
+        assertTrue(state.isBold)
+        assertTrue(state.isItalic)
+        type(state, "X")
+        assertRendered(state, "word X")
+        assertFalse(
+            styler.markdownInlineAnnotatedString(state.markdown).spanStyles.any {
+                it.item.fontStyle == androidx.compose.ui.text.font.FontStyle.Italic && it.start < 5
+            },
+        )
+    }
+
+    @Test
+    fun togglingBoldRightBeforeEnclosingItalicsCloseKeepsBothActiveWithoutRetroactivelyFormattingExistingText() {
+        val state = MarkdownEditorState()
+        state.toggleItalic()
+        type(state, "word ")
+        assertEquals("*word *", state.markdown)
+        assertTrue(state.isItalic)
+
+        state.toggleBold()
+
+        assertTrue(state.isBold)
+        assertTrue(state.isItalic)
+        type(state, "X")
+        assertRendered(state, "word X")
+        assertFalse(
+            styler.markdownInlineAnnotatedString(state.markdown).spanStyles.any {
+                it.item.fontWeight == androidx.compose.ui.text.font.FontWeight.Bold && it.start < 5
+            },
+        )
+    }
+
     private fun type(
         state: MarkdownEditorState,
         inserted: String,
     ) {
         val cursor = state.textFieldValue.selection.start
         state.update(TextFieldValue(state.markdown.replaceRange(cursor, cursor, inserted), TextRange(cursor + inserted.length)))
+    }
+
+    private fun backspace(state: MarkdownEditorState) {
+        val cursor = state.textFieldValue.selection.start
+        if (cursor == 0) return
+        state.update(TextFieldValue(state.markdown.removeRange(cursor - 1, cursor), TextRange(cursor - 1)))
     }
 
     private fun assertRendered(

@@ -31,8 +31,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.ColorScheme
@@ -61,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -949,6 +951,39 @@ private fun EditableHexValue(
             textAlign = TextAlign.Center,
         )
     var hadFocus by remember(editing) { mutableStateOf(false) }
+    var displayDraft by remember(draft) { mutableStateOf(draft.toPrefixedHexFieldValue()) }
+    val hexTextFieldState =
+        rememberTextFieldState(
+            initialText = displayDraft.text,
+            initialSelection = displayDraft.selection,
+        )
+    LaunchedEffect(displayDraft) {
+        val currentValue = TextFieldValue(hexTextFieldState.text.toString(), hexTextFieldState.selection)
+        if (currentValue != displayDraft) {
+            hexTextFieldState.edit {
+                replace(0, length, displayDraft.text)
+                selection = displayDraft.selection
+            }
+        }
+    }
+    LaunchedEffect(hexTextFieldState) {
+        snapshotFlow { TextFieldValue(hexTextFieldState.text.toString(), hexTextFieldState.selection) }
+            .collect { updatedValue ->
+                val acceptedValue = updatedValue.acceptPrefixedHexInput()
+                if (acceptedValue != null) {
+                    displayDraft = updatedValue
+                    onDraftChange(acceptedValue)
+                } else {
+                    hexTextFieldState.edit {
+                        replace(0, length, displayDraft.text)
+                        selection = displayDraft.selection
+                    }
+                    if (hapticEnabled) {
+                        view.performRejectHaptic()
+                    }
+                }
+            }
+    }
     LaunchedEffect(editing) {
         if (!editing) onBoundsChange(null)
     }
@@ -994,15 +1029,8 @@ private fun EditableHexValue(
         contentAlignment = Alignment.Center,
     ) {
         BasicTextField(
-            value = draft.toPrefixedHexFieldValue(),
-            onValueChange = { value ->
-                val acceptedValue = value.acceptPrefixedHexInput()
-                if (acceptedValue != null) {
-                    onDraftChange(acceptedValue)
-                } else {
-                    if (hapticEnabled) view.performRejectHaptic()
-                }
-            },
+            state = hexTextFieldState,
+            lineLimits = TextFieldLineLimits.SingleLine,
             modifier =
                 Modifier
                     .fillMaxWidth()
@@ -1014,7 +1042,6 @@ private fun EditableHexValue(
                             onStopEditing()
                         }
                     },
-            singleLine = true,
             textStyle = textStyle,
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             keyboardOptions =
@@ -1023,7 +1050,7 @@ private fun EditableHexValue(
                     keyboardType = KeyboardType.Ascii,
                     imeAction = ImeAction.Done,
                 ),
-            keyboardActions = KeyboardActions(onDone = { onStopEditing() }),
+            onKeyboardAction = { onStopEditing() },
         )
     }
 }

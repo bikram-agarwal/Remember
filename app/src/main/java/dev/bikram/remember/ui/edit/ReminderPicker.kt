@@ -48,6 +48,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDefaults
 import androidx.compose.material3.DisplayMode
@@ -131,6 +132,7 @@ import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
+import dev.bikram.remember.ui.common.rememberHoistedDigitTextFieldState
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberConfirmDialog
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
@@ -2131,6 +2133,12 @@ private fun CompactDigitField(
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         }
     val outlineShape = MaterialTheme.shapes.medium
+    val textFieldState =
+        rememberHoistedDigitTextFieldState(
+            value = value,
+            onFilteredChange = onFilteredChange,
+            maxDigits = maxDigits,
+        )
     Box(
         modifier =
             modifier
@@ -2145,12 +2153,9 @@ private fun CompactDigitField(
         contentAlignment = Alignment.Center,
     ) {
         BasicTextField(
-            value = value,
-            onValueChange = { entered ->
-                onFilteredChange(entered.filter { ch -> ch.isDigit() }.take(maxDigits))
-            },
+            state = textFieldState,
             enabled = enabled,
-            singleLine = true,
+            lineLimits = TextFieldLineLimits.SingleLine,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             textStyle =
