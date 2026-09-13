@@ -30,7 +30,13 @@ class MarkdownVisualTransformationTest {
         val transformedText = transformation.filter(AnnotatedString("***Bold-italic***"))
 
         assertTrue(transformedText.text.spanStyles.any { spanRange -> spanRange.start == 0 && spanRange.end == 11 })
-        assertTrue(transformedText.text.spanStyles.size >= 2)
+        val style =
+            transformedText.text.spanStyles.fold(
+                androidx.compose.ui.text
+                    .SpanStyle(),
+            ) { combined, span -> combined.merge(span.item) }
+        assertEquals(androidx.compose.ui.text.font.FontWeight.Bold, style.fontWeight)
+        assertEquals(androidx.compose.ui.text.font.FontStyle.Italic, style.fontStyle)
     }
 
     @Test

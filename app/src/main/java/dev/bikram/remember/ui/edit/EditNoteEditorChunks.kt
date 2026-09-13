@@ -43,7 +43,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -99,15 +98,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-private const val UNDO_MAX_HISTORY = 50
-
-// Snapshotting length+hash avoids collecting the whole TextFieldValue on every keystroke while
-// still detecting body edits for the debounced persistence pipeline.
-private data class BodyFingerprint(
-    val length: Int,
-    val textHash: Int,
-)
-
 /**
  * Bridges the editor's [MarkdownEditorState] with [EditNoteViewModel.body]. Owns the "last
  * synced markdown" book-keeping so flushes from the debounced typing pipeline, lifecycle
@@ -118,7 +108,6 @@ private data class BodyFingerprint(
 @Stable
 internal class EditorBodyBridge(
     private val currentMarkdown: () -> String,
-    private val undoController: UndoRedoController?,
     private val onMarkdownChanged: (String) -> Unit,
 ) {
     @Volatile var lastSyncedBody: String = ""
@@ -128,15 +117,9 @@ internal class EditorBodyBridge(
         lastSyncedBody = initial
     }
 
-    fun replaceFromHistory(markdown: String) {
-        lastSyncedBody = markdown
-        onMarkdownChanged(markdown)
-    }
-
     fun pushIfChanged(markdown: String) {
         if (markdown == lastSyncedBody) return
         lastSyncedBody = markdown
-        undoController?.capture(markdown)
         onMarkdownChanged(markdown)
     }
 
@@ -153,8 +136,7 @@ internal class EditorBodyBridge(
  *
  * Owns these subtle concerns so leaf composables don't have to:
  * - Initial load: waits for [EditNoteViewModel.loaded] before seeding the editor and
- *   resetting [undoController], so existing notes start with their loaded content as the
- *   undo baseline rather than "" (which made an undo of the first edit erase the loaded body).
+ *   establishing the loaded document as the editor's undo baseline.
  * - View<->edit flips: pushes any pending edits to the VM when leaving edit mode.
  * - Background sync: when not in edit mode, mirrors VM body changes back into the editor.
  * - Lifecycle ON_STOP: synchronously flushes the markdown then triggers a save through
@@ -166,21 +148,19 @@ internal class EditorBodyBridge(
 internal fun rememberEditorBodyBridge(
     vm: EditNoteViewModel,
     markdownEditorState: MarkdownEditorState,
-    undoController: UndoRedoController,
     isEditMode: Boolean,
     appScope: CoroutineScope,
 ): EditorBodyBridge {
     val bridge =
-        remember(vm, markdownEditorState, undoController) {
+        remember(vm, markdownEditorState) {
             EditorBodyBridge(
                 currentMarkdown = { markdownEditorState.markdown },
-                undoController = undoController,
                 onMarkdownChanged = vm::setBody,
             )
         }
     val isEditModeState = rememberUpdatedState(isEditMode)
 
-    // Seed the editor and undo baseline once the VM finishes loading from disk. Resetting on
+    // Seed the editor once the VM finishes loading from disk. Resetting on
     // (loaded -> true) instead of immediately at remember{} time fixes the historical bug where
     // an existing note's first edit went into an empty undo stack (so undoing erased it).
     LaunchedEffect(vm, markdownEditorState, bridge) {
@@ -188,7 +168,6 @@ internal fun rememberEditorBodyBridge(
         val initialBody = vm.body.value
         markdownEditorState.setMarkdown(initialBody)
         bridge.reset(initialBody)
-        undoController.reset(initialBody)
     }
 
     // In view mode: mirror VM body changes back into the editor so external edits (e.g. the
@@ -197,7 +176,9 @@ internal fun rememberEditorBodyBridge(
     LaunchedEffect(vm, markdownEditorState, bridge) {
         vm.body.collect { latestBody ->
             if (!isEditModeState.value && latestBody != bridge.lastSyncedBody) {
-                markdownEditorState.setMarkdown(latestBody)
+                if (latestBody != markdownEditorState.markdown) {
+                    markdownEditorState.setMarkdown(latestBody)
+                }
                 bridge.reset(latestBody)
             }
         }
@@ -213,10 +194,8 @@ internal fun rememberEditorBodyBridge(
     if (isEditMode) {
         LaunchedEffect(markdownEditorState, bridge) {
             try {
-                snapshotFlow {
-                    val markdown = markdownEditorState.markdown
-                    BodyFingerprint(markdown.length, markdown.hashCode())
-                }.distinctUntilChanged()
+                snapshotFlow { markdownEditorState.markdown }
+                    .distinctUntilChanged()
                     .debounce(250)
                     .collectLatest { bridge.flush() }
             } finally {
@@ -288,28 +267,23 @@ internal fun rememberEditorBodyBridge(
 @Composable
 internal fun EditNoteBottomBarSection(
     markdownEditorState: MarkdownEditorState,
-    undoController: UndoRedoController,
     bridge: EditorBodyBridge,
     isEditMode: Boolean,
     imeVisible: Boolean = false,
 ) {
     val onUndo =
-        remember(markdownEditorState, undoController, bridge) {
+        remember(markdownEditorState, bridge) {
             {
-                undoController.undo(markdownEditorState.markdown)?.let { previous ->
-                    markdownEditorState.setMarkdown(previous)
-                    bridge.replaceFromHistory(previous)
-                }
+                markdownEditorState.undo()
+                bridge.flush()
                 Unit
             }
         }
     val onRedo =
-        remember(markdownEditorState, undoController, bridge) {
+        remember(markdownEditorState, bridge) {
             {
-                undoController.redo(markdownEditorState.markdown)?.let { next ->
-                    markdownEditorState.setMarkdown(next)
-                    bridge.replaceFromHistory(next)
-                }
+                markdownEditorState.redo()
+                bridge.flush()
                 Unit
             }
         }
@@ -322,7 +296,6 @@ internal fun EditNoteBottomBarSection(
     ) {
         EditNoteFormatBarContent(
             markdownEditorState = markdownEditorState,
-            undoController = undoController,
             onUndo = onUndo,
             onRedo = onRedo,
             imeVisible = imeVisible,
@@ -345,7 +318,6 @@ internal fun EditNoteBottomBarSection(
 @Composable
 internal fun EditNoteFormatBarContent(
     markdownEditorState: MarkdownEditorState,
-    undoController: UndoRedoController,
     modifier: Modifier = Modifier,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
@@ -364,67 +336,11 @@ internal fun EditNoteFormatBarContent(
                 Modifier
                     .fillMaxWidth()
                     .then(if (imeVisible) Modifier else Modifier.navigationBarsPadding()),
-            canUndo = undoController.canUndo,
-            canRedo = undoController.canRedo,
+            canUndo = markdownEditorState.canUndo,
+            canRedo = markdownEditorState.canRedo,
             onUndo = onUndo,
             onRedo = onRedo,
         )
-    }
-}
-
-/**
- * Undo / redo controller backed by Compose state lists so toolbar enabled-state recomposes
- * automatically. Capacity is capped at [UNDO_MAX_HISTORY] entries so a long editing session
- * doesn't grow unbounded.
- */
-@Stable
-internal class UndoRedoController {
-    private val undoStack = mutableStateListOf<String>()
-    private val redoStack = mutableStateListOf<String>()
-    private var lastPushed: String = ""
-    private var suppressCapture: Boolean = false
-
-    val canUndo: Boolean get() = undoStack.isNotEmpty()
-    val canRedo: Boolean get() = redoStack.isNotEmpty()
-
-    fun reset(initial: String) {
-        undoStack.clear()
-        redoStack.clear()
-        lastPushed = initial
-        suppressCapture = false
-    }
-
-    fun capture(markdown: String) {
-        if (suppressCapture) {
-            suppressCapture = false
-            lastPushed = markdown
-            return
-        }
-        if (markdown == lastPushed) return
-        undoStack.add(lastPushed)
-        if (undoStack.size > UNDO_MAX_HISTORY) undoStack.removeAt(0)
-        redoStack.clear()
-        lastPushed = markdown
-    }
-
-    fun undo(current: String): String? {
-        if (undoStack.isEmpty()) return null
-        redoStack.add(current)
-        if (redoStack.size > UNDO_MAX_HISTORY) redoStack.removeAt(0)
-        val prev = undoStack.removeAt(undoStack.lastIndex)
-        lastPushed = prev
-        suppressCapture = true
-        return prev
-    }
-
-    fun redo(current: String): String? {
-        if (redoStack.isEmpty()) return null
-        undoStack.add(current)
-        if (undoStack.size > UNDO_MAX_HISTORY) undoStack.removeAt(0)
-        val next = redoStack.removeAt(redoStack.lastIndex)
-        lastPushed = next
-        suppressCapture = true
-        return next
     }
 }
 
@@ -516,17 +432,17 @@ internal fun EditNoteMarkdownEditorSection(
                     .heightIn(min = 140.dp),
             onChecklistToggle = { lineIndex, checked ->
                 val updatedMarkdown = markdownEditorState.markdown.withChecklistLineToggled(lineIndex, checked)
-                markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
+                markdownEditorState.replaceMarkdown(updatedMarkdown)
                 onMarkdownChanged(updatedMarkdown)
             },
             onChecklistCheckAll = {
                 val updatedMarkdown = markdownEditorState.markdown.withAllChecklistLinesToggled(true)
-                markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
+                markdownEditorState.replaceMarkdown(updatedMarkdown)
                 onMarkdownChanged(updatedMarkdown)
             },
             onChecklistUncheckAll = {
                 val updatedMarkdown = markdownEditorState.markdown.withAllChecklistLinesToggled(false)
-                markdownEditorState.setMarkdown(updatedMarkdown, moveCursorToEnd = false)
+                markdownEditorState.replaceMarkdown(updatedMarkdown)
                 onMarkdownChanged(updatedMarkdown)
             },
             onTextTap = { tap ->

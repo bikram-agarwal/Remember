@@ -50,9 +50,17 @@ private fun String.indexOfAsteriskClosingMarker(
 ): Int {
     val openStack = mutableListOf<Int>()
     var gluedFallbackIndex = -1
+    var openingFallbackIndex = -1
     var currentIndex = startIndex
     while (currentIndex < length) {
         if (this[currentIndex] != '*') {
+            // Balanced non-asterisk wrappers own their contents. Stars in code, a link or an
+            // underlined/struck span cannot close an emphasis wrapper outside it.
+            val nestedEnd = nonAsteriskWrapperEnd(currentIndex, allowTrailingWhitespace)
+            if (nestedEnd > currentIndex) {
+                currentIndex = nestedEnd
+                continue
+            }
             currentIndex++
             continue
         }
@@ -66,14 +74,31 @@ private fun String.indexOfAsteriskClosingMarker(
         val prevChar = getOrNull(runStart - 1)
         val nextChar = getOrNull(runEnd)
         val editingClose = allowTrailingWhitespace && isEditingWhitespaceClose(runStart, runEnd)
-        val canClose = (prevChar != null && !prevChar.isWhitespace()) || editingClose
-        val canOpen = nextChar != null && !nextChar.isWhitespace()
+        val previousPunctuation = prevChar?.isMarkdownPunctuation() == true
+        val nextPunctuation = nextChar?.isMarkdownPunctuation() == true
+        val betweenPunctuation = previousPunctuation && nextPunctuation
+        val canClose =
+            (
+                prevChar != null && !prevChar.isWhitespace() &&
+                    (!previousPunctuation || nextChar == null || nextChar.isWhitespace() || nextPunctuation)
+            ) || editingClose
+        val canOpen =
+            nextChar != null && !nextChar.isWhitespace() &&
+                (!nextPunctuation || prevChar == null || prevChar.isWhitespace() || previousPunctuation)
 
         // The remainder of a leading run belongs to nested emphasis. For example, when
         // trying bold at the start of ***one**two*, the third star opens italic and must
         // consume a closer before bold can close. Empty symmetric wrappers stay eligible
         // for the fallback below so toolbar scaffolding can still be rendered.
         if (runStart == startIndex && getOrNull(startIndex - 1) == '*' && canOpen && runLength != markerLength) {
+            openStack.add(runLength)
+            continue
+        }
+
+        if (canOpen && canClose && openStack.isEmpty() && runLength > markerLength && betweenPunctuation) {
+            // Between tags, a longer run can either end this span or open a nested one. Prefer
+            // the nested match when it has its own closer; retain the split-run alternative.
+            if (openingFallbackIndex == -1) openingFallbackIndex = runStart
             openStack.add(runLength)
             continue
         }
@@ -106,17 +131,44 @@ private fun String.indexOfAsteriskClosingMarker(
                 if (gluedFallbackIndex == -1) {
                     gluedFallbackIndex = matchedIndex
                 }
+            } else if (remaining > 0 && canOpen) {
+                // A shorter run cannot close this wrapper, but can open nested emphasis after
+                // another closing tag: **<u>*Word *</u>*next *** must leave the final two stars
+                // for bold after the new italic span has consumed its own closing star.
+                openStack.add(remaining)
             }
         } else if (canOpen) {
             openStack.add(runLength)
         }
     }
-    return gluedFallbackIndex
+    return if (gluedFallbackIndex >= 0) gluedFallbackIndex else openingFallbackIndex
 }
 
-// While editing, a space before a closing delimiter is an intermediate typing state.
-// Keep that wrapper visible as formatting without accepting a later word's opening marker
-// as its close, or allowing emphasis to continue across a newline. Saved rendering stays strict.
+private val NonAsteriskMarkers = listOf("~~", "`")
+
+private fun String.nonAsteriskWrapperEnd(
+    index: Int,
+    allowTrailingWhitespace: Boolean,
+): Int {
+    if (getOrNull(index) == '[') {
+        MarkdownLinkRegex.matchAt(this, index)?.let { return it.range.last + 1 }
+    }
+    if (startsWith("<u>", index, ignoreCase = true)) {
+        val close = indexOf("</u>", index + 3, ignoreCase = true)
+        if (close >= 0) return close + 4
+    }
+    for (marker in NonAsteriskMarkers) {
+        if (startsWith(marker, index) && isValidOpening(index, marker.length)) {
+            val close = indexOfNonAsteriskClosingMarker(marker, index + marker.length, allowTrailingWhitespace)
+            if (close >= 0) return close + marker.length
+        }
+    }
+    return -1
+}
+
+// A note can be saved with spaces still inside its active formatting wrappers. Preview, saved
+// rendering and interaction mapping opt into the same bounded whitespace rule. Do not accept a
+// later word's opening marker as a whitespace close, or a newline immediately before the close.
 private fun String.isEditingWhitespaceClose(
     markerStart: Int,
     markerEnd: Int,
@@ -134,3 +186,14 @@ internal fun String.isValidOpening(
     val nextChar = getOrNull(index + markerLength)
     return nextChar != null && !nextChar.isWhitespace()
 }
+
+private fun Char.isMarkdownPunctuation(): Boolean =
+    when (category) {
+        CharCategory.CONNECTOR_PUNCTUATION, CharCategory.DASH_PUNCTUATION,
+        CharCategory.START_PUNCTUATION, CharCategory.END_PUNCTUATION,
+        CharCategory.INITIAL_QUOTE_PUNCTUATION, CharCategory.FINAL_QUOTE_PUNCTUATION,
+        CharCategory.OTHER_PUNCTUATION, CharCategory.MATH_SYMBOL,
+        CharCategory.CURRENCY_SYMBOL, CharCategory.MODIFIER_SYMBOL, CharCategory.OTHER_SYMBOL,
+        -> true
+        else -> false
+    }

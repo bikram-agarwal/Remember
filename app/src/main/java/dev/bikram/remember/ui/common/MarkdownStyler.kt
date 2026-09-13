@@ -15,26 +15,10 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextIndent
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
-
-internal val MarkdownHeadingLineRegex = Regex("""^(#{1,3})\s+(.*)$""")
-internal val MarkdownChecklistLineRegex = Regex("""^(\s*)- \[([ xX])\]\s+(.*)$""")
-internal val MarkdownBulletLineRegex = Regex("""^(\s*)[-*+]\s+(.*)$""")
-internal val MarkdownNumberedLineRegex = Regex("""^(\s*)(\d+)[.)]\s+(.*)$""")
-internal val MarkdownQuoteLineRegex = Regex("""^\s*>\s?(.*)$""")
-
-// A dash-run line is a horizontal rule, not a bullet: MarkdownBulletLineRegex requires whitespace
-// after its marker, so `---` never matched it and is safe to claim here. Only `-` runs are treated
-// as rules - `***` and `___` are deliberately left alone because they collide with the inline
-// bold/italic markers, which would make typing emphasis at the start of a line ambiguous.
-internal val MarkdownHorizontalRuleLineRegex = Regex("""^ {0,3}-{3,}[ \t]*$""")
-internal val MarkdownCodeFenceLineRegex = Regex("""^\s*```\s*$""")
-private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
 
 @Composable
 internal fun rememberMarkdownStyler(bodyStyle: TextStyle): MarkdownStyler {
@@ -139,401 +123,71 @@ internal class MarkdownStyler(
         return baseIndent + nestedIndent
     }
 
+    fun inlineSpanStyle(kind: MarkdownInlineKind): SpanStyle =
+        when (kind) {
+            MarkdownInlineKind.Bold -> boldSpanStyle
+            MarkdownInlineKind.Italic -> italicSpanStyle
+            MarkdownInlineKind.BoldItalic -> boldSpanStyle.merge(italicSpanStyle)
+            MarkdownInlineKind.Underline -> underlineSpanStyle
+            MarkdownInlineKind.Strikethrough -> strikethroughSpanStyle
+            MarkdownInlineKind.Code -> inlineCodeSpanStyle
+            MarkdownInlineKind.Link -> linkSpanStyle
+        }
+
     fun markdownInlineAnnotatedString(
         source: String,
         includeLinkAnnotations: Boolean = true,
+    ): AnnotatedString = renderInline(MarkdownInlineProjection(source), includeLinkAnnotations)
+
+    fun renderInline(
+        projection: MarkdownInlineProjection,
+        includeLinkAnnotations: Boolean = true,
+        textDecoration: TextDecoration? = null,
     ): AnnotatedString =
         buildAnnotatedString {
-            appendInlineMarkdown(
-                source = source,
-                includeLinkAnnotations = includeLinkAnnotations,
-            )
-        }
+            append(projection.text)
+            if (textDecoration != null && length > 0) {
+                addStyle(SpanStyle(textDecoration = textDecoration), 0, length)
+            }
+            for (span in projection.spans) {
+                val start = projection.visibleOffsets[span.openEnd]
+                val end = projection.visibleOffsets[span.closeStart]
+                if (end <= start) continue
+                addStyle(inlineSpanStyle(span.kind), start, end)
+                if (includeLinkAnnotations && span.url != null) {
+                    addLink(LinkAnnotation.Url(span.url.markdownLinkUrl()), start, end)
+                }
+            }
+        }.withCombinedMarkdownDecorations()
 
     fun markdownPreviewAnnotatedString(
         markdown: String,
         includeLinkAnnotations: Boolean = true,
-    ): AnnotatedString {
-        val previewSource =
-            markdown.lines().joinToString("\n") { line ->
-                visibleLineContent(line)
-            }
-        return markdownInlineAnnotatedString(
-            source = previewSource,
-            includeLinkAnnotations = includeLinkAnnotations,
-        )
-    }
+    ): AnnotatedString = markdownCardPreview(markdown, this, includeLinkAnnotations).text
 
-    fun markdownEditingAnnotatedString(markdown: String): AnnotatedString =
-        buildAnnotatedString {
+    fun markdownEditingAnnotatedString(markdown: String): AnnotatedString {
+        val syntax = parseMarkdownDocument(markdown)
+        return buildAnnotatedString {
             append(markdown)
-            applyBlockStyles(
-                source = markdown,
-                builder = this,
-            )
-        }
-
-    fun quoteContentForLine(line: String): String? {
-        val quoteMatch = MarkdownQuoteLineRegex.matchEntire(line)
-        if (quoteMatch != null) {
-            return quoteMatch.groupValues[1]
-        }
-        return null
-    }
-
-    fun visibleLineContent(line: String): String {
-        MarkdownHeadingLineRegex.matchEntire(line)?.let { match ->
-            return match.groupValues[2]
-        }
-        MarkdownChecklistLineRegex.matchEntire(line)?.let { match ->
-            return match.groupValues[3]
-        }
-        MarkdownBulletLineRegex.matchEntire(line)?.let { match ->
-            return match.groupValues[2]
-        }
-        MarkdownNumberedLineRegex.matchEntire(line)?.let { match ->
-            return match.groupValues[3]
-        }
-        MarkdownQuoteLineRegex.matchEntire(line)?.let { match ->
-            return match.groupValues[1]
-        }
-        return line
-    }
-
-    private fun AnnotatedString.Builder.appendInlineMarkdown(
-        source: String,
-        includeLinkAnnotations: Boolean,
-    ) {
-        // Regex.find(source, currentIndex) rescans to the end of the string on every fallback
-        // character, which is O(n^2) for long plain-text bodies with no link syntax. Precompute
-        // matches once and consume them with a forward-only cursor instead.
-        val linkMatchIterator = MarkdownLinkRegex.findAll(source).iterator()
-        var pendingLinkMatch = if (linkMatchIterator.hasNext()) linkMatchIterator.next() else null
-
-        fun linkMatchAt(index: Int): MatchResult? {
-            while (pendingLinkMatch != null && pendingLinkMatch!!.range.first < index) {
-                pendingLinkMatch = if (linkMatchIterator.hasNext()) linkMatchIterator.next() else null
-            }
-            return pendingLinkMatch?.takeIf { it.range.first == index }
-        }
-
-        var currentIndex = 0
-        while (currentIndex < source.length) {
-            val linkMatch = linkMatchAt(currentIndex)
-            if (linkMatch != null) {
-                val url = linkMatch.groupValues[2]
-                val appendLinkText = {
-                    withStyle(linkSpanStyle) {
-                        appendInlineMarkdown(
-                            source = linkMatch.groupValues[1],
-                            includeLinkAnnotations = includeLinkAnnotations,
-                        )
+            for (line in syntax.lines) {
+                if (line.contentStart > line.start) addStyle(syntaxMarkerSpanStyle, line.start, line.contentStart)
+                when (line.kind) {
+                    MarkdownBlockKind.Heading -> addStyle(headingSpanStyle(line.headingLevel), line.contentStart, line.end)
+                    MarkdownBlockKind.Checklist, MarkdownBlockKind.Bullet, MarkdownBlockKind.Numbered -> addStyle(listParagraphStyle, line.start, line.end)
+                    MarkdownBlockKind.Quote -> {
+                        addStyle(quoteParagraphStyle, line.start, line.end)
+                        addStyle(quoteSpanStyle, line.contentStart, line.end)
                     }
+                    MarkdownBlockKind.Code -> addStyle(codeBlockSpanStyle, line.start, line.end)
+                    else -> Unit
                 }
-                if (includeLinkAnnotations) {
-                    withLink(LinkAnnotation.Url(url.withHttpScheme())) {
-                        appendLinkText()
-                    }
-                } else {
-                    appendLinkText()
-                }
-                currentIndex = linkMatch.range.last + 1
-                continue
+                if (line.checked) addStyle(strikethroughSpanStyle, line.contentStart, line.end)
             }
-
-            // Each close-marker search scans forward to the end of the string when it finds no
-            // match. It must stay behind the cheap startsWith/isValidOpening checks — otherwise,
-            // for plain text with no markdown syntax, every character would trigger up to five
-            // full forward scans, making this whole pass O(n^2) instead of O(n).
-            if (source.startsWith("`", currentIndex) && source.isValidOpening(currentIndex, 1)) {
-                val inlineCodeClose = source.indexOfMarkdownClosingMarker("`", currentIndex + 1)
-                if (inlineCodeClose > currentIndex) {
-                    withStyle(inlineCodeSpanStyle) {
-                        append(source.substring(currentIndex + 1, inlineCodeClose))
-                    }
-                    currentIndex = inlineCodeClose + 1
-                    continue
-                }
+            for (span in syntax.spans) {
+                addStyle(inlineSpanStyle(span.kind), span.openEnd, span.closeStart)
+                addStyle(syntaxMarkerSpanStyle, span.openStart, span.openEnd)
+                addStyle(syntaxMarkerSpanStyle, span.closeStart, span.closeEnd)
             }
-
-            if (source.startsWith("<u>", currentIndex, ignoreCase = true)) {
-                val underlineClose = source.indexOf("</u>", currentIndex + 3, ignoreCase = true)
-                if (underlineClose > currentIndex) {
-                    withStyle(underlineSpanStyle) {
-                        appendInlineMarkdown(
-                            source = source.substring(currentIndex + 3, underlineClose),
-                            includeLinkAnnotations = includeLinkAnnotations,
-                        )
-                    }
-                    currentIndex = underlineClose + 4
-                    continue
-                }
-            }
-
-            if (source.startsWith("~~", currentIndex) && source.isValidOpening(currentIndex, 2)) {
-                val strikeClose = source.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
-                if (strikeClose > currentIndex) {
-                    withStyle(strikethroughSpanStyle) {
-                        appendInlineMarkdown(
-                            source = source.substring(currentIndex + 2, strikeClose),
-                            includeLinkAnnotations = includeLinkAnnotations,
-                        )
-                    }
-                    currentIndex = strikeClose + 2
-                    continue
-                }
-            }
-
-            if (source.startsWith("***", currentIndex) && source.isValidOpening(currentIndex, 3)) {
-                val boldItalicClose = source.indexOfMarkdownClosingMarker("***", currentIndex + 3)
-                if (boldItalicClose > currentIndex) {
-                    withStyle(boldSpanStyle) {
-                        withStyle(italicSpanStyle) {
-                            appendInlineMarkdown(
-                                source = source.substring(currentIndex + 3, boldItalicClose),
-                                includeLinkAnnotations = includeLinkAnnotations,
-                            )
-                        }
-                    }
-                    currentIndex = boldItalicClose + 3
-                    continue
-                }
-            }
-
-            if (source.startsWith("**", currentIndex) && source.isValidOpening(currentIndex, 2)) {
-                val boldClose = source.indexOfMarkdownClosingMarker("**", currentIndex + 2)
-                if (boldClose > currentIndex) {
-                    withStyle(boldSpanStyle) {
-                        appendInlineMarkdown(
-                            source = source.substring(currentIndex + 2, boldClose),
-                            includeLinkAnnotations = includeLinkAnnotations,
-                        )
-                    }
-                    currentIndex = boldClose + 2
-                    continue
-                }
-            }
-
-            if (source.startsWith("*", currentIndex) && source.isValidOpening(currentIndex, 1)) {
-                val italicClose = source.indexOfMarkdownClosingMarker("*", currentIndex + 1)
-                if (italicClose > currentIndex) {
-                    withStyle(italicSpanStyle) {
-                        appendInlineMarkdown(
-                            source = source.substring(currentIndex + 1, italicClose),
-                            includeLinkAnnotations = includeLinkAnnotations,
-                        )
-                    }
-                    currentIndex = italicClose + 1
-                    continue
-                }
-            }
-
-            append(source[currentIndex])
-            currentIndex++
-        }
+        }.withCombinedMarkdownDecorations()
     }
-
-    private fun applyBlockStyles(
-        source: String,
-        builder: AnnotatedString.Builder,
-    ) {
-        var lineStartIndex = 0
-        var inCodeBlock = false
-        while (lineStartIndex <= source.length) {
-            val lineEndIndex =
-                source.indexOf('\n', lineStartIndex).let { newlineIndex ->
-                    if (newlineIndex < 0) source.length else newlineIndex
-                }
-            val line = source.substring(lineStartIndex, lineEndIndex)
-            if (MarkdownCodeFenceLineRegex.matches(line)) {
-                builder.addStyle(syntaxMarkerSpanStyle, lineStartIndex, lineEndIndex)
-                inCodeBlock = !inCodeBlock
-            } else if (inCodeBlock) {
-                builder.addStyle(codeBlockSpanStyle, lineStartIndex, lineEndIndex)
-            } else {
-                applyMarkdownLineStyles(
-                    source = source,
-                    line = line,
-                    lineStartIndex = lineStartIndex,
-                    lineEndIndex = lineEndIndex,
-                    builder = builder,
-                )
-            }
-
-            if (lineEndIndex == source.length) {
-                break
-            }
-            lineStartIndex = lineEndIndex + 1
-        }
-    }
-
-    private fun applyMarkdownLineStyles(
-        source: String,
-        line: String,
-        lineStartIndex: Int,
-        lineEndIndex: Int,
-        builder: AnnotatedString.Builder,
-    ) {
-        MarkdownHeadingLineRegex.matchEntire(line)?.let { match ->
-            val headingLevel = match.groupValues[1].length
-            val contentStartIndex = lineStartIndex + match.groupValues[1].length + 1
-            builder.addStyle(syntaxMarkerSpanStyle, lineStartIndex, contentStartIndex)
-            builder.addStyle(headingSpanStyle(headingLevel), contentStartIndex, lineEndIndex)
-            applyInlineEditingStyles(source = source, startIndex = contentStartIndex, endIndex = lineEndIndex, builder = builder)
-            return
-        }
-
-        MarkdownChecklistLineRegex.matchEntire(line)?.let { match ->
-            val contentStartIndex = lineStartIndex + match.groups[3]!!.range.first
-            builder.addStyle(listParagraphStyle, lineStartIndex, lineEndIndex)
-            builder.addStyle(syntaxMarkerSpanStyle, lineStartIndex, contentStartIndex)
-            applyInlineEditingStyles(source = source, startIndex = contentStartIndex, endIndex = lineEndIndex, builder = builder)
-            return
-        }
-
-        MarkdownBulletLineRegex.matchEntire(line)?.let { match ->
-            val contentStartIndex = lineStartIndex + match.groups[2]!!.range.first
-            builder.addStyle(listParagraphStyle, lineStartIndex, lineEndIndex)
-            builder.addStyle(syntaxMarkerSpanStyle, lineStartIndex, contentStartIndex)
-            applyInlineEditingStyles(source = source, startIndex = contentStartIndex, endIndex = lineEndIndex, builder = builder)
-            return
-        }
-
-        MarkdownNumberedLineRegex.matchEntire(line)?.let { match ->
-            val contentStartIndex = lineStartIndex + match.groups[3]!!.range.first
-            builder.addStyle(listParagraphStyle, lineStartIndex, lineEndIndex)
-            builder.addStyle(syntaxMarkerSpanStyle, lineStartIndex, contentStartIndex)
-            applyInlineEditingStyles(source = source, startIndex = contentStartIndex, endIndex = lineEndIndex, builder = builder)
-            return
-        }
-
-        MarkdownQuoteLineRegex.matchEntire(line)?.let { match ->
-            val contentStartIndex = lineStartIndex + match.groups[1]!!.range.first
-            builder.addStyle(quoteParagraphStyle, lineStartIndex, lineEndIndex)
-            builder.addStyle(syntaxMarkerSpanStyle, lineStartIndex, contentStartIndex)
-            builder.addStyle(quoteSpanStyle, contentStartIndex, lineEndIndex)
-            applyInlineEditingStyles(source = source, startIndex = contentStartIndex, endIndex = lineEndIndex, builder = builder)
-            return
-        }
-
-        applyInlineEditingStyles(
-            source = source,
-            startIndex = lineStartIndex,
-            endIndex = lineEndIndex,
-            builder = builder,
-        )
-    }
-
-    private fun applyInlineEditingStyles(
-        source: String,
-        startIndex: Int,
-        endIndex: Int,
-        builder: AnnotatedString.Builder,
-    ) {
-        var currentIndex = startIndex
-        while (currentIndex < endIndex) {
-            val linkMatch = MarkdownLinkRegex.find(source, currentIndex)
-            if (linkMatch != null && linkMatch.range.first == currentIndex && linkMatch.range.last < endIndex) {
-                applyLinkEditingStyles(
-                    match = linkMatch,
-                    builder = builder,
-                    source = source,
-                    endIndex = endIndex,
-                )
-                currentIndex = linkMatch.range.last + 1
-                continue
-            }
-
-            val inlineCodeClose = source.indexOf('`', currentIndex + 1)
-            if (source.startsWith("`", currentIndex) && inlineCodeClose in (currentIndex + 1)..<endIndex) {
-                builder.addStyle(syntaxMarkerSpanStyle, currentIndex, currentIndex + 1)
-                builder.addStyle(inlineCodeSpanStyle, currentIndex + 1, inlineCodeClose)
-                builder.addStyle(syntaxMarkerSpanStyle, inlineCodeClose, inlineCodeClose + 1)
-                currentIndex = inlineCodeClose + 1
-                continue
-            }
-
-            val underlineClose = source.indexOf("</u>", currentIndex + 3, ignoreCase = true)
-            if (source.startsWith("<u>", currentIndex, ignoreCase = true) && underlineClose in (currentIndex + 3)..<endIndex) {
-                builder.addStyle(syntaxMarkerSpanStyle, currentIndex, currentIndex + 3)
-                builder.addStyle(underlineSpanStyle, currentIndex + 3, underlineClose)
-                applyInlineEditingStyles(source = source, startIndex = currentIndex + 3, endIndex = underlineClose, builder = builder)
-                builder.addStyle(syntaxMarkerSpanStyle, underlineClose, underlineClose + 4)
-                currentIndex = underlineClose + 4
-                continue
-            }
-
-            val strikeClose = source.indexOf("~~", currentIndex + 2)
-            if (source.startsWith("~~", currentIndex) && strikeClose in (currentIndex + 2)..<endIndex) {
-                builder.addStyle(syntaxMarkerSpanStyle, currentIndex, currentIndex + 2)
-                builder.addStyle(strikethroughSpanStyle, currentIndex + 2, strikeClose)
-                applyInlineEditingStyles(source = source, startIndex = currentIndex + 2, endIndex = strikeClose, builder = builder)
-                builder.addStyle(syntaxMarkerSpanStyle, strikeClose, strikeClose + 2)
-                currentIndex = strikeClose + 2
-                continue
-            }
-
-            val boldItalicClose = source.indexOf("***", currentIndex + 3)
-            if (source.startsWith("***", currentIndex) && boldItalicClose in (currentIndex + 3)..<endIndex) {
-                builder.addStyle(syntaxMarkerSpanStyle, currentIndex, currentIndex + 3)
-                builder.addStyle(boldSpanStyle, currentIndex + 3, boldItalicClose)
-                builder.addStyle(italicSpanStyle, currentIndex + 3, boldItalicClose)
-                applyInlineEditingStyles(source = source, startIndex = currentIndex + 3, endIndex = boldItalicClose, builder = builder)
-                builder.addStyle(syntaxMarkerSpanStyle, boldItalicClose, boldItalicClose + 3)
-                currentIndex = boldItalicClose + 3
-                continue
-            }
-
-            val boldClose = source.indexOf("**", currentIndex + 2)
-            if (source.startsWith("**", currentIndex) && boldClose in (currentIndex + 2)..<endIndex) {
-                builder.addStyle(syntaxMarkerSpanStyle, currentIndex, currentIndex + 2)
-                builder.addStyle(boldSpanStyle, currentIndex + 2, boldClose)
-                applyInlineEditingStyles(source = source, startIndex = currentIndex + 2, endIndex = boldClose, builder = builder)
-                builder.addStyle(syntaxMarkerSpanStyle, boldClose, boldClose + 2)
-                currentIndex = boldClose + 2
-                continue
-            }
-
-            val italicClose = source.indexOf('*', currentIndex + 1)
-            if (source.startsWith("*", currentIndex) && italicClose in (currentIndex + 1)..<endIndex) {
-                builder.addStyle(syntaxMarkerSpanStyle, currentIndex, currentIndex + 1)
-                builder.addStyle(italicSpanStyle, currentIndex + 1, italicClose)
-                applyInlineEditingStyles(source = source, startIndex = currentIndex + 1, endIndex = italicClose, builder = builder)
-                builder.addStyle(syntaxMarkerSpanStyle, italicClose, italicClose + 1)
-                currentIndex = italicClose + 1
-                continue
-            }
-
-            currentIndex++
-        }
-    }
-
-    private fun applyLinkEditingStyles(
-        match: MatchResult,
-        builder: AnnotatedString.Builder,
-        source: String,
-        endIndex: Int,
-    ) {
-        val labelGroup = match.groups[1] ?: return
-        val urlGroup = match.groups[2] ?: return
-        val labelStartIndex = labelGroup.range.first
-        val labelEndIndex = labelGroup.range.last + 1
-        val urlStartIndex = urlGroup.range.first
-        val linkEndIndex = match.range.last + 1
-        if (linkEndIndex > endIndex) {
-            return
-        }
-        builder.addStyle(syntaxMarkerSpanStyle, match.range.first, labelStartIndex)
-        builder.addStyle(linkSpanStyle, labelStartIndex, labelEndIndex)
-        applyInlineEditingStyles(source = source, startIndex = labelStartIndex, endIndex = labelEndIndex, builder = builder)
-        builder.addStyle(syntaxMarkerSpanStyle, labelEndIndex, urlStartIndex)
-        builder.addStyle(syntaxMarkerSpanStyle, urlStartIndex, linkEndIndex)
-    }
-}
-
-private fun String.withHttpScheme(): String {
-    if (startsWith("http://") || startsWith("https://")) {
-        return this
-    }
-    return "https://$this"
 }
