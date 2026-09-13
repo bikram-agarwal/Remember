@@ -6,6 +6,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.getActiveReminders
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -94,6 +95,7 @@ class EditNoteViewModel
                 if (opts.actions != old.actions) return true
                 if (opts.tags != old.tags) return true
                 if (opts.recurrence != old.recurrence) return true
+                if (opts.reminders != old.getActiveReminders()) return true
                 return false
             }
         }
@@ -105,6 +107,7 @@ class EditNoteViewModel
                     return@withLock null
                 }
                 if (!hasNetChanges()) {
+                    acceptPersistedSnapshot(originalNote)
                     persistence.clearDirty()
                     return@withLock null
                 }
@@ -134,6 +137,7 @@ class EditNoteViewModel
                     }
                 } else {
                     if (!persistence.isDirty) return@withLock null
+                    val old = originalNote
                     val epochAtWrite = persistence.currentEpoch()
                     repository.updateNote(id, finalTitle, bodyValue, 0, currentOptions())
                     if (titleValue.isBlank()) setTitle(finalTitle)
@@ -143,7 +147,6 @@ class EditNoteViewModel
                     }
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
 
-                    val old = originalNote
                     val savedNote = repository.get(id)?.note
                     acceptPersistedSnapshot(savedNote)
                     if (savedNote != null) {
@@ -169,6 +172,7 @@ class EditNoteViewModel
                                         actions = old.actions,
                                         tags = old.tags,
                                         recurrence = old.recurrence,
+                                        reminders = old.getActiveReminders(),
                                     ),
                             )
                             repository.setStarred(id, old.starred)

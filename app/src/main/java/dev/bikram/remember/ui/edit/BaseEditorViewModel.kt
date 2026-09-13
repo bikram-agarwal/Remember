@@ -171,6 +171,7 @@ abstract class BaseEditorViewModel(
     protected var loadedId: Long? = noteId
     protected var originalNote: dev.bikram.remember.data.NoteEntity? = null
     private var starredEditedLocally = false
+    private var remindersEditedLocally = false
 
     protected fun markDirty() {
         persistence.markDirty()
@@ -189,6 +190,7 @@ abstract class BaseEditorViewModel(
     protected fun acceptPersistedSnapshot(note: dev.bikram.remember.data.NoteEntity?) {
         originalNote = note
         starredEditedLocally = false
+        remindersEditedLocally = note != null && _reminders.value != note.getActiveReminders()
     }
 
     /**
@@ -197,7 +199,6 @@ abstract class BaseEditorViewModel(
      */
     protected fun applyLoadedCommon(existing: NoteWithItems) {
         val n = existing.note
-        acceptPersistedSnapshot(n)
         _title.value = n.title
         _starred.value = n.starred || n.tags.contains(RememberReservedTags.STARRED)
         val activeRems = n.getActiveReminders()
@@ -220,6 +221,7 @@ abstract class BaseEditorViewModel(
         _pinned.value = n.pinned
         _createdAt.value = n.createdAt
         _updatedAt.value = n.updatedAt
+        acceptPersistedSnapshot(n)
     }
 
     /**
@@ -238,10 +240,14 @@ abstract class BaseEditorViewModel(
                 }
                 val n = row.note
                 val activeRems = n.getActiveReminders()
-                if (_reminders.value != activeRems) _reminders.value = activeRems
-                if (_reminderAt.value != n.reminderAt) _reminderAt.value = n.reminderAt
-                val sanitized = n.recurrence?.sanitized()
-                if (_recurrence.value != sanitized) _recurrence.value = sanitized
+                // Room also emits after pinning, attachments, and our own suspended saves.
+                // Keep the draft until its reminder changes have actually been persisted.
+                if (!remindersEditedLocally) {
+                    _reminders.value = activeRems
+                    val soonest = activeRems.minByOrNull { it.reminderAt }
+                    _reminderAt.value = soonest?.reminderAt
+                    _recurrence.value = soonest?.recurrence?.sanitized()
+                }
                 val externallyStarred = n.starred || n.tags.contains(RememberReservedTags.STARRED)
                 if (!starredEditedLocally && _starred.value != externallyStarred) {
                     _starred.value = externallyStarred
@@ -295,6 +301,7 @@ abstract class BaseEditorViewModel(
         } else {
             _reminders.value = emptyList()
         }
+        remindersEditedLocally = true
         markDirty()
     }
 
@@ -304,6 +311,7 @@ abstract class BaseEditorViewModel(
         val soonest = remindersList.minByOrNull { it.reminderAt }
         _reminderAt.value = soonest?.reminderAt
         _recurrence.value = soonest?.recurrence?.sanitized()
+        remindersEditedLocally = true
         markDirty()
     }
 

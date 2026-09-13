@@ -125,6 +125,8 @@ class NoteRepository(
 
     suspend fun get(id: Long): NoteWithItems? = noteDao.get(id)
 
+    suspend fun snapshotAllNotes(): List<NoteWithItems> = noteDao.allNotes()
+
     /**
      * FTS4 search across active notes. Empty / whitespace-only [query] returns an empty flow
      * (callers should fall back to [observeActive] instead). The query is tokenised on

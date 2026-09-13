@@ -583,6 +583,8 @@ class NoteRepositoryRecurrenceTest {
 
         override suspend fun get(id: Long): NoteWithItems? = stored.takeIf { it.note.id == id }
 
+        override suspend fun allNotes(): List<NoteWithItems> = listOf(stored)
+
         override suspend fun activeRemindersUntil(untilMillis: Long): List<NoteWithItems> {
             val reminderAt = stored.note.reminderAt ?: return emptyList()
             return if (

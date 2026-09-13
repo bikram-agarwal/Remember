@@ -42,6 +42,11 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE id = :id LIMIT 1")
     suspend fun get(id: Long): NoteWithItems?
 
+    /** One consistent snapshot of all shelves, including their checklist rows and attachments. */
+    @Transaction
+    @Query("SELECT * FROM notes ORDER BY id ASC")
+    suspend fun allNotes(): List<NoteWithItems>
+
     @Transaction
     @Query(
         """

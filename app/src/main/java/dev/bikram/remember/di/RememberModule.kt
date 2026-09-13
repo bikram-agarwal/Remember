@@ -214,7 +214,9 @@ object RememberModule {
 
     @Provides
     @Singleton
-    fun provideNoteBackupDirtyTracker(): NoteBackupDirtyTracker = NoteBackupDirtyTracker()
+    fun provideNoteBackupDirtyTracker(
+        @ApplicationContext context: Context,
+    ): NoteBackupDirtyTracker = NoteBackupDirtyTracker(context)
 
     @Provides
     @Singleton

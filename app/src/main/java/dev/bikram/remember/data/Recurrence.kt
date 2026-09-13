@@ -9,7 +9,6 @@ import java.time.DayOfWeek
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
-import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 import java.util.Calendar
 
@@ -61,6 +60,16 @@ data class RecurrenceRule(
      * by the repository when the user completes an occurrence.
      */
     fun nextAfter(afterMillis: Long): Long? {
+        if (interval < 1) return null
+        if (unit == RecurrenceUnit.MONTH) {
+            when (val mode = monthlyMode) {
+                is MonthlyMode.ByDayOfMonth -> if (mode.day !in 1..31) return null
+                is MonthlyMode.ByNthWeekday -> {
+                    if (mode.ordinal !in 1..5 || mode.weekday !in Calendar.SUNDAY..Calendar.SATURDAY) return null
+                }
+                null -> Unit
+            }
+        }
         val cal = Calendar.getInstance().apply { timeInMillis = afterMillis }
         when (unit) {
             RecurrenceUnit.HOUR -> cal.add(Calendar.HOUR_OF_DAY, interval)
@@ -97,6 +106,7 @@ data class RecurrenceRule(
             RecurrenceUnit.YEAR -> cal.add(Calendar.YEAR, interval)
         }
         val next = cal.timeInMillis
+        if (next <= afterMillis) return null
         if (endKind == RecurrenceEndKind.ON_DATE && endDate != null && next > endDate) return null
         return next
     }
@@ -143,17 +153,6 @@ data class RecurrenceRule(
     }
 }
 
-private fun calendarDayOfWeek(day: DayOfWeek): Int =
-    when (day) {
-        DayOfWeek.SUNDAY -> Calendar.SUNDAY
-        DayOfWeek.MONDAY -> Calendar.MONDAY
-        DayOfWeek.TUESDAY -> Calendar.TUESDAY
-        DayOfWeek.WEDNESDAY -> Calendar.WEDNESDAY
-        DayOfWeek.THURSDAY -> Calendar.THURSDAY
-        DayOfWeek.FRIDAY -> Calendar.FRIDAY
-        DayOfWeek.SATURDAY -> Calendar.SATURDAY
-    }
-
 private fun startOfIsoWeekMonday(date: java.time.LocalDate): java.time.LocalDate = date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
 /**
@@ -161,8 +160,8 @@ private fun startOfIsoWeekMonday(date: java.time.LocalDate): java.time.LocalDate
  * [interval] counts ISO weeks from the week of the last occurrence: week offsets divisible
  * by [interval] are eligible (0 = same ISO week as [afterMillis]).
  *
- * Returns null when no slot exists within the search horizon (corrupt [daysOfWeek] values, or
- * exhaustive scan without a hit) so callers do not fabricate a bogus far-future instant.
+ * Computes one candidate per selected weekday instead of scanning every skipped day.
+ * Returns null for corrupt weekdays or an instant outside the epoch-millisecond range.
  */
 private fun nextWeeklyWithDaysAfter(
     afterMillis: Long,
@@ -175,29 +174,27 @@ private fun nextWeeklyWithDaysAfter(
     ) {
         return null
     }
-    val safeInterval = interval.coerceAtLeast(1)
     val zone = ZoneId.systemDefault()
     val baseZdt = ZonedDateTime.ofInstant(Instant.ofEpochMilli(afterMillis), zone)
     val wallClock = baseZdt.toLocalTime()
     val anchorMonday = startOfIsoWeekMonday(baseZdt.toLocalDate())
-    var currentDate = baseZdt.toLocalDate().plusDays(1)
-    val maxDays = 371 * safeInterval
-    repeat(maxDays) {
-        val candidateZdt = ZonedDateTime.of(currentDate, wallClock, zone)
-        val candidateMillis = candidateZdt.toInstant().toEpochMilli()
-        if (candidateMillis > afterMillis) {
-            val calendarDow = calendarDayOfWeek(candidateZdt.dayOfWeek)
-            if (calendarDow in daysOfWeek) {
-                val candidateMonday = startOfIsoWeekMonday(currentDate)
-                val weeksDiff = ChronoUnit.WEEKS.between(anchorMonday, candidateMonday)
-                if (weeksDiff % safeInterval.toLong() == 0L) {
-                    return candidateMillis
-                }
+    return daysOfWeek
+        .mapNotNull { weekday ->
+            // Calendar uses Sunday = 1; ISO weeks start with Monday at offset zero.
+            var candidateDate = anchorMonday.plusDays((weekday + 5L) % 7L)
+            if (!candidateDate.isAfter(baseZdt.toLocalDate())) {
+                candidateDate = candidateDate.plusWeeks(interval.toLong())
             }
-        }
-        currentDate = currentDate.plusDays(1)
-    }
-    return null
+            try {
+                ZonedDateTime
+                    .of(candidateDate, wallClock, zone)
+                    .toInstant()
+                    .toEpochMilli()
+                    .takeIf { candidateMillis -> candidateMillis > afterMillis }
+            } catch (_: ArithmeticException) {
+                null
+            }
+        }.minOrNull()
 }
 
 private fun advanceToNthWeekday(
