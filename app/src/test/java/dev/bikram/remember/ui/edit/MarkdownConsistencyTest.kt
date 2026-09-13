@@ -1,4 +1,4 @@
-@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE", "ktlint:standard:function-expression-body")
+@file:Suppress("ktlint:standard:function-expression-body")
 
 package dev.bikram.remember.ui.edit
 
@@ -68,9 +68,11 @@ class MarkdownConsistencyTest {
                 val state = MarkdownEditorState()
                 order.forEach { toggle(state, it) }
                 input(state, "Word ")
+                val beforeToggle = state.markdown
                 toggle(state, removed)
+                val afterToggle = state.markdown
                 input(state, "next ")
-                assertEquals(order.toSet() - removed, state.inlineFormats)
+                assertEquals("$order removing $removed: ${state.markdown}", order.toSet() - removed, state.inlineFormats)
                 val preview = MarkdownOutputTransformation(styler).preview(state.markdown).text
                 val saved = styler.markdownInlineAnnotatedString(state.markdown)
                 assertEquals("$order removing $removed: ${state.markdown}", "Word next ", preview.text)
@@ -79,7 +81,7 @@ class MarkdownConsistencyTest {
                     val expected = if (index < 5) order.toSet() else order.toSet() - removed
                     // Ending a format may move the separating space outside its wrapper.
                     // Preserve that existing command policy while checking every rendered style.
-                    if (index != 4) assertFormats("$order removing $removed at $index", resolvedStyle(saved, index), expected)
+                    if (index != 4) assertFormats("$order removing $removed at $index: $beforeToggle -> $afterToggle -> ${state.markdown}", resolvedStyle(saved, index), expected)
                     assertEquals(resolvedStyle(preview, index), resolvedStyle(saved, index))
                 }
             }
@@ -106,6 +108,40 @@ class MarkdownConsistencyTest {
                 "**[Word](https://example.com/a**b) next**" to "Word next",
             )
         for ((source, expected) in cases) assertInlineConsistency(source, expected)
+    }
+
+    @Test
+    fun nestedUnderlineAndStrikeOwnTheirClosersAndIgnoreLiteralMarkers() {
+        val cases =
+            linkedMapOf(
+                "<u>outer <u>inner</u> end</u>" to "outer inner end",
+                "<U>outer <u>inner</U> end</u>" to "outer inner end",
+                "~~outer ~~inner~~ end~~" to "outer inner end",
+                "~~***<u>~~item 1~~</u>***~~" to "item 1",
+                "~~<u>~~<u>text</u>~~</u>~~" to "text",
+                "~~before `a~~b` after~~" to "before a~~b after",
+                "<u>before `</u>` after</u>" to "before </u> after",
+                "<u>before [<u>label</u>](example.com/</u>) after</u>" to "before label after",
+                "~~before [~~label~~](example.com/a~~b) after~~" to "before label after",
+                "***<u>outer <u>inner </u> end </u>***" to "outer inner  end ",
+                "~~unfinished and ~~complete~~" to "~~unfinished and complete",
+                "<u>unfinished and <u>complete</u>" to "<u>unfinished and complete",
+            )
+        for ((source, expected) in cases) assertInlineConsistency(source, expected)
+        assertInlineConsistency("~~***<u>~~item 1~~</u>***~~", "item 1", formats.toSet())
+        assertInlineConsistency("<u>outer <u>inner</u> end</u>", "outer inner end", setOf(MarkdownInlineFormat.UNDERLINE))
+        assertInlineConsistency("~~outer ~~inner~~ end~~", "outer inner end", setOf(MarkdownInlineFormat.STRIKETHROUGH))
+    }
+
+    @Test(timeout = 5_000)
+    fun deeplyNestedUnderlineDoesNotUseTheCallStackOrLeaveTagsVisible() {
+        val source = "<u>".repeat(2_000) + "Word" + "</u>".repeat(2_000)
+        val projection = MarkdownInlineProjection(source)
+        assertEquals("Word", projection.text)
+        assertEquals(2_000, projection.spans.size)
+        assertEquals(6_000, projection.sourceOffsets[0])
+        val unmatched = "<u>".repeat(2_000) + "Word"
+        assertEquals(unmatched, MarkdownInlineProjection(unmatched).text)
     }
 
     @Test
@@ -291,16 +327,73 @@ class MarkdownConsistencyTest {
     }
 
     @Test
+    fun selectionsAcrossWrappersPreserveTextAndOnlyToggleTheRequestedStyle() {
+        val cases =
+            listOf(
+                Triple("🙂~~Xa BW~~o**r**d", TextRange(6, 8), MarkdownInlineFormat.BOLD),
+                Triple("*<u>🙂</u><u>🙂🙂🙂</u>r*", TextRange(9, 0), MarkdownInlineFormat.STRIKETHROUGH),
+                Triple("A**lph a **B~~e~~~~ta~~", TextRange(10, 0), MarkdownInlineFormat.ITALIC),
+            )
+        for ((source, selection, format) in cases) {
+            val state = MarkdownEditorState(source)
+            val projection = MarkdownInlineProjection(source, parseMarkdownDocument(source).spans)
+            val before = styler.markdownInlineAnnotatedString(source)
+            state.textFieldState.edit {
+                this.selection = TextRange(projection.sourceOffsets[selection.start], projection.sourceOffsets[selection.end])
+            }
+            toggle(state, format)
+            assertInlineConsistency(state.markdown, before.text)
+            val after = styler.markdownInlineAnnotatedString(state.markdown)
+            for (index in before.indices) {
+                if (before[index].isWhitespace()) continue
+                val existing = resolvedStyle(before, index)
+                val expected =
+                    buildSet {
+                        if (existing.fontWeight == FontWeight.Bold) add(MarkdownInlineFormat.BOLD)
+                        if (existing.fontStyle == FontStyle.Italic) add(MarkdownInlineFormat.ITALIC)
+                        if (existing.textDecoration?.contains(TextDecoration.Underline) == true) add(MarkdownInlineFormat.UNDERLINE)
+                        if (existing.textDecoration?.contains(TextDecoration.LineThrough) == true) add(MarkdownInlineFormat.STRIKETHROUGH)
+                        if (index in selection.min until selection.max) add(format)
+                    }
+                assertFormats("$source at $index: ${state.markdown}", resolvedStyle(after, index), expected)
+            }
+        }
+    }
+
+    @Test
+    fun deferredTypingFormatsSurviveUndoRedoAndApplyToEveryInsertedCharacter() {
+        val state = MarkdownEditorState()
+        state.toggleBold()
+        state.toggleUnderline()
+        state.toggleStrikethrough()
+        state.toggleItalic()
+        input(state, "Word ")
+        val source = state.markdown
+        state.toggleUnderline()
+        assertEquals(source, state.markdown)
+        assertEquals(formats.toSet() - MarkdownInlineFormat.UNDERLINE, state.inlineFormats)
+        state.undo()
+        assertEquals(formats.toSet(), state.inlineFormats)
+        state.redo()
+        for (character in "next ") input(state, character.toString())
+        assertInlineConsistency(state.markdown, "Word next ")
+        val saved = styler.markdownInlineAnnotatedString(state.markdown)
+        for (index in 5 until saved.length) {
+            assertFormats(state.markdown, resolvedStyle(saved, index), formats.toSet() - MarkdownInlineFormat.UNDERLINE)
+        }
+    }
+
+    @Test
     fun autocorrectionAndCompositionKeepPreviewAndSavedTextInAgreement() {
         val state = MarkdownEditorState()
         formats.forEach { toggle(state, it) }
         for (word in listOf("W", "Wor", "Wrod", "Word")) {
-            state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
-                val start = composition?.start ?: selection.min
-                val end = composition?.end ?: selection.max
+            state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
+                val start = imeComposition?.start ?: selection.min
+                val end = imeComposition?.end ?: selection.max
                 replace(start, end, word)
                 selection = TextRange(start + word.length)
-                setComposition(start, start + word.length)
+                setImeComposition(start, start + word.length)
             }
             assertInlineConsistency(state.markdown, word, formats.toSet())
             assertEquals(formats.toSet(), state.inlineFormats)
@@ -394,7 +487,7 @@ class MarkdownConsistencyTest {
         state: MarkdownEditorState,
         text: String,
     ) {
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
             val start = selection.min
             replace(start, selection.max, text)
             selection = TextRange(start + text.length)

@@ -25,7 +25,17 @@ internal data class MarkdownLineSyntax(
     val number: String = "",
     val checked: Boolean = false,
     val headingLevel: Int = 0,
-)
+) {
+    val hasEditablePrefix: Boolean
+        get() =
+            when (kind) {
+                MarkdownBlockKind.Heading, MarkdownBlockKind.Checklist, MarkdownBlockKind.Bullet, MarkdownBlockKind.Numbered, MarkdownBlockKind.Quote -> true
+                else -> false
+            }
+
+    val isEmptyBlock: Boolean
+        get() = hasEditablePrefix && contentStart == end
+}
 
 internal data class MarkdownDocumentSyntax(
     val source: String,
@@ -43,6 +53,10 @@ internal val MarkdownQuoteLineRegex = Regex("""^\s*>\s?(.*)$""")
 internal val MarkdownHorizontalRuleLineRegex = Regex("""^ {0,3}-{3,}[ \t]*$""")
 internal val MarkdownCodeFenceLineRegex = Regex("""^\s*```\s*$""")
 internal val MarkdownLinkRegex = Regex("""\[([^\]\n]+)]\(([^)\n]+)\)""")
+
+// Incomplete input is intentionally distinct from complete syntax: Backspace may leave half
+// a checklist marker or a heading without its space while deleting an empty block prefix.
+internal val MarkdownPartialBlockPrefixRegex = Regex("""^\s*(#{1,3}|- \[[ xX]?\]?|\d+[.)]?|[-*+]|>)\s*$""")
 
 internal fun parseMarkdownLine(
     line: String,
@@ -123,6 +137,7 @@ private fun collectMarkdownInlineSpans(
     sourceOffset: Int,
     spans: MutableList<MarkdownInlineSpan>,
 ) {
+    val matcher = MarkdownInlineMatcher(source)
     val links = MarkdownLinkRegex.findAll(source).iterator()
     var nextLink = if (links.hasNext()) links.next() else null
     // Explicit frames keep deeply nested pasted markup off the JVM call stack.
@@ -143,7 +158,7 @@ private fun collectMarkdownInlineSpans(
             if (link != null) {
                 MarkdownInlineSpan(MarkdownInlineKind.Link, index, link.groups[1]!!.range.first, link.groups[1]!!.range.last + 1, link.range.last + 1, link.groupValues[2])
             } else {
-                findMarkdownInlineSpan(source, index, frame.end)
+                findMarkdownInlineSpan(source, index, frame.end, matcher)
             }
         if (span == null) {
             frame.index++
@@ -171,17 +186,16 @@ private fun findMarkdownInlineSpan(
     source: String,
     index: Int,
     end: Int,
+    matcher: MarkdownInlineMatcher,
 ): MarkdownInlineSpan? {
+    if (source.startsWith("****", index) && source.getOrNull(index + 4) != '*' && index + 4 <= end) {
+        return MarkdownInlineSpan(MarkdownInlineKind.Bold, index, index + 2, index + 2, index + 4)
+    }
     for ((marker, kind) in MarkdownInlineMarkers) {
         // Never search for closers at ordinary characters: that previously caused large-paste ANRs.
         if (!source.startsWith(marker, index, ignoreCase = kind == MarkdownInlineKind.Underline)) continue
         if (kind != MarkdownInlineKind.Underline && !source.isValidOpening(index, marker.length)) continue
-        val close =
-            if (kind == MarkdownInlineKind.Underline) {
-                source.indexOf("</u>", index + marker.length, ignoreCase = true)
-            } else {
-                source.indexOfMarkdownClosingMarker(marker, index + marker.length, allowTrailingWhitespace = true)
-            }
+        val close = matcher.closingMarker(marker, index + marker.length, end)
         val closingLength = if (kind == MarkdownInlineKind.Underline) 4 else marker.length
         if (close >= index + marker.length && close + closingLength <= end) {
             return MarkdownInlineSpan(kind, index, index + marker.length, close, close + closingLength)

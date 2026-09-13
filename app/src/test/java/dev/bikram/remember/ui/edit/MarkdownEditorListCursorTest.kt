@@ -1,4 +1,4 @@
-@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE", "ktlint:standard:function-expression-body")
+@file:Suppress("ktlint:standard:function-expression-body")
 
 package dev.bikram.remember.ui.edit
 
@@ -120,14 +120,14 @@ class MarkdownEditorListCursorTest {
                 .single { it.name.startsWith("getSelection-") }
                 .invoke(visualText) as Long
         assertEquals(expectedText, visualText.toString())
-        assertEquals("Displayed cursor for '$expectedText'", TextRange(expectedText.length).packedValue, selection)
+        assertEquals("Displayed cursor for '$expectedText'", TextRange(expectedText.length).toComposeTestRange(), selection)
     }
 
     private fun type(
         state: MarkdownEditorState,
         text: String,
     ) {
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
             val start = selection.min
             replace(start, selection.max, text)
             selection = TextRange(start + text.length)

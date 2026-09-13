@@ -14,6 +14,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.bikram.remember.ui.common.MarkdownInlineProjection
+import dev.bikram.remember.ui.common.parseMarkdownDocument
 
 /**
  * The field owns the document. Input, toolbar commands and history operate on it immediately;
@@ -69,6 +71,7 @@ internal class MarkdownEditorState(
             val incoming = TextFieldValue(toString(), selection)
             val edited = MarkdownEditBuffer(previousValue)
             edited.update(incoming, livePreview, livePreview)
+            if (livePreview) applyPendingFormats(before, edited)
             val after = inputSnapshot(before, incoming, edited)
             // Compose commits this buffer. Never call TextFieldState.edit from this callback.
             applyMarkdownValue(edited.textFieldValue)
@@ -85,6 +88,7 @@ internal class MarkdownEditorState(
         val before = snapshot(textFieldValue)
         val edited = MarkdownEditBuffer(textFieldValue)
         edited.update(value, cleanUpEmptyMarkdownWrappers, breakLineAfterHorizontalRule)
+        if (cleanUpEmptyMarkdownWrappers) applyPendingFormats(before, edited)
         val after = inputSnapshot(before, value, edited)
         Snapshot.withMutableSnapshot {
             textFieldState.edit { applyMarkdownValue(edited.textFieldValue) }
@@ -219,17 +223,43 @@ internal class MarkdownEditorState(
         edit: MarkdownEditBuffer.() -> Unit,
     ) {
         val formats = inlineFormats
-        command(if (format in formats) formats - format else formats + format, edit)
+        if (textFieldState.selection.collapsed && format != MarkdownInlineFormat.INLINE_CODE) {
+            val pending = snapshot(textFieldValue).pendingFormats
+            val candidate = MarkdownEditBuffer(textFieldValue)
+            candidate.edit()
+            val before = MarkdownInlineProjection(markdown, parseMarkdownDocument(markdown).spans)
+            val after = MarkdownInlineProjection(candidate.markdown, parseMarkdownDocument(candidate.markdown).spans)
+            if (pending || before.text != after.text) {
+                // Adjacent empty emphasis merges into ambiguous star runs. Keep the typing
+                // intent in explicit state and apply its markers to the next inserted text.
+                command(if (format in formats) formats - format else formats + format, pendingFormats = true) {}
+                return
+            }
+        }
+        command(if (format in formats) formats - format else formats + format, edit = edit)
+    }
+
+    private fun applyPendingFormats(
+        before: MarkdownEditorSnapshot,
+        edited: MarkdownEditBuffer,
+    ) {
+        if (!before.selection.collapsed || !before.pendingFormats) return
+        val change = markdownChangedRange(before.text, edited.markdown)
+        if (change.originalEnd != change.start || change.updatedEnd == change.start || '\n' in edited.markdown.substring(change.start, change.updatedEnd)) return
+        edited.update(TextFieldValue(edited.markdown, TextRange(change.start, change.updatedEnd)), false, false)
+        edited.update(preserveMarkdownSelectionFormatting(edited.textFieldValue, edited.textFieldValue, desiredFormats = before.formats), false, false)
+        edited.update(TextFieldValue(edited.markdown, TextRange(edited.textFieldValue.selection.max)), false, false)
     }
 
     private fun command(
         formats: Set<MarkdownInlineFormat>? = null,
+        pendingFormats: Boolean = false,
         edit: MarkdownEditBuffer.() -> Unit,
     ) {
         val before = snapshot(textFieldValue)
         val edited = MarkdownEditBuffer(textFieldValue)
         edited.edit()
-        val after = MarkdownEditorSnapshot(edited.markdown, edited.textFieldValue.selection, formats ?: edited.inlineFormats())
+        val after = MarkdownEditorSnapshot(edited.markdown, edited.textFieldValue.selection, formats ?: edited.inlineFormats(), pendingFormats)
         Snapshot.withMutableSnapshot {
             textFieldState.edit { applyMarkdownValue(edited.textFieldValue) }
             explicitFormatting = after
@@ -240,13 +270,8 @@ internal class MarkdownEditorState(
 
     private fun snapshot(value: TextFieldValue): MarkdownEditorSnapshot {
         val explicit = explicitFormatting
-        val formats =
-            if (explicit?.text == value.text && explicit.selection == value.selection) {
-                explicit.formats
-            } else {
-                MarkdownEditBuffer(value).inlineFormats()
-            }
-        return MarkdownEditorSnapshot(value.text, value.selection, formats)
+        if (explicit?.text == value.text && explicit.selection == value.selection) return explicit
+        return MarkdownEditorSnapshot(value.text, value.selection, MarkdownEditBuffer(value).inlineFormats())
     }
 
     private fun inputSnapshot(
@@ -264,10 +289,12 @@ internal class MarkdownEditorState(
                 edited.markdown == incoming.text &&
                 (inserted.isNotEmpty() || removed.isNotEmpty()) &&
                 (inserted + removed).none { it in "*~\u0060<>\n" }
+        val pendingInput = before.pendingFormats && inserted.isNotEmpty() && '\n' !in inserted
         return MarkdownEditorSnapshot(
             edited.markdown,
             edited.textFieldValue.selection,
-            if (plainEdit) before.formats else edited.inlineFormats(),
+            if (plainEdit || pendingInput) before.formats else edited.inlineFormats(),
+            pendingInput,
         )
     }
 

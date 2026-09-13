@@ -1,5 +1,3 @@
-@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
-
 package dev.bikram.remember.ui.edit
 
 import androidx.compose.ui.text.TextRange
@@ -42,9 +40,9 @@ class MarkdownEditorImeTest {
     fun correctionCommittedWithEnterContinuesTheListInTheSameTransaction() {
         val state = MarkdownEditorState("1. ")
         compose(state, "firs")
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
             replace(3, 7, "first\n")
-            commitComposition()
+            commitImeComposition()
             selection = TextRange(9)
         }
 
@@ -88,11 +86,11 @@ class MarkdownEditorImeTest {
         state: MarkdownEditorState,
         word: String,
     ) {
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
-            val start = composition?.start ?: selection.min
-            val end = composition?.end ?: selection.max
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
+            val start = imeComposition?.start ?: selection.min
+            val end = imeComposition?.end ?: selection.max
             replace(start, end, word)
-            setComposition(start, start + word.length)
+            setImeComposition(start, start + word.length)
             selection = TextRange(start + word.length)
         }
     }

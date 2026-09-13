@@ -11,6 +11,9 @@ internal data class MarkdownEditorSnapshot(
     val text: String,
     val selection: TextRange,
     val formats: Set<MarkdownInlineFormat>,
+    // Only explicit deferred commands need materializing on input. Cursor-derived toolbar
+    // state may differ at marker boundaries without representing a pending command.
+    val pendingFormats: Boolean = false,
 )
 
 internal enum class MarkdownEditKind { Insert, Delete, Replace, Command }

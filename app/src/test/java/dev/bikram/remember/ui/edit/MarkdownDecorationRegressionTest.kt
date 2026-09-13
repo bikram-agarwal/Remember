@@ -1,4 +1,4 @@
-@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE", "ktlint:standard:function-expression-body")
+@file:Suppress("ktlint:standard:function-expression-body")
 
 package dev.bikram.remember.ui.edit
 
@@ -269,7 +269,7 @@ class MarkdownDecorationRegressionTest {
         state: MarkdownEditorState,
         text: String,
     ) {
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
             val start = selection.min
             replace(start, selection.max, text)
             selection = TextRange(start + text.length)

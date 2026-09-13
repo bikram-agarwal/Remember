@@ -1,5 +1,3 @@
-@file:Suppress("INVISIBLE_MEMBER", "INVISIBLE_REFERENCE")
-
 package dev.bikram.remember.ui.edit
 
 import androidx.compose.ui.graphics.Color
@@ -137,7 +135,7 @@ class MarkdownEditorBackspaceTest {
             val transformedState = transformed(state)
             transformedState.javaClass.methods
                 .single { it.name.startsWith("selectCharsIn-") }
-                .invoke(transformedState, selection.packedValue)
+                .invoke(transformedState, selection.toComposeTestRange())
             deleteDisplayedRange(transformedState, selection)
             val remaining = "Word".removeRange(selection.min, selection.max)
             val formats = if (remaining.isEmpty()) emptySet() else setOf(MarkdownInlineFormat.BOLD, MarkdownInlineFormat.UNDERLINE)
@@ -190,14 +188,14 @@ class MarkdownEditorBackspaceTest {
         state.toggleBold()
         val transformedState = transformed(state)
         val select = transformedState.javaClass.methods.single { it.name.startsWith("selectCharsIn-") }
-        select.invoke(transformedState, TextRange.Zero.packedValue)
+        select.invoke(transformedState, TextRange.Zero.toComposeTestRange())
         assertTrue(state.isBold)
         assertEquals(TextRange(2), state.textFieldState.selection)
         type(state, "Word")
         pressBackspace(transformedState)
         assertTrue(state.isBold)
         state.toggleBold()
-        select.invoke(transformedState, TextRange(3).packedValue)
+        select.invoke(transformedState, TextRange(3).toComposeTestRange())
         assertFalse(state.isBold)
         type(state, " plain")
         assertEquals("**Wor** plain", state.markdown)
@@ -208,7 +206,7 @@ class MarkdownEditorBackspaceTest {
     fun rawImeBackspaceOnClosingMarkersDeletesThePreviousVisibleGrapheme() {
         for (ending in listOf("d", "😀", "e\u0301", "👨‍👩‍👧‍👦")) {
             val state = MarkdownEditorState("**Wor$ending**")
-            state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
+            state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
                 replace(length - 1, length, "")
                 selection = TextRange(length)
             }
@@ -220,21 +218,21 @@ class MarkdownEditorBackspaceTest {
     fun composingBackspaceKeepsCompositionAndFormatting() {
         val state = MarkdownEditorState()
         state.toggleBold()
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
             replace(2, 2, "Word")
-            setComposition(2, 6)
+            setImeComposition(2, 6)
             selection = TextRange(6)
         }
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
             replace(5, 6, "")
-            setComposition(2, 5)
+            setImeComposition(2, 5)
             selection = TextRange(5)
         }
         assertFormatted(state, "Wor", setOf(MarkdownInlineFormat.BOLD))
         assertEquals(TextRange(2, 5), state.textFieldState.composition)
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
             replace(2, 5, "")
-            commitComposition()
+            commitImeComposition()
             selection = TextRange(2)
         }
         assertEquals("", state.markdown)
@@ -245,7 +243,7 @@ class MarkdownEditorBackspaceTest {
     @Test
     fun sourceModeStillAllowsDeletingMarkdownSyntax() {
         val state = MarkdownEditorState("**Word**")
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = false)) {
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = false)) {
             replace(length - 1, length, "")
         }
         assertEquals("**Word*", state.markdown)
@@ -268,7 +266,7 @@ class MarkdownEditorBackspaceTest {
             val transformedState = transformed(state)
             transformedState.javaClass.methods
                 .single { it.name.startsWith("selectCharsIn-") }
-                .invoke(transformedState, selection.packedValue)
+                .invoke(transformedState, selection.toComposeTestRange())
 
             deleteDisplayedRange(transformedState, selection)
 
@@ -294,7 +292,7 @@ class MarkdownEditorBackspaceTest {
         val selection = TextRange(displayed.indexOf("gone"), displayed.indexOf(" end"))
         transformedState.javaClass.methods
             .single { it.name.startsWith("selectCharsIn-") }
-            .invoke(transformedState, selection.packedValue)
+            .invoke(transformedState, selection.toComposeTestRange())
 
         deleteDisplayedRange(transformedState, selection)
 
@@ -309,7 +307,7 @@ class MarkdownEditorBackspaceTest {
         val selection = TextRange(1, 7)
         transformedState.javaClass.methods
             .single { it.name.startsWith("selectCharsIn-") }
-            .invoke(transformedState, selection.packedValue)
+            .invoke(transformedState, selection.toComposeTestRange())
 
         deleteDisplayedRange(transformedState, selection)
 
@@ -325,7 +323,7 @@ class MarkdownEditorBackspaceTest {
         val selection = TextRange(displayed.indexOf("gone"), displayed.indexOf("gone") + 4)
         transformedState.javaClass.methods
             .single { it.name.startsWith("selectCharsIn-") }
-            .invoke(transformedState, selection.packedValue)
+            .invoke(transformedState, selection.toComposeTestRange())
 
         deleteDisplayedRange(transformedState, selection)
 
@@ -362,7 +360,7 @@ class MarkdownEditorBackspaceTest {
         state: MarkdownEditorState,
         text: String,
     ) {
-        state.textFieldState.editAsUser(state.inputTransformation(livePreview = true)) {
+        state.textFieldState.editAsUserForTest(state.inputTransformation(livePreview = true)) {
             val start = selection.min
             replace(start, selection.max, text)
             selection = TextRange(start + text.length)
@@ -377,7 +375,7 @@ class MarkdownEditorBackspaceTest {
         // the Kotlin compile API. This includes its output-to-source mapping and user commit.
         val replace = transformedState.javaClass.methods.single { it.name.startsWith("replaceText-") && it.parameterCount == 5 }
         val undoBehavior = requireNotNull(replace.parameterTypes[2].enumConstants).single { it.toString() == "MergeIfPossible" }
-        replace.invoke(transformedState, "", range.packedValue, undoBehavior, true, false)
+        replace.invoke(transformedState, "", range.toComposeTestRange(), undoBehavior, true, false)
     }
 
     private fun pressBackspace(transformedState: Any) {
