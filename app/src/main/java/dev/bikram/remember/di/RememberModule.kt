@@ -30,7 +30,6 @@ import dev.bikram.remember.googletasks.GoogleTasksRepository
 import dev.bikram.remember.reminders.ReminderScheduler
 import dev.bikram.remember.ui.lock.AppLockSession
 import dev.bikram.remember.update.UpdateCheckWorkScheduler
-import dev.bikram.remember.widget.NotesWidgetUpdater
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -102,11 +101,9 @@ object RememberModule {
         database: RememberDatabase,
         reminderScheduler: ReminderScheduler,
         tagRepository: TagRepository,
-        notesWidgetUpdater: NotesWidgetUpdater,
         appMediaStorage: AppMediaStorage,
         @IoDispatcher ioDispatcher: CoroutineDispatcher,
         @DefaultDispatcher defaultDispatcher: CoroutineDispatcher,
-        @ApplicationScope applicationScope: CoroutineScope,
     ): NoteRepository =
         NoteRepository(
             noteDao = database.noteDao(),
@@ -114,12 +111,10 @@ object RememberModule {
             attachmentDao = database.attachmentDao(),
             scheduler = reminderScheduler,
             tagRepository = tagRepository,
-            notesWidgetUpdater = notesWidgetUpdater,
             database = database,
             appMediaStorage = appMediaStorage,
             ioDispatcher = ioDispatcher,
             defaultDispatcher = defaultDispatcher,
-            applicationScope = applicationScope,
         )
 
     @Provides

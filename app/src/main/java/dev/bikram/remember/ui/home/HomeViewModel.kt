@@ -8,14 +8,11 @@ import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.NotesFilter
-import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.data.ViewOptionsPrefs
-import dev.bikram.remember.data.matches
 import dev.bikram.remember.data.pinned
 import dev.bikram.remember.ui.common.BulkUndoableAction
 import kotlinx.collections.immutable.persistentSetOf
-import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.channels.Channel
@@ -23,7 +20,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
@@ -110,95 +106,15 @@ class HomeViewModel
         private val allActiveNotes: Flow<List<NoteWithItems>> = repository.observeActive()
 
         val state: StateFlow<HomeState> =
-            combine(
-                listOf(
-                    filter,
-                    notesSource,
-                    allActiveNotes,
-                    viewOptionsFlow,
-                    selectedIds,
-                    archivedSearchSource,
-                    trashedSearchSource,
-                ),
-            ) { values ->
-                @Suppress("UNCHECKED_CAST")
-                val currentFilter = values[0] as NotesFilter
-
-                @Suppress("UNCHECKED_CAST")
-                val searchResults = values[1] as List<NoteWithItems>
-
-                @Suppress("UNCHECKED_CAST")
-                val allActive = values[2] as List<NoteWithItems>
-
-                val viewOptions = values[3] as ViewOptions
-
-                @Suppress("UNCHECKED_CAST")
-                val selected = values[4] as Set<Long>
-
-                @Suppress("UNCHECKED_CAST")
-                val archivedSearch = values[5] as List<NoteWithItems>
-
-                @Suppress("UNCHECKED_CAST")
-                val trashedSearch = values[6] as List<NoteWithItems>
-
-                val filtered =
-                    if (currentFilter.text.isBlank()) {
-                        searchResults.filter { currentFilter.matches(it) }
-                    } else {
-                        val facetOnly = currentFilter.copy(text = "")
-                        searchResults.filter { facetOnly.matches(it) }
-                    }
-                val facetOnly = currentFilter.copy(text = "")
-                val filteredArchived =
-                    if (currentFilter.text.isBlank()) {
-                        emptyList()
-                    } else {
-                        archivedSearch.filter { facetOnly.matches(it) }
-                    }
-                val filteredTrashed =
-                    if (currentFilter.text.isBlank()) {
-                        emptyList()
-                    } else {
-                        trashedSearch.filter { facetOnly.matches(it) }
-                    }
-                val tags =
-                    allActive
-                        .flatMap { noteWithItems -> RememberReservedTags.userVisibleTags(noteWithItems.note.tags) }
-                        .distinct()
-                        .sorted()
-                val arrangedItems = arrangeItems(filtered, viewOptions)
-                val visibleIds =
-                    arrangedItems
-                        .mapNotNull { item -> (item as? HomeListItem.NoteRow)?.card?.id }
-                        .toSet()
-                val prunedSelection = selected.intersect(visibleIds).toPersistentSet()
-                var canPinSelected = false
-                var canStarSelected = false
-                if (prunedSelection.isNotEmpty()) {
-                    val seenSelectedIds = HashSet<Long>()
-                    for (item in arrangedItems) {
-                        if (canPinSelected && canStarSelected) break
-                        val card = (item as? HomeListItem.NoteRow)?.card ?: continue
-                        if (card.id !in prunedSelection || !seenSelectedIds.add(card.id)) continue
-                        if (!card.pinned) canPinSelected = true
-                        if (!card.starred) canStarSelected = true
-                    }
-                }
-                HomeState(
-                    loading = false,
-                    filter = currentFilter,
-                    items = arrangedItems.toPersistentList(),
-                    totalActive = allActive.size,
-                    availableTags = tags.toPersistentList(),
-                    viewOptions = viewOptions,
-                    selectedIds = prunedSelection,
-                    inSelectionMode = prunedSelection.isNotEmpty(),
-                    canPinSelected = canPinSelected,
-                    canStarSelected = canStarSelected,
-                    archivedMatches = filteredArchived.toPersistentList(),
-                    trashedMatches = filteredTrashed.toPersistentList(),
-                )
-            }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
+            homeStateFlow(
+                filter = filter,
+                notesSource = notesSource,
+                allActiveNotes = allActiveNotes,
+                viewOptions = viewOptionsFlow,
+                selectedIds = selectedIds,
+                archivedSearchSource = archivedSearchSource,
+                trashedSearchSource = trashedSearchSource,
+            ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
 
         fun setFilter(value: NotesFilter) {
             filter.value = value

@@ -4,16 +4,12 @@ import androidx.room.withTransaction
 import dev.bikram.remember.di.DefaultDispatcher
 import dev.bikram.remember.di.IoDispatcher
 import dev.bikram.remember.reminders.ReminderScheduler
-import dev.bikram.remember.widget.NotesWidgetUpdater
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.launch
 
 data class NoteOptions(
     val reminderAt: Long? = null,
@@ -66,42 +62,12 @@ class NoteRepository(
     val tagRepository: TagRepository? = null,
     private val clock: () -> Long = System::currentTimeMillis,
     private val database: RememberDatabase? = null,
-    private val notesWidgetUpdater: NotesWidgetUpdater? = null,
     private val appMediaStorage: AppMediaStorage? = null,
     @param:IoDispatcher private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
     @param:DefaultDispatcher private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default,
-    /**
-     * Long-lived scope used for fire-and-forget post-write bookkeeping (summary
-     * notification rebuild, widget refresh). Decoupling these from the calling
-     * coroutine lets the UI's StateFlow recompose immediately after the DB write
-     * commits, instead of waiting on ~250ms of widget debounce + ~30-60ms of
-     * notification builder work that previously blocked Main. Default is provided
-     * so unit tests that construct the repository directly don't need to wire
-     * Hilt's @ApplicationScope -- production binding always overrides it.
-     */
-    private val applicationScope: CoroutineScope =
-        CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
 ) {
-    /**
-     * Fires the heavy post-write bookkeeping (summary notification rebuild + widget
-     * refresh) on [applicationScope] so the calling coroutine can return immediately
-     * and the UI's StateFlow can pick up the DB change without queueing behind these
-     * launches. Lighter-weight side effects -- alarm cancel/schedule via
-     * [ReminderScheduler], and individual DB writes -- stay synchronous on the
-     * caller's coroutine because they're cheap and need ordering guarantees with
-     * paired operations (e.g. cancel-then-schedule for undo).
-     *
-     * @param includeSummary set false for write paths that don't change reminder
-     *     state (starred toggle, attachment add/remove, picture URI, list item
-     *     check toggle) -- the summary notification only reflects pending reminders
-     *     so re-querying for those changes is wasted work.
-     */
-    private fun postWriteBookkeeping(includeSummary: Boolean = true) {
-        applicationScope.launch {
-            if (includeSummary) refreshReminderSummaryNotification()
-            notesWidgetUpdater?.refreshAll()
-        }
-    }
+    // NoteRefreshObserver owns widget and summary refreshes after committed database changes.
+    // Per-note alarm scheduling/cancellation stays synchronous here to preserve ordering.
 
     fun observeActive(): Flow<List<NoteWithItems>> = noteDao.observeActive().flowOn(ioDispatcher)
 
@@ -224,7 +190,6 @@ class NoteRepository(
                 scheduler?.scheduleOrShow(createdNote, emptyList())
             }
         }
-        postWriteBookkeeping()
         return noteId
     }
 
@@ -285,7 +250,6 @@ class NoteRepository(
                 scheduler?.scheduleOrShow(createdNoteWithItems.note, createdNoteWithItems.items)
             }
         }
-        postWriteBookkeeping()
         return id
     }
 
@@ -337,7 +301,6 @@ class NoteRepository(
                 scheduler?.scheduleOrShow(createdNoteWithItems.note, createdNoteWithItems.items)
             }
         }
-        postWriteBookkeeping()
         return id
     }
 
@@ -384,7 +347,6 @@ class NoteRepository(
         if (oldPictureUri != null && oldPictureUri != options.pictureUri) {
             cleanupUnreferencedMedia(listOf(oldPictureUri))
         }
-        postWriteBookkeeping()
     }
 
     suspend fun updateList(
@@ -455,7 +417,6 @@ class NoteRepository(
             if (oldPictureUri != null && oldPictureUri != options.pictureUri) {
                 cleanupUnreferencedMedia(listOf(oldPictureUri))
             }
-            postWriteBookkeeping()
         }
     }
 
@@ -468,12 +429,10 @@ class NoteRepository(
         val newTags = if (starred) (baseTags + RememberReservedTags.STARRED).distinct() else baseTags
         if (row.note.starred == starred && row.note.tags == newTags) return
         noteDao.update(row.note.copy(starred = starred, tags = newTags, updatedAt = clock()))
-        postWriteBookkeeping(includeSummary = false)
     }
 
     /**
-     * Pins or unpins [id]. Pinning only affects placement on Home (the top "Pinned" section),
-     * so - like [setStarred] - this skips the reminder-summary refresh.
+     * Pins or unpins [id]. Pinning only affects placement on Home (the top "Pinned" section).
      *
      * Deliberately does not touch [NoteEntity.updatedAt]: pinning is a view concern, and
      * bumping the modified timestamp would silently reshuffle the list under a
@@ -486,14 +445,12 @@ class NoteRepository(
         val row = noteDao.get(id) ?: return
         if (row.note.pinned == pinned) return
         noteDao.update(row.note.copy(pinnedAt = if (pinned) clock() else null))
-        postWriteBookkeeping(includeSummary = false)
     }
 
     suspend fun moveToTrash(id: Long) {
         noteDao.setTrashed(id, true, clock())
         scheduler?.cancel(id)
         scheduler?.cancelNotification(id)
-        postWriteBookkeeping()
     }
 
     suspend fun snoozeSoonestReminder(
@@ -568,7 +525,6 @@ class NoteRepository(
             scheduler?.cancel(archivedId)
             scheduler?.cancelNotification(archivedId)
         }
-        postWriteBookkeeping()
     }
 
     suspend fun restoreFromTrash(id: Long) {
@@ -580,7 +536,6 @@ class NoteRepository(
                 scheduler?.scheduleOrShow(restoredNote, noteWithItems.items)
             }
         }
-        postWriteBookkeeping()
     }
 
     /**
@@ -591,7 +546,6 @@ class NoteRepository(
         noteDao.setArchived(id, true, clock())
         scheduler?.cancel(id)
         scheduler?.cancelNotification(id)
-        postWriteBookkeeping()
     }
 
     suspend fun unarchiveNote(id: Long) {
@@ -603,7 +557,6 @@ class NoteRepository(
                 scheduler?.scheduleOrShow(unarchivedNote, noteWithItems.items)
             }
         }
-        postWriteBookkeeping()
     }
 
     suspend fun deleteForever(id: Long) {
@@ -612,7 +565,6 @@ class NoteRepository(
         scheduler?.cancelNotification(id)
         noteDao.deleteById(id)
         cleanupUnreferencedMedia(deletedNote?.mediaUris().orEmpty())
-        postWriteBookkeeping()
     }
 
     suspend fun emptyTrash() {
@@ -624,7 +576,6 @@ class NoteRepository(
         }
         noteDao.emptyTrash()
         cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
-        postWriteBookkeeping()
     }
 
     // ---------------------------------------------------------------------------
@@ -662,7 +613,6 @@ class NoteRepository(
                 changed += id
             }
         }
-        if (changed.isNotEmpty()) postWriteBookkeeping(includeSummary = false)
         return changed
     }
 
@@ -687,7 +637,6 @@ class NoteRepository(
                 changed += id
             }
         }
-        if (changed.isNotEmpty()) postWriteBookkeeping(includeSummary = false)
         return changed
     }
 
@@ -701,7 +650,6 @@ class NoteRepository(
             scheduler?.cancel(id)
             scheduler?.cancelNotification(id)
         }
-        postWriteBookkeeping()
     }
 
     suspend fun unarchiveNotes(ids: Collection<Long>) {
@@ -720,7 +668,6 @@ class NoteRepository(
                 scheduler?.scheduleOrShow(note, noteWithItems.items)
             }
         }
-        postWriteBookkeeping()
     }
 
     suspend fun moveToTrash(ids: Collection<Long>) {
@@ -733,7 +680,6 @@ class NoteRepository(
             scheduler?.cancel(id)
             scheduler?.cancelNotification(id)
         }
-        postWriteBookkeeping()
     }
 
     suspend fun restoreFromTrash(ids: Collection<Long>) {
@@ -749,7 +695,6 @@ class NoteRepository(
                 scheduler?.scheduleOrShow(note, noteWithItems.items)
             }
         }
-        postWriteBookkeeping()
     }
 
     /**
@@ -768,7 +713,6 @@ class NoteRepository(
             ids.forEach { id -> noteDao.deleteById(id) }
         }
         cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
-        postWriteBookkeeping()
     }
 
     /**
@@ -811,7 +755,6 @@ class NoteRepository(
         }
         noteDao.deleteTrashedOlderThan(cutoffMillis)
         cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
-        postWriteBookkeeping()
         return deletedNotes.size
     }
 
@@ -828,7 +771,6 @@ class NoteRepository(
         }
         noteDao.deleteAllNotes()
         cleanupUnreferencedMedia(deletedNotes.flatMap { deletedNote -> deletedNote.mediaUris() })
-        postWriteBookkeeping()
     }
 
     /**
@@ -856,7 +798,6 @@ class NoteRepository(
             }
         cleanupUnreferencedMedia(replacedNotes.flatMap { replacedNote -> replacedNote.mediaUris() })
         resyncRemindersAfterMassReplace(oldIds)
-        postWriteBookkeeping()
         return count
     }
 
@@ -888,7 +829,6 @@ class NoteRepository(
                 }
             }
         }
-        postWriteBookkeeping()
     }
 
     private suspend fun resyncRemindersAfterMassReplace(oldIds: Set<Long>) {
@@ -991,7 +931,6 @@ class NoteRepository(
                 ),
             )
         refreshAttachmentSearchText(noteId)
-        postWriteBookkeeping(includeSummary = false)
         return attachmentId
     }
 
@@ -1220,7 +1159,6 @@ class NoteRepository(
         if (oldPictureUri != null && oldPictureUri != pictureUri) {
             cleanupUnreferencedMedia(listOf(oldPictureUri))
         }
-        postWriteBookkeeping(includeSummary = false)
     }
 
     suspend fun removeAttachment(id: Long) {
@@ -1228,7 +1166,6 @@ class NoteRepository(
         attachmentDao.deleteById(id)
         removedAttachment?.noteId?.let { noteId -> refreshAttachmentSearchText(noteId) }
         cleanupUnreferencedMedia(listOfNotNull(removedAttachment?.uri))
-        postWriteBookkeeping(includeSummary = false)
     }
 
     private suspend fun refreshAttachmentSearchText(noteId: Long) {
@@ -1342,7 +1279,6 @@ class NoteRepository(
 
     suspend fun toggleItemChecked(item: ChecklistItemEntity) {
         itemDao.update(item.copy(checked = !item.checked))
-        postWriteBookkeeping(includeSummary = false)
     }
 
     /**
@@ -1390,7 +1326,6 @@ class NoteRepository(
             )
             scheduler?.cancel(noteId)
             scheduler?.cancelNotification(noteId)
-            postWriteBookkeeping()
             return snapshot
         }
 
@@ -1445,7 +1380,6 @@ class NoteRepository(
         } else {
             scheduler?.scheduleOrShow(nextNote, existingWithItems.items)
         }
-        postWriteBookkeeping()
         return snapshot
     }
 
@@ -1459,7 +1393,6 @@ class NoteRepository(
         val restoredNote = restoredIncompleteNote(existing, snapshot)
         noteDao.update(restoredNote)
         scheduler?.scheduleOrShow(restoredNote, existingWithItems.items)
-        postWriteBookkeeping()
         return true
     }
 
@@ -1476,7 +1409,6 @@ class NoteRepository(
             }
         }
         if (database != null) database.withTransaction { applyAll() } else applyAll()
-        postWriteBookkeeping()
     }
 
     private fun restoredIncompleteNote(

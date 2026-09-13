@@ -22,6 +22,7 @@ import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.quickcapture.QuickCaptureNotifier
 import dev.bikram.remember.reminders.ReminderScheduler
+import dev.bikram.remember.reminders.observeNoteRefreshes
 import dev.bikram.remember.trash.RememberTrashSweepWork
 import dev.bikram.remember.ui.lock.AppLockSession
 import dev.bikram.remember.update.PlayInAppUpdateProgressController
@@ -33,7 +34,6 @@ import dev.bikram.remember.update.UpdateCheckWorkScheduler
 import dev.bikram.remember.widget.NotesWidgetUpdater
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
@@ -96,14 +96,17 @@ class RememberApp :
         ensureReminderChannel()
         updateAvailableNotifier.ensureNotificationChannel()
         QuickCaptureNotifier.ensureChannel(this)
-        scheduleWidgetRefreshes()
+        applicationScope.observeNoteRefreshes(
+            notesSource = noteRepository.observeActive(),
+            reminderPreferences = reminderPrefs.state,
+            refreshWidgets = notesWidgetUpdater::refreshAll,
+            refreshSummary = noteRepository::refreshReminderSummaryNotification,
+            refreshActiveNotifications = noteRepository::refreshActiveReminderNotifications,
+        )
         observeQuickCapturePref()
-        observeReminderPrefs()
-        observeReminderSummarySource()
         backupExportCoordinator.start()
         applicationScope.launch {
             RememberBackupWork.updateSchedule(this@RememberApp, backupPrefs.snapshot())
-            noteRepository.refreshReminderSummaryNotification()
             updateCheckWorkScheduler.syncFromPreferences()
             runCatching {
                 runStartupUpdateCheck()
@@ -138,24 +141,6 @@ class RememberApp :
         updateAvailableNotifier.notifyIfNewUpdateAvailable(updateInfo, prefs)
     }
 
-    private fun observeReminderPrefs() {
-        reminderPrefs.state
-            .distinctUntilChanged()
-            .onEach {
-                noteRepository.refreshActiveReminderNotifications()
-                noteRepository.refreshReminderSummaryNotification()
-            }.launchIn(applicationScope)
-    }
-
-    private fun observeReminderSummarySource() {
-        noteRepository
-            .observeActive()
-            .drop(1)
-            .onEach {
-                noteRepository.refreshReminderSummaryNotification()
-            }.launchIn(applicationScope)
-    }
-
     private fun observeQuickCapturePref() {
         quickCapturePrefs.state
             .map { it.enabled }
@@ -166,15 +151,6 @@ class RememberApp :
                 } else {
                     QuickCaptureNotifier.hide(this@RememberApp)
                 }
-            }.launchIn(applicationScope)
-    }
-
-    private fun scheduleWidgetRefreshes() {
-        noteRepository
-            .observeActive()
-            .drop(1) // skip initial emission
-            .onEach {
-                notesWidgetUpdater.refreshAll()
             }.launchIn(applicationScope)
     }
 
