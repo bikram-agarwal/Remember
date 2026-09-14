@@ -39,7 +39,6 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import dev.bikram.remember.R
-import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.QuickCaptureState
 import dev.bikram.remember.data.ReminderPreferencesState
@@ -73,7 +72,6 @@ internal fun RemindersSection(
     reminderPrefs: ReminderPrefs,
     quickCaptureState: QuickCaptureState,
     quickCapturePrefs: QuickCapturePrefs,
-    noteRepository: NoteRepository,
     notificationsGranted: Boolean,
     notificationPermissionLauncher: ActivityResultLauncher<String>,
     permissionLinked: Boolean,
@@ -263,7 +261,6 @@ internal fun RemindersSection(
                 onCheckedChange = { enabled ->
                     scope.launch {
                         reminderPrefs.setKeepReminderNotificationsUntilDone(enabled)
-                        noteRepository.refreshActiveReminderNotifications()
                     }
                 },
             )
@@ -277,7 +274,6 @@ internal fun RemindersSection(
                 onCheckedChange = { enabled ->
                     scope.launch {
                         reminderPrefs.setReminderSummaryNotificationEnabled(enabled)
-                        noteRepository.refreshReminderSummaryNotification()
                     }
                 },
             )

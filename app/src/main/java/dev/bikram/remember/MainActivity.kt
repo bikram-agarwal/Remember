@@ -126,7 +126,8 @@ class MainActivity : FragmentActivity() {
                     navigationBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
                 )
             }
-            val tagColors by tagRepository.observeTagColorMap().collectAsStateWithLifecycle(
+            val tagColorFlow = remember(tagRepository) { tagRepository.observeTagColorMap() }
+            val tagColors by tagColorFlow.collectAsStateWithLifecycle(
                 initialValue = emptyMap(),
             )
             val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(

@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:function-expression-body")
+
 package dev.bikram.remember.ui.common
 
 import androidx.compose.foundation.background
@@ -50,7 +52,6 @@ import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
 
-private val MarkdownLinkRegex = Regex("""\[([^\]]+)]\(([^)]+)\)""")
 private val MarkdownChecklistContinuationLineRegex = Regex("""^\s{4,}(.+)$""")
 private const val MARKDOWN_PREVIEW_HORIZONTAL_RULE = "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
 
@@ -84,23 +85,14 @@ internal fun MarkdownText(
     val styler = rememberMarkdownStyler(style)
     val includeLinkAnnotations = onLinkClick == null && onLinkLongPress == null
     if (maxLines != Int.MAX_VALUE) {
-        val previewSource = remember(markdown) { markdownPreviewSource(markdown) }
-        val preview =
-            remember(previewSource.source, styler, includeLinkAnnotations) {
-                styler.markdownInlineAnnotatedString(
-                    source = previewSource.source,
-                    includeLinkAnnotations = includeLinkAnnotations,
-                )
-            }
+        val preview = remember(markdown, styler, includeLinkAnnotations) { markdownCardPreview(markdown, styler, includeLinkAnnotations) }
         MarkdownInlineText(
-            text = preview,
+            styler = styler,
+            rendered = preview,
             style = style,
             maxLines = maxLines,
             overflow = overflow,
             modifier = modifier,
-            source = previewSource.source,
-            sourceOffset = 0,
-            sourceOffsetByIndex = previewSource.sourceOffsetByIndex,
             onTextTap = onTextTap,
             onTextLongPress = onTextLongPress,
             onLinkClick = onLinkClick,
@@ -109,7 +101,7 @@ internal fun MarkdownText(
         return
     }
 
-    val lineStartOffsets = remember(markdown) { markdown.lineStartOffsets() }
+    val blocks = remember(markdown) { parseMarkdownLines(markdown) }
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -120,11 +112,10 @@ internal fun MarkdownText(
             val quoteLines = mutableListOf<String>()
             val quoteLineContentOffsets = mutableListOf<Int>()
             while (lineIndex < lines.size) {
-                val quoteMatch = MarkdownQuoteLineRegex.matchEntire(lines[lineIndex]) ?: break
-                quoteLines.add(quoteMatch.groupValues[1])
+                val quoteBlock = blocks[lineIndex].takeIf { it.kind == MarkdownBlockKind.Quote } ?: break
+                quoteLines.add(markdown.substring(quoteBlock.contentStart, quoteBlock.end))
                 quoteLineContentOffsets.add(
-                    lineStartOffsets.getOrElse(lineIndex) { markdown.length } +
-                        (quoteMatch.groups[1]?.range?.first ?: 0),
+                    quoteBlock.contentStart,
                 )
                 lineIndex++
             }
@@ -140,15 +131,15 @@ internal fun MarkdownText(
                     onLinkClick = onLinkClick,
                     onLinkLongPress = onLinkLongPress,
                 )
-            } else if (lineIndex < lines.size && MarkdownCodeFenceLineRegex.matches(lines[lineIndex])) {
-                val codeBlockStartOffset = lineStartOffsets.getOrElse(lineIndex) { markdown.length }
+            } else if (lineIndex < lines.size && blocks[lineIndex].kind == MarkdownBlockKind.CodeFence) {
+                val codeBlockStartOffset = (blocks[lineIndex].end + 1).coerceAtMost(markdown.length)
                 val codeLines = mutableListOf<String>()
                 lineIndex++
-                while (lineIndex < lines.size && !MarkdownCodeFenceLineRegex.matches(lines[lineIndex])) {
+                while (lineIndex < lines.size && blocks[lineIndex].kind != MarkdownBlockKind.CodeFence) {
                     codeLines.add(lines[lineIndex])
                     lineIndex++
                 }
-                if (lineIndex < lines.size && MarkdownCodeFenceLineRegex.matches(lines[lineIndex])) {
+                if (lineIndex < lines.size && blocks[lineIndex].kind == MarkdownBlockKind.CodeFence) {
                     lineIndex++
                 }
                 MarkdownCodeBlock(
@@ -161,19 +152,19 @@ internal fun MarkdownText(
                 )
             } else {
                 val checklistContinuationLines =
-                    if (MarkdownChecklistLineRegex.matchEntire(lines[lineIndex]) != null) {
+                    if (blocks[lineIndex].kind == MarkdownBlockKind.Checklist) {
                         val continuationLines = mutableListOf<MarkdownContinuationLine>()
                         var continuationIndex = lineIndex + 1
                         while (continuationIndex < lines.size) {
                             val continuationLine = lines[continuationIndex]
                             val continuationMatch =
                                 MarkdownChecklistContinuationLineRegex.matchEntire(continuationLine) ?: break
-                            if (isMarkdownBlockLine(continuationLine)) break
+                            if (blocks[continuationIndex].kind != MarkdownBlockKind.Plain) break
                             val contentRange = continuationMatch.groups[1]?.range ?: break
                             continuationLines +=
                                 MarkdownContinuationLine(
                                     text = continuationMatch.groupValues[1],
-                                    lineStartOffset = lineStartOffsets.getOrElse(continuationIndex) { markdown.length },
+                                    lineStartOffset = blocks[continuationIndex].start,
                                     contentStartOffset = contentRange.first,
                                 )
                             continuationIndex++
@@ -184,8 +175,9 @@ internal fun MarkdownText(
                     }
                 MarkdownLine(
                     line = lines[lineIndex],
+                    block = blocks[lineIndex],
                     lineIndex = lineIndex,
-                    lineStartOffset = lineStartOffsets.getOrElse(lineIndex) { markdown.length },
+                    lineStartOffset = blocks[lineIndex].start,
                     checklistContinuationLines = checklistContinuationLines,
                     style = style,
                     styler = styler,
@@ -210,18 +202,10 @@ private data class MarkdownContinuationLine(
     val contentStartOffset: Int,
 )
 
-private fun isMarkdownBlockLine(line: String): Boolean =
-    MarkdownHeadingLineRegex.matchEntire(line) != null ||
-        MarkdownHorizontalRuleLineRegex.matches(line) ||
-        MarkdownChecklistLineRegex.matchEntire(line) != null ||
-        MarkdownBulletLineRegex.matchEntire(line) != null ||
-        MarkdownNumberedLineRegex.matchEntire(line) != null ||
-        MarkdownQuoteLineRegex.matchEntire(line) != null ||
-        MarkdownCodeFenceLineRegex.matches(line)
-
 @Composable
 private fun MarkdownLine(
     line: String,
+    block: MarkdownLineSyntax,
     lineIndex: Int,
     lineStartOffset: Int,
     checklistContinuationLines: List<MarkdownContinuationLine>,
@@ -236,7 +220,7 @@ private fun MarkdownLine(
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)?,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)?,
 ) {
-    if (MarkdownHorizontalRuleLineRegex.matches(line)) {
+    if (block.kind == MarkdownBlockKind.Rule) {
         MarkdownHorizontalRule(
             // Tapping the rule enters editing at the end of the dashes, so a backspace right after
             // is all it takes to turn the rule back into plain text.
@@ -247,20 +231,16 @@ private fun MarkdownLine(
         return
     }
 
-    val headingMatch = MarkdownHeadingLineRegex.matchEntire(line)
-    if (headingMatch != null) {
-        val headingLevel = headingMatch.groupValues[1].length
-        val contentRange = headingMatch.groups[2]?.range
+    val content = line.substring(block.contentStart - lineStartOffset)
+    if (block.kind == MarkdownBlockKind.Heading) {
+        val headingLevel = block.headingLevel
         MarkdownInlineText(
-            text =
-                styler.markdownInlineAnnotatedString(
-                    source = headingMatch.groupValues[2],
-                    includeLinkAnnotations = includeLinkAnnotations,
-                ),
+            styler = styler,
+            includeLinkAnnotations = includeLinkAnnotations,
             style = styler.headingTextStyle(headingLevel = headingLevel),
             modifier = Modifier.fillMaxWidth(),
-            source = headingMatch.groupValues[2],
-            sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
+            source = content,
+            sourceOffset = block.contentStart,
             onTextTap = onTextTap,
             onTextLongPress = onTextLongPress,
             onLinkClick = onLinkClick,
@@ -269,14 +249,13 @@ private fun MarkdownLine(
         return
     }
 
-    val checklistMatch = MarkdownChecklistLineRegex.matchEntire(line)
-    if (checklistMatch != null) {
-        val checked = checklistMatch.groupValues[2].equals("x", ignoreCase = true)
+    if (block.kind == MarkdownBlockKind.Checklist) {
+        val checked = block.checked
         val checkboxSize = markdownChecklistCheckboxSize(style, LocalDensity.current)
         val hasLongPressAction = onChecklistCheckAll != null || onChecklistUncheckAll != null
         var showMenu by remember { mutableStateOf(false) }
         Row(
-            modifier = Modifier.padding(start = styler.listStartPadding(checklistMatch.groupValues[1], baseIndent = 0.dp)),
+            modifier = Modifier.padding(start = styler.listStartPadding(block.indent, baseIndent = 0.dp)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box {
@@ -342,21 +321,18 @@ private fun MarkdownLine(
                 }
             }
             Spacer(Modifier.width(8.dp))
-            val contentRange = checklistMatch.groups[3]?.range
+
             Column(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 MarkdownInlineText(
-                    text =
-                        styler.markdownInlineAnnotatedString(
-                            source = checklistMatch.groupValues[3],
-                            includeLinkAnnotations = includeLinkAnnotations,
-                        ),
+                    styler = styler,
+                    includeLinkAnnotations = includeLinkAnnotations,
                     style = if (checked) style.copy(textDecoration = TextDecoration.LineThrough) else style,
                     modifier = Modifier.fillMaxWidth(),
-                    source = checklistMatch.groupValues[3],
-                    sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
+                    source = content,
+                    sourceOffset = block.contentStart,
                     onTextTap = onTextTap,
                     onTextLongPress = onTextLongPress,
                     onLinkClick = onLinkClick,
@@ -364,11 +340,8 @@ private fun MarkdownLine(
                 )
                 checklistContinuationLines.forEach { continuationLine ->
                     MarkdownInlineText(
-                        text =
-                            styler.markdownInlineAnnotatedString(
-                                source = continuationLine.text,
-                                includeLinkAnnotations = includeLinkAnnotations,
-                            ),
+                        styler = styler,
+                        includeLinkAnnotations = includeLinkAnnotations,
                         style = style,
                         modifier = Modifier.fillMaxWidth(),
                         source = continuationLine.text,
@@ -384,10 +357,9 @@ private fun MarkdownLine(
         return
     }
 
-    val bulletMatch = MarkdownBulletLineRegex.matchEntire(line)
-    if (bulletMatch != null) {
+    if (block.kind == MarkdownBlockKind.Bullet) {
         Row(
-            modifier = Modifier.padding(start = styler.listStartPadding(bulletMatch.groupValues[1], baseIndent = 16.dp)),
+            modifier = Modifier.padding(start = styler.listStartPadding(block.indent, baseIndent = 16.dp)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -395,17 +367,14 @@ private fun MarkdownLine(
                 style = style,
             )
             Spacer(Modifier.width(8.dp))
-            val contentRange = bulletMatch.groups[2]?.range
+
             MarkdownInlineText(
-                text =
-                    styler.markdownInlineAnnotatedString(
-                        source = bulletMatch.groupValues[2],
-                        includeLinkAnnotations = includeLinkAnnotations,
-                    ),
+                styler = styler,
+                includeLinkAnnotations = includeLinkAnnotations,
                 style = style,
                 modifier = Modifier.weight(1f),
-                source = bulletMatch.groupValues[2],
-                sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
+                source = content,
+                sourceOffset = block.contentStart,
                 onTextTap = onTextTap,
                 onTextLongPress = onTextLongPress,
                 onLinkClick = onLinkClick,
@@ -415,28 +384,24 @@ private fun MarkdownLine(
         return
     }
 
-    val numberedMatch = MarkdownNumberedLineRegex.matchEntire(line)
-    if (numberedMatch != null) {
+    if (block.kind == MarkdownBlockKind.Numbered) {
         Row(
-            modifier = Modifier.padding(start = styler.listStartPadding(numberedMatch.groupValues[1], baseIndent = 8.dp)),
+            modifier = Modifier.padding(start = styler.listStartPadding(block.indent, baseIndent = 8.dp)),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                text = "${numberedMatch.groupValues[2]}.",
+                text = "${block.number}.",
                 style = style,
             )
             Spacer(Modifier.width(8.dp))
-            val contentRange = numberedMatch.groups[3]?.range
+
             MarkdownInlineText(
-                text =
-                    styler.markdownInlineAnnotatedString(
-                        source = numberedMatch.groupValues[3],
-                        includeLinkAnnotations = includeLinkAnnotations,
-                    ),
+                styler = styler,
+                includeLinkAnnotations = includeLinkAnnotations,
                 style = style,
                 modifier = Modifier.weight(1f),
-                source = numberedMatch.groupValues[3],
-                sourceOffset = lineStartOffset + (contentRange?.first ?: 0),
+                source = content,
+                sourceOffset = block.contentStart,
                 onTextTap = onTextTap,
                 onTextLongPress = onTextLongPress,
                 onLinkClick = onLinkClick,
@@ -447,11 +412,8 @@ private fun MarkdownLine(
     }
 
     MarkdownInlineText(
-        text =
-            styler.markdownInlineAnnotatedString(
-                source = line,
-                includeLinkAnnotations = includeLinkAnnotations,
-            ),
+        styler = styler,
+        includeLinkAnnotations = includeLinkAnnotations,
         style = style,
         modifier = Modifier.fillMaxWidth(),
         source = line,
@@ -502,14 +464,15 @@ private fun MarkdownHorizontalRule(
 
 @Composable
 private fun MarkdownInlineText(
-    text: AnnotatedString,
+    styler: MarkdownStyler,
     style: TextStyle,
     modifier: Modifier = Modifier,
+    includeLinkAnnotations: Boolean = true,
+    rendered: MarkdownRenderedContent? = null,
     maxLines: Int = Int.MAX_VALUE,
     overflow: TextOverflow = TextOverflow.Clip,
-    source: String = text.text,
+    source: String = "",
     sourceOffset: Int = 0,
-    sourceOffsetByIndex: IntArray? = null,
     onTextTap: ((MarkdownTextTap) -> Unit)? = null,
     onTextLongPress: ((MarkdownTextTap) -> Unit)? = null,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)? = null,
@@ -518,14 +481,16 @@ private fun MarkdownInlineText(
     val hapticEnabled = LocalHapticEnabled.current
     val view = LocalView.current
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
-    val inlineInteractionMap =
-        remember(source, sourceOffset, sourceOffsetByIndex) {
-            MarkdownInlineInteractionBuilder(
-                source = source,
-                sourceOffset = sourceOffset,
-                sourceOffsetByIndex = sourceOffsetByIndex,
-            ).build()
+    val content =
+        rendered ?: remember(source, sourceOffset, styler, includeLinkAnnotations, style.textDecoration) {
+            val projection = MarkdownInlineProjection(source)
+            MarkdownRenderedContent(
+                styler.renderInline(projection, includeLinkAnnotations, style.textDecoration),
+                MarkdownInlineInteractionBuilder(source, sourceOffset).build(projection),
+            )
         }
+    val text = content.text
+    val inlineInteractionMap = content.interactions
     val interactionModifier =
         if (onTextTap != null || onTextLongPress != null || onLinkClick != null || onLinkLongPress != null) {
             Modifier.pointerInput(inlineInteractionMap, onTextTap, onTextLongPress, onLinkClick, onLinkLongPress) {
@@ -615,11 +580,8 @@ private fun MarkdownQuoteBlock(
             lines.forEachIndexed { quoteLineIndex, quoteLine ->
                 val lineStartOffset = lineContentOffsets.getOrElse(quoteLineIndex) { 0 }
                 MarkdownInlineText(
-                    text =
-                        styler.markdownInlineAnnotatedString(
-                            source = quoteLine,
-                            includeLinkAnnotations = includeLinkAnnotations,
-                        ),
+                    styler = styler,
+                    includeLinkAnnotations = includeLinkAnnotations,
                     style =
                         style.copy(
                             color = styler.quoteColor,
@@ -695,7 +657,7 @@ private fun MarkdownCodeBlock(
     }
 }
 
-private sealed interface MarkdownInlineInteraction {
+internal sealed interface MarkdownInlineInteraction {
     data class Text(
         val markdownOffset: Int,
     ) : MarkdownInlineInteraction
@@ -705,13 +667,13 @@ private sealed interface MarkdownInlineInteraction {
     ) : MarkdownInlineInteraction
 }
 
-private data class MarkdownInlineLinkRange(
+internal data class MarkdownInlineLinkRange(
     val visibleStart: Int,
     val visibleEnd: Int,
     val link: MarkdownLinkInteraction,
 )
 
-private data class MarkdownInlineInteractionMap(
+internal data class MarkdownInlineInteractionMap(
     val sourceOffsetByVisibleOffset: IntArray,
     val links: List<MarkdownInlineLinkRange>,
 ) {
@@ -728,165 +690,37 @@ private data class MarkdownInlineInteractionMap(
     }
 }
 
-private class MarkdownInlineInteractionBuilder(
+internal class MarkdownInlineInteractionBuilder(
     private val source: String,
     private val sourceOffset: Int,
     private val sourceOffsetByIndex: IntArray? = null,
 ) {
-    private val sourceOffsets = mutableListOf<Int>()
-    private val links = mutableListOf<MarkdownInlineLinkRange>()
-
     fun build(): MarkdownInlineInteractionMap {
-        appendInlineMarkdown(sourceSegment = source, segmentOffset = 0)
-        sourceOffsets.add(sourceOffsetAt(source.length))
+        return build(MarkdownInlineProjection(source))
+    }
+
+    fun build(projection: MarkdownInlineProjection): MarkdownInlineInteractionMap {
+        val links =
+            projection.spans.filter { it.kind == MarkdownInlineKind.Link }.mapNotNull { span ->
+                val start = projection.visibleOffsets[span.openEnd]
+                val end = projection.visibleOffsets[span.closeStart]
+                if (end <= start) return@mapNotNull null
+                MarkdownInlineLinkRange(
+                    start,
+                    end,
+                    MarkdownLinkInteraction(
+                        requireNotNull(span.url).markdownLinkUrl(),
+                        source.substring(span.openEnd, span.closeStart),
+                        sourceOffsetAt(span.openStart),
+                        sourceOffsetAt(span.openEnd),
+                        sourceOffsetAt(span.closeStart),
+                    ),
+                )
+            }
         return MarkdownInlineInteractionMap(
-            sourceOffsetByVisibleOffset = sourceOffsets.toIntArray(),
-            links = links,
+            IntArray(projection.sourceOffsets.size) { sourceOffsetAt(projection.sourceOffsets[it]) },
+            links,
         )
-    }
-
-    private fun appendInlineMarkdown(
-        sourceSegment: String,
-        segmentOffset: Int,
-    ) {
-        // Regex.find(sourceSegment, currentIndex) rescans to the end of the segment on every
-        // fallback character, which is O(n^2) for long plain-text segments with no link syntax.
-        // Precompute matches once and consume them with a forward-only cursor instead.
-        val linkMatchIterator = MarkdownLinkRegex.findAll(sourceSegment).iterator()
-        var pendingLinkMatch = if (linkMatchIterator.hasNext()) linkMatchIterator.next() else null
-
-        fun linkMatchAt(index: Int): MatchResult? {
-            while (pendingLinkMatch != null && pendingLinkMatch!!.range.first < index) {
-                pendingLinkMatch = if (linkMatchIterator.hasNext()) linkMatchIterator.next() else null
-            }
-            return pendingLinkMatch?.takeIf { it.range.first == index }
-        }
-
-        var currentIndex = 0
-        while (currentIndex < sourceSegment.length) {
-            val linkMatch = linkMatchAt(currentIndex)
-            if (linkMatch != null) {
-                val linkTextRange = linkMatch.groups[1]?.range
-                val visibleStart = sourceOffsets.size
-                if (linkTextRange != null) {
-                    appendInlineMarkdown(
-                        sourceSegment = linkMatch.groupValues[1],
-                        segmentOffset = segmentOffset + linkTextRange.first,
-                    )
-                    val visibleEnd = sourceOffsets.size
-                    if (visibleEnd > visibleStart) {
-                        links.add(
-                            MarkdownInlineLinkRange(
-                                visibleStart = visibleStart,
-                                visibleEnd = visibleEnd,
-                                link =
-                                    MarkdownLinkInteraction(
-                                        url = linkMatch.groupValues[2].withHttpScheme(),
-                                        text = linkMatch.groupValues[1],
-                                        markdownOffset = sourceOffsetAt(segmentOffset + linkMatch.range.first),
-                                        textStartOffset = sourceOffsetAt(segmentOffset + linkTextRange.first),
-                                        textEndOffset = sourceOffsetAt(segmentOffset + linkTextRange.last + 1),
-                                    ),
-                            ),
-                        )
-                    }
-                }
-                currentIndex = linkMatch.range.last + 1
-                continue
-            }
-
-            // Each close-marker search scans forward to the end of the segment when it finds no
-            // match. It must stay behind the cheap startsWith/isValidOpening checks — otherwise,
-            // for plain text with no markdown syntax, every character would trigger up to five
-            // full forward scans, making this whole pass O(n^2) instead of O(n).
-            if (sourceSegment.startsWith("`", currentIndex) && sourceSegment.isValidOpening(currentIndex, 1)) {
-                val inlineCodeClose = sourceSegment.indexOfMarkdownClosingMarker("`", currentIndex + 1)
-                if (inlineCodeClose > currentIndex) {
-                    appendPlainTextRange(
-                        rangeStart = currentIndex + 1,
-                        rangeEnd = inlineCodeClose,
-                        segmentOffset = segmentOffset,
-                    )
-                    currentIndex = inlineCodeClose + 1
-                    continue
-                }
-            }
-
-            if (sourceSegment.startsWith("<u>", currentIndex, ignoreCase = true)) {
-                val underlineClose = sourceSegment.indexOf("</u>", currentIndex + 3, ignoreCase = true)
-                if (underlineClose > currentIndex) {
-                    appendInlineMarkdown(
-                        sourceSegment = sourceSegment.substring(currentIndex + 3, underlineClose),
-                        segmentOffset = segmentOffset + currentIndex + 3,
-                    )
-                    currentIndex = underlineClose + 4
-                    continue
-                }
-            }
-
-            if (sourceSegment.startsWith("~~", currentIndex) && sourceSegment.isValidOpening(currentIndex, 2)) {
-                val strikeClose = sourceSegment.indexOfMarkdownClosingMarker("~~", currentIndex + 2)
-                if (strikeClose > currentIndex) {
-                    appendInlineMarkdown(
-                        sourceSegment = sourceSegment.substring(currentIndex + 2, strikeClose),
-                        segmentOffset = segmentOffset + currentIndex + 2,
-                    )
-                    currentIndex = strikeClose + 2
-                    continue
-                }
-            }
-
-            if (sourceSegment.startsWith("***", currentIndex) && sourceSegment.isValidOpening(currentIndex, 3)) {
-                val boldItalicClose = sourceSegment.indexOfMarkdownClosingMarker("***", currentIndex + 3)
-                if (boldItalicClose > currentIndex) {
-                    appendInlineMarkdown(
-                        sourceSegment = sourceSegment.substring(currentIndex + 3, boldItalicClose),
-                        segmentOffset = segmentOffset + currentIndex + 3,
-                    )
-                    currentIndex = boldItalicClose + 3
-                    continue
-                }
-            }
-
-            if (sourceSegment.startsWith("**", currentIndex) && sourceSegment.isValidOpening(currentIndex, 2)) {
-                val boldClose = sourceSegment.indexOfMarkdownClosingMarker("**", currentIndex + 2)
-                if (boldClose > currentIndex) {
-                    appendInlineMarkdown(
-                        sourceSegment = sourceSegment.substring(currentIndex + 2, boldClose),
-                        segmentOffset = segmentOffset + currentIndex + 2,
-                    )
-                    currentIndex = boldClose + 2
-                    continue
-                }
-            }
-
-            if (sourceSegment.startsWith("*", currentIndex) && sourceSegment.isValidOpening(currentIndex, 1)) {
-                val italicClose = sourceSegment.indexOfMarkdownClosingMarker("*", currentIndex + 1)
-                if (italicClose > currentIndex) {
-                    appendInlineMarkdown(
-                        sourceSegment = sourceSegment.substring(currentIndex + 1, italicClose),
-                        segmentOffset = segmentOffset + currentIndex + 1,
-                    )
-                    currentIndex = italicClose + 1
-                    continue
-                }
-            }
-
-            sourceOffsets.add(sourceOffsetAt(segmentOffset + currentIndex))
-            currentIndex++
-        }
-    }
-
-    private fun appendPlainTextRange(
-        rangeStart: Int,
-        rangeEnd: Int,
-        segmentOffset: Int,
-    ) {
-        var currentIndex = rangeStart
-        while (currentIndex < rangeEnd) {
-            sourceOffsets.add(sourceOffsetAt(segmentOffset + currentIndex))
-            currentIndex++
-        }
     }
 
     private fun sourceOffsetAt(index: Int): Int {
@@ -911,159 +745,46 @@ internal fun markdownChecklistCheckboxSize(
     return if (requestedSize > 0.dp) maxOf(requestedSize, 18.dp) else fallbackSize
 }
 
-private data class MarkdownPreviewSource(
-    val source: String,
-    val sourceOffsetByIndex: IntArray,
+internal data class MarkdownRenderedContent(
+    val text: AnnotatedString,
+    val interactions: MarkdownInlineInteractionMap,
 )
 
-private fun markdownPreviewSource(markdown: String): MarkdownPreviewSource {
-    val preview = StringBuilder()
+/** Card layout changes only presentation; inline meaning and source positions come from syntax. */
+internal fun markdownCardPreview(
+    markdown: String,
+    styler: MarkdownStyler,
+    includeLinkAnnotations: Boolean = true,
+): MarkdownRenderedContent {
+    val builder = AnnotatedString.Builder()
     val offsets = mutableListOf<Int>()
-    val lineStartOffsets = markdown.lineStartOffsets()
-    val lines = markdown.lines()
-
-    fun appendText(
-        text: String,
-        offset: Int,
-    ) {
-        text.forEachIndexed { index, character ->
-            preview.append(character)
-            offsets.add((offset + index).coerceIn(0, markdown.length))
+    val links = mutableListOf<MarkdownInlineLinkRange>()
+    for (line in parseMarkdownLines(markdown)) {
+        if (line.start > 0) {
+            builder.append('\n')
+            offsets.add(line.start - 1)
         }
-    }
-
-    fun appendSyntheticText(
-        text: String,
-        offset: Int,
-    ) {
-        text.forEach { character ->
-            preview.append(character)
-            offsets.add(offset.coerceIn(0, markdown.length))
+        val prefix =
+            when (line.kind) {
+                MarkdownBlockKind.Rule -> MARKDOWN_PREVIEW_HORIZONTAL_RULE
+                MarkdownBlockKind.Checklist -> line.indent + if (line.checked) "\u2611 " else "\u2610 "
+                MarkdownBlockKind.Bullet -> "  " + line.indent + "\u2022 "
+                MarkdownBlockKind.Numbered -> " " + line.indent + line.number + ". "
+                else -> ""
+            }
+        builder.append(prefix)
+        repeat(prefix.length) { offsets.add(line.start) }
+        val content = markdown.substring(line.contentStart, line.end)
+        val projection = if (line.kind == MarkdownBlockKind.Code) MarkdownInlineProjection(content, emptyList()) else MarkdownInlineProjection(content)
+        val visibleStart = builder.length
+        builder.append(styler.renderInline(projection, includeLinkAnnotations, if (line.checked) TextDecoration.LineThrough else null))
+        if (line.kind == MarkdownBlockKind.Code && builder.length > visibleStart) {
+            builder.addStyle(styler.codeBlockSpanStyle, visibleStart, builder.length)
         }
-    }
-
-    fun appendSourceRange(
-        line: String,
-        lineStartOffset: Int,
-        range: IntRange,
-    ) {
-        for (sourceIndex in range) {
-            preview.append(line[sourceIndex])
-            offsets.add(lineStartOffset + sourceIndex)
-        }
-    }
-
-    lines.forEachIndexed { lineIndex, line ->
-        val lineStartOffset = lineStartOffsets.getOrElse(lineIndex) { markdown.length }
-        if (lineIndex > 0) {
-            preview.append('\n')
-            offsets.add((lineStartOffset - 1).coerceIn(0, markdown.length))
-        }
-        appendPreviewLine(
-            line = line,
-            lineStartOffset = lineStartOffset,
-            appendText = ::appendText,
-            appendSyntheticText = ::appendSyntheticText,
-            appendSourceRange = ::appendSourceRange,
-        )
+        val interactions = MarkdownInlineInteractionBuilder(content, line.contentStart).build(projection)
+        offsets.addAll(interactions.sourceOffsetByVisibleOffset.dropLast(1))
+        links.addAll(interactions.links.map { it.copy(visibleStart = it.visibleStart + visibleStart, visibleEnd = it.visibleEnd + visibleStart) })
     }
     offsets.add(markdown.length)
-    return MarkdownPreviewSource(
-        source = preview.toString(),
-        sourceOffsetByIndex = offsets.toIntArray(),
-    )
+    return MarkdownRenderedContent(builder.toAnnotatedString().withCombinedMarkdownDecorations(), MarkdownInlineInteractionMap(offsets.toIntArray(), links))
 }
-
-private fun appendPreviewLine(
-    line: String,
-    lineStartOffset: Int,
-    appendText: (String, Int) -> Unit,
-    appendSyntheticText: (String, Int) -> Unit,
-    appendSourceRange: (String, Int, IntRange) -> Unit,
-) {
-    if (MarkdownHorizontalRuleLineRegex.matches(line)) {
-        // Card previews are a single Text, so the rule cannot be a real divider here; a short
-        // dash run at least reads as one instead of leaking the raw `---` syntax.
-        appendSyntheticText(MARKDOWN_PREVIEW_HORIZONTAL_RULE, lineStartOffset)
-        return
-    }
-    MarkdownHeadingLineRegex
-        .matchEntire(line)
-        ?.groups
-        ?.get(2)
-        ?.range
-        ?.let { range ->
-            appendSourceRange(line, lineStartOffset, range)
-            return
-        }
-    MarkdownChecklistLineRegex.matchEntire(line)?.let { match ->
-        val contentRange = match.groups[3]?.range ?: return@let
-        val checked = match.groupValues[2].equals("x", ignoreCase = true)
-        appendSourceRange(line, lineStartOffset, match.groups[1]?.range ?: IntRange.EMPTY)
-        appendSyntheticText(
-            if (checked) "\u2611 " else "\u2610 ",
-            lineStartOffset + (match.groups[2]?.range?.first ?: contentRange.first),
-        )
-        if (checked && !match.groupValues[3].hasStrikethroughWrapper()) {
-            appendSyntheticText("~~", lineStartOffset + contentRange.first)
-            appendSourceRange(line, lineStartOffset, contentRange)
-            appendSyntheticText("~~", lineStartOffset + contentRange.last + 1)
-        } else {
-            appendSourceRange(line, lineStartOffset, contentRange)
-        }
-        return
-    }
-    MarkdownBulletLineRegex.matchEntire(line)?.let { match ->
-        val contentRange = match.groups[2]?.range ?: return@let
-        appendSyntheticText("  ", lineStartOffset)
-        appendSourceRange(line, lineStartOffset, match.groups[1]?.range ?: IntRange.EMPTY)
-        appendSyntheticText("\u2022 ", lineStartOffset + match.groupValues[1].length)
-        appendSourceRange(line, lineStartOffset, contentRange)
-        return
-    }
-    MarkdownNumberedLineRegex.matchEntire(line)?.let { match ->
-        val contentRange = match.groups[3]?.range ?: return@let
-        appendSyntheticText(" ", lineStartOffset)
-        appendSourceRange(line, lineStartOffset, match.groups[1]?.range ?: IntRange.EMPTY)
-        val numberRange = match.groups[2]?.range ?: return@let
-        appendText(match.groupValues[2], lineStartOffset + numberRange.first)
-        appendSyntheticText(". ", lineStartOffset + numberRange.last + 1)
-        appendSourceRange(line, lineStartOffset, contentRange)
-        return
-    }
-    MarkdownQuoteLineRegex
-        .matchEntire(line)
-        ?.groups
-        ?.get(1)
-        ?.range
-        ?.let { range ->
-            appendSourceRange(line, lineStartOffset, range)
-            return
-        }
-    appendSourceRange(line, lineStartOffset, line.indices)
-}
-
-private fun String.hasStrikethroughWrapper(): Boolean {
-    val contentStart = indexOfFirst { !it.isWhitespace() }.let { if (it < 0) return false else it }
-    val contentEndExclusive = indexOfLast { !it.isWhitespace() } + 1
-    return contentEndExclusive - contentStart >= 4 &&
-        startsWith("~~", contentStart) &&
-        substring(contentStart, contentEndExclusive).endsWith("~~")
-}
-
-private fun String.lineStartOffsets(): List<Int> {
-    val offsets = mutableListOf(0)
-    forEachIndexed { index, character ->
-        if (character == '\n') {
-            offsets.add(index + 1)
-        }
-    }
-    return offsets
-}
-
-private fun String.withHttpScheme(): String =
-    if (startsWith("http://") || startsWith("https://")) {
-        this
-    } else {
-        "https://$this"
-    }

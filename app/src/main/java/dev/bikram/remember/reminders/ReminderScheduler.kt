@@ -39,25 +39,24 @@ class ReminderScheduler(
         if (whenMillis <= System.currentTimeMillis()) return
         val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val pi = pendingIntent(noteId, reminderIndex)
-        if (importance == Importance.HIGH) {
-            // HIGH-importance reminders use setAlarmClock: it is exempt from Doze and
-            // the per-app exact-alarm rate limit, needs no SCHEDULE_EXACT_ALARM
-            // (playstore flavor) or USE_EXACT_ALARM (github) grant, and surfaces the
-            // system's next-alarm indicator in the status bar. The show intent is what
-            // fires when the user taps that indicator.
-            am.setAlarmClock(AlarmManager.AlarmClockInfo(whenMillis, openAppPendingIntent()), pi)
-            return
-        }
-        val canExact = am.canScheduleExactAlarms()
-        if (canExact) {
-            // Guarded by canScheduleExactAlarms(); inexact scheduling remains the fallback.
-            am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMillis, pi)
-        } else {
-            am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMillis, pi)
-            val fallbackCount = inexactFallbackScheduleCounter.incrementAndGet()
-            Log.w(TAG, "Scheduled reminder with inexact alarm fallback. fallbackCount=$fallbackCount")
-            DiagnosticLog.record(context, "Scheduled reminder with inexact alarm fallback. fallbackCount=$fallbackCount")
-        }
+        scheduleWithExactAlarmFallback(
+            canScheduleExactAlarms = am.canScheduleExactAlarms(),
+            scheduleExact = {
+                if (importance == Importance.HIGH) {
+                    // Alarm clocks bypass Doze and expose the system's next-alarm indicator,
+                    // but still require exact-alarm access, just like setExactAndAllowWhileIdle.
+                    am.setAlarmClock(AlarmManager.AlarmClockInfo(whenMillis, openAppPendingIntent()), pi)
+                } else {
+                    am.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMillis, pi)
+                }
+            },
+            scheduleInexact = {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMillis, pi)
+                val fallbackCount = inexactFallbackScheduleCounter.incrementAndGet()
+                Log.w(TAG, "Scheduled reminder with inexact alarm fallback. fallbackCount=$fallbackCount")
+                DiagnosticLog.record(context, "Scheduled reminder with inexact alarm fallback. fallbackCount=$fallbackCount")
+            },
+        )
     }
 
     suspend fun scheduleOrShow(
@@ -65,6 +64,11 @@ class ReminderScheduler(
         items: List<ChecklistItemEntity> = emptyList(),
         silentDueNotification: Boolean = false,
     ) {
+        if (note.trashed || note.archived || note.completedAt != null) {
+            cancel(note.id)
+            cancelNotification(note.id)
+            return
+        }
         val activeReminders = note.getActiveReminders()
         if (activeReminders.isEmpty()) {
             cancel(note.id)
@@ -416,6 +420,22 @@ class ReminderScheduler(
             }
         }
     }
+}
+
+internal fun scheduleWithExactAlarmFallback(
+    canScheduleExactAlarms: Boolean,
+    scheduleExact: () -> Unit,
+    scheduleInexact: () -> Unit,
+) {
+    if (canScheduleExactAlarms) {
+        try {
+            scheduleExact()
+            return
+        } catch (_: SecurityException) {
+            // Access can be revoked between the permission check and the system call.
+        }
+    }
+    scheduleInexact()
 }
 
 internal fun latestDueReminderIndex(

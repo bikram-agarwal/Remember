@@ -243,7 +243,6 @@ fun SettingsRoute(
     val backupIo = settingsDependencies.backupIo()
     val themePrefs = settingsDependencies.themePrefs()
     val viewOptionsPrefs = settingsDependencies.viewOptionsPrefs()
-    val noteRepository = settingsDependencies.noteRepository()
     val updatePrefs = settingsDependencies.updatePrefs()
     val playInAppUpdateProgressController = settingsDependencies.playInAppUpdateProgressController()
     val rememberUpdateState: RememberUpdateState = settingsDependencies.rememberUpdateState()
@@ -755,7 +754,6 @@ fun SettingsRoute(
                                         reminderPrefs = reminderPrefs,
                                         quickCaptureState = quickCaptureState,
                                         quickCapturePrefs = quickCapturePrefs,
-                                        noteRepository = noteRepository,
                                         notificationsGranted = notificationsGranted,
                                         notificationPermissionLauncher = notificationPermissionLauncher,
                                         permissionLinked = permissionLinked,

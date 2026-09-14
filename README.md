@@ -96,7 +96,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 - **Manual backup and restore**: export to any folder, including cloud drives.
 - **Auto-export** on every change, or on a schedule via background worker.
 - **Media inclusion**: optionally embed pictures and attachments in the backup file.
-- **Import from Google Tasks**: via OAuth sign-in or a Takeout JSON file, with three import modes: one note per task, grouped by list, or a list as a checklist.
+- **Flexible imports**: bring over your data from Google Tasks or Tasks.org (via direct account sync, Google Takeout JSON, or local backup files). Customize your layout using three import modes: single note per task, grouped by list, or rendered as a task checklist.
 
 
 ### 🏠 Widgets and shortcuts

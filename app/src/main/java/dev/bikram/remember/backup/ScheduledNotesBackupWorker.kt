@@ -30,13 +30,10 @@ class ScheduledNotesBackupWorker
             if (!prefs.scheduledExportEnabled || backupDestinations.isEmpty()) {
                 return Result.success()
             }
-            if (!noteBackupDirtyTracker.consumePendingChangeSinceLastTreeExport()) {
-                return Result.success()
-            }
-            val exportOutcome = backupIo.exportToTreeFolders(backupDestinations)
-            if (exportOutcome.isFailure) {
-                noteBackupDirtyTracker.markNotesChangedSinceLastTreeExport()
-            }
+            val exportOutcome =
+                noteBackupDirtyTracker.exportPendingChanges {
+                    backupIo.exportToTreeFolders(backupDestinations)
+                } ?: return Result.success()
             return exportOutcome.fold(
                 onSuccess = { Result.success() },
                 onFailure = { error ->

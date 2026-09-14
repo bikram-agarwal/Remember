@@ -52,19 +52,18 @@ internal fun MarkdownToolbar(
     onRedo: (() -> Unit)? = null,
 ) {
     var showLinkDialog by remember { mutableStateOf(false) }
-    val selectionRevision = state.selectionRevision
-    val activeHeading = remember(selectionRevision) { state.headingLevel }
-    val cursorInLink = remember(selectionRevision) { state.selectedLinkUrl != null }
-    val isBulletList = remember(selectionRevision) { state.isBulletList }
-    val isNumberedList = remember(selectionRevision) { state.isNumberedList }
-    val isChecklist = remember(selectionRevision) { state.isChecklist }
-    val isQuote = remember(selectionRevision) { state.isQuote }
-    val isBold = remember(selectionRevision) { state.isBold }
-    val isItalic = remember(selectionRevision) { state.isItalic }
-    val isUnderline = remember(selectionRevision) { state.isUnderline }
-    val isStrikethrough = remember(selectionRevision) { state.isStrikethrough }
-    val isInlineCode = remember(selectionRevision) { state.isInlineCode }
-    val isCodeBlock = remember(selectionRevision) { state.isCodeBlock }
+    val activeHeading = state.headingLevel
+    val cursorInLink = state.selectedLinkUrl != null
+    val isBulletList = state.isBulletList
+    val isNumberedList = state.isNumberedList
+    val isChecklist = state.isChecklist
+    val isQuote = state.isQuote
+    val isBold = state.isBold
+    val isItalic = state.isItalic
+    val isUnderline = state.isUnderline
+    val isStrikethrough = state.isStrikethrough
+    val isInlineCode = state.isInlineCode
+    val isCodeBlock = state.isCodeBlock
 
     if (showLinkDialog) {
         MarkdownLinkDialog(
@@ -352,11 +351,11 @@ private fun MarkdownLinkDialog(
     editing: Boolean,
     onDismiss: () -> Unit,
 ) {
-    val selectionRevision = state.selectionRevision
-    val initialText = remember(selectionRevision) { state.selectedText() }
-    val initialUrl = remember(selectionRevision) { state.selectedLinkUrl.orEmpty() }
-    var linkText by remember(selectionRevision) { mutableStateOf(initialText) }
-    var linkUrl by remember(selectionRevision) { mutableStateOf(initialUrl) }
+    val selection = state.textFieldState.selection
+    val initialText = state.selectedText()
+    val initialUrl = state.selectedLinkUrl.orEmpty()
+    var linkText by remember(state, selection) { mutableStateOf(initialText) }
+    var linkUrl by remember(state, selection) { mutableStateOf(initialUrl) }
 
     AlertDialog(
         onDismissRequest = onDismiss,

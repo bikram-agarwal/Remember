@@ -845,11 +845,14 @@
     <string name="google_tasks_import_intro_title">Connect your Google Tasks</string>
     <string name="google_tasks_import_intro_body">Connect a Google account, choose the tasks you want, and add them to Remember. Read-only access, no changes are made to Google Tasks.</string>
     <string name="google_tasks_import_takeout_title">Import from a file</string>
-    <string name="google_tasks_import_takeout_body">The most private way to move your data. No account sign-in required. Just select the takeout file you downloaded from Google.</string>
-    <string name="google_tasks_import_takeout_step_1">1. Open Google Takeout for Tasks, tap \"Next step\", then \"Create export\"</string>
-    <string name="google_tasks_import_takeout_step_2">2. Check your email for the download link. Download and extract the archive.</string>
-    <string name="google_tasks_import_takeout_step_3">3. Come back here and tap \"Choose Tasks.json\"</string>
-    <string name="google_tasks_import_takeout_pick_json">Choose Tasks.json</string>
+    <string name="google_tasks_import_takeout_body">Import a Google Tasks Takeout file or a Tasks.org backup. No account sign-in required.</string>
+    <string name="google_tasks_import_steps_google_heading">Google Tasks</string>
+    <string name="google_tasks_import_takeout_step_1">Open Google Takeout for Tasks, tap \"Next step\", then \"Create export\".</string>
+    <string name="google_tasks_import_takeout_step_2">Check your email for the download link. Download and extract the archive.</string>
+    <string name="google_tasks_import_steps_tasks_org_heading">Tasks.org</string>
+    <string name="google_tasks_import_tasks_org_step_1">In Tasks.org, open Settings, then Backup, and create a backup.</string>
+    <string name="google_tasks_import_choose_json_step">Come back here and choose the saved json file</string>
+    <string name="google_tasks_import_takeout_pick_json">Choose JSON file</string>
     <string name="google_tasks_import_takeout_open_takeout">Open Google Takeout</string>
     <string name="google_tasks_import_takeout_collapse_summary" tools:ignore="PluralsCandidate">Collapsed %1$d recurring task instances into %2$d tasks</string>
     <string name="google_tasks_import_pick_account">Choose Google account</string>
@@ -878,7 +881,7 @@
     </plurals>
     <string name="google_tasks_import_error_network">Could not reach Google Tasks. Check your connection and try again.</string>
     <string name="google_tasks_import_error_consent">Consent is required to import Google Tasks</string>
-    <string name="google_tasks_import_error_takeout_parse">Could not read this file. Choose the Google Tasks Tasks.json file from Takeout.</string>
+    <string name="google_tasks_import_error_takeout_parse">Could not read this file. Choose a Google Tasks Takeout Tasks.json file or a Tasks.org backup.</string>
     <string name="google_tasks_import_error_auth_default">Could not sign in to Google. Try a different account.</string>
     <string name="google_tasks_import_error_unknown_default">Something went wrong while talking to Google Tasks</string>
     <plurals name="google_tasks_import_search_hint">
@@ -895,9 +898,10 @@
     <string name="google_tasks_import_source_label">Source</string>
     <string name="google_tasks_import_source_google_subtitle" tools:ignore="PluralsCandidate">%1$d tasks · %2$d lists</string>
     <string name="google_tasks_import_source_takeout_title">Takeout JSON</string>
+    <string name="google_tasks_import_source_tasks_org_title">Tasks.org backup</string>
     <string name="google_tasks_import_source_action_refresh">Refresh from Google</string>
     <string name="google_tasks_import_source_action_switch_account">Switch Google account</string>
-    <string name="google_tasks_import_source_action_use_takeout">Use Takeout JSON instead</string>
+    <string name="google_tasks_import_source_action_use_takeout">Use an import file instead</string>
     <string name="google_tasks_import_source_action_connect_google">Connect Google account instead</string>
     <string name="google_tasks_import_source_action_disconnect">Disconnect</string>
     <string name="google_tasks_import_source_action_cancel_takeout">Cancel</string>

@@ -30,7 +30,7 @@ class MarkdownEditorStateTest {
     }
 
     @Test
-    fun backspaceInsideEmptyBoldMarkersRemovesWholeWrapper() {
+    fun backspaceInsideEmptyBoldMarkersClearsFormatting() {
         val state = MarkdownEditorState()
         state.toggleBold()
 
@@ -38,6 +38,7 @@ class MarkdownEditorStateTest {
 
         assertEquals("", state.markdown)
         assertEquals(TextRange(0), state.textFieldValue.selection)
+        assertFalse(state.isBold)
     }
 
     @Test
@@ -364,23 +365,25 @@ class MarkdownEditorStateTest {
     }
 
     @Test
-    fun deletingBoldContentRemovesEmptyWrapper() {
+    fun deletingBoldContentClearsEmptyFormatting() {
         val state = MarkdownEditorState("**BOLD**")
 
         state.update(TextFieldValue("****", selection = TextRange(2)))
 
         assertEquals("", state.markdown)
         assertEquals(TextRange(0), state.textFieldValue.selection)
+        assertFalse(state.isBold)
     }
 
     @Test
-    fun deletingInlineContentRemovesOnlyEmptyWrapper() {
+    fun deletingInlineContentClearsEmptyFormattingAndPreservesSurroundingText() {
         val state = MarkdownEditorState("Start **BOLD** end")
 
         state.update(TextFieldValue("Start **** end", selection = TextRange(8)))
 
         assertEquals("Start  end", state.markdown)
         assertEquals(TextRange(6), state.textFieldValue.selection)
+        assertFalse(state.isBold)
     }
 
     @Test

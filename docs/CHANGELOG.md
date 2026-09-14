@@ -1,3 +1,23 @@
+## v1.7.0 Import Tasks.org
+
+### ✨ New Features
+- You can now import your tasks from Tasks.org app. Descriptions, tags, due times, recurrence, and nested subtasks come through with the tasks.
+
+### 🛠 Improved Features
+- High-importance reminders now fall back to an inexact alarm if access is missing or revoked.
+- Items in home-screen widgets now fill to the bottom of the widget instead of leaving a padded gap.
+- Markdown live-preview and rendering overhauled for better support and stability. 
+- Added a Viber brand icon in the icon picker.
+
+### 🐛 Bug Fixes
+- In landscape, the import screen uses the same 40/60 two-pane layout as the rest of the app.
+- Skip imported / Overwrite now treat trashed notes as gone, so deleting imported notes and importing again creates new notes instead of skipping or rewriting the trash.
+- Pinning or adding an attachment no longer wipes an unsaved reminder change.
+- Reminders are no longer scheduled for notes that are already done, archived, or in the trash.
+- Invalid or broken recurrence rules no longer loop or jump to the wrong date.
+
+---
+
 ## v1.6.0 Checklist collapse, Markdown fixes
 
 ### ✨ New Features

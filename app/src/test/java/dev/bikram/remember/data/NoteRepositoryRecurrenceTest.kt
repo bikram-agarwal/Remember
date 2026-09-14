@@ -476,6 +476,38 @@ class NoteRepositoryRecurrenceTest {
     }
 
     @Test
+    fun `reopening the picker on a sub-minute reminder reports no pending edit`() {
+        // The picker edits down to the minute, so a stored reminder carrying seconds (a snooze,
+        // or a due date imported from another app) must not look edited the moment it loads.
+        val withSeconds = calendarMillis(2026, Calendar.APRIL, 26, 9, 0) + 1_000L
+        val reminder =
+            NoteReminder(
+                reminderAt = withSeconds,
+                recurrence = RecurrenceRule(unit = RecurrenceUnit.DAY),
+            )
+
+        val untouched = reminder.toDraft().toReminder()
+        val reloaded = untouched.toDraft().toReminder()
+
+        assertEquals(untouched, reloaded)
+    }
+
+    @Test
+    fun `editing the time after reopening still reports a change`() {
+        val withSeconds = calendarMillis(2026, Calendar.APRIL, 26, 9, 0) + 1_000L
+        val reminder = NoteReminder(reminderAt = withSeconds)
+
+        val untouched = reminder.toDraft().toReminder()
+        val edited =
+            reminder
+                .toDraft()
+                .copy(reminderHour = 10)
+                .toReminder()
+
+        assertTrue(untouched != edited)
+    }
+
+    @Test
     fun `toReminder automatically selects today date when time is entered without date`() {
         val now = calendarMillis(2026, Calendar.AUGUST, 1, 11, 30)
         val draft =
@@ -550,6 +582,8 @@ class NoteRepositoryRecurrenceTest {
         override fun observe(id: Long): Flow<NoteWithItems?> = flowOf(stored.takeIf { it.note.id == id })
 
         override suspend fun get(id: Long): NoteWithItems? = stored.takeIf { it.note.id == id }
+
+        override suspend fun allNotes(): List<NoteWithItems> = listOf(stored)
 
         override suspend fun activeRemindersUntil(untilMillis: Long): List<NoteWithItems> {
             val reminderAt = stored.note.reminderAt ?: return emptyList()

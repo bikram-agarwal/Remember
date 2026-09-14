@@ -20,6 +20,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +33,14 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -41,12 +50,10 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
@@ -60,10 +67,6 @@ internal enum class MarkdownEditorDisplayMode { MarkdownCode, LivePreview }
 
 private const val LIVE_PREVIEW_DEBOUNCE_DELAY_MS = 250L
 
-// Uses the deprecated value/onValueChange BasicTextField + VisualTransformation - see the
-// @Suppress comment on MarkdownVisualTransformation for why this hasn't been migrated to
-// TextFieldState/OutputTransformation yet.
-@Suppress("DEPRECATION")
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun MarkdownTextEditor(
@@ -111,12 +114,12 @@ internal fun MarkdownTextEditor(
         }
     }
 
-    val visualTransformation =
+    val outputTransformation =
         remember(displayMode, styler, settledMarkdownForHighlighting) {
             if (displayMode == MarkdownEditorDisplayMode.LivePreview) {
-                MarkdownVisualTransformation(styler, settledSource = settledMarkdownForHighlighting)
+                MarkdownOutputTransformation(styler, settledSource = settledMarkdownForHighlighting)
             } else {
-                VisualTransformation.None
+                null
             }
         }
     var focused by remember { mutableStateOf(false) }
@@ -128,7 +131,7 @@ internal fun MarkdownTextEditor(
     // draw phase keeps parsing off the draw path, and bodies without any dash run never parse at
     // all (markdownHorizontalRuleLineStarts short-circuits on them).
     val horizontalRuleTransformedOffsets =
-        remember(displayMode, visualTransformation, state.markdown) {
+        remember(displayMode, outputTransformation, state.markdown) {
             if (displayMode != MarkdownEditorDisplayMode.LivePreview) {
                 emptyList()
             } else {
@@ -136,17 +139,17 @@ internal fun MarkdownTextEditor(
                 if (ruleLineStarts.isEmpty()) {
                     emptyList()
                 } else {
-                    // filter() is memoized on the source, so this reuses the parse the text field
+                    // preview() is memoized on the source, so this reuses the parse the text field
                     // itself needs for the same frame.
-                    val transformedText = visualTransformation.filter(AnnotatedString(state.markdown))
-                    if (transformedText.text.text == state.markdown) {
+                    val transformedText = outputTransformation?.preview(state.markdown)
+                    if (transformedText == null || transformedText.text.text == state.markdown) {
                         // Nothing was hidden, so highlighting is off for this body (over
                         // LIVE_PREVIEW_HIGHLIGHT_MAX_CHARS, or still mid-debounce) and the dashes
                         // are showing as plain text. Painting a rule over them would be noise.
                         emptyList()
                     } else {
                         ruleLineStarts.map { lineStart ->
-                            transformedText.offsetMapping.originalToTransformed(lineStart)
+                            transformedText.originalToTransformed(lineStart)
                         }
                     }
                 }
@@ -186,18 +189,15 @@ internal fun MarkdownTextEditor(
     LaunchedEffect(focused, state.textFieldValue.selection, state.markdown.length, keyboardBottomInsetPx) {
         if (focused) {
             kotlinx.coroutines.delay(140)
-            val transformedText =
-                visualTransformation.filter(
-                    AnnotatedString(state.markdown),
-                )
+            val preview = outputTransformation?.preview(state.markdown)
+            val displayedText = preview?.text?.text ?: state.markdown
             val transformedCursor =
-                transformedText.offsetMapping
-                    .originalToTransformed(state.textFieldValue.selection.end)
-                    .coerceIn(0, transformedText.text.length)
+                (preview?.originalToTransformed(state.textFieldState.selection.end) ?: state.textFieldState.selection.end)
+                    .coerceIn(0, displayedText.length)
             val layoutResult = textLayoutResult
             val layoutText = layoutResult?.layoutInput?.text?.text
             val cursorRect =
-                if (layoutResult != null && layoutText == transformedText.text.text) {
+                if (layoutResult != null && layoutText == displayedText) {
                     runCatching {
                         layoutResult.getCursorRect(transformedCursor.coerceIn(0, layoutText.length))
                     }.getOrNull()
@@ -223,37 +223,52 @@ internal fun MarkdownTextEditor(
         }
     }
 
+    // The editor history also records formatting-only commands. Do not retain a second native
+    // text-only history; the field's shortcuts and toolbar both use MarkdownEditorState.
+    SideEffect { state.textFieldState.undoState.clearHistory() }
+
     Column(modifier = modifier.fillMaxWidth()) {
         BasicTextField(
-            value = state.textFieldValue,
-            onValueChange = { value ->
-                state.update(
-                    value = value,
-                    cleanUpEmptyMarkdownWrappers = displayMode == MarkdownEditorDisplayMode.LivePreview,
-                    // Only live preview hides the dashes, so only live preview needs the cursor
-                    // moved off the finished rule. Markdown-code mode stays a literal text editor.
-                    breakLineAfterHorizontalRule = displayMode == MarkdownEditorDisplayMode.LivePreview,
-                )
-            },
+            state = state.textFieldState,
+            inputTransformation =
+                remember(state, displayMode) {
+                    state.inputTransformation(livePreview = displayMode == MarkdownEditorDisplayMode.LivePreview)
+                },
             textStyle = editorTextStyle,
-            visualTransformation = visualTransformation,
+            outputTransformation = outputTransformation,
             // capitalization is intentionally constant: switching it at runtime (it used to
             // flip to Words while state.shouldCapitalizeNextInputInEmptyInlineWrapper was true)
             // forces Compose to renegotiate the IME session, which visibly hid and reshowed the
             // keyboard every time typing began inside an empty formatting marker at a sentence
-            // start. MarkdownEditorState.update() now capitalizes that first character itself.
+            // start. The Markdown input rules capitalize that first character in the input buffer.
             keyboardOptions =
                 KeyboardOptions(
                     capitalization = KeyboardCapitalization.Sentences,
                     imeAction = ImeAction.Default,
                 ),
             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            onTextLayout = { textLayoutResult = it },
+            onTextLayout = { getResult -> textLayoutResult = getResult() },
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .heightIn(min = 140.dp)
-                    .drawBehind {
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown || (!event.isCtrlPressed && !event.isMetaPressed)) {
+                            false
+                        } else {
+                            when (event.key) {
+                                Key.Z -> {
+                                    if (event.isShiftPressed) state.redo() else state.undo()
+                                    true
+                                }
+                                Key.Y -> {
+                                    state.redo()
+                                    true
+                                }
+                                else -> false
+                            }
+                        }
+                    }.drawBehind {
                         val layoutResult = textLayoutResult ?: return@drawBehind
                         val layoutTextLength = layoutResult.layoutInput.text.length
                         horizontalRuleTransformedOffsets.forEach { transformedOffset ->
@@ -288,7 +303,7 @@ internal fun MarkdownTextEditor(
                         focused = it.isFocused
                         onFocusChanged(it.isFocused)
                     },
-            decorationBox = { innerTextField ->
+            decorator = { innerTextField ->
                 Box(modifier = Modifier.fillMaxWidth()) {
                     if (state.markdown.isEmpty()) {
                         Text(

@@ -10,7 +10,10 @@
         android:pathData="M24,0H192C205,0 216,11 216,24V192C216,205 205,216 192,216H24C11,216 0,205 0,192V24C0,11 11,0 24,0Z" />
     <path
         android:fillColor="#206C3A"
-        android:pathData="M24,24H104V38H24Z" />
+        android:pathData="M24,24H38V38H24Z" />
+    <path
+        android:fillColor="#206C3A"
+        android:pathData="M44,24H116V38H44Z" />
     <path
         android:fillColor="#58735F"
         android:pathData="M122,26H188V38H122Z" />

@@ -223,10 +223,8 @@ fun EditNoteScreen(
     val bodyEditorFocused = isEditMode && bodyFocused && !titleFocused
 
     val markdownEditorState = remember(editorNoteKey) { MarkdownEditorState() }
-    val undoController = remember(editorNoteKey) { UndoRedoController() }
-    val markdownSelectionActive by remember {
+    val markdownSelectionActive by remember(markdownEditorState) {
         derivedStateOf {
-            markdownEditorState.selectionRevision
             isEditMode && markdownEditorState.hasSelection
         }
     }
@@ -235,7 +233,6 @@ fun EditNoteScreen(
         rememberEditorBodyBridge(
             vm = vm,
             markdownEditorState = markdownEditorState,
-            undoController = undoController,
             isEditMode = isEditMode,
             appScope = appScope,
         )
@@ -441,22 +438,18 @@ fun EditNoteScreen(
                     // and re-allocating on every recomposition defeats their skippable-composable
                     // optimization.
                     val onUndo =
-                        remember(markdownEditorState, undoController, bridge) {
+                        remember(markdownEditorState, bridge) {
                             {
-                                undoController.undo(markdownEditorState.markdown)?.let { previous ->
-                                    markdownEditorState.setMarkdown(previous)
-                                    bridge.replaceFromHistory(previous)
-                                }
+                                markdownEditorState.undo()
+                                bridge.flush()
                                 Unit
                             }
                         }
                     val onRedo =
-                        remember(markdownEditorState, undoController, bridge) {
+                        remember(markdownEditorState, bridge) {
                             {
-                                undoController.redo(markdownEditorState.markdown)?.let { next ->
-                                    markdownEditorState.setMarkdown(next)
-                                    bridge.replaceFromHistory(next)
-                                }
+                                markdownEditorState.redo()
+                                bridge.flush()
                                 Unit
                             }
                         }
@@ -466,7 +459,6 @@ fun EditNoteScreen(
                         formatContent = {
                             EditNoteFormatBarContent(
                                 markdownEditorState = markdownEditorState,
-                                undoController = undoController,
                                 onUndo = onUndo,
                                 onRedo = onRedo,
                                 imeVisible = imeVisible,

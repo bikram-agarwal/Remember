@@ -203,12 +203,7 @@ class BackupIo(
     )
 
     private suspend fun snapshotNotes(): NotesSnapshot {
-        val all =
-            notesForBackup(
-                activeNotes = repository.observeActive().first(),
-                archivedNotes = repository.observeArchived().first(),
-                trashedNotes = repository.observeTrashed().first(),
-            )
+        val all = repository.snapshotAllNotes()
         val tagColors =
             repository.tagRepository
                 ?.observeTagColorMap()
@@ -1123,19 +1118,6 @@ class BackupIo(
         const val REL_PREFIX = "REL:"
         private const val MAX_NOTES_JSON_BYTES = 32L * 1024L * 1024L
         private const val MAX_METADATA_JSON_BYTES = 1024L * 1024L
-    }
-}
-
-@Suppress("ktlint:standard:function-expression-body")
-internal fun notesForBackup(
-    activeNotes: List<NoteWithItems>,
-    archivedNotes: List<NoteWithItems>,
-    trashedNotes: List<NoteWithItems>,
-): List<NoteWithItems> {
-    return buildList(activeNotes.size + archivedNotes.size + trashedNotes.size) {
-        addAll(activeNotes)
-        addAll(archivedNotes)
-        addAll(trashedNotes)
     }
 }
 

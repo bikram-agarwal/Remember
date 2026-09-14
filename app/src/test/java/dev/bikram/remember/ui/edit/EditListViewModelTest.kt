@@ -339,12 +339,13 @@ class MainDispatcherRule(
     }
 }
 
-private class FakeRepositoryStore {
+internal class FakeRepositoryStore {
     var nextNoteId = 1L
     var nextItemId = 1L
     val notes = LinkedHashMap<Long, NoteEntity>()
     val itemsByNote = LinkedHashMap<Long, MutableList<ChecklistItemEntity>>()
     val observedNotes = LinkedHashMap<Long, MutableStateFlow<NoteWithItems?>>()
+    var afterNoteUpdate: suspend () -> Unit = {}
 
     fun repository(): NoteRepository =
         NoteRepository(
@@ -386,6 +387,11 @@ private class FakeNoteDao(
 
     override suspend fun get(id: Long): NoteWithItems? = store.noteWithItems(id)
 
+    override suspend fun allNotes(): List<NoteWithItems> =
+        store.notes.keys
+            .sorted()
+            .mapNotNull { noteId -> store.noteWithItems(noteId) }
+
     override suspend fun activeRemindersUntil(untilMillis: Long): List<NoteWithItems> = emptyList()
 
     override suspend fun activeStarred(): List<NoteWithItems> =
@@ -415,6 +421,7 @@ private class FakeNoteDao(
     override suspend fun update(note: NoteEntity) {
         store.notes[note.id] = note
         store.publishNote(note.id)
+        store.afterNoteUpdate()
     }
 
     override suspend fun setStarred(

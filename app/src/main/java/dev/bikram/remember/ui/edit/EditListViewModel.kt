@@ -7,6 +7,7 @@ import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.getActiveReminders
 import dev.bikram.remember.domain.checklist.ChecklistEditResult
 import dev.bikram.remember.domain.checklist.ChecklistEditor
 import dev.bikram.remember.domain.checklist.EditableItem
@@ -394,6 +395,7 @@ class EditListViewModel
                 if (opts.actions != old.actions) return true
                 if (opts.tags != old.tags) return true
                 if (opts.recurrence != old.recurrence) return true
+                if (opts.reminders != old.getActiveReminders()) return true
                 if (nonEmpty.size != oldItems.size) return true
                 // Compare by sortOrder-sorted traversal rather than raw list index, since the editor
                 // reorders items by sortOrder while the persisted list also comes back ordered by
@@ -426,6 +428,7 @@ class EditListViewModel
                     return@withLock null
                 }
                 if (!hasNetChanges()) {
+                    acceptPersistedSnapshot(originalNote)
                     persistence.clearDirty()
                     return@withLock null
                 }
@@ -458,6 +461,8 @@ class EditListViewModel
                     }
                 } else {
                     if (!persistence.isDirty) return@withLock null
+                    val old = originalNote
+                    val oldItems = originalItems
                     val epochAtWrite = persistence.currentEpoch()
                     repository.updateList(id, finalTitle, 0, persistable, currentOptions())
                     if (t.isBlank()) setTitle(finalTitle)
@@ -466,9 +471,6 @@ class EditListViewModel
                         repository.setStarred(id, starred.value)
                     }
                     persistence.clearDirtyIfUnchanged(epochAtWrite)
-
-                    val old = originalNote
-                    val oldItems = originalItems
 
                     val savedList = repository.get(id)
                     acceptPersistedSnapshot(savedList?.note)
@@ -507,6 +509,7 @@ class EditListViewModel
                                         actions = old.actions,
                                         tags = old.tags,
                                         recurrence = old.recurrence,
+                                        reminders = old.getActiveReminders(),
                                     ),
                             )
                             repository.setStarred(id, old.starred)

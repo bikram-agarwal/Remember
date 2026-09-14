@@ -1,11 +1,13 @@
 package dev.bikram.remember.googletasks
 
+import dev.bikram.remember.data.RecurrenceUnit
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.Instant
+import java.util.Calendar
 
 /**
  * Pure unit coverage for the parts of the Google Tasks import pipeline that don't depend on
@@ -450,5 +452,211 @@ class GoogleTasksParsingTest {
         assertEquals(2, parsed.tasks.size)
         assertEquals(setOf("takeout:home:home-task", "takeout:work:work-task"), parsed.tasks.map { it.task.id }.toSet())
         assertEquals(0, parsed.stats.collapsedInstanceCount)
+    }
+
+    @Test
+    fun `parses Tasks org backup with list tags reminder and recurrence`() {
+        val payload =
+            """
+            {
+              "version": 151100,
+              "data": {
+                "tasks": [
+                  {
+                    "task": {
+                      "title": "Test",
+                      "notes": "Task details",
+                      "dueDate": 1789844400000,
+                      "recurrence": "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,FR",
+                      "remoteId": "task-1"
+                    },
+                    "tags": [
+                      { "name": "Home", "tagUid": "tag-1" }
+                    ],
+                    "caldavTasks": [
+                      { "calendar": "calendar-1", "remoteId": "caldav-task-1" }
+                    ]
+                  }
+                ],
+                "caldavCalendars": [
+                  { "uuid": "calendar-1", "name": "Default list" }
+                ]
+              }
+            }
+            """.trimIndent()
+
+        val parsed = ManualTaskImportParser().parse(payload)
+        val importedTask = parsed.tasks.single()
+
+        assertEquals(ManualTaskImportSource.TASKS_ORG, parsed.source)
+        assertEquals("Default list", parsed.taskLists.single().title)
+        assertEquals("tasks-org:task-1", importedTask.task.id)
+        assertEquals("Task details", importedTask.task.notes)
+        assertEquals(1789844400000, importedTask.reminderAt)
+        assertEquals(listOf("Home"), importedTask.tags)
+        assertEquals(RecurrenceUnit.WEEK, importedTask.recurrence?.unit)
+        assertEquals(2, importedTask.recurrence?.interval)
+        assertEquals(
+            setOf(Calendar.MONDAY, Calendar.FRIDAY),
+            importedTask.recurrence
+                ?.daysOfWeek,
+        )
+    }
+
+    @Test
+    fun `parses Tasks org completion and parent relationship`() {
+        val payload =
+            """
+            {
+              "version": 151100,
+              "data": {
+                "tasks": [
+                  {
+                    "task": {
+                      "title": "Parent",
+                      "remoteId": "parent-1"
+                    },
+                    "caldavTasks": [
+                      { "calendar": "calendar-1", "remoteId": "caldav-parent-1" }
+                    ]
+                  },
+                  {
+                    "task": {
+                      "title": "Child",
+                      "remoteId": "child-1",
+                      "completionDate": 1789844400000
+                    },
+                    "caldavTasks": [
+                      {
+                        "calendar": "calendar-1",
+                        "remoteId": "caldav-child-1",
+                        "remoteParent": "caldav-parent-1"
+                      }
+                    ]
+                  }
+                ],
+                "caldavCalendars": []
+              }
+            }
+            """.trimIndent()
+
+        val parsed = TasksOrgBackupParser().parse(payload)
+        val child = parsed.tasks.single { task -> task.task.title == "Child" }
+
+        assertEquals("tasks-org:parent-1", child.task.parent)
+        assertEquals(GoogleTaskStatus.COMPLETED, child.task.status)
+        assertEquals("2026-09-19T19:00:00Z", child.task.completed)
+    }
+
+    @Test
+    fun `Tasks org subtask parent resolves across nesting levels`() {
+        val payload =
+            """
+            {
+              "version": 151100,
+              "data": {
+                "tasks": [
+                  {
+                    "task": { "title": "Parent", "remoteId": "parent-1" },
+                    "caldavTasks": [
+                      { "calendar": "calendar-1", "remoteId": "caldav-parent-1" }
+                    ]
+                  },
+                  {
+                    "task": { "title": "Child", "remoteId": "child-1" },
+                    "caldavTasks": [
+                      {
+                        "calendar": "calendar-1",
+                        "remoteId": "caldav-child-1",
+                        "remoteParent": "caldav-parent-1"
+                      }
+                    ]
+                  },
+                  {
+                    "task": { "title": "Grandchild", "remoteId": "grandchild-1" },
+                    "caldavTasks": [
+                      {
+                        "calendar": "calendar-1",
+                        "remoteId": "caldav-grandchild-1",
+                        "remoteParent": "caldav-child-1"
+                      }
+                    ]
+                  }
+                ],
+                "caldavCalendars": [
+                  { "uuid": "calendar-1", "name": "Default list" }
+                ]
+              }
+            }
+            """.trimIndent()
+
+        val parsed = TasksOrgBackupParser().parse(payload)
+        val parentIdsByTitle = parsed.tasks.associate { task -> task.task.title to task.task.parent }
+
+        assertNull(parentIdsByTitle["Parent"])
+        assertEquals("tasks-org:parent-1", parentIdsByTitle["Child"])
+        assertEquals("tasks-org:child-1", parentIdsByTitle["Grandchild"])
+        assertEquals(1, parsed.taskLists.size)
+    }
+
+    @Test
+    fun `Tasks org keeps every task in one list when calendars are shared`() {
+        val payload =
+            """
+            {
+              "version": 151100,
+              "data": {
+                "tasks": [
+                  {
+                    "task": { "title": "Loose task", "remoteId": "loose-1" },
+                    "caldavTasks": [
+                      {
+                        "calendar": "calendar-1",
+                        "remoteId": "caldav-loose-1",
+                        "remoteParent": "missing-parent"
+                      }
+                    ]
+                  }
+                ],
+                "caldavCalendars": [
+                  { "uuid": "calendar-1", "name": "Default list" }
+                ]
+              }
+            }
+            """.trimIndent()
+
+        val parsed = TasksOrgBackupParser().parse(payload)
+
+        // An unresolvable parent must not strand the task - the importer would drop it.
+        assertNull(
+            parsed.tasks
+                .single()
+                .task.parent,
+        )
+    }
+
+    @Test
+    fun `manual parser still detects Google Takeout`() {
+        val payload =
+            """
+            {
+              "tasks": [
+                {
+                  "id": "google-task",
+                  "title": "Google task"
+                }
+              ]
+            }
+            """.trimIndent()
+
+        val parsed = ManualTaskImportParser().parse(payload)
+
+        assertEquals(ManualTaskImportSource.GOOGLE_TAKEOUT, parsed.source)
+        assertEquals(
+            "takeout:default:google-task",
+            parsed.tasks
+                .single()
+                .task.id,
+        )
     }
 }

@@ -165,16 +165,19 @@ The **quick capture notification** is a persistent shortcut for creating a new n
 
 ## Import, backup, and restore
 
-### Importing from Google Tasks
+### Importing from Google Tasks or Tasks.org
 
-Remember can import tasks from Google Tasks in two ways. Tap the `+` -> Import, and then:
+Remember can import tasks from Google Tasks or a Tasks.org backup. Tap the `+` -> Import, and then:
 
-- **Connect Google** to sign into your account to browse and select tasks to import. OR
-- **Manual import**, to download `Tasks.json` from Google Takeout and provide that to Remember. No sign-in required.
+- **Connect Google** to sign into your account and select tasks to import. OR
+- **Manual import**, to pick a JSON file. No sign-in required. Use either:
+  - Google Takeout: open Google Takeout for Tasks, create an export, download and extract the archive, then choose the `Tasks.json` file.
+  - Tasks.org: in Tasks.org, open Settings, then Backup, create a backup, then choose the saved json file.
 
-The import is read-only — Remember never edits your Google Tasks. Imported tasks can become individual notes, grouped notes, or checklist-style lists depending on the import mode you choose.
+The import is read-only — Remember never edits Google Tasks or Tasks.org. Imported tasks can become individual notes, grouped notes, or checklist-style lists depending on the import mode you choose.
 
-**If import fails:** check your internet connection for Connect Google, or try switching accounts if sign-in fails. For manual import, select the `Tasks.json` file from the extracted Takeout archive — Remember expects the Google Tasks Takeout format, not a generic JSON file.
+
+**If import fails:** check your internet connection for Connect Google, or try switching accounts if sign-in fails. For manual import, choose the `Tasks.json` file from the extracted Takeout archive, or a Tasks.org `user….json` backup — Remember does not accept a generic JSON file.
 
 ### What a backup includes
 

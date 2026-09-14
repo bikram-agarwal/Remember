@@ -151,7 +151,7 @@ class MarkdownFormattingRegressionTest {
     }
 
     @Test
-    fun deletingLastCharacterRemovesAllEmptyNestedWrappers() {
+    fun deletingLastCharacterClearsAllEmptyNestedFormats() {
         for (source in listOf("***a***", "**<u>a</u>**", "<u>~~a~~</u>")) {
             val state = MarkdownEditorState(source)
             val cursor = source.indexOf('a') + 1
@@ -159,6 +159,7 @@ class MarkdownFormattingRegressionTest {
             state.update(TextFieldValue(source.removeRange(cursor - 1, cursor), TextRange(cursor - 1)))
             assertEquals("", state.markdown)
             assertEquals(TextRange(0), state.textFieldValue.selection)
+            assertTrue(state.inlineFormats.isEmpty())
         }
     }
 
@@ -185,7 +186,7 @@ class MarkdownFormattingRegressionTest {
     // backspacing the newline back out, the cursor sits right after a whole run of hidden marker
     // characters. A plain single-character backspace there used to delete one raw marker character
     // (not the visible trailing space the user is looking at), corrupting the marker run - bold
-    // vanished entirely and a stray "*" appeared. See withBackspaceRedirectedOffMarkerCharacter.
+    // vanished entirely and a stray "*" appeared. See withInlineFormattingPreserved.
     @Test
     fun backspaceRightAfterClosedNestedFormatsRemovesVisibleCharacterNotMarker() {
         val state = MarkdownEditorState()

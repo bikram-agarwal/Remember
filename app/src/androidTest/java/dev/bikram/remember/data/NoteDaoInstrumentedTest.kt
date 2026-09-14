@@ -33,6 +33,35 @@ class NoteDaoInstrumentedTest {
     }
 
     @Test
+    fun backup_snapshot_reads_all_shelves_and_their_children_together() =
+        runBlocking {
+            val activeId = database.noteDao().insert(note(title = "Active", kind = NoteKind.LIST))
+            val archivedId = database.noteDao().insert(note(title = "Archived", archived = true))
+            val trashedId = database.noteDao().insert(note(title = "Trashed", trashed = true))
+            database.checklistItemDao().insert(
+                ChecklistItemEntity(noteId = activeId, text = "List item", checked = true, sortOrder = 1.0),
+            )
+            database.attachmentDao().insert(
+                NoteAttachmentEntity(noteId = archivedId, uri = "content://test/attachment", displayName = "Archived file"),
+            )
+
+            val snapshot = database.noteDao().allNotes()
+
+            assertEquals(listOf(activeId, archivedId, trashedId), snapshot.map { it.note.id })
+            assertEquals(
+                "List item",
+                snapshot
+                    .first()
+                    .items
+                    .single()
+                    .text,
+            )
+            assertEquals("Archived file", snapshot[1].attachments.single().displayName)
+            assertTrue(snapshot[1].note.archived)
+            assertTrue(snapshot[2].note.trashed)
+        }
+
+    @Test
     fun checklist_items_are_ordered_by_weighted_sort_order() =
         runBlocking {
             val noteId = database.noteDao().insert(note(title = "Weekend list", kind = NoteKind.LIST))

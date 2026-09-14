@@ -103,7 +103,11 @@ internal fun quickCaptureNeedsCondensedCopy(
     trailingText: String,
     measureTextWidthPx: (String, Float) -> Float = ::measureWidgetTextWidthPx,
 ): Boolean {
-    val contentWidthPx = (widgetWidthDp - QUICK_CAPTURE_HORIZONTAL_PADDING_DP * 2) * density
+    val contentWidthPx =
+        (
+            widgetWidthDp - QUICK_CAPTURE_HORIZONTAL_PADDING_DP * 2 -
+                WIDGET_HEADER_ICON_COMPACT_DP - WIDGET_HEADER_ICON_GAP_DP
+        ) * density
     val cappedScale = fontScale.coerceAtLeast(0.01f).coerceAtMost(1.3f)
     val titleWidthPx = measureTextWidthPx(title, QUICK_CAPTURE_HEADER_TITLE_SP * cappedScale * density)
     val trailingWidthPx = measureTextWidthPx(trailingText, QUICK_CAPTURE_HEADER_TRAILING_SP * cappedScale * density)
@@ -267,13 +271,17 @@ private fun AgendaWidgetContent(
 ) {
     val context = LocalContext.current
     val compact = LocalSize.current.width < 220.dp
+    val contentPadding = if (compact) 10.dp else 12.dp
     Column(
         modifier =
             GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.widgetBackground)
                 .cornerRadius(20.dp)
-                .padding(if (compact) 10.dp else 12.dp),
+                // No bottom padding: the list scrolls all the way to the widget's bottom edge, so a
+                // partially visible card is cut off by the edge instead of by a band of empty
+                // background. The trailing spacer item below restores the inset at the list's end.
+                .padding(start = contentPadding, end = contentPadding, top = contentPadding),
     ) {
         WidgetHeader(
             compact = compact,
@@ -322,6 +330,7 @@ private fun AgendaWidgetContent(
                         }
                     }
                 }
+                item { Spacer(GlanceModifier.height(contentPadding)) }
             }
         }
     }
@@ -335,13 +344,15 @@ private fun SelectedNotesWidgetContent(
 ) {
     val context = LocalContext.current
     val compact = LocalSize.current.width < 220.dp
+    val contentPadding = if (compact) 10.dp else 12.dp
     Column(
         modifier =
             GlanceModifier
                 .fillMaxSize()
                 .background(GlanceTheme.colors.widgetBackground)
                 .cornerRadius(20.dp)
-                .padding(if (compact) 10.dp else 12.dp),
+                // Bottom edge stays unpadded for the same reason as the agenda widget above.
+                .padding(start = contentPadding, end = contentPadding, top = contentPadding),
     ) {
         WidgetHeader(
             title = selectedNotesHeaderTitle(context, config),
@@ -367,6 +378,7 @@ private fun SelectedNotesWidgetContent(
                         }
                     }
                 }
+                item { Spacer(GlanceModifier.height(contentPadding)) }
             }
         }
     }
@@ -451,19 +463,32 @@ private fun WidgetHeader(
         modifier = GlanceModifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = title ?: context.getString(R.string.widget_header_title),
-            style =
-                TextStyle(
-                    color = GlanceTheme.colors.primary,
-                    fontSize = if (compact) 13.scaledSp() else 14.scaledSp(),
-                    fontWeight = FontWeight.Medium,
-                ),
+        Row(
             modifier =
                 GlanceModifier
                     .defaultWeight()
                     .clickable(actionStartActivity(openNotesIntent(context))),
-        )
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                provider = ImageProvider(R.drawable.ic_stat_remember),
+                contentDescription = null,
+                modifier = GlanceModifier.size((if (compact) WIDGET_HEADER_ICON_COMPACT_DP else WIDGET_HEADER_ICON_DP).dp),
+                colorFilter = ColorFilter.tint(GlanceTheme.colors.primary),
+            )
+            Spacer(GlanceModifier.width(WIDGET_HEADER_ICON_GAP_DP.dp))
+            Text(
+                text = title ?: context.getString(R.string.widget_header_title),
+                maxLines = 1,
+                style =
+                    TextStyle(
+                        color = GlanceTheme.colors.primary,
+                        fontSize = if (compact) 13.scaledSp() else 14.scaledSp(),
+                        fontWeight = FontWeight.Medium,
+                    ),
+                modifier = GlanceModifier.defaultWeight(),
+            )
+        }
         if (trailingText != null) {
             Text(
                 text = trailingText,
@@ -1311,6 +1336,9 @@ private const val WIDGET_SYMBOL_BITMAP_SIZE_PX = 64
 private const val WIDGET_SYMBOL_SOURCE_BITMAP_SIZE_PX = 192
 private const val WIDGET_SYMBOL_TEXT_SIZE_PX = 144f
 private const val WIDGET_SYMBOL_OUTPUT_PADDING_PX = 4f
+private const val WIDGET_HEADER_ICON_DP = 18f
+private const val WIDGET_HEADER_ICON_COMPACT_DP = 16f
+private const val WIDGET_HEADER_ICON_GAP_DP = 6f
 private const val QUICK_CAPTURE_HORIZONTAL_PADDING_DP = 12f
 private const val QUICK_CAPTURE_HEADER_TITLE_SP = 13
 private const val QUICK_CAPTURE_HEADER_TRAILING_SP = 11

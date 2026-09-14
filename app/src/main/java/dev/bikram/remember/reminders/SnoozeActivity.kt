@@ -111,7 +111,8 @@ class SnoozeActivity : ComponentActivity() {
             val themeState by themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
             )
-            val tagColors by tagRepository.observeTagColorMap().collectAsStateWithLifecycle(
+            val tagColorFlow = remember(tagRepository) { tagRepository.observeTagColorMap() }
+            val tagColors by tagColorFlow.collectAsStateWithLifecycle(
                 initialValue = emptyMap(),
             )
             val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
