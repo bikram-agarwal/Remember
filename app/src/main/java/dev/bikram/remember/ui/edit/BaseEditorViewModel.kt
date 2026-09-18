@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.remember.data.AppMediaStorage
+import dev.bikram.remember.data.DefaultNotePreferencesState
+import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
@@ -45,6 +47,7 @@ abstract class BaseEditorViewModel(
     protected val repository: NoteRepository,
     protected val appMediaStorage: AppMediaStorage?,
     savedStateHandle: SavedStateHandle,
+    private val defaultNotePrefs: DefaultNotePrefs? = null,
 ) : ViewModel() {
     protected val noteId: Long? =
         savedStateHandle
@@ -144,6 +147,26 @@ abstract class BaseEditorViewModel(
 
     private val _trashed = MutableStateFlow(false)
     val trashed: StateFlow<Boolean> = _trashed.asStateFlow()
+
+    init {
+        if (noteId == null) {
+            viewModelScope.launch {
+                val prefs = defaultNotePrefs ?: return@launch
+                applyNewNoteDefaults(prefs.snapshot())
+            }
+        }
+    }
+
+    /**
+     * Seeds a brand-new draft from Settings > Defaults. Does not mark dirty: blank notes with only
+     * defaults still discard on back; typing or an explicit edit then persists them with the
+     * seeded values. The default reminder time and recurrence are deliberately not applied here -
+     * they only seed the reminder picker, so a new note never gets a reminder it wasn't given.
+     */
+    private fun applyNewNoteDefaults(defaults: DefaultNotePreferencesState) {
+        _visibility.value = defaults.defaultVisibility
+        _importance.value = defaults.defaultImportance
+    }
 
     protected fun updateTimestamps(
         createdAt: Long?,

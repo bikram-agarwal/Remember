@@ -88,7 +88,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 ### 🔒 Privacy and security
 
 - **App lock** with device credential unlock, and biometric authentication. No need to create a new PIN. 
-- **Note visibility levels:** Default (full notification), Private (hides notification body), or Secret (hides everything — no widget or notification content).
+- **Note visibility levels:** Normal (full notification), Private (hides notification body), or Secret (hides everything — no widget or notification content).
 - **No account required.** Your notes are stored entirely locally. Zero tracking, analytics, or automated background telemetry.
 
 ### 💾 Backup and import

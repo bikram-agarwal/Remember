@@ -120,6 +120,8 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.bikram.remember.R
+import dev.bikram.remember.data.DEFAULT_REMINDER_MINUTES_OF_DAY
+import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.MonthlyMode
 import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.data.RecurrenceEndKind
@@ -253,17 +255,22 @@ internal val ReminderDraftListSaver =
         },
     )
 
-private fun createBlankDraft(now: Long): ReminderDraft {
+private fun createBlankDraft(
+    now: Long,
+    defaultReminderMinutesOfDay: Int = DEFAULT_REMINDER_MINUTES_OF_DAY,
+    defaultRecurrence: RecurrenceRule? = null,
+): ReminderDraft {
     val cal = Calendar.getInstance().apply { timeInMillis = now + 60 * 60 * 1000L }
     return ReminderDraft(
         selectedDate = pickerDayMillisForLocalWallClock(cal.timeInMillis),
         reminderDateExplicit = false,
-        reminderHour = 9,
-        reminderMinute = 0,
+        reminderHour = DefaultNotePrefs.hourFromMinutesOfDay(defaultReminderMinutesOfDay),
+        reminderMinute = DefaultNotePrefs.minuteFromMinutesOfDay(defaultReminderMinutesOfDay),
         reminderTimeExplicit = false,
         repeatOn = false,
         repeatExpanded = false,
-        unit = RecurrenceUnit.DAY,
+        // The default recurrence only preselects the unit; everything else stays as it was.
+        unit = defaultRecurrence?.unit ?: RecurrenceUnit.DAY,
         intervalText = "1",
         daysOfWeek = setOf(cal.get(Calendar.DAY_OF_WEEK)),
         monthlyKind = MonthlyKind.BY_DAY,
@@ -279,7 +286,7 @@ private fun createBlankDraft(now: Long): ReminderDraft {
     )
 }
 
-internal fun NoteReminder.toDraft(): ReminderDraft {
+internal fun NoteReminder.toDraft(defaultRecurrence: RecurrenceRule? = null): ReminderDraft {
     val baseTime = originalReminderAt ?: reminderAt
     val cal = Calendar.getInstance().apply { timeInMillis = baseTime }
     val rule = recurrence
@@ -291,7 +298,8 @@ internal fun NoteReminder.toDraft(): ReminderDraft {
         reminderTimeExplicit = true,
         repeatOn = rule != null,
         repeatExpanded = false,
-        unit = rule?.unit ?: RecurrenceUnit.DAY,
+        // With no rule of its own, only the unit comes from the default.
+        unit = rule?.unit ?: defaultRecurrence?.unit ?: RecurrenceUnit.DAY,
         intervalText = (rule?.interval ?: 1).toString(),
         daysOfWeek = rule?.daysOfWeek ?: setOf(cal.get(Calendar.DAY_OF_WEEK)),
         monthlyKind =
@@ -311,9 +319,27 @@ internal fun NoteReminder.toDraft(): ReminderDraft {
     )
 }
 
+/**
+ * Moves the repeat controls' unedited starting values onto [dateMillis]. Until repeat is turned
+ * on they are placeholders derived from the date the reminder fires on, so picking a new date has
+ * to carry them along - otherwise "every week" would offer the weekday the sheet was opened on.
+ * Once repeat is on the user owns those values and they are left alone.
+ */
+private fun ReminderDraft.withRepeatAnchorsOn(dateMillis: Long): ReminderDraft {
+    if (repeatOn) return this
+    val fireDay = Instant.ofEpochMilli(dateMillis).atZone(ZoneOffset.UTC).toLocalDate()
+    val fireWeekday = (fireDay.dayOfWeek.value % 7) + 1
+    return copy(
+        daysOfWeek = setOf(fireWeekday),
+        dayOfMonth = fireDay.dayOfMonth,
+        nthOrdinal = ((fireDay.dayOfMonth - 1) / 7) + 1,
+        nthWeekday = fireWeekday,
+    )
+}
+
 internal fun ReminderDraft.toReminder(nowMillis: Long = System.currentTimeMillis()): NoteReminder {
-    val hour24 = if (reminderTimeExplicit) reminderHour else 9
-    val minuteVal = if (reminderTimeExplicit) reminderMinute else 0
+    val hour24 = reminderHour
+    val minuteVal = reminderMinute
     val effectiveDate =
         if (!reminderDateExplicit && reminderTimeExplicit) {
             pickerDayMillisForLocalWallClock(nowMillis)
@@ -409,12 +435,7 @@ private fun formatCollapsedHeader(
     if (!draft.reminderDateExplicit && !draft.reminderTimeExplicit) {
         return context.getString(R.string.options_reminder)
     }
-    val timePart =
-        if (draft.reminderTimeExplicit) {
-            formatTimeOfDay(context, draft.reminderHour, draft.reminderMinute)
-        } else {
-            formatTimeOfDay(context, 9, 0)
-        }
+    val timePart = formatTimeOfDay(context, draft.reminderHour, draft.reminderMinute)
     val effectiveDate =
         if (!draft.reminderDateExplicit && draft.reminderTimeExplicit) {
             pickerDayMillisForLocalWallClock(System.currentTimeMillis())
@@ -454,14 +475,22 @@ fun ReminderPickerSheet(
     initialReminders: List<NoteReminder>,
     onConfirm: (List<NoteReminder>) -> Unit,
     onDismiss: () -> Unit,
+    defaultReminderMinutesOfDay: Int = DEFAULT_REMINDER_MINUTES_OF_DAY,
+    defaultRecurrence: RecurrenceRule? = null,
 ) {
     val now = remember { System.currentTimeMillis() }
     var drafts by rememberSaveable(stateSaver = ReminderDraftListSaver) {
         mutableStateOf(
             if (initialReminders.isEmpty()) {
-                listOf(createBlankDraft(now))
+                listOf(
+                    createBlankDraft(
+                        now = now,
+                        defaultReminderMinutesOfDay = defaultReminderMinutesOfDay,
+                        defaultRecurrence = defaultRecurrence,
+                    ),
+                )
             } else {
-                initialReminders.map { it.toDraft() }
+                initialReminders.map { it.toDraft(defaultRecurrence) }
             },
         )
     }
@@ -474,7 +503,10 @@ fun ReminderPickerSheet(
     // against the stored values: the picker only edits down to the minute, so a stored reminder
     // carrying seconds or millis (snoozes, imported due dates) would otherwise read as edited the
     // instant the sheet opened, and cancelling would ask about changes the user never made.
-    val initialAsEdited = remember(initialReminders, now) { initialReminders.map { it.toDraft().toReminder(now) } }
+    val initialAsEdited =
+        remember(initialReminders, now, defaultRecurrence) {
+            initialReminders.map { it.toDraft(defaultRecurrence).toReminder(now) }
+        }
     val hasChanges =
         if (initialReminders.isEmpty()) {
             drafts.any { it.reminderDateExplicit || it.reminderTimeExplicit }
@@ -668,13 +700,14 @@ fun ReminderPickerSheet(
                                                 drafts =
                                                     drafts.mapIndexed { idx, d ->
                                                         if (idx == index) {
-                                                            d.copy(
-                                                                selectedDate = targetDateMillis,
-                                                                reminderDateExplicit = true,
-                                                                reminderHour = zdt.hour,
-                                                                reminderMinute = zdt.minute,
-                                                                reminderTimeExplicit = true,
-                                                            )
+                                                            d
+                                                                .copy(
+                                                                    selectedDate = targetDateMillis,
+                                                                    reminderDateExplicit = true,
+                                                                    reminderHour = zdt.hour,
+                                                                    reminderMinute = zdt.minute,
+                                                                    reminderTimeExplicit = true,
+                                                                ).withRepeatAnchorsOn(targetDateMillis)
                                                         } else {
                                                             d
                                                         }
@@ -900,7 +933,13 @@ fun ReminderPickerSheet(
                                 }.clip(MaterialTheme.shapes.medium)
                                 .clickable {
                                     val newDraftKey = nextDraftKey
-                                    val nextDrafts = drafts + createBlankDraft(now)
+                                    val nextDrafts =
+                                        drafts +
+                                            createBlankDraft(
+                                                now = now,
+                                                defaultReminderMinutesOfDay = defaultReminderMinutesOfDay,
+                                                defaultRecurrence = defaultRecurrence,
+                                            )
                                     nextDraftKey += 1L
                                     drafts = nextDrafts
                                     draftKeys = draftKeys + newDraftKey
@@ -1020,7 +1059,13 @@ fun ReminderPickerSheet(
             onConfirm = { dateMillis ->
                 drafts =
                     drafts.mapIndexed { idx, d ->
-                        if (idx == expandedIndex) d.copy(selectedDate = dateMillis, reminderDateExplicit = true) else d
+                        if (idx == expandedIndex) {
+                            d
+                                .copy(selectedDate = dateMillis, reminderDateExplicit = true)
+                                .withRepeatAnchorsOn(dateMillis)
+                        } else {
+                            d
+                        }
                     }
                 dateDialogOpen = false
             },

@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
 import dev.bikram.remember.data.BackupPrefs
+import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.OnboardingPrefs
@@ -202,12 +203,13 @@ object DiagnosticLog {
             val theme = ThemePrefs(context).state.first()
             val interaction = InteractionPrefs(context).state.first()
             val reminder = ReminderPrefs(context).snapshot()
+            val defaultNote = DefaultNotePrefs(context).snapshot()
             val backup = BackupPrefs(context).snapshot()
             val update = UpdatePrefs(context).snapshot()
             val quickCapture = QuickCapturePrefs(context).snapshot()
             val onboarding = OnboardingPrefs(context).state.first()
             val lock = LockPrefs(context).state.first()
-            PreferencesSnapshot(theme, interaction, reminder, backup, update, quickCapture, onboarding, lock)
+            PreferencesSnapshot(theme, interaction, reminder, defaultNote, backup, update, quickCapture, onboarding, lock)
         }.getOrNull()
 
     private fun StringBuilder.appendPreferencesSnapshot(
@@ -248,6 +250,23 @@ object DiagnosticLog {
         // Reminders.
         appendLine(context.getString(R.string.diagnostics_keep_reminders_until_done_format, snapshot.reminder.keepReminderNotificationsUntilDone.toString()))
         appendLine(context.getString(R.string.diagnostics_reminder_summary_enabled_format, snapshot.reminder.reminderSummaryNotificationEnabled.toString()))
+
+        // Note defaults.
+        appendLine(context.getString(R.string.diagnostics_default_visibility_format, snapshot.defaultNote.defaultVisibility.toString()))
+        appendLine(context.getString(R.string.diagnostics_default_importance_format, snapshot.defaultNote.defaultImportance.toString()))
+        appendLine(
+            context.getString(
+                R.string.diagnostics_default_reminder_time_format,
+                snapshot.defaultNote.defaultReminderMinutesOfDay.toString(),
+            ),
+        )
+        appendLine(
+            context.getString(
+                R.string.diagnostics_default_recurrence_format,
+                snapshot.defaultNote.defaultRecurrence?.toString()
+                    ?: context.getString(R.string.common_none),
+            ),
+        )
 
         // Backup.
         appendLine(context.getString(R.string.diagnostics_auto_export_on_change_format, snapshot.backup.autoExportOnChange.toString()))
@@ -502,6 +521,7 @@ object DiagnosticLog {
         val theme: dev.bikram.remember.data.ThemeState,
         val interaction: dev.bikram.remember.data.InteractionState,
         val reminder: dev.bikram.remember.data.ReminderPreferencesState,
+        val defaultNote: dev.bikram.remember.data.DefaultNotePreferencesState,
         val backup: dev.bikram.remember.data.BackupPreferencesState,
         val update: dev.bikram.remember.data.UpdatePreferencesState,
         val quickCapture: dev.bikram.remember.data.QuickCaptureState,

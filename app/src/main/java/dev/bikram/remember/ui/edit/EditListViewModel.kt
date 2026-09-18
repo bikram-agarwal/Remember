@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.ChecklistItemEntity
+import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.getActiveReminders
@@ -29,7 +30,8 @@ class EditListViewModel
         repository: NoteRepository,
         appMediaStorage: AppMediaStorage? = null,
         savedStateHandle: SavedStateHandle,
-    ) : BaseEditorViewModel(repository, appMediaStorage, savedStateHandle) {
+        defaultNotePrefs: DefaultNotePrefs? = null,
+    ) : BaseEditorViewModel(repository, appMediaStorage, savedStateHandle, defaultNotePrefs) {
         private val _items = MutableStateFlow<List<EditableItem>>(emptyList())
         val items: StateFlow<List<EditableItem>> = _items.asStateFlow()
 

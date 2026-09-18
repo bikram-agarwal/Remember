@@ -5,6 +5,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.BackupPrefs
+import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.DevModePrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
@@ -39,6 +40,8 @@ interface SettingsDependenciesEntryPoint {
     fun quickCapturePrefs(): QuickCapturePrefs
 
     fun reminderPrefs(): ReminderPrefs
+
+    fun defaultNotePrefs(): DefaultNotePrefs
 
     fun backupPrefs(): BackupPrefs
 
@@ -97,6 +100,8 @@ interface DevOptionsDependenciesEntryPoint {
     fun reminderScheduler(): ReminderScheduler
 
     fun reminderPrefs(): ReminderPrefs
+
+    fun defaultNotePrefs(): DefaultNotePrefs
 
     fun themePrefs(): ThemePrefs
 

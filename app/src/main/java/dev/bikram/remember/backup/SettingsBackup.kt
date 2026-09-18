@@ -2,6 +2,7 @@ package dev.bikram.remember.backup
 
 import dev.bikram.remember.data.BackupPrefs
 import dev.bikram.remember.data.BackupSettingsRestoreOutcome
+import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.QuickCapturePrefs
@@ -19,6 +20,7 @@ object SettingsBackup {
     const val KEY_BACKUP = "backup_prefs"
     const val KEY_QUICK_CAPTURE = "quick_capture_prefs"
     const val KEY_REMINDER = "reminder_prefs"
+    const val KEY_DEFAULT_NOTE = "default_note_prefs"
     const val KEY_UPDATE = "update_prefs"
 
     suspend fun exportJson(
@@ -29,6 +31,7 @@ object SettingsBackup {
         backupPrefs: BackupPrefs,
         quickCapturePrefs: QuickCapturePrefs,
         reminderPrefs: ReminderPrefs,
+        defaultNotePrefs: DefaultNotePrefs,
         updatePrefs: UpdatePrefs,
     ): JSONObject =
         JSONObject().apply {
@@ -39,6 +42,7 @@ object SettingsBackup {
             put(KEY_BACKUP, backupPrefs.exportForBackup())
             put(KEY_QUICK_CAPTURE, quickCapturePrefs.exportForBackup())
             put(KEY_REMINDER, reminderPrefs.exportForBackup())
+            put(KEY_DEFAULT_NOTE, defaultNotePrefs.exportForBackup())
             put(KEY_UPDATE, updatePrefs.exportForBackup())
         }
 
@@ -51,6 +55,7 @@ object SettingsBackup {
         backupPrefs: BackupPrefs,
         quickCapturePrefs: QuickCapturePrefs,
         reminderPrefs: ReminderPrefs,
+        defaultNotePrefs: DefaultNotePrefs,
         updatePrefs: UpdatePrefs,
     ): BackupSettingsRestoreOutcome {
         if (root == null) return BackupSettingsRestoreOutcome()
@@ -61,6 +66,7 @@ object SettingsBackup {
         val backupRestoreOutcome = backupPrefs.importFromBackup(root.optJSONObject(KEY_BACKUP))
         quickCapturePrefs.importFromBackup(root.optJSONObject(KEY_QUICK_CAPTURE))
         reminderPrefs.importFromBackup(root.optJSONObject(KEY_REMINDER))
+        defaultNotePrefs.importFromBackup(root.optJSONObject(KEY_DEFAULT_NOTE))
         updatePrefs.importFromBackup(root.optJSONObject(KEY_UPDATE))
         return backupRestoreOutcome
     }

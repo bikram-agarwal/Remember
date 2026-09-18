@@ -203,11 +203,11 @@ Remember stores notes on your device in a local database. The database is not en
 
 Remember supports Android Auto Backup. Your notes, lists, tags, and settings are automatically backed up to your Google account and restored when you reinstall the app on a new device. Attachments and pictures are not included in Auto Backup — use the in-app backup with **Include media in backup** enabled if you need those to transfer as well.
 
-### Visibility: Default, Private, and Secret
+### Visibility: Normal, Private, and Secret
 
 Visibility controls what appears in notifications and widgets — it is not a sharing or encryption setting.
 
-- **Default** allows the title and note content to appear in notifications and widgets.
+- **Normal** allows the title and note content to appear in notifications and widgets.
 - **Private** hides notification body content and widget preview text.
 - **Secret** hides both the note title and body from notification and keeps the item out of widgets entirely.
 

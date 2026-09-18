@@ -107,10 +107,11 @@ encrypt -> Where notes are stored
 encrypted -> Where notes are stored
 plaintext -> Where notes are stored
 data security -> Where notes are stored
-private -> Visibility: Default, Private, and Secret
-secret note -> Visibility: Default, Private, and Secret
-hide note -> Visibility: Default, Private, and Secret
-hide notification -> Visibility: Default, Private, and Secret
+private -> Visibility: Normal, Private, and Secret
+secret note -> Visibility: Normal, Private, and Secret
+hide note -> Visibility: Normal, Private, and Secret
+hide notification -> Visibility: Normal, Private, and Secret
+normal visibility -> Visibility: Normal, Private, and Secret
 lock -> App lock
 lock app -> App lock
 pin -> App lock

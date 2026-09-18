@@ -147,6 +147,7 @@ class BackupIo(
     private val backupPrefs: BackupPrefs,
     private val quickCapturePrefs: QuickCapturePrefs,
     private val reminderPrefs: ReminderPrefs,
+    private val defaultNotePrefs: DefaultNotePrefs,
     private val updatePrefs: UpdatePrefs,
     private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
 ) {
@@ -179,11 +180,33 @@ class BackupIo(
 
     fun suggestedBackupFileName(): String = "remember_backup_${backupFileTimestamp()}.zip"
 
-    private suspend fun buildSettingsJson(): JSONObject = SettingsBackup.exportJson(themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
+    private suspend fun buildSettingsJson(): JSONObject =
+        SettingsBackup.exportJson(
+            themePrefs,
+            viewOptionsPrefs,
+            lockPrefs,
+            interactionPrefs,
+            backupPrefs,
+            quickCapturePrefs,
+            reminderPrefs,
+            defaultNotePrefs,
+            updatePrefs,
+        )
 
     private suspend fun importSettingsFromJson(settingsJson: JSONObject?): BackupSettingsRestoreOutcome {
         val restoreOutcome =
-            SettingsBackup.importJson(settingsJson, themePrefs, viewOptionsPrefs, lockPrefs, interactionPrefs, backupPrefs, quickCapturePrefs, reminderPrefs, updatePrefs)
+            SettingsBackup.importJson(
+                settingsJson,
+                themePrefs,
+                viewOptionsPrefs,
+                lockPrefs,
+                interactionPrefs,
+                backupPrefs,
+                quickCapturePrefs,
+                reminderPrefs,
+                defaultNotePrefs,
+                updatePrefs,
+            )
         runCatching {
             RememberBackupWork.updateSchedule(context, backupPrefs.snapshot())
         }.onFailure { error ->
