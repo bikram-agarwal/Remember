@@ -38,6 +38,9 @@ battery saver -> Troubleshooting reminders | Notification permission and reliabi
 background restriction -> Notification permission and reliability
 reliable reminder -> Notification permission and reliability
 
+high importance -> Importance: Low, Normal, and High
+heads-up reminder -> Importance: Low, Normal, and High
+
 # --- Keep until done / persistent reminders ---
 keep reminding -> Keep reminders until done
 remind again -> Keep reminders until done
@@ -55,6 +58,18 @@ remind me later -> Snooze
 later tonight -> Snooze
 snooze options -> Snooze
 push reminder -> Snooze
+absolute snooze -> Snooze
+snooze duration -> Snooze
+snooze minutes -> Snooze
+snooze type -> Snooze
+
+# --- Defaults ---
+new note defaults -> Defaults
+default visibility -> Defaults
+default importance -> Defaults
+default reminder time -> Defaults
+default recurrence -> Defaults
+default repeat -> Defaults
 
 # --- Recurring / repeating ---
 repeat reminder -> Recurring reminders

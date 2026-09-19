@@ -819,6 +819,13 @@
     <string name="settings_defaults_recurrence_weekly">Weekly</string>
     <string name="settings_defaults_recurrence_monthly">Monthly</string>
     <string name="settings_defaults_recurrence_yearly">Yearly</string>
+    <string name="settings_snooze_type_title">Snooze type</string>
+    <string name="settings_snooze_type_desc">Choose smart presets or a duration</string>
+    <string name="settings_snooze_type_presets">Presets</string>
+    <string name="settings_snooze_type_duration">Duration</string>
+    <string name="snooze_duration_minutes">Minutes</string>
+    <string name="snooze_duration_hours">Hours</string>
+    <string name="snooze_duration_days">Days</string>
 
     <!-- Settings: haptics, notifications, swipe -->
     <string name="settings_haptics_section">Haptics</string>
@@ -1247,6 +1254,7 @@
     <string name="diagnostics_default_importance_format">Default importance: %1$s</string>
     <string name="diagnostics_default_reminder_time_format">Default reminder time (minutes): %1$s</string>
     <string name="diagnostics_default_recurrence_format">Default recurrence: %1$s</string>
+    <string name="diagnostics_snooze_type_format">Snooze type: %1$s</string>
     <string name="diagnostics_auto_export_on_change_format">Auto export on change: %1$s</string>
     <string name="diagnostics_scheduled_export_enabled_format">Scheduled export enabled: %1$s</string>
     <string name="diagnostics_include_media_in_backup_format">Include media in backup: %1$s</string>

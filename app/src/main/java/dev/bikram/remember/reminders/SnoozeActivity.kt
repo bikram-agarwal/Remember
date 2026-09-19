@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,12 +48,18 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.ReminderPreferencesState
+import dev.bikram.remember.data.ReminderPrefs
+import dev.bikram.remember.data.SnoozeType
 import dev.bikram.remember.data.TagRepository
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
+import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.edit.CalendarPickerDialog
 import dev.bikram.remember.ui.edit.ReminderTimePickerDialog
@@ -81,6 +88,8 @@ class SnoozeActivity : ComponentActivity() {
     @Inject lateinit var themePrefs: ThemePrefs
 
     @Inject lateinit var interactionPrefs: InteractionPrefs
+
+    @Inject lateinit var reminderPrefs: ReminderPrefs
 
     @ApplicationScope @Inject
     lateinit var applicationScope: CoroutineScope
@@ -118,6 +127,9 @@ class SnoozeActivity : ComponentActivity() {
             val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
                 initialValue = InteractionState(),
             )
+            val reminderState by reminderPrefs.state.collectAsStateWithLifecycle(
+                initialValue = ReminderPreferencesState(),
+            )
             CompositionLocalProvider(LocalTagColors provides tagColors) {
                 RememberTheme(
                     themeState = themeState,
@@ -135,6 +147,7 @@ class SnoozeActivity : ComponentActivity() {
                         contentAlignment = Alignment.Center,
                     ) {
                         SnoozeDialogContent(
+                            snoozeType = reminderState.snoozeType,
                             onSnooze = { timeMillis -> snoozeAndFinish(noteId, timeMillis) },
                             onDismiss = { finish() },
                         )
@@ -191,6 +204,7 @@ class SnoozeActivity : ComponentActivity() {
  */
 @Composable
 fun SnoozeDialogContent(
+    snoozeType: SnoozeType = SnoozeType.RELATIVE,
     onSnooze: (Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -219,6 +233,10 @@ fun SnoozeDialogContent(
 
     var customDateMillis by remember { mutableStateOf<Long?>(null) }
     var customTimePickerOpen by remember { mutableStateOf(false) }
+    var durationValue by remember { mutableStateOf(10) }
+    var durationUnit by remember { mutableStateOf(SnoozeDurationUnit.MINUTES) }
+    var durationValueExpanded by remember { mutableStateOf(false) }
+    var durationUnitExpanded by remember { mutableStateOf(false) }
 
     Surface(
         shape = MaterialTheme.shapes.extraLargeIncreased,
@@ -262,21 +280,72 @@ fun SnoozeDialogContent(
 
             Spacer(Modifier.height(16.dp))
 
-            presets.forEachIndexed { index, preset ->
-                if (preset.dividerBefore && index > 0) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            if (snoozeType == SnoozeType.RELATIVE) {
+                presets.forEachIndexed { index, preset ->
+                    if (preset.dividerBefore && index > 0) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                            thickness = 1.dp,
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        )
+                    }
+                    SnoozePresetRow(
+                        symbolName = preset.symbolName,
+                        title = preset.title,
+                        subtitle = preset.subtitle,
+                        trailing = preset.absoluteTime,
+                        onClick = { onSnooze(preset.targetMillis) },
                     )
                 }
-                SnoozePresetRow(
-                    symbolName = preset.symbolName,
-                    title = preset.title,
-                    subtitle = preset.subtitle,
-                    trailing = preset.absoluteTime,
-                    onClick = { onSnooze(preset.targetMillis) },
-                )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    RememberOutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = { durationValueExpanded = true },
+                    ) {
+                        Text(durationValue.toString())
+                        DropdownMenu(
+                            expanded = durationValueExpanded,
+                            onDismissRequest = { durationValueExpanded = false },
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ) {
+                            for (durationOption in 1..durationUnit.maximumValue) {
+                                RememberDropdownMenuItem(
+                                    text = { Text(durationOption.toString()) },
+                                    onClick = {
+                                        durationValue = durationOption
+                                        durationValueExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    RememberOutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = { durationUnitExpanded = true },
+                    ) {
+                        Text(stringResource(durationUnit.labelRes))
+                        DropdownMenu(
+                            expanded = durationUnitExpanded,
+                            onDismissRequest = { durationUnitExpanded = false },
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        ) {
+                            SnoozeDurationUnit.entries.forEach { unitOption ->
+                                RememberDropdownMenuItem(
+                                    text = { Text(stringResource(unitOption.labelRes)) },
+                                    onClick = {
+                                        durationUnit = unitOption
+                                        durationValue = durationValue.coerceAtMost(unitOption.maximumValue)
+                                        durationUnitExpanded = false
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             HorizontalDivider(
@@ -295,10 +364,26 @@ fun SnoozeDialogContent(
             Spacer(Modifier.height(8.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 RememberTextButton(onClick = onDismiss) {
                     Text(stringResource(R.string.common_cancel))
+                }
+                if (snoozeType == SnoozeType.ABSOLUTE) {
+                    RememberButton(
+                        onClick = {
+                            val target =
+                                when (durationUnit) {
+                                    SnoozeDurationUnit.MINUTES -> now.plusMinutes(durationValue.toLong())
+                                    SnoozeDurationUnit.HOURS -> now.plusHours(durationValue.toLong())
+                                    SnoozeDurationUnit.DAYS -> now.plusDays(durationValue.toLong())
+                                }
+                            onSnooze(target.toInstant().toEpochMilli())
+                        },
+                    ) {
+                        Text(stringResource(R.string.action_type_snooze))
+                    }
                 }
             }
         }
@@ -333,6 +418,15 @@ fun SnoozeDialogContent(
             },
         )
     }
+}
+
+private enum class SnoozeDurationUnit(
+    val maximumValue: Int,
+    val labelRes: Int,
+) {
+    MINUTES(60, R.string.snooze_duration_minutes),
+    HOURS(24, R.string.snooze_duration_hours),
+    DAYS(30, R.string.snooze_duration_days),
 }
 
 @Composable

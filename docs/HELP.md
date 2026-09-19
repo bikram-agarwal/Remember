@@ -82,9 +82,13 @@ Add a reminder date and time to any note or list. When the time arrives, Remembe
 
 Reminder notifications can include the title, note content or list items, a picture, snooze, mark done, and one custom action button.
 
-### High-importance reminders
+### Importance: Low, Normal, and High
 
-High-importance reminders use stronger notification behavior: heads-up alerts, sound, and vibration. Use them when a reminder needs to be immediately noticeable. Importance does not affect when a reminder fires — only how loud it is when it does.
+Importance controls how loud a reminder is when it fires - not when it fires.
+
+- **Low** is silent, with no status bar icon or vibration.
+- **Normal** uses the standard sound and vibration.
+- **High** pops up as a heads-up alert and is treated as an alarm. Use it when a reminder needs to be immediately noticeable.
 
 ### Recurring reminders
 
@@ -94,7 +98,12 @@ When you mark a recurring reminder done, Remember advances it to the next schedu
 
 ### Snooze
 
-Snooze moves a reminder to a later time without opening the app. Presets include soon, later today, this evening, tomorrow, next week, or a custom date and time.
+Snooze moves a reminder to a later time without opening the app. The snooze sheet follows **Snooze type** in Settings -> Notifications.
+
+- **Presets** offers named times: soon, later today, this evening, tomorrow, next week.
+- **Duration** replaces those with a duration: 1-60 minutes, 1-24 hours, or 1-30 days. Choose the number and unit, then tap **Snooze**.
+
+**Pick a specific time** stays available in both modes, with a date and time picker.
 
 ### Keep reminders until done
 

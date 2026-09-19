@@ -21,7 +21,7 @@
   <br/>
   <!-- Distribution Badges -->
   <a href="https://github.com/bikram-agarwal/Remember/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/bikram-agarwal/Remember?color=a1168e&include_prereleases&logo=github&style=for-the-badge&labelColor=700f63"/></a>
-  <a href="https://play.google.com/store/apps/details?id=dev.bikram.remember"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v1.7.0-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
+  <a href="https://play.google.com/store/apps/details?id=dev.bikram.remember"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v1.8.0-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
   <a href="https://f-droid.org/packages/dev.bikram.remember.gh"><img alt="F-Droid" src="https://img.shields.io/f-droid/v/dev.bikram.remember.gh?color=a1168e&logo=FDROID&style=for-the-badge&labelColor=700f63"/></a>
   <br/>
   <a href="https://trendshift.io/repositories/72537" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/72537/daily?language=Kotlin" alt="bikram-agarwal%2FRemember | Trendshift" width="250" height="55"/></a>
@@ -44,7 +44,7 @@ If a reminder notification gets swiped away without being marked Done, Remember 
 ### ⏰ Reminders that actually work
 
 - **Keep reminders until done.** The feature the app is built around. Enable it, and accidental dismissals stop mattering — Remember re-posts the notification until the note is marked done.
-- **Reminers/Snooze that speaks human.** Presets like *soon*, *later today*, *this evening*, *tomorrow morning*, or pick a custom date and time — not arbitrary minute counts.
+- **Reminers/snooze that speaks human.** Relative presets like *soon*, *later today*, *this evening*, *tomorrow morning*, OR pick a duration in minutes, hours, or days. A custom date and time is always available.
 - **Multiple reminders per note.** Add up to three reminders to the same note, each with its own time and repeat pattern.
 - **Action buttons in the notification.** A reminder to call someone shows a call button right there. A reminder to pick something up shows directions. You can act on the reminder right from the notification.
 - **High-importance mode.** Heads-up alerts, sound, and vibration for the things that cannot wait.

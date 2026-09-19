@@ -3,15 +3,22 @@ package dev.bikram.remember.data
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import org.json.JSONObject
 
+enum class SnoozeType {
+    RELATIVE,
+    ABSOLUTE,
+}
+
 data class ReminderPreferencesState(
     val keepReminderNotificationsUntilDone: Boolean = false,
     val reminderSummaryNotificationEnabled: Boolean = false,
+    val snoozeType: SnoozeType = SnoozeType.RELATIVE,
 )
 
 private val Context.reminderDataStore by preferencesDataStore(name = "reminder_prefs")
@@ -22,6 +29,7 @@ class ReminderPrefs(
     private object Keys {
         val KEEP_UNTIL_DONE = booleanPreferencesKey("keep_reminder_notifications_until_done")
         val SUMMARY_NOTIFICATION = booleanPreferencesKey("reminder_summary_notification")
+        val SNOOZE_TYPE = stringPreferencesKey("snooze_type")
     }
 
     val state: Flow<ReminderPreferencesState> =
@@ -29,6 +37,10 @@ class ReminderPrefs(
             ReminderPreferencesState(
                 keepReminderNotificationsUntilDone = prefs[Keys.KEEP_UNTIL_DONE] ?: false,
                 reminderSummaryNotificationEnabled = prefs[Keys.SUMMARY_NOTIFICATION] ?: false,
+                snoozeType =
+                    prefs[Keys.SNOOZE_TYPE]?.let { raw ->
+                        runCatching { SnoozeType.valueOf(raw) }.getOrNull()
+                    } ?: SnoozeType.RELATIVE,
             )
         }
 
@@ -46,11 +58,21 @@ class ReminderPrefs(
         }
     }
 
+    suspend fun setSnoozeType(snoozeType: SnoozeType) {
+        context.reminderDataStore.edit { prefs ->
+            prefs[Keys.SNOOZE_TYPE] = snoozeType.name
+        }
+    }
+
     suspend fun exportForBackup(): JSONObject {
         val prefs = context.reminderDataStore.data.first()
         return JSONObject().apply {
             put(Keys.KEEP_UNTIL_DONE.name, prefs[Keys.KEEP_UNTIL_DONE] ?: false)
             put(Keys.SUMMARY_NOTIFICATION.name, prefs[Keys.SUMMARY_NOTIFICATION] ?: false)
+            put(
+                Keys.SNOOZE_TYPE.name,
+                prefs[Keys.SNOOZE_TYPE] ?: SnoozeType.RELATIVE.name,
+            )
         }
     }
 
@@ -62,6 +84,13 @@ class ReminderPrefs(
             }
             if (json.has(Keys.SUMMARY_NOTIFICATION.name) && !json.isNull(Keys.SUMMARY_NOTIFICATION.name)) {
                 mutable[Keys.SUMMARY_NOTIFICATION] = json.getBoolean(Keys.SUMMARY_NOTIFICATION.name)
+            }
+            if (json.has(Keys.SNOOZE_TYPE.name) && !json.isNull(Keys.SNOOZE_TYPE.name)) {
+                val snoozeType =
+                    runCatching { SnoozeType.valueOf(json.getString(Keys.SNOOZE_TYPE.name)) }.getOrNull()
+                if (snoozeType != null) {
+                    mutable[Keys.SNOOZE_TYPE] = snoozeType.name
+                }
             }
         }
     }

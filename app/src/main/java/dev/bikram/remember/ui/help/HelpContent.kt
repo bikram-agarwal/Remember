@@ -83,4 +83,12 @@ val helpSubsectionActions: Map<String, List<HelpAction>> =
             listOf(
                 HelpAction.OpenAppSection("Go to Security settings", "security"),
             ),
+        "Defaults" to
+            listOf(
+                HelpAction.OpenAppSection("Go to Defaults settings", "defaults"),
+            ),
+        "Snooze" to
+            listOf(
+                HelpAction.OpenAppSection("Go to Notifications settings", "notifications"),
+            ),
     )

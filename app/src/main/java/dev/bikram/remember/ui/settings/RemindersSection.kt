@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -43,7 +44,10 @@ import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.QuickCaptureState
 import dev.bikram.remember.data.ReminderPreferencesState
 import dev.bikram.remember.data.ReminderPrefs
+import dev.bikram.remember.data.SnoozeType
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
+import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberSwitch
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
@@ -61,6 +65,7 @@ import kotlinx.coroutines.launch
  *     optimisation exemption when the platform offers them as one toggle, otherwise
  *     surfaced as two separate rows.
  *   - Sticky reminder notifications until the note is marked done.
+ *   - Snooze sheet style (named presets vs a duration).
  *   - Reminder summary notification (the persistent multi-reminder summary).
  *   - Quick-capture persistent notification.
  *
@@ -278,7 +283,7 @@ internal fun RemindersSection(
                 },
             )
         }
-        GroupedListItem(position = GroupPosition.LAST) {
+        GroupedListItem(position = GroupPosition.MIDDLE) {
             SettingsToggleRow(
                 materialSymbolName = "bolt",
                 title = stringResource(R.string.settings_quick_capture_title),
@@ -288,6 +293,82 @@ internal fun RemindersSection(
                     scope.launch { quickCapturePrefs.setEnabled(enabled) }
                 },
             )
+        }
+        GroupedListItem(position = GroupPosition.LAST) {
+            SnoozeTypeRow(
+                snoozeType = reminderState.snoozeType,
+                onSelect = { selected ->
+                    scope.launch { reminderPrefs.setSnoozeType(selected) }
+                },
+            )
+        }
+    }
+}
+
+@Composable
+private fun SnoozeTypeRow(
+    snoozeType: SnoozeType,
+    onSelect: (SnoozeType) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val selectedLabelRes =
+        when (snoozeType) {
+            SnoozeType.RELATIVE -> R.string.settings_snooze_type_presets
+            SnoozeType.ABSOLUTE -> R.string.settings_snooze_type_duration
+        }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .appClickable { expanded = true }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = "snooze",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            weight = FontWeight.Medium,
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                stringResource(R.string.settings_snooze_type_title),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                stringResource(R.string.settings_snooze_type_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        RememberOutlinedButton(onClick = { expanded = true }) {
+            Text(stringResource(selectedLabelRes))
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                SnoozeType.entries.forEach { option ->
+                    val optionLabelRes =
+                        when (option) {
+                            SnoozeType.RELATIVE -> R.string.settings_snooze_type_presets
+                            SnoozeType.ABSOLUTE -> R.string.settings_snooze_type_duration
+                        }
+                    RememberDropdownMenuItem(
+                        text = { Text(stringResource(optionLabelRes)) },
+                        onClick = {
+                            onSelect(option)
+                            expanded = false
+                        },
+                    )
+                }
+            }
         }
     }
 }

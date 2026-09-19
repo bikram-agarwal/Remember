@@ -250,6 +250,7 @@ object DiagnosticLog {
         // Reminders.
         appendLine(context.getString(R.string.diagnostics_keep_reminders_until_done_format, snapshot.reminder.keepReminderNotificationsUntilDone.toString()))
         appendLine(context.getString(R.string.diagnostics_reminder_summary_enabled_format, snapshot.reminder.reminderSummaryNotificationEnabled.toString()))
+        appendLine(context.getString(R.string.diagnostics_snooze_type_format, snapshot.reminder.snoozeType.toString()))
 
         // Note defaults.
         appendLine(context.getString(R.string.diagnostics_default_visibility_format, snapshot.defaultNote.defaultVisibility.toString()))
