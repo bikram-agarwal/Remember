@@ -87,33 +87,20 @@ internal fun RemindersSection(
     highlightItemRequestId: Int = 0,
 ) {
     val context = LocalContext.current
-    var keepUntilDoneHighlight by rememberSaveable { mutableStateOf(false) }
-    var keepUntilDoneHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
-    var handledKeepUntilDoneHighlightRequestId by rememberSaveable { mutableIntStateOf(0) }
-    LaunchedEffect(highlightItemKey, highlightItemRequestId) {
-        if (
-            highlightItemKey == "keep_until_done" &&
-            highlightItemRequestId != handledKeepUntilDoneHighlightRequestId
-        ) {
-            handledKeepUntilDoneHighlightRequestId = highlightItemRequestId
-            keepUntilDoneHighlight = true
-            keepUntilDoneHighlightExpiresAtMillis =
-                SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
-        } else if (highlightItemKey != "keep_until_done") {
-            keepUntilDoneHighlight = false
-            keepUntilDoneHighlightExpiresAtMillis = 0L
-        }
-    }
-    LaunchedEffect(keepUntilDoneHighlight, keepUntilDoneHighlightExpiresAtMillis) {
-        if (!keepUntilDoneHighlight) return@LaunchedEffect
-        val remainingHighlightMillis = keepUntilDoneHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
-        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
-        keepUntilDoneHighlight = false
-        keepUntilDoneHighlightExpiresAtMillis = 0L
-    }
     val keepUntilDoneHighlightActive =
-        keepUntilDoneHighlight && keepUntilDoneHighlightExpiresAtMillis > SystemClock.elapsedRealtime()
+        rememberSettingsItemHighlightActive(
+            itemKey = "keep_until_done",
+            highlightItemKey = highlightItemKey,
+            highlightItemRequestId = highlightItemRequestId,
+        )
     val keepUntilDoneHighlightAlpha = rememberSectionHighlightPulseAlpha(keepUntilDoneHighlightActive)
+    val snoozeTypeHighlightActive =
+        rememberSettingsItemHighlightActive(
+            itemKey = "snooze_type",
+            highlightItemKey = highlightItemKey,
+            highlightItemRequestId = highlightItemRequestId,
+        )
+    val snoozeTypeHighlightAlpha = rememberSectionHighlightPulseAlpha(snoozeTypeHighlightActive)
     GroupedListColumn {
         GroupedListItem(position = GroupPosition.FIRST) {
             Row(
@@ -294,7 +281,19 @@ internal fun RemindersSection(
                 },
             )
         }
-        GroupedListItem(position = GroupPosition.LAST) {
+        GroupedListItem(
+            position = GroupPosition.LAST,
+            modifier =
+                Modifier
+                    .zIndex(if (snoozeTypeHighlightActive) 1f else 0f)
+                    .pulsingSectionHighlightOutline(
+                        active = snoozeTypeHighlightActive,
+                        outlineColor =
+                            MaterialTheme.colorScheme.primary.copy(alpha = snoozeTypeHighlightAlpha),
+                        expandDp = 4.dp,
+                        cornerRadiusDp = 12.dp,
+                    ),
+        ) {
             SnoozeTypeRow(
                 snoozeType = reminderState.snoozeType,
                 onSelect = { selected ->
@@ -303,6 +302,44 @@ internal fun RemindersSection(
             )
         }
     }
+}
+
+/**
+ * Item-level deep-link highlight for a single settings row.
+ *
+ * The request id is a monotonic counter owned by [SettingsRoute]; acknowledging it in
+ * `rememberSaveable` state is what lets the same row be deep-linked twice in a row. Both halves of
+ * that handshake must survive configuration change and back-stack removal together, otherwise the
+ * second deep link raises a request id the acknowledger has already seen and nothing pulses.
+ */
+@Composable
+private fun rememberSettingsItemHighlightActive(
+    itemKey: String,
+    highlightItemKey: String?,
+    highlightItemRequestId: Int,
+): Boolean {
+    var highlighted by rememberSaveable { mutableStateOf(false) }
+    var highlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
+    var handledHighlightRequestId by rememberSaveable { mutableIntStateOf(0) }
+    LaunchedEffect(highlightItemKey, highlightItemRequestId) {
+        if (highlightItemKey == itemKey && highlightItemRequestId != handledHighlightRequestId) {
+            handledHighlightRequestId = highlightItemRequestId
+            highlighted = true
+            highlightExpiresAtMillis =
+                SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
+        } else if (highlightItemKey != itemKey) {
+            highlighted = false
+            highlightExpiresAtMillis = 0L
+        }
+    }
+    LaunchedEffect(highlighted, highlightExpiresAtMillis) {
+        if (!highlighted) return@LaunchedEffect
+        val remainingHighlightMillis = highlightExpiresAtMillis - SystemClock.elapsedRealtime()
+        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
+        highlighted = false
+        highlightExpiresAtMillis = 0L
+    }
+    return highlighted && highlightExpiresAtMillis > SystemClock.elapsedRealtime()
 }
 
 @Composable

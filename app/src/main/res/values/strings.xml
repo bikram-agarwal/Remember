@@ -805,6 +805,11 @@
     <string name="help_collapse_all_cd">Collapse all</string>
     <string name="help_search_placeholder">Search</string>
     <string name="help_no_results">No results</string>
+    <string name="help_action_notification_settings">Go to notification settings</string>
+    <string name="help_action_reminder_settings">Go to Reminders setting</string>
+    <string name="help_action_snooze_settings">Go to Snooze setting</string>
+    <string name="help_action_backup_settings">Go to Backup settings</string>
+    <string name="help_action_security_settings">Go to Security settings</string>
 
     <!-- Settings: note defaults for new notes and lists -->
     <string name="settings_defaults_visibility_title">Default visibility</string>

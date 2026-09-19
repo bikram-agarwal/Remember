@@ -8,11 +8,11 @@ import dev.bikram.remember.ui.common.parseMarkdownLine
 
 /**
  * Moves a newline typed inside inline wrappers past their closing markers, so the break lands
- * after the formatted run instead of splitting it. [spans] are the spans of [previousValue].text.
+ * after the formatted run instead of splitting it. [spans] lazily supplies the previous text's spans.
  */
 internal fun TextFieldValue.withInlineWrapperEnterAdjusted(
     previousValue: TextFieldValue,
-    spans: List<MarkdownWrapperRange>,
+    spans: () -> List<MarkdownWrapperRange>,
 ): TextFieldValue {
     if (!previousValue.selection.collapsed || !selection.collapsed) {
         return this
@@ -35,9 +35,10 @@ internal fun TextFieldValue.withInlineWrapperEnterAdjusted(
         return this
     }
 
+    val wrapperSpans = spans()
     var adjustedNewlineIndex = previousCursor
     while (true) {
-        val closing = spans.filter { it.closeStart == adjustedNewlineIndex }.maxByOrNull { it.closeEnd } ?: break
+        val closing = wrapperSpans.filter { it.closeStart == adjustedNewlineIndex }.maxByOrNull { it.closeEnd } ?: break
         adjustedNewlineIndex = closing.closeEnd
     }
     if (adjustedNewlineIndex > previousCursor) {
@@ -58,16 +59,16 @@ internal fun TextFieldValue.withInlineWrapperEnterAdjusted(
 
 /**
  * Applies deletions the way live preview displays them, dropping hidden Markdown syntax the user
- * cannot see instead of the raw characters. [spans] are the spans of [previousValue].text.
+ * cannot see instead of the raw characters. [spans] lazily supplies the previous text's spans.
  */
 internal fun TextFieldValue.withLivePreviewDeletionApplied(
     previousValue: TextFieldValue,
-    spans: List<MarkdownWrapperRange>,
+    spans: () -> List<MarkdownWrapperRange>,
 ): TextFieldValue {
     if (!selection.collapsed) {
         return this
     }
-    withInlineFormattingPreserved(previousValue, spans)?.let { return it }
+    withInlineFormattingPreserved(previousValue, spans())?.let { return it }
     if (text.length >= previousValue.text.length) return this
     val cursor = selection.start.coerceIn(0, text.length)
     val previousCursor = previousValue.selection.start.coerceIn(0, previousValue.text.length)

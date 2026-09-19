@@ -97,13 +97,12 @@ private enum class FocusField { TITLE, DETAILS }
 private fun listShelfState(
     trashed: Boolean,
     archived: Boolean,
-): NoteShelfState {
-    return when {
+): NoteShelfState =
+    when {
         trashed -> NoteShelfState.TRASHED
         archived -> NoteShelfState.ARCHIVED
         else -> NoteShelfState.ACTIVE
     }
-}
 
 private fun listEditorScrollProgress(
     firstVisibleItemIndex: Int,
@@ -116,12 +115,18 @@ private fun listEditorScrollProgress(
     return (firstVisibleItemScrollOffset.toFloat() / thresholdPx).coerceIn(0f, 1f)
 }
 
-private fun shouldShowListEditorActionBar(
+@Composable
+private fun ListEditorBottomBarSlot(
     bottomBarVisible: Boolean,
     isEditMode: Boolean,
     imeVisible: Boolean,
-): Boolean {
-    return bottomBarVisible && !isEditMode && !imeVisible
+    actionContent: @Composable () -> Unit,
+) {
+    EditorBottomBarSlot(
+        isEditMode = false,
+        actionBarVisible = bottomBarVisible && !isEditMode && !imeVisible,
+        actionContent = actionContent,
+    )
 }
 
 @Composable
@@ -555,15 +560,10 @@ fun EditListScreen(
                     )
                 },
                 bottomBar = {
-                    val actionBarVisible =
-                        shouldShowListEditorActionBar(
-                            bottomBarVisible = bottomBarVisible,
-                            isEditMode = isEditMode,
-                            imeVisible = imeVisible,
-                        )
-                    EditorBottomBarSlot(
-                        isEditMode = false,
-                        actionBarVisible = actionBarVisible,
+                    ListEditorBottomBarSlot(
+                        bottomBarVisible = bottomBarVisible,
+                        isEditMode = isEditMode,
+                        imeVisible = imeVisible,
                         actionContent = {
                             NoteActionBottomBarContent(
                                 shelfState = shelfState,

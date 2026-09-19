@@ -68,6 +68,7 @@ import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.time.Clock
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalTime
@@ -195,12 +196,10 @@ class SnoozeActivity : ComponentActivity() {
 }
 
 /**
- * Smart snooze sheet. Each row commits the user to an absolute target time
- * (e.g. "5:30 PM" today), not a duration relative to "now", so users don't have
- * to do mental math. Times round to clean :00 / :15 boundaries; the preset
- * list adapts to time-of-day so options like "This evening" disappear once
- * it's late. The trailing "Pick a specific time" row falls through to the
- * existing date + time picker dialogs for the long-tail case.
+ * Snooze sheet with named target times or a duration starting at confirmation.
+ * Presets round to clean :00 / :15 boundaries and adapt to time of day, so options
+ * like "This evening" disappear once it is late. Both modes offer the existing
+ * date and time picker dialogs through "Pick a specific time".
  */
 @Composable
 fun SnoozeDialogContent(
@@ -212,10 +211,8 @@ fun SnoozeDialogContent(
     val resources = LocalResources.current
     val configuration = LocalConfiguration.current
     val locale = configuration.locales[0]
-    // Capture once at composition. We never re-read the wall clock during the
-    // session; if the user lingers in the sheet for hours the absolute targets
-    // would otherwise drift, and recomputing every recomposition would shift
-    // the visible labels mid-tap.
+    // Keep named preset targets and labels stable during this session. Duration snoozes
+    // read the clock separately when confirmed so the full requested delay starts then.
     val nowMillis = remember { System.currentTimeMillis() }
     val zone = remember { ZoneId.systemDefault() }
     val now =
@@ -319,13 +316,7 @@ fun SnoozeDialogContent(
                 showSnooze = snoozeType == SnoozeType.ABSOLUTE,
                 onDismiss = onDismiss,
                 onSnooze = {
-                    val target =
-                        when (durationUnit) {
-                            SnoozeDurationUnit.MINUTES -> now.plusMinutes(durationValue.toLong())
-                            SnoozeDurationUnit.HOURS -> now.plusHours(durationValue.toLong())
-                            SnoozeDurationUnit.DAYS -> now.plusDays(durationValue.toLong())
-                        }
-                    onSnooze(target.toInstant().toEpochMilli())
+                    onSnooze(durationUnit.targetMillis(durationValue))
                 },
             )
         }
@@ -489,13 +480,28 @@ private fun SnoozeCustomTimePickers(
     }
 }
 
-private enum class SnoozeDurationUnit(
+internal enum class SnoozeDurationUnit(
     val maximumValue: Int,
     val labelRes: Int,
 ) {
     MINUTES(60, R.string.snooze_duration_minutes),
     HOURS(24, R.string.snooze_duration_hours),
     DAYS(30, R.string.snooze_duration_days),
+    ;
+
+    fun targetMillis(
+        value: Int,
+        clock: Clock = Clock.systemDefaultZone(),
+    ): Long {
+        val now = ZonedDateTime.now(clock)
+        val target =
+            when (this) {
+                MINUTES -> now.plusMinutes(value.toLong())
+                HOURS -> now.plusHours(value.toLong())
+                DAYS -> now.plusDays(value.toLong())
+            }
+        return target.toInstant().toEpochMilli()
+    }
 }
 
 @Composable

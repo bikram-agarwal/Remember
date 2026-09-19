@@ -360,7 +360,7 @@ private fun MarkdownLine(
     if (block.kind == MarkdownBlockKind.Bullet) {
         Row(
             modifier = Modifier.padding(start = styler.listStartPadding(block.indent, baseIndent = 16.dp)),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             Text(
                 text = "\u2022",
@@ -387,7 +387,7 @@ private fun MarkdownLine(
     if (block.kind == MarkdownBlockKind.Numbered) {
         Row(
             modifier = Modifier.padding(start = styler.listStartPadding(block.indent, baseIndent = 8.dp)),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             Text(
                 text = "${block.number}.",

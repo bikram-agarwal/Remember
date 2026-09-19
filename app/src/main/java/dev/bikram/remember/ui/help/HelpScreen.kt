@@ -436,7 +436,7 @@ private fun HelpSubsectionCard(
                                         }
                                     },
                                 ) {
-                                    Text(action.label)
+                                    Text(stringResource(action.labelRes))
                                 }
                             }
                         }

@@ -1,6 +1,8 @@
 package dev.bikram.remember.data
 
 import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -30,9 +32,11 @@ const val DEFAULT_REMINDER_MINUTES_OF_DAY = 9 * 60
 
 private val Context.defaultNoteDataStore by preferencesDataStore(name = "default_note_prefs")
 
-class DefaultNotePrefs(
-    private val context: Context,
+class DefaultNotePrefs internal constructor(
+    private val dataStore: DataStore<Preferences>,
 ) {
+    constructor(context: Context) : this(context.defaultNoteDataStore)
+
     private object Keys {
         val VISIBILITY = stringPreferencesKey("default_visibility")
         val IMPORTANCE = stringPreferencesKey("default_importance")
@@ -41,7 +45,7 @@ class DefaultNotePrefs(
     }
 
     val state: Flow<DefaultNotePreferencesState> =
-        context.defaultNoteDataStore.data.map { prefs ->
+        dataStore.data.map { prefs ->
             DefaultNotePreferencesState(
                 defaultVisibility =
                     prefs[Keys.VISIBILITY]?.let { raw ->
@@ -61,25 +65,25 @@ class DefaultNotePrefs(
     suspend fun snapshot(): DefaultNotePreferencesState = state.first()
 
     suspend fun setDefaultVisibility(visibility: Visibility) {
-        context.defaultNoteDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[Keys.VISIBILITY] = visibility.name
         }
     }
 
     suspend fun setDefaultImportance(importance: Importance) {
-        context.defaultNoteDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[Keys.IMPORTANCE] = importance.name
         }
     }
 
     suspend fun setDefaultReminderMinutesOfDay(minutesOfDay: Int) {
-        context.defaultNoteDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[Keys.REMINDER_MINUTES] = minutesOfDay.coerceIn(0, 1439)
         }
     }
 
     suspend fun setDefaultRecurrence(rule: RecurrenceRule?) {
-        context.defaultNoteDataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val encoded = RecurrenceRule.toJson(rule)
             if (encoded == null) {
                 prefs.remove(Keys.RECURRENCE_JSON)
@@ -106,7 +110,7 @@ class DefaultNotePrefs(
 
     suspend fun importFromBackup(json: JSONObject?) {
         if (json == null || json.length() == 0) return
-        context.defaultNoteDataStore.edit { mutable ->
+        dataStore.edit { mutable ->
             if (json.has(Keys.VISIBILITY.name) && !json.isNull(Keys.VISIBILITY.name)) {
                 val visibility =
                     runCatching { Visibility.valueOf(json.getString(Keys.VISIBILITY.name)) }.getOrNull()
@@ -144,7 +148,7 @@ class DefaultNotePrefs(
     }
 
     suspend fun reset() {
-        context.defaultNoteDataStore.edit { it.clear() }
+        dataStore.edit { it.clear() }
     }
 
     companion object {

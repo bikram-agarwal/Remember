@@ -103,14 +103,14 @@ internal class MarkdownEditBuffer(
         val shouldCapitalizeNext = shouldCapitalizeNextInputInEmptyInlineWrapper
         val selectionAdjustedValue =
             if (cleanUpEmptyMarkdownWrappers) value.withHiddenMarkerSelectionCollapsed(previousValue) else value
-        // formatSpans() still describes previousValue here: textFieldValue is only reassigned below.
+        // Resolve spans only when a transform needs them, while textFieldValue is still previousValue.
         val newlineAdjustedValue =
-            selectionAdjustedValue.withInlineWrapperEnterAdjusted(previousValue = previousValue, spans = formatSpans())
+            selectionAdjustedValue.withInlineWrapperEnterAdjusted(previousValue = previousValue, spans = ::formatSpans)
         val updatedValue =
             newlineAdjustedValue.withListContinuationApplied(previousValue = previousValue)
         val cleanedValue =
             if (cleanUpEmptyMarkdownWrappers && updatedValue == newlineAdjustedValue) {
-                updatedValue.withLivePreviewDeletionApplied(previousValue = previousValue, spans = formatSpans())
+                updatedValue.withLivePreviewDeletionApplied(previousValue = previousValue, spans = ::formatSpans)
             } else {
                 updatedValue
             }
