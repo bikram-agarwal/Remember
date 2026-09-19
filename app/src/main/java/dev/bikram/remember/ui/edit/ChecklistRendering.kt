@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -33,6 +34,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
@@ -45,8 +47,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.isSpecified
 import dev.bikram.remember.R
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -59,6 +63,7 @@ import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.feedback.performSwipeThresholdHaptic
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
+import kotlin.math.roundToInt
 
 /**
  * A synthetic, non-persisted header that stands in for the real parent row when a child has been
@@ -172,6 +177,22 @@ internal fun ChecklistRow(
     val view = LocalView.current
     var detailsExpanded by rememberSaveable(item.localId) { mutableStateOf(false) }
     var showCheckboxMenu by remember { mutableStateOf(false) }
+
+    // A one-line title lines up with the checkbox because both line boxes are centered in the same
+    // row: the title's line box gets equal slack above and below inside the checkbox gutter.
+    // When the title wraps, the row grows and centering would drop the checkbox to the
+    // middle of the paragraph, so the gutter is pinned to the top and the title gets that same
+    // slack back as top padding - which keeps the checkbox exactly where it sits on a one-liner.
+    var titleFirstLineHeightPx by remember(item.localId) { mutableIntStateOf(0) }
+    var titleWrapped by remember(item.localId) { mutableStateOf(false) }
+    val titleTopSlack =
+        if (titleWrapped && titleFirstLineHeightPx > 0) {
+            with(LocalDensity.current) {
+                ((CHECKLIST_GUTTER_HEIGHT - titleFirstLineHeightPx.toDp()) / 2).coerceAtLeast(0.dp)
+            }
+        } else {
+            0.dp
+        }
 
     var titleFieldValue by remember(item.localId) {
         mutableStateOf(TextFieldValue(text = item.text, selection = TextRange(item.text.length)))
@@ -346,11 +367,12 @@ internal fun ChecklistRow(
                 // cascade branch is skipped). The row body retains the horizontal indent gesture,
                 // so users can still swipe the text area left or right to change depth.
                 val cdReorder = stringResource(R.string.cd_reorder_drag_handle)
+                // Same gutter as the checkbox it replaces in edit mode, so the title sits at the
+                // same x in both modes instead of jumping sideways when edit mode is toggled.
                 Box(
                     modifier =
                         dragHandleModifier
-                            .padding(start = 4.dp, end = 4.dp)
-                            .size(32.dp)
+                            .size(width = CHECKLIST_GUTTER_WIDTH, height = CHECKLIST_GUTTER_HEIGHT)
                             .semantics { contentDescription = cdReorder },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -362,79 +384,81 @@ internal fun ChecklistRow(
                     )
                 }
             }
-            val hasLongPressAction = onCheckAll != null || onUncheckAll != null
-            Box {
-                Box(
-                    modifier =
-                        if (hasLongPressAction) {
-                            Modifier
-                                .size(40.dp)
-                                .appCombinedClickable(
-                                    onClick = onToggle,
-                                    // appCombinedClickable fires the long-press haptic itself.
-                                    onLongClick = { showCheckboxMenu = true },
-                                    role = Role.Checkbox,
-                                )
-                        } else {
-                            Modifier
-                                .size(40.dp)
-                                .appClickable(
-                                    onClick = onToggle,
-                                    role = Role.Checkbox,
-                                )
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    RememberMaterialRoundedSymbol(
-                        name = if (item.checked) "check_box" else "check_box_outline_blank",
-                        size = 24.dp,
-                        tint = checkboxTint,
-                        weight = FontWeight.Medium,
-                    )
-                }
-
-                if (hasLongPressAction) {
-                    DropdownMenu(
-                        expanded = showCheckboxMenu,
-                        onDismissRequest = { showCheckboxMenu = false },
-                        shape = RoundedCornerShape(16.dp),
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            if (!isEditMode) {
+                val hasLongPressAction = onCheckAll != null || onUncheckAll != null
+                Box(modifier = if (titleWrapped) Modifier.align(Alignment.Top) else Modifier) {
+                    Box(
+                        modifier =
+                            if (hasLongPressAction) {
+                                Modifier
+                                    .size(width = CHECKLIST_GUTTER_WIDTH, height = CHECKLIST_GUTTER_HEIGHT)
+                                    .appCombinedClickable(
+                                        onClick = onToggle,
+                                        // appCombinedClickable fires the long-press haptic itself.
+                                        onLongClick = { showCheckboxMenu = true },
+                                        role = Role.Checkbox,
+                                    )
+                            } else {
+                                Modifier
+                                    .size(width = CHECKLIST_GUTTER_WIDTH, height = CHECKLIST_GUTTER_HEIGHT)
+                                    .appClickable(
+                                        onClick = onToggle,
+                                        role = Role.Checkbox,
+                                    )
+                            },
+                        contentAlignment = Alignment.Center,
                     ) {
-                        RememberDropdownMenuItem(
-                            text = { Text(stringResource(R.string.checklist_action_check_all)) },
-                            leadingIcon = {
-                                RememberMaterialRoundedSymbol(
-                                    name = "done_all",
-                                    size = 20.dp,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                )
-                            },
-                            onClick = {
-                                showCheckboxMenu = false
-                                onCheckAll?.invoke()
-                            },
+                        RememberMaterialRoundedSymbol(
+                            name = if (item.checked) "check_box" else "check_box_outline_blank",
+                            size = checklistTitleFontSizeDp(),
+                            tint = checkboxTint,
+                            weight = FontWeight.Medium,
                         )
-                        RememberDropdownMenuItem(
-                            text = { Text(stringResource(R.string.checklist_action_uncheck_all)) },
-                            leadingIcon = {
-                                RememberMaterialRoundedSymbol(
-                                    name = "remove_done",
-                                    size = 20.dp,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                            },
-                            onClick = {
-                                showCheckboxMenu = false
-                                onUncheckAll?.invoke()
-                            },
-                        )
+                    }
+
+                    if (hasLongPressAction) {
+                        DropdownMenu(
+                            expanded = showCheckboxMenu,
+                            onDismissRequest = { showCheckboxMenu = false },
+                            shape = RoundedCornerShape(16.dp),
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        ) {
+                            RememberDropdownMenuItem(
+                                text = { Text(stringResource(R.string.checklist_action_check_all)) },
+                                leadingIcon = {
+                                    RememberMaterialRoundedSymbol(
+                                        name = "done_all",
+                                        size = 20.dp,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                },
+                                onClick = {
+                                    showCheckboxMenu = false
+                                    onCheckAll?.invoke()
+                                },
+                            )
+                            RememberDropdownMenuItem(
+                                text = { Text(stringResource(R.string.checklist_action_uncheck_all)) },
+                                leadingIcon = {
+                                    RememberMaterialRoundedSymbol(
+                                        name = "remove_done",
+                                        size = 20.dp,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                },
+                                onClick = {
+                                    showCheckboxMenu = false
+                                    onUncheckAll?.invoke()
+                                },
+                            )
+                        }
                     }
                 }
             }
             if (isEditMode) {
                 BasicTextField(
                     state = titleTextFieldState,
-                    lineLimits = TextFieldLineLimits.SingleLine,
+                    lineLimits = TextFieldLineLimits.Default,
                     textStyle =
                         MaterialTheme.typography.bodyLarge.copy(
                             color =
@@ -452,6 +476,12 @@ internal fun ChecklistRow(
                         ),
                     onKeyboardAction = { onNext() },
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    onTextLayout = { getResult ->
+                        getResult()?.let { layout ->
+                            titleWrapped = layout.lineCount > 1
+                            titleFirstLineHeightPx = (layout.getLineBottom(0) - layout.getLineTop(0)).roundToInt()
+                        }
+                    },
                     modifier =
                         Modifier
                             .weight(1f)
@@ -487,7 +517,12 @@ internal fun ChecklistRow(
                         )
                     }
                 }
-                RememberIconButton(onClick = onRemove) {
+                // Last element in the row, so the button's own inset reads as a gap against the
+                // editor's trailing edge - keep it just wide enough for the glyph.
+                RememberIconButton(
+                    onClick = onRemove,
+                    modifier = Modifier.size(CHECKLIST_ROW_TRAILING_BUTTON_SIZE),
+                ) {
                     RememberMaterialRoundedSymbol(
                         name = "close",
                         size = 24.dp,
@@ -511,11 +546,17 @@ internal fun ChecklistRow(
                                 },
                             textDecoration = if (item.checked) TextDecoration.LineThrough else TextDecoration.None,
                         ),
-                    onTextLayout = { titleLayout = it },
+                    onTextLayout = { layout ->
+                        titleLayout = layout
+                        titleWrapped = layout.lineCount > 1
+                        titleFirstLineHeightPx = (layout.getLineBottom(0) - layout.getLineTop(0)).roundToInt()
+                    },
                     modifier =
                         if (onTextTap != null) {
                             Modifier
                                 .weight(1f)
+                                .align(if (titleWrapped) Alignment.Top else Alignment.CenterVertically)
+                                .padding(top = titleTopSlack)
                                 .pointerInput(onTextTap, titleLayout) {
                                     detectTapGestures { tapOffset ->
                                         val offset =
@@ -528,7 +569,10 @@ internal fun ChecklistRow(
                                     }
                                 }
                         } else {
-                            Modifier.weight(1f)
+                            Modifier
+                                .weight(1f)
+                                .align(if (titleWrapped) Alignment.Top else Alignment.CenterVertically)
+                                .padding(top = titleTopSlack)
                         },
                 )
                 if (hasChildren && onToggleChildren != null) {
@@ -555,11 +599,14 @@ internal fun ChecklistRow(
         }
 
         if (detailsExpanded || (!isEditMode && detailPreview.isNotBlank())) {
-            val detailsStartPadding = (if (isEditMode && showDragHandle) 40.dp else 0.dp) + 40.dp
+            // Line the details up with the title: the leading gutter is the drag handle in edit
+            // mode and the checkbox everywhere else, and both are CHECKLIST_GUTTER_WIDTH wide.
+            val detailsStartPadding =
+                if (isEditMode && !showDragHandle) 0.dp else CHECKLIST_GUTTER_WIDTH
             if (isEditMode) {
                 BasicTextField(
                     state = detailsTextFieldState,
-                    lineLimits = TextFieldLineLimits.SingleLine,
+                    lineLimits = TextFieldLineLimits.Default,
                     textStyle =
                         MaterialTheme.typography.bodyMedium.copy(
                             color =
@@ -638,6 +685,26 @@ internal fun ChecklistRow(
 }
 
 /**
+ * Gutter that holds the checkbox and doubles as its touch target. The width only has to clear the
+ * glyph plus a small inset - keeping it square would push the checkbox (and with it the title) well
+ * away from the row's leading edge. The height stays a full tap target and is what the title's
+ * first line is centered against.
+ */
+private val CHECKLIST_GUTTER_WIDTH = 28.dp
+private val CHECKLIST_GUTTER_HEIGHT = 40.dp
+
+/** Trailing remove button; sized to its 24dp glyph plus a 4dp inset. */
+private val CHECKLIST_ROW_TRAILING_BUTTON_SIZE = 32.dp
+
+/** Glyph height of checklist title text. The checkbox is drawn at this size so it matches the text. */
+@Composable
+private fun checklistTitleFontSizeDp(): Dp {
+    val fontSize = MaterialTheme.typography.bodyLarge.fontSize
+    if (!fontSize.isSpecified) return 16.dp
+    return with(LocalDensity.current) { fontSize.toDp() }
+}
+
+/**
  * Read-only header that stands in for the real parent when the parent lives in the opposite
  * section from its child. Styled to match a regular checklist row (checkbox gutter + text) but
  * at reduced opacity so it reads as context rather than an interactive row. The ghost uses a
@@ -656,6 +723,7 @@ internal fun GhostParentHeaderRow(
      * false and sit flush at depth 0.
      */
     showDragHandleGutter: Boolean,
+    showCheckbox: Boolean = true,
     childrenExpanded: Boolean,
     onToggleChildren: () -> Unit,
     modifier: Modifier = Modifier,
@@ -672,23 +740,25 @@ internal fun GhostParentHeaderRow(
                     .alpha(0.45f),
         ) {
             if (showDragHandleGutter) {
-                Spacer(Modifier.width(40.dp))
+                Spacer(Modifier.width(CHECKLIST_GUTTER_WIDTH))
             }
-            // Static checkbox icon (no click behaviour). Using the Box + icon avoids the ripple and
-            // minSize guarantees of RememberIconButton so the ghost can't steal taps meant for a
-            // child below it.
-            Box(
-                modifier =
-                    Modifier
-                        .size(40.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                RememberMaterialRoundedSymbol(
-                    name = if (isParentChecked) "check_box" else "check_box_outline_blank",
-                    size = 24.dp,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    weight = FontWeight.Medium,
-                )
+            if (showCheckbox) {
+                // Static checkbox icon (no click behaviour). Using the Box + icon avoids the ripple and
+                // minSize guarantees of RememberIconButton so the ghost can't steal taps meant for a
+                // child below it.
+                Box(
+                    modifier =
+                        Modifier
+                            .size(width = CHECKLIST_GUTTER_WIDTH, height = CHECKLIST_GUTTER_HEIGHT),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    RememberMaterialRoundedSymbol(
+                        name = if (isParentChecked) "check_box" else "check_box_outline_blank",
+                        size = checklistTitleFontSizeDp(),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        weight = FontWeight.Medium,
+                    )
+                }
             }
             Text(
                 text = header.text.ifEmpty { stringResource(R.string.edit_list_new_item_placeholder) },

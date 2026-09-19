@@ -4,6 +4,7 @@
   "ecg_heart": ["EKG"],
   "fastfood": ["burger", "food", "fries"],
   "featured_seasonal_and_gifts": ["present", "christmas", "holiday", "birthday"],
+  "ic_brand_nbc": ["peacock"],
   "local_cafe": ["espresso", "latte", "cappuccino"],
   "local_florist": ["roses", "bouquet"],
   "local_taxi": ["cab", "uber", "rideshare"],

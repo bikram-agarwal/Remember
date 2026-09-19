@@ -686,6 +686,7 @@ fun EditListScreen(
                                     // Active rows draw a drag-handle gutter while in edit mode; the ghost
                                     // has to mirror that so its checkbox lines up with the rows below.
                                     showDragHandleGutter = isEditMode,
+                                    showCheckbox = !isEditMode,
                                     childrenExpanded = entry.header.realParentLocalId !in collapsedActiveParentIdSet,
                                     onToggleChildren = {
                                         toggleActiveParentChildrenCollapsed(entry.header.realParentLocalId)
@@ -907,6 +908,7 @@ fun EditListScreen(
                                             // Completed rows never render a drag handle, so the ghost in
                                             // the checked section never reserves a gutter either.
                                             showDragHandleGutter = false,
+                                            showCheckbox = !isEditMode,
                                             childrenExpanded = entry.header.realParentLocalId !in collapsedCompletedParentIdSet,
                                             onToggleChildren = {
                                                 toggleCompletedParentChildrenCollapsed(entry.header.realParentLocalId)
