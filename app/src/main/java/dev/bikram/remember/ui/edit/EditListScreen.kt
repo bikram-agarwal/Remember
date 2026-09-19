@@ -94,6 +94,56 @@ import java.io.File
 
 private enum class FocusField { TITLE, DETAILS }
 
+private fun listShelfState(
+    trashed: Boolean,
+    archived: Boolean,
+): NoteShelfState {
+    return when {
+        trashed -> NoteShelfState.TRASHED
+        archived -> NoteShelfState.ARCHIVED
+        else -> NoteShelfState.ACTIVE
+    }
+}
+
+private fun listEditorScrollProgress(
+    firstVisibleItemIndex: Int,
+    firstVisibleItemScrollOffset: Int,
+    thresholdPx: Float,
+): Float {
+    if (firstVisibleItemIndex > 0) {
+        return 1f
+    }
+    return (firstVisibleItemScrollOffset.toFloat() / thresholdPx).coerceIn(0f, 1f)
+}
+
+private fun shouldShowListEditorActionBar(
+    bottomBarVisible: Boolean,
+    isEditMode: Boolean,
+    imeVisible: Boolean,
+): Boolean {
+    return bottomBarVisible && !isEditMode && !imeVisible
+}
+
+@Composable
+private fun rememberListEditorBarVisibilityConnection(
+    onVisibilityChange: (Boolean) -> Unit,
+): NestedScrollConnection {
+    return remember(onVisibilityChange) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(
+                available: Offset,
+                source: NestedScrollSource,
+            ): Offset {
+                when {
+                    available.y < -1f -> onVisibilityChange(false)
+                    available.y > 1f && source == NestedScrollSource.UserInput -> onVisibilityChange(true)
+                }
+                return Offset.Zero
+            }
+        }
+    }
+}
+
 @Composable
 fun EditListRoute(
     appScope: CoroutineScope,
@@ -193,7 +243,6 @@ fun EditListRoute(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@Suppress("CyclomaticComplexMethod")
 @Composable
 fun EditListScreen(
     vm: EditListViewModel,
@@ -254,12 +303,7 @@ fun EditListScreen(
             topBlurProgressPower = 1.1f,
         )
 
-    val shelfState =
-        when {
-            trashed -> NoteShelfState.TRASHED
-            archived -> NoteShelfState.ARCHIVED
-            else -> NoteShelfState.ACTIVE
-        }
+    val shelfState = listShelfState(trashed = trashed, archived = archived)
     val readOnly = shelfState != NoteShelfState.ACTIVE
 
     var isEditMode by remember(existing, forceEdit) { mutableStateOf(!existing || forceEdit) }
@@ -325,21 +369,8 @@ fun EditListScreen(
     // SHOW direction on NestedScrollSource.UserInput means the spring-back phase never
     // re-reveals the bar, giving a clean M3E overscroll feel.
     val barVisibilityNestedScroll =
-        remember {
-            object : NestedScrollConnection {
-                override fun onPreScroll(
-                    available: Offset,
-                    source: NestedScrollSource,
-                ): Offset {
-                    val dy = available.y
-                    when {
-                        dy < -1f -> bottomBarVisible = false
-                        dy > 1f && source == NestedScrollSource.UserInput ->
-                            bottomBarVisible = true
-                    }
-                    return Offset.Zero
-                }
-            }
+        rememberListEditorBarVisibilityConnection { visible ->
+            bottomBarVisible = visible
         }
 
     val density = LocalDensity.current
@@ -365,25 +396,21 @@ fun EditListScreen(
 
     val topAlphaMultiplier by remember(lazyListState) {
         derivedStateOf {
-            if (lazyListState.firstVisibleItemIndex > 0) {
-                1f
-            } else {
-                val offsetPx = lazyListState.firstVisibleItemScrollOffset.toFloat()
-                val thresholdPx = with(density) { 24.dp.toPx() }
-                (offsetPx / thresholdPx).coerceIn(0f, 1f)
-            }
+            listEditorScrollProgress(
+                firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset,
+                thresholdPx = with(density) { 24.dp.toPx() },
+            )
         }
     }
 
     val titleCollapseProgress by remember(lazyListState) {
         derivedStateOf {
-            if (lazyListState.firstVisibleItemIndex > 0) {
-                1f
-            } else {
-                val offsetPx = lazyListState.firstVisibleItemScrollOffset.toFloat()
-                val thresholdPx = with(density) { 72.dp.toPx() }
-                (offsetPx / thresholdPx).coerceIn(0f, 1f)
-            }
+            listEditorScrollProgress(
+                firstVisibleItemIndex = lazyListState.firstVisibleItemIndex,
+                firstVisibleItemScrollOffset = lazyListState.firstVisibleItemScrollOffset,
+                thresholdPx = with(density) { 72.dp.toPx() },
+            )
         }
     }
 
@@ -528,7 +555,12 @@ fun EditListScreen(
                     )
                 },
                 bottomBar = {
-                    val actionBarVisible = bottomBarVisible && !isEditMode && !imeVisible
+                    val actionBarVisible =
+                        shouldShowListEditorActionBar(
+                            bottomBarVisible = bottomBarVisible,
+                            isEditMode = isEditMode,
+                            imeVisible = imeVisible,
+                        )
                     EditorBottomBarSlot(
                         isEditMode = false,
                         actionBarVisible = actionBarVisible,

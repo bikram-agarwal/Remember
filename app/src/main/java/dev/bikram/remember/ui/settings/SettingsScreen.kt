@@ -209,7 +209,6 @@ private object SettingsScreenSessionState {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-@Suppress("CyclomaticComplexMethod")
 @Composable
 fun SettingsRoute(
     onOpenIntro: () -> Unit = {},

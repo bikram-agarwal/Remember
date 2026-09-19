@@ -281,71 +281,24 @@ fun SnoozeDialogContent(
             Spacer(Modifier.height(16.dp))
 
             if (snoozeType == SnoozeType.RELATIVE) {
-                presets.forEachIndexed { index, preset ->
-                    if (preset.dividerBefore && index > 0) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                            thickness = 1.dp,
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                        )
-                    }
-                    SnoozePresetRow(
-                        symbolName = preset.symbolName,
-                        title = preset.title,
-                        subtitle = preset.subtitle,
-                        trailing = preset.absoluteTime,
-                        onClick = { onSnooze(preset.targetMillis) },
-                    )
-                }
+                SnoozeRelativePresets(
+                    presets = presets,
+                    onSnooze = onSnooze,
+                )
             } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    RememberOutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { durationValueExpanded = true },
-                    ) {
-                        Text(durationValue.toString())
-                        DropdownMenu(
-                            expanded = durationValueExpanded,
-                            onDismissRequest = { durationValueExpanded = false },
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        ) {
-                            for (durationOption in 1..durationUnit.maximumValue) {
-                                RememberDropdownMenuItem(
-                                    text = { Text(durationOption.toString()) },
-                                    onClick = {
-                                        durationValue = durationOption
-                                        durationValueExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                    RememberOutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { durationUnitExpanded = true },
-                    ) {
-                        Text(stringResource(durationUnit.labelRes))
-                        DropdownMenu(
-                            expanded = durationUnitExpanded,
-                            onDismissRequest = { durationUnitExpanded = false },
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        ) {
-                            SnoozeDurationUnit.entries.forEach { unitOption ->
-                                RememberDropdownMenuItem(
-                                    text = { Text(stringResource(unitOption.labelRes)) },
-                                    onClick = {
-                                        durationUnit = unitOption
-                                        durationValue = durationValue.coerceAtMost(unitOption.maximumValue)
-                                        durationUnitExpanded = false
-                                    },
-                                )
-                            }
-                        }
-                    }
-                }
+                SnoozeDurationChooser(
+                    durationValue = durationValue,
+                    onDurationValueChange = { nextValue -> durationValue = nextValue },
+                    durationUnit = durationUnit,
+                    onDurationUnitChange = { nextUnit ->
+                        durationUnit = nextUnit
+                        durationValue = durationValue.coerceAtMost(nextUnit.maximumValue)
+                    },
+                    durationValueExpanded = durationValueExpanded,
+                    onDurationValueExpandedChange = { expanded -> durationValueExpanded = expanded },
+                    durationUnitExpanded = durationUnitExpanded,
+                    onDurationUnitExpandedChange = { expanded -> durationUnitExpanded = expanded },
+                )
             }
 
             HorizontalDivider(
@@ -362,43 +315,159 @@ fun SnoozeDialogContent(
             )
 
             Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                verticalAlignment = Alignment.CenterVertically,
+            SnoozeSheetButtons(
+                showSnooze = snoozeType == SnoozeType.ABSOLUTE,
+                onDismiss = onDismiss,
+                onSnooze = {
+                    val target =
+                        when (durationUnit) {
+                            SnoozeDurationUnit.MINUTES -> now.plusMinutes(durationValue.toLong())
+                            SnoozeDurationUnit.HOURS -> now.plusHours(durationValue.toLong())
+                            SnoozeDurationUnit.DAYS -> now.plusDays(durationValue.toLong())
+                        }
+                    onSnooze(target.toInstant().toEpochMilli())
+                },
+            )
+        }
+    }
+
+    SnoozeCustomTimePickers(
+        now = now,
+        nowMillis = nowMillis,
+        zone = zone,
+        customDateMillis = customDateMillis,
+        customTimePickerOpen = customTimePickerOpen,
+        onCustomDateMillisChange = { nextDate -> customDateMillis = nextDate },
+        onCustomTimePickerOpenChange = { open -> customTimePickerOpen = open },
+        onSnooze = onSnooze,
+    )
+}
+
+@Composable
+private fun SnoozeRelativePresets(
+    presets: List<SnoozePreset>,
+    onSnooze: (Long) -> Unit,
+) {
+    presets.forEachIndexed { index, preset ->
+        if (preset.dividerBefore && index > 0) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            )
+        }
+        SnoozePresetRow(
+            symbolName = preset.symbolName,
+            title = preset.title,
+            subtitle = preset.subtitle,
+            trailing = preset.absoluteTime,
+            onClick = { onSnooze(preset.targetMillis) },
+        )
+    }
+}
+
+@Composable
+private fun SnoozeDurationChooser(
+    durationValue: Int,
+    onDurationValueChange: (Int) -> Unit,
+    durationUnit: SnoozeDurationUnit,
+    onDurationUnitChange: (SnoozeDurationUnit) -> Unit,
+    durationValueExpanded: Boolean,
+    onDurationValueExpandedChange: (Boolean) -> Unit,
+    durationUnitExpanded: Boolean,
+    onDurationUnitExpandedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        RememberOutlinedButton(
+            modifier = Modifier.weight(1f),
+            onClick = { onDurationValueExpandedChange(true) },
+        ) {
+            Text(durationValue.toString())
+            DropdownMenu(
+                expanded = durationValueExpanded,
+                onDismissRequest = { onDurationValueExpandedChange(false) },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {
-                RememberTextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-                if (snoozeType == SnoozeType.ABSOLUTE) {
-                    RememberButton(
+                for (durationOption in 1..durationUnit.maximumValue) {
+                    RememberDropdownMenuItem(
+                        text = { Text(durationOption.toString()) },
                         onClick = {
-                            val target =
-                                when (durationUnit) {
-                                    SnoozeDurationUnit.MINUTES -> now.plusMinutes(durationValue.toLong())
-                                    SnoozeDurationUnit.HOURS -> now.plusHours(durationValue.toLong())
-                                    SnoozeDurationUnit.DAYS -> now.plusDays(durationValue.toLong())
-                                }
-                            onSnooze(target.toInstant().toEpochMilli())
+                            onDurationValueChange(durationOption)
+                            onDurationValueExpandedChange(false)
                         },
-                    ) {
-                        Text(stringResource(R.string.action_type_snooze))
-                    }
+                    )
+                }
+            }
+        }
+        RememberOutlinedButton(
+            modifier = Modifier.weight(1f),
+            onClick = { onDurationUnitExpandedChange(true) },
+        ) {
+            Text(stringResource(durationUnit.labelRes))
+            DropdownMenu(
+                expanded = durationUnitExpanded,
+                onDismissRequest = { onDurationUnitExpandedChange(false) },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                SnoozeDurationUnit.entries.forEach { unitOption ->
+                    RememberDropdownMenuItem(
+                        text = { Text(stringResource(unitOption.labelRes)) },
+                        onClick = {
+                            onDurationUnitChange(unitOption)
+                            onDurationUnitExpandedChange(false)
+                        },
+                    )
                 }
             }
         }
     }
+}
 
-    // "Pick a specific time" flow: date picker → time picker → onSnooze.
+@Composable
+private fun SnoozeSheetButtons(
+    showSnooze: Boolean,
+    onDismiss: () -> Unit,
+    onSnooze: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RememberTextButton(onClick = onDismiss) {
+            Text(stringResource(R.string.common_cancel))
+        }
+        if (showSnooze) {
+            RememberButton(onClick = onSnooze) {
+                Text(stringResource(R.string.action_type_snooze))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SnoozeCustomTimePickers(
+    now: ZonedDateTime,
+    nowMillis: Long,
+    zone: ZoneId,
+    customDateMillis: Long?,
+    customTimePickerOpen: Boolean,
+    onCustomDateMillisChange: (Long?) -> Unit,
+    onCustomTimePickerOpenChange: (Boolean) -> Unit,
+    onSnooze: (Long) -> Unit,
+) {
     val pendingDate = customDateMillis
     if (pendingDate != null && !customTimePickerOpen) {
         CalendarPickerDialog(
             initial = pendingDate,
             onConfirm = { dayMillis ->
-                customDateMillis = dayMillis
-                customTimePickerOpen = true
+                onCustomDateMillisChange(dayMillis)
+                onCustomTimePickerOpenChange(true)
             },
-            onDismiss = { customDateMillis = null },
+            onDismiss = { onCustomDateMillisChange(null) },
         )
     }
     if (customTimePickerOpen) {
@@ -408,13 +477,13 @@ fun SnoozeDialogContent(
             onConfirm = { hour, minute ->
                 val day = customDateMillis ?: pickerDayMillisForLocalWallClock(nowMillis)
                 val target = combineDayAndLocalTime(day, hour, minute, zone)
-                customTimePickerOpen = false
-                customDateMillis = null
+                onCustomTimePickerOpenChange(false)
+                onCustomDateMillisChange(null)
                 onSnooze(target)
             },
             onDismiss = {
-                customTimePickerOpen = false
-                customDateMillis = null
+                onCustomTimePickerOpenChange(false)
+                onCustomDateMillisChange(null)
             },
         )
     }
