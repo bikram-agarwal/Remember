@@ -96,6 +96,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.backup.RememberBackupWork
 import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.BackupPreferencesState
+import dev.bikram.remember.data.DefaultNotePreferencesState
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.QuickCaptureState
@@ -163,6 +164,7 @@ enum class SettingsSectionKey(
 ) {
     Appearance("appearance", "palette", R.string.settings_section_appearance),
     Notifications("notifications", "notifications", R.string.settings_notifications_section),
+    Defaults("defaults", "tune", R.string.settings_defaults_section),
 
     // FilePipe files the same toggle under its broader "Touch & Sound" section. Divergent heading
     // only; the toggle and its behaviour are in parity.
@@ -207,7 +209,6 @@ private object SettingsScreenSessionState {
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
-@Suppress("CyclomaticComplexMethod")
 @Composable
 fun SettingsRoute(
     onOpenIntro: () -> Unit = {},
@@ -239,6 +240,7 @@ fun SettingsRoute(
     val interactionPrefs = settingsDependencies.interactionPrefs()
     val quickCapturePrefs = settingsDependencies.quickCapturePrefs()
     val reminderPrefs = settingsDependencies.reminderPrefs()
+    val defaultNotePrefs = settingsDependencies.defaultNotePrefs()
     val backupPrefs = settingsDependencies.backupPrefs()
     val backupIo = settingsDependencies.backupIo()
     val themePrefs = settingsDependencies.themePrefs()
@@ -263,6 +265,9 @@ fun SettingsRoute(
     )
     val reminderState by reminderPrefs.state.collectAsStateWithLifecycle(
         initialValue = ReminderPreferencesState(),
+    )
+    val defaultNoteState by defaultNotePrefs.state.collectAsStateWithLifecycle(
+        initialValue = DefaultNotePreferencesState(),
     )
 
     val biometricAvailable =
@@ -552,7 +557,7 @@ fun SettingsRoute(
     val highlightItem = highlightSectionKey?.substringAfter(".", "")?.takeIf { it.isNotEmpty() }
     // rememberSaveable, NOT remember: this request counter is acknowledged by a matching
     // rememberSaveable counter in the receiving section (see RemindersSection's
-    // `handledKeepUntilDoneHighlightRequestId`). A monotonic-counter handshake only works if both
+    // `rememberSettingsItemHighlightActive`). A monotonic-counter handshake only works if both
     // halves have the same lifetime. With a plain remember, the request side reset to 0 every time
     // Settings left the back stack while the ack side survived at 1 - so the second item-level deep
     // link raised request 1 again, the ack already read 1, and the highlight silently never fired.
@@ -765,6 +770,25 @@ fun SettingsRoute(
                                     )
                                 }
                             } // notifications Column
+                        }
+                    }
+
+                    if (includeSettingsSection(SettingsSectionKey.Defaults)) {
+                        item(key = "defaults") {
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Defaults.routeKey,
+                                materialSymbolName = SettingsSectionKey.Defaults.iconName,
+                                title = stringResource(SettingsSectionKey.Defaults.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                            ) {
+                                DefaultsSection(
+                                    defaultsState = defaultNoteState,
+                                    defaultNotePrefs = defaultNotePrefs,
+                                    scope = scope,
+                                )
+                            }
                         }
                     }
 

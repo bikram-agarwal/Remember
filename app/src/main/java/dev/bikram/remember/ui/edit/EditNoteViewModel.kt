@@ -4,6 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dev.bikram.remember.data.AppMediaStorage
+import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.getActiveReminders
@@ -25,7 +26,8 @@ class EditNoteViewModel
         repository: NoteRepository,
         appMediaStorage: AppMediaStorage? = null,
         savedStateHandle: SavedStateHandle,
-    ) : BaseEditorViewModel(repository, appMediaStorage, savedStateHandle) {
+        defaultNotePrefs: DefaultNotePrefs? = null,
+    ) : BaseEditorViewModel(repository, appMediaStorage, savedStateHandle, defaultNotePrefs) {
         private val _body = MutableStateFlow(if (noteId == null) prefillBody else "")
         val body: StateFlow<String> = _body.asStateFlow()
 

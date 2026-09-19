@@ -1,3 +1,11 @@
+## v1.8.0 Your defaults, snooze type
+
+### ✨ New Features
+- **Defaults** in Settings: choose the default visibility, importance, reminder time, and the recurrence; so new notes and lists start the way you work.
+- **Snooze type** in Notifications: use presets (soon, later today, and the rest), or switch to duration and snooze by minutes, hours, or days. Pick a specific time stays available in both modes.
+
+---
+
 ## v1.7.0 Import Tasks.org
 
 ### ✨ New Features

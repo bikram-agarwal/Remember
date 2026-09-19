@@ -11,6 +11,7 @@ import dev.bikram.remember.backup.NoteBackupDirtyTracker
 import dev.bikram.remember.data.AppMediaStorage
 import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.BackupPrefs
+import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.DevModePrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
@@ -64,6 +65,12 @@ object RememberModule {
     fun provideReminderPrefs(
         @ApplicationContext context: Context,
     ): ReminderPrefs = ReminderPrefs(context)
+
+    @Provides
+    @Singleton
+    fun provideDefaultNotePrefs(
+        @ApplicationContext context: Context,
+    ): DefaultNotePrefs = DefaultNotePrefs(context)
 
     @Provides
     @Singleton
@@ -165,6 +172,7 @@ object RememberModule {
         backupPrefs: BackupPrefs,
         quickCapturePrefs: QuickCapturePrefs,
         reminderPrefs: ReminderPrefs,
+        defaultNotePrefs: DefaultNotePrefs,
         updatePrefs: UpdatePrefs,
         updateCheckWorkScheduler: UpdateCheckWorkScheduler,
     ): BackupIo =
@@ -178,6 +186,7 @@ object RememberModule {
             backupPrefs = backupPrefs,
             quickCapturePrefs = quickCapturePrefs,
             reminderPrefs = reminderPrefs,
+            defaultNotePrefs = defaultNotePrefs,
             updatePrefs = updatePrefs,
             updateCheckWorkScheduler = updateCheckWorkScheduler,
         )

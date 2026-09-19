@@ -2133,6 +2133,12 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         label = "Beats",
                     ),
                     IconChoice(
+                        key = "${ICON_DRAWABLE_PREFIX}ic_brand_disneyplus",
+                        symbolName = null,
+                        drawableRes = R.drawable.ic_brand_disneyplus,
+                        label = "Disney+",
+                    ),
+                    IconChoice(
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_hbomax",
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_hbomax,
@@ -2172,7 +2178,7 @@ internal val bundledMaterialSymbolIconCategories: List<IconCategory> =
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_nbc",
                         symbolName = null,
                         drawableRes = R.drawable.ic_brand_nbc,
-                        label = "Nbc",
+                        label = "NBC",
                     ),
                     IconChoice(
                         key = "${ICON_DRAWABLE_PREFIX}ic_brand_netflix",

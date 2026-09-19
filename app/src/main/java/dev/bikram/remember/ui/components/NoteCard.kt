@@ -752,7 +752,7 @@ private fun ChecklistPreview(
                     // Indent children one gutter's width to mirror the editor hierarchy.
                     if (item.depth > 0) Spacer(Modifier.width(16.dp))
                     RememberMaterialRoundedSymbol(
-                        name = if (item.checked) "check_circle" else "radio_button_unchecked",
+                        name = if (item.checked) "check_box" else "check_box_outline_blank",
                         size = 16.dp,
                         tint = contentColor,
                         weight = FontWeight.Medium,

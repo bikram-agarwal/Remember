@@ -1585,7 +1585,10 @@ private fun buildIconSearchFields(
     iconAliases: Map<String, List<String>>,
 ): List<SearchableField> {
     val tags = choice.symbolName?.let { iconKeywords[it] }.orEmpty()
-    val aliases = choice.symbolName?.let { iconAliases[it] }.orEmpty()
+    // Brand entries have no ligature, so their aliases are keyed by drawable name
+    // (`ic_brand_nbc` -> peacock) instead.
+    val aliasKey = choice.symbolName ?: choice.key.removePrefix(ICON_DRAWABLE_PREFIX)
+    val aliases = iconAliases[aliasKey].orEmpty()
     return listOf(
         SearchableField(text = humanizeIconKey(choice.key), weight = FIELD_WEIGHT_NAME),
         SearchableField(text = iconKeyToSearchWords(choice.key), weight = FIELD_WEIGHT_SLUG),

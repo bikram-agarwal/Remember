@@ -4,8 +4,8 @@
 
 ### Notes vs. lists
 
-Use a **note** when you want free-form text — details, instructions, links, or longer context.
-Use a **list** when the work is made of steps you can check off.
+- Use a **note** when you want free-form text — details, instructions, links, or longer context.
+- Use a **list** when the work is made of steps you can check off.
 
 ### Creating notes and lists
 
@@ -17,7 +17,6 @@ Use a **list** when the work is made of steps you can check off.
 ### Marking something done
 
 Marking a note or list done moves it out of your active work into the done area.
-
 - For a one-time reminder, marking done clears the reminder notification.
 - For a recurring reminder, marking done advances the item to the next scheduled occurrence. If no future occurrence exists, the item moves to done like a one-time reminder.
 
@@ -27,7 +26,7 @@ Marking a note or list done moves it out of your active work into the done area.
 
 ### What you can set on a note or list
 
-Each note and list supports: an icon, tags, reminder, notification action, importance level, visibility setting, picture, and attachments. Pictures appear as hero images on cards and in reminder notifications. Attachments stay connected to the note they belong to.
+Each note and list supports: an icon, tags, reminder, notification action, importance level, visibility setting, picture, and attachments. Pictures appear as cover images on cards and in reminder notifications. Attachments stay connected to the note they belong to.
 
 ### Note formatting
 
@@ -45,23 +44,16 @@ Lists contain checkable items you can reorder, and supports one level of nesting
 
 - **Tags** group related notes and lists for quick filtering.
 - **Star** marks important items so they surface easily.
-- **Pin** keeps an item at the very top of the Notes tab. See [Pinning](#pinning) below.
+- **Pin** keeps an item at the very top of the Notes tab.
 - **Archive** removes items from the active list without deleting them.
 - **Trash** is for items you intend to remove.
 
 ### Pinning
 
-Pinned notes and lists collect in a **Pinned** section at the very top of the Notes tab. The section
-stays there no matter how you sort or group the list — pinning is about placement, and starring is
-about marking a favorite, so the two are separate and can be used together.
-
-- Pin or unpin from the note's bottom bar, by swiping a card right (Pin is the first reveal action
-  by default), or by selecting several notes and using **Pin** in the selection bar.
-- Searching or filtering can hide a pinned item, because those narrow down what the list contains.
-  Changing the sort or grouping never will. The **Pinned** filter under "Others" does the reverse —
-  it shows only your pinned items.
-- Marking a pinned item done moves it to the **Done** section at the bottom, like anything else. It
-  stays pinned, so it returns to the top if you mark it not done again.
+Pinned notes and lists collect in a **Pinned** section at the very top of the Notes tab. The section stays there no matter how you sort or group the list — pinning is about placement, and starring is about marking a favorite, so the two are separate and can be used together.
+- Pin or unpin from the note's bottom bar, by swiping a card right (Pin is the first reveal action by default), or by selecting several notes and using **Pin** in the selection bar.
+- Searching or filtering can hide a pinned item, because those narrow down what the list contains. Changing the sort or grouping never will. 
+- Marking a pinned item done moves it to the **Done** section at the bottom, like anything else. It stays pinned, so it returns to the top if you mark it not done again.
 - Duplicating a pinned item does not pin the copy.
 
 ### Search
@@ -82,9 +74,12 @@ Add a reminder date and time to any note or list. When the time arrives, Remembe
 
 Reminder notifications can include the title, note content or list items, a picture, snooze, mark done, and one custom action button.
 
-### High-importance reminders
+### Importance: Low, Normal, and High
 
-High-importance reminders use stronger notification behavior: heads-up alerts, sound, and vibration. Use them when a reminder needs to be immediately noticeable. Importance does not affect when a reminder fires — only how loud it is when it does.
+Importance controls how loud a reminder is when it fires - not when it fires.
+- **Low** is silent, with no status bar icon or vibration.
+- **Normal** uses the standard sound and vibration.
+- **High** pops up as a heads-up alert and is treated as an alarm. Use it when a reminder needs to be immediately noticeable.
 
 ### Recurring reminders
 
@@ -92,9 +87,6 @@ Recurring reminders can repeat daily, weekly, monthly, or yearly. You can end th
 
 When you mark a recurring reminder done, Remember advances it to the next scheduled occurrence. If there is no future occurrence, the item moves to done.
 
-### Snooze
-
-Snooze moves a reminder to a later time without opening the app. Presets include soon, later today, this evening, tomorrow, next week, or a custom date and time.
 
 ### Keep reminders until done
 
@@ -107,6 +99,13 @@ The **reminder summary notification** is a quiet, persistent overview of overdue
 ### Notification permission and reliability
 
 Android requires notification permission before Remember can post reminder alerts, snooze actions, and quick capture. The Notifications section in Settings shows the permissions available on your device. Some devices expose a separate background or battery reliability option — granting it makes reminders less likely to be delayed by battery optimization. The exact options vary by Android version and manufacturer.
+
+### Snooze
+
+Snooze moves a reminder to a later time without opening the app. The snooze sheet follows **Snooze type** in Settings -> Notifications.
+- **Presets** offers named times: soon, later today, this evening, tomorrow, next week.
+- **Duration** replaces those with a duration: 1-60 minutes, 1-24 hours, or 1-30 days. Choose the number and unit, then tap **Snooze**.
+**Pick a specific time** stays available in both modes, with a date and time picker.
 
 ### Troubleshooting reminders
 
@@ -168,14 +167,11 @@ The **quick capture notification** is a persistent shortcut for creating a new n
 ### Importing from Google Tasks or Tasks.org
 
 Remember can import tasks from Google Tasks or a Tasks.org backup. Tap the `+` -> Import, and then:
-
 - **Connect Google** to sign into your account and select tasks to import. OR
 - **Manual import**, to pick a JSON file. No sign-in required. Use either:
   - Google Takeout: open Google Takeout for Tasks, create an export, download and extract the archive, then choose the `Tasks.json` file.
   - Tasks.org: in Tasks.org, open Settings, then Backup, create a backup, then choose the saved json file.
-
 The import is read-only — Remember never edits Google Tasks or Tasks.org. Imported tasks can become individual notes, grouped notes, or checklist-style lists depending on the import mode you choose.
-
 
 **If import fails:** check your internet connection for Connect Google, or try switching accounts if sign-in fails. For manual import, choose the `Tasks.json` file from the extracted Takeout archive, or a Tasks.org `user….json` backup — Remember does not accept a generic JSON file.
 
@@ -203,11 +199,10 @@ Remember stores notes on your device in a local database. The database is not en
 
 Remember supports Android Auto Backup. Your notes, lists, tags, and settings are automatically backed up to your Google account and restored when you reinstall the app on a new device. Attachments and pictures are not included in Auto Backup — use the in-app backup with **Include media in backup** enabled if you need those to transfer as well.
 
-### Visibility: Default, Private, and Secret
+### Visibility: Normal, Private, and Secret
 
 Visibility controls what appears in notifications and widgets — it is not a sharing or encryption setting.
-
-- **Default** allows the title and note content to appear in notifications and widgets.
+- **Normal** allows the title and note content to appear in notifications and widgets.
 - **Private** hides notification body content and widget preview text.
 - **Secret** hides both the note title and body from notification and keeps the item out of widgets entirely.
 
@@ -222,21 +217,17 @@ App lock requires your device lock — or biometrics, if your device supports it
 ### Appearance
 
 **Theme mode**
-
 System, Light, Dark, or Black. Black uses a true black background rather than dark grey — sharper on OLED screens. It also disables gradient and enhanced shading, since those effects are designed for non-black backgrounds.
 
 **Color source**
-
 - **Material You** — pulls colors from your wallpaper on Android 12 and above, and updates automatically when the wallpaper changes.
 - **Presets** — eight hand-tuned schemes: Forest, Ember, Grove, Honey, Ocean, Iris, Dusk, and Berry.
 - **Custom color** — enter any hex value. You can save multiple custom colors and switch between them.
 
 **Palette style**
-
 Controls how Material 3 expands your seed color into a full palette. The same seed can feel very different across styles. Options: Tonal Spot (default), Vibrant, Expressive, Rainbow, Fruit Salad, Neutral, Monochrome, Fidelity, Content. Palette style applies to presets and custom colors; Material You manages its own palette.
 
 **Visual effects**
-
 - **Gradient background** — blends your primary color into the background for tinted depth rather than a flat surface. Disabled in Black mode.
 - **UI scale** - makes the whole interface smaller or larger (75% to 125%). Text, icons, and spacing change together.
 - **Enhanced shading** — makes cards darker in dark mode, lighter in light mode. Disabled in Black mode.

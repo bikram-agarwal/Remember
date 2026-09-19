@@ -457,13 +457,13 @@
     <!-- Importance -->
     <string name="importance_low">Low</string>
     <string name="importance_low_description">Silent. No status bar icon or vibration.</string>
-    <string name="importance_default">Default</string>
+    <string name="importance_default">Normal</string>
     <string name="importance_default_description">Standard sound and vibration.</string>
     <string name="importance_high">High</string>
     <string name="importance_high_description">Pops up on screen as a heads-up alert. Treated as alarm.</string>
 
     <!-- Visibility -->
-    <string name="visibility_default">Default</string>
+    <string name="visibility_default">Normal</string>
     <string name="visibility_default_description">Show title and content.</string>
     <string name="visibility_private">Private</string>
     <string name="visibility_private_description">Show title, redact content.</string>
@@ -795,6 +795,7 @@
     <string name="settings_expand_all_sections_cd">Expand all settings sections</string>
     <string name="settings_collapse_all_sections_cd">Collapse all settings sections</string>
     <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_defaults_section">Defaults</string>
     <string name="settings_section_security">Security</string>
     <string name="settings_updates_section">Updates</string>
     <string name="settings_section_about">About</string>
@@ -804,6 +805,32 @@
     <string name="help_collapse_all_cd">Collapse all</string>
     <string name="help_search_placeholder">Search</string>
     <string name="help_no_results">No results</string>
+    <string name="help_action_notification_settings">Go to notification settings</string>
+    <string name="help_action_reminder_settings">Go to Reminders setting</string>
+    <string name="help_action_snooze_settings">Go to Snooze setting</string>
+    <string name="help_action_backup_settings">Go to Backup settings</string>
+    <string name="help_action_security_settings">Go to Security settings</string>
+
+    <!-- Settings: note defaults for new notes and lists -->
+    <string name="settings_defaults_visibility_title">Default visibility</string>
+    <string name="settings_defaults_visibility_desc">Applied to new notes and lists</string>
+    <string name="settings_defaults_importance_title">Default importance</string>
+    <string name="settings_defaults_importance_desc">Notification priority for new notes and lists</string>
+    <string name="settings_defaults_reminder_time_title">Default reminder time</string>
+    <string name="settings_defaults_reminder_time_desc">Time of day used for new reminders</string>
+    <string name="settings_defaults_recurrence_title">Default recurrence</string>
+    <string name="settings_defaults_recurrence_desc">Repeat rule preselected when you enable repeat</string>
+    <string name="settings_defaults_recurrence_daily">Daily</string>
+    <string name="settings_defaults_recurrence_weekly">Weekly</string>
+    <string name="settings_defaults_recurrence_monthly">Monthly</string>
+    <string name="settings_defaults_recurrence_yearly">Yearly</string>
+    <string name="settings_snooze_type_title">Snooze type</string>
+    <string name="settings_snooze_type_desc">Choose smart presets or a duration</string>
+    <string name="settings_snooze_type_presets">Presets</string>
+    <string name="settings_snooze_type_duration">Duration</string>
+    <string name="snooze_duration_minutes">Minutes</string>
+    <string name="snooze_duration_hours">Hours</string>
+    <string name="snooze_duration_days">Days</string>
 
     <!-- Settings: haptics, notifications, swipe -->
     <string name="settings_haptics_section">Haptics</string>
@@ -1228,6 +1255,11 @@
     <string name="diagnostics_swipe_end_to_start_format">Swipe end-to-start: %1$s</string>
     <string name="diagnostics_keep_reminders_until_done_format">Keep reminders until done: %1$s</string>
     <string name="diagnostics_reminder_summary_enabled_format">Reminder summary notification: %1$s</string>
+    <string name="diagnostics_default_visibility_format">Default visibility: %1$s</string>
+    <string name="diagnostics_default_importance_format">Default importance: %1$s</string>
+    <string name="diagnostics_default_reminder_time_format">Default reminder time (minutes): %1$s</string>
+    <string name="diagnostics_default_recurrence_format">Default recurrence: %1$s</string>
+    <string name="diagnostics_snooze_type_format">Snooze type: %1$s</string>
     <string name="diagnostics_auto_export_on_change_format">Auto export on change: %1$s</string>
     <string name="diagnostics_scheduled_export_enabled_format">Scheduled export enabled: %1$s</string>
     <string name="diagnostics_include_media_in_backup_format">Include media in backup: %1$s</string>

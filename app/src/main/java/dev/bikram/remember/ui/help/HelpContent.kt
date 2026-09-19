@@ -1,5 +1,8 @@
 package dev.bikram.remember.ui.help
 
+import androidx.annotation.StringRes
+import dev.bikram.remember.R
+
 data class HelpSection(
     val title: String,
     val subsections: List<HelpSubsection>,
@@ -11,10 +14,11 @@ data class HelpSubsection(
 )
 
 sealed class HelpAction {
-    abstract val label: String
+    @get:StringRes
+    abstract val labelRes: Int
 
     data class OpenAppSection(
-        override val label: String,
+        @get:StringRes override val labelRes: Int,
         val sectionKey: String,
     ) : HelpAction()
 }
@@ -65,22 +69,26 @@ val helpSubsectionActions: Map<String, List<HelpAction>> =
     mapOf(
         "Notification permission and reliability" to
             listOf(
-                HelpAction.OpenAppSection("Open notification settings", "notifications"),
+                HelpAction.OpenAppSection(R.string.help_action_notification_settings, "notifications"),
             ),
         "Troubleshooting reminders" to
             listOf(
-                HelpAction.OpenAppSection("Open notification settings", "notifications"),
+                HelpAction.OpenAppSection(R.string.help_action_notification_settings, "notifications"),
             ),
         "Keep reminders until done" to
             listOf(
-                HelpAction.OpenAppSection("Go to Reminders settings", "notifications.keep_until_done"),
+                HelpAction.OpenAppSection(R.string.help_action_reminder_settings, "notifications.keep_until_done"),
             ),
         "What a backup includes" to
             listOf(
-                HelpAction.OpenAppSection("Go to Backup settings", "backup"),
+                HelpAction.OpenAppSection(R.string.help_action_backup_settings, "backup"),
             ),
         "App lock" to
             listOf(
-                HelpAction.OpenAppSection("Go to Security settings", "security"),
+                HelpAction.OpenAppSection(R.string.help_action_security_settings, "security"),
+            ),
+        "Snooze" to
+            listOf(
+                HelpAction.OpenAppSection(R.string.help_action_snooze_settings, "notifications.snooze_type"),
             ),
     )

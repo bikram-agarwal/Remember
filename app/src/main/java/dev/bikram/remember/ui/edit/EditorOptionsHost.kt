@@ -3,14 +3,20 @@ package dev.bikram.remember.ui.edit
 import android.net.Uri
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.remember.R
+import dev.bikram.remember.data.DefaultNotePreferencesState
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteReminder
+import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.components.RememberConfirmDialog
@@ -123,9 +129,23 @@ fun EditorOptionSheets(
     onDismissDeleteForever: () -> Unit,
     onDismissPictureViewer: () -> Unit,
 ) {
+    val context = LocalContext.current
+    val defaultNotePrefs =
+        remember(context) {
+            EntryPointAccessors
+                .fromApplication(
+                    context.applicationContext,
+                    SettingsDependenciesEntryPoint::class.java,
+                ).defaultNotePrefs()
+        }
+    val defaultNoteState by defaultNotePrefs.state.collectAsStateWithLifecycle(
+        initialValue = DefaultNotePreferencesState(),
+    )
     if (reminderPickerOpen) {
         ReminderPickerSheet(
             initialReminders = currentReminders,
+            defaultReminderMinutesOfDay = defaultNoteState.defaultReminderMinutesOfDay,
+            defaultRecurrence = defaultNoteState.defaultRecurrence,
             onConfirm = { reminders ->
                 onReminderChange(reminders)
                 onDismissReminder()

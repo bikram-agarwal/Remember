@@ -6,6 +6,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.EntryPointAccessors
 import dev.bikram.remember.data.AppMediaStorage
+import dev.bikram.remember.data.DefaultNotePreferencesState
+import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
@@ -45,6 +47,7 @@ abstract class BaseEditorViewModel(
     protected val repository: NoteRepository,
     protected val appMediaStorage: AppMediaStorage?,
     savedStateHandle: SavedStateHandle,
+    private val defaultNotePrefs: DefaultNotePrefs? = null,
 ) : ViewModel() {
     protected val noteId: Long? =
         savedStateHandle
@@ -128,8 +131,8 @@ abstract class BaseEditorViewModel(
     private val _updatedAt = MutableStateFlow<Long?>(null)
     val updatedAt: StateFlow<Long?> = _updatedAt.asStateFlow()
 
-    /** True after an existing row's initial database load has completed. New drafts are ready immediately. */
-    private val _loaded = MutableStateFlow(noteId == null)
+    /** True after the existing row or the new draft's defaults have finished loading. */
+    private val _loaded = MutableStateFlow(noteId == null && defaultNotePrefs == null)
     val loaded: StateFlow<Boolean> = _loaded.asStateFlow()
 
     private val _missingNote = MutableStateFlow(false)
@@ -144,6 +147,17 @@ abstract class BaseEditorViewModel(
 
     private val _trashed = MutableStateFlow(false)
     val trashed: StateFlow<Boolean> = _trashed.asStateFlow()
+
+    /**
+     * Seeds a brand-new draft from Settings > Defaults. Does not mark dirty: blank notes with only
+     * defaults still discard on back; typing or an explicit edit then persists them with the
+     * seeded values. The default reminder time and recurrence are deliberately not applied here -
+     * they only seed the reminder picker, so a new note never gets a reminder it wasn't given.
+     */
+    private fun applyNewNoteDefaults(defaults: DefaultNotePreferencesState) {
+        if (!visibilityEditedLocally) _visibility.value = defaults.defaultVisibility
+        if (!importanceEditedLocally) _importance.value = defaults.defaultImportance
+    }
 
     protected fun updateTimestamps(
         createdAt: Long?,
@@ -172,6 +186,23 @@ abstract class BaseEditorViewModel(
     protected var originalNote: dev.bikram.remember.data.NoteEntity? = null
     private var starredEditedLocally = false
     private var remindersEditedLocally = false
+    private var visibilityEditedLocally = false
+    private var importanceEditedLocally = false
+
+    init {
+        if (noteId == null && defaultNotePrefs != null) {
+            // Acquire before launching so a save or attachment cannot persist unseeded defaults.
+            check(persistence.tryLock()) { "persistence lock must be unlocked at construction" }
+            viewModelScope.launch {
+                try {
+                    applyNewNoteDefaults(defaultNotePrefs.snapshot())
+                } finally {
+                    _loaded.value = true
+                    persistence.unlock()
+                }
+            }
+        }
+    }
 
     protected fun markDirty() {
         persistence.markDirty()
@@ -316,12 +347,14 @@ abstract class BaseEditorViewModel(
     }
 
     fun setImportance(value: Importance) {
+        importanceEditedLocally = true
         if (_importance.value == value) return
         _importance.value = value
         markDirty()
     }
 
     fun setVisibility(value: NoteVisibility) {
+        visibilityEditedLocally = true
         if (_visibility.value == value) return
         _visibility.value = value
         markDirty()

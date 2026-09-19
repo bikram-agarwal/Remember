@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,12 +48,18 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.ReminderPreferencesState
+import dev.bikram.remember.data.ReminderPrefs
+import dev.bikram.remember.data.SnoozeType
 import dev.bikram.remember.data.TagRepository
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
+import dev.bikram.remember.ui.components.RememberOutlinedButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.edit.CalendarPickerDialog
 import dev.bikram.remember.ui.edit.ReminderTimePickerDialog
@@ -61,6 +68,7 @@ import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import java.time.Clock
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalTime
@@ -81,6 +89,8 @@ class SnoozeActivity : ComponentActivity() {
     @Inject lateinit var themePrefs: ThemePrefs
 
     @Inject lateinit var interactionPrefs: InteractionPrefs
+
+    @Inject lateinit var reminderPrefs: ReminderPrefs
 
     @ApplicationScope @Inject
     lateinit var applicationScope: CoroutineScope
@@ -118,6 +128,9 @@ class SnoozeActivity : ComponentActivity() {
             val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
                 initialValue = InteractionState(),
             )
+            val reminderState by reminderPrefs.state.collectAsStateWithLifecycle(
+                initialValue = ReminderPreferencesState(),
+            )
             CompositionLocalProvider(LocalTagColors provides tagColors) {
                 RememberTheme(
                     themeState = themeState,
@@ -135,6 +148,7 @@ class SnoozeActivity : ComponentActivity() {
                         contentAlignment = Alignment.Center,
                     ) {
                         SnoozeDialogContent(
+                            snoozeType = reminderState.snoozeType,
                             onSnooze = { timeMillis -> snoozeAndFinish(noteId, timeMillis) },
                             onDismiss = { finish() },
                         )
@@ -182,15 +196,14 @@ class SnoozeActivity : ComponentActivity() {
 }
 
 /**
- * Smart snooze sheet. Each row commits the user to an absolute target time
- * (e.g. "5:30 PM" today), not a duration relative to "now", so users don't have
- * to do mental math. Times round to clean :00 / :15 boundaries; the preset
- * list adapts to time-of-day so options like "This evening" disappear once
- * it's late. The trailing "Pick a specific time" row falls through to the
- * existing date + time picker dialogs for the long-tail case.
+ * Snooze sheet with named target times or a duration starting at confirmation.
+ * Presets round to clean :00 / :15 boundaries and adapt to time of day, so options
+ * like "This evening" disappear once it is late. Both modes offer the existing
+ * date and time picker dialogs through "Pick a specific time".
  */
 @Composable
 fun SnoozeDialogContent(
+    snoozeType: SnoozeType = SnoozeType.RELATIVE,
     onSnooze: (Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -198,10 +211,8 @@ fun SnoozeDialogContent(
     val resources = LocalResources.current
     val configuration = LocalConfiguration.current
     val locale = configuration.locales[0]
-    // Capture once at composition. We never re-read the wall clock during the
-    // session; if the user lingers in the sheet for hours the absolute targets
-    // would otherwise drift, and recomputing every recomposition would shift
-    // the visible labels mid-tap.
+    // Keep named preset targets and labels stable during this session. Duration snoozes
+    // read the clock separately when confirmed so the full requested delay starts then.
     val nowMillis = remember { System.currentTimeMillis() }
     val zone = remember { ZoneId.systemDefault() }
     val now =
@@ -219,6 +230,10 @@ fun SnoozeDialogContent(
 
     var customDateMillis by remember { mutableStateOf<Long?>(null) }
     var customTimePickerOpen by remember { mutableStateOf(false) }
+    var durationValue by remember { mutableStateOf(10) }
+    var durationUnit by remember { mutableStateOf(SnoozeDurationUnit.MINUTES) }
+    var durationValueExpanded by remember { mutableStateOf(false) }
+    var durationUnitExpanded by remember { mutableStateOf(false) }
 
     Surface(
         shape = MaterialTheme.shapes.extraLargeIncreased,
@@ -262,20 +277,24 @@ fun SnoozeDialogContent(
 
             Spacer(Modifier.height(16.dp))
 
-            presets.forEachIndexed { index, preset ->
-                if (preset.dividerBefore && index > 0) {
-                    HorizontalDivider(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                    )
-                }
-                SnoozePresetRow(
-                    symbolName = preset.symbolName,
-                    title = preset.title,
-                    subtitle = preset.subtitle,
-                    trailing = preset.absoluteTime,
-                    onClick = { onSnooze(preset.targetMillis) },
+            if (snoozeType == SnoozeType.RELATIVE) {
+                SnoozeRelativePresets(
+                    presets = presets,
+                    onSnooze = onSnooze,
+                )
+            } else {
+                SnoozeDurationChooser(
+                    durationValue = durationValue,
+                    onDurationValueChange = { nextValue -> durationValue = nextValue },
+                    durationUnit = durationUnit,
+                    onDurationUnitChange = { nextUnit ->
+                        durationUnit = nextUnit
+                        durationValue = durationValue.coerceAtMost(nextUnit.maximumValue)
+                    },
+                    durationValueExpanded = durationValueExpanded,
+                    onDurationValueExpandedChange = { expanded -> durationValueExpanded = expanded },
+                    durationUnitExpanded = durationUnitExpanded,
+                    onDurationUnitExpandedChange = { expanded -> durationUnitExpanded = expanded },
                 )
             }
 
@@ -293,27 +312,153 @@ fun SnoozeDialogContent(
             )
 
             Spacer(Modifier.height(8.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
+            SnoozeSheetButtons(
+                showSnooze = snoozeType == SnoozeType.ABSOLUTE,
+                onDismiss = onDismiss,
+                onSnooze = {
+                    onSnooze(durationUnit.targetMillis(durationValue))
+                },
+            )
+        }
+    }
+
+    SnoozeCustomTimePickers(
+        now = now,
+        nowMillis = nowMillis,
+        zone = zone,
+        customDateMillis = customDateMillis,
+        customTimePickerOpen = customTimePickerOpen,
+        onCustomDateMillisChange = { nextDate -> customDateMillis = nextDate },
+        onCustomTimePickerOpenChange = { open -> customTimePickerOpen = open },
+        onSnooze = onSnooze,
+    )
+}
+
+@Composable
+private fun SnoozeRelativePresets(
+    presets: List<SnoozePreset>,
+    onSnooze: (Long) -> Unit,
+) {
+    presets.forEachIndexed { index, preset ->
+        if (preset.dividerBefore && index > 0) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+            )
+        }
+        SnoozePresetRow(
+            symbolName = preset.symbolName,
+            title = preset.title,
+            subtitle = preset.subtitle,
+            trailing = preset.absoluteTime,
+            onClick = { onSnooze(preset.targetMillis) },
+        )
+    }
+}
+
+@Composable
+private fun SnoozeDurationChooser(
+    durationValue: Int,
+    onDurationValueChange: (Int) -> Unit,
+    durationUnit: SnoozeDurationUnit,
+    onDurationUnitChange: (SnoozeDurationUnit) -> Unit,
+    durationValueExpanded: Boolean,
+    onDurationValueExpandedChange: (Boolean) -> Unit,
+    durationUnitExpanded: Boolean,
+    onDurationUnitExpandedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        RememberOutlinedButton(
+            modifier = Modifier.weight(1f),
+            onClick = { onDurationValueExpandedChange(true) },
+        ) {
+            Text(durationValue.toString())
+            DropdownMenu(
+                expanded = durationValueExpanded,
+                onDismissRequest = { onDurationValueExpandedChange(false) },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
             ) {
-                RememberTextButton(onClick = onDismiss) {
-                    Text(stringResource(R.string.common_cancel))
+                for (durationOption in 1..durationUnit.maximumValue) {
+                    RememberDropdownMenuItem(
+                        text = { Text(durationOption.toString()) },
+                        onClick = {
+                            onDurationValueChange(durationOption)
+                            onDurationValueExpandedChange(false)
+                        },
+                    )
+                }
+            }
+        }
+        RememberOutlinedButton(
+            modifier = Modifier.weight(1f),
+            onClick = { onDurationUnitExpandedChange(true) },
+        ) {
+            Text(stringResource(durationUnit.labelRes))
+            DropdownMenu(
+                expanded = durationUnitExpanded,
+                onDismissRequest = { onDurationUnitExpandedChange(false) },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                SnoozeDurationUnit.entries.forEach { unitOption ->
+                    RememberDropdownMenuItem(
+                        text = { Text(stringResource(unitOption.labelRes)) },
+                        onClick = {
+                            onDurationUnitChange(unitOption)
+                            onDurationUnitExpandedChange(false)
+                        },
+                    )
                 }
             }
         }
     }
+}
 
-    // "Pick a specific time" flow: date picker → time picker → onSnooze.
+@Composable
+private fun SnoozeSheetButtons(
+    showSnooze: Boolean,
+    onDismiss: () -> Unit,
+    onSnooze: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RememberTextButton(onClick = onDismiss) {
+            Text(stringResource(R.string.common_cancel))
+        }
+        if (showSnooze) {
+            RememberButton(onClick = onSnooze) {
+                Text(stringResource(R.string.action_type_snooze))
+            }
+        }
+    }
+}
+
+@Composable
+private fun SnoozeCustomTimePickers(
+    now: ZonedDateTime,
+    nowMillis: Long,
+    zone: ZoneId,
+    customDateMillis: Long?,
+    customTimePickerOpen: Boolean,
+    onCustomDateMillisChange: (Long?) -> Unit,
+    onCustomTimePickerOpenChange: (Boolean) -> Unit,
+    onSnooze: (Long) -> Unit,
+) {
     val pendingDate = customDateMillis
     if (pendingDate != null && !customTimePickerOpen) {
         CalendarPickerDialog(
             initial = pendingDate,
             onConfirm = { dayMillis ->
-                customDateMillis = dayMillis
-                customTimePickerOpen = true
+                onCustomDateMillisChange(dayMillis)
+                onCustomTimePickerOpenChange(true)
             },
-            onDismiss = { customDateMillis = null },
+            onDismiss = { onCustomDateMillisChange(null) },
         )
     }
     if (customTimePickerOpen) {
@@ -323,15 +468,39 @@ fun SnoozeDialogContent(
             onConfirm = { hour, minute ->
                 val day = customDateMillis ?: pickerDayMillisForLocalWallClock(nowMillis)
                 val target = combineDayAndLocalTime(day, hour, minute, zone)
-                customTimePickerOpen = false
-                customDateMillis = null
+                onCustomTimePickerOpenChange(false)
+                onCustomDateMillisChange(null)
                 onSnooze(target)
             },
             onDismiss = {
-                customTimePickerOpen = false
-                customDateMillis = null
+                onCustomTimePickerOpenChange(false)
+                onCustomDateMillisChange(null)
             },
         )
+    }
+}
+
+internal enum class SnoozeDurationUnit(
+    val maximumValue: Int,
+    val labelRes: Int,
+) {
+    MINUTES(60, R.string.snooze_duration_minutes),
+    HOURS(24, R.string.snooze_duration_hours),
+    DAYS(30, R.string.snooze_duration_days),
+    ;
+
+    fun targetMillis(
+        value: Int,
+        clock: Clock = Clock.systemDefaultZone(),
+    ): Long {
+        val now = ZonedDateTime.now(clock)
+        val target =
+            when (this) {
+                MINUTES -> now.plusMinutes(value.toLong())
+                HOURS -> now.plusHours(value.toLong())
+                DAYS -> now.plusDays(value.toLong())
+            }
+        return target.toInstant().toEpochMilli()
     }
 }
 
