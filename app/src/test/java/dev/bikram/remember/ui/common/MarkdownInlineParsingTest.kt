@@ -72,11 +72,18 @@ class MarkdownInlineParsingTest {
     }
 
     @Test
-    fun checklistCheckboxSizeKeepsSmallSpecifiedFontsVisible() {
+    fun checklistCheckboxSizeScalesWithTextAtListRatio() {
         assertEquals(
-            18.dp,
+            12.dp,
             markdownChecklistCheckboxSize(
                 style = TextStyle(fontSize = 8.sp),
+                density = Density(1f),
+            ),
+        )
+        assertEquals(
+            24.dp,
+            markdownChecklistCheckboxSize(
+                style = TextStyle(fontSize = 16.sp),
                 density = Density(1f),
             ),
         )

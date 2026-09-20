@@ -27,6 +27,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -230,7 +231,7 @@ fun SnoozeDialogContent(
 
     var customDateMillis by remember { mutableStateOf<Long?>(null) }
     var customTimePickerOpen by remember { mutableStateOf(false) }
-    var durationValue by remember { mutableStateOf(10) }
+    var durationValue by remember { mutableIntStateOf(10) }
     var durationUnit by remember { mutableStateOf(SnoozeDurationUnit.MINUTES) }
     var durationValueExpanded by remember { mutableStateOf(false) }
     var durationUnitExpanded by remember { mutableStateOf(false) }

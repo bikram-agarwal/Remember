@@ -36,6 +36,15 @@ class AdaptiveLayoutTest {
     }
 
     @Test
+    fun multiPaneLayoutRequiresBothExpandedDirectiveAndExpandedWindowWidth() {
+        assertEquals(false, supportsMultiPaneLayout(maxHorizontalPartitions = 2, screenWidthDp = 438))
+        assertEquals(false, supportsMultiPaneLayout(maxHorizontalPartitions = 1, screenWidthDp = 840))
+        assertEquals(true, supportsMultiPaneLayout(maxHorizontalPartitions = 2, screenWidthDp = 840))
+        // Phone in landscape at the smallest system display size: wide window, short side stays phone-sized.
+        assertEquals(true, supportsMultiPaneLayout(maxHorizontalPartitions = 2, screenWidthDp = 1079))
+    }
+
+    @Test
     fun noteMosaicColumnCountUsesWidthBreakpoints() {
         assertEquals(1, noteMosaicColumnCount(320.dp))
         assertEquals(2, noteMosaicColumnCount(340.dp))

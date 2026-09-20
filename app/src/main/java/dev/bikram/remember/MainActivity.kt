@@ -11,6 +11,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -43,6 +46,8 @@ import dev.bikram.remember.data.effectiveDarkTheme
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.ui.InAppRatingAutoPromptHost
+import dev.bikram.remember.ui.common.LocalSystemPaneScaffoldDirective
+import dev.bikram.remember.ui.common.LocalSystemWindowAdaptiveInfo
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.lock.AppLockSession
 import dev.bikram.remember.ui.lock.LockScreen
@@ -103,6 +108,7 @@ class MainActivity : FragmentActivity() {
         const val EXTRA_OPEN_SETTINGS_UPDATES = "extra_open_settings_updates"
     }
 
+    @OptIn(ExperimentalMaterial3AdaptiveApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
         super.onCreate(savedInstanceState)
@@ -115,6 +121,8 @@ class MainActivity : FragmentActivity() {
         applicationScope.launch { themePrefs.migrateLegacyBlackThemeIfNeeded() }
         applicationScope.launch { openSettingsUpdatesIfAppWasUpdated() }
         setContent {
+            val systemWindowAdaptiveInfo = currentWindowAdaptiveInfoV2()
+            val systemPaneScaffoldDirective = calculatePaneScaffoldDirective(systemWindowAdaptiveInfo)
             val themeState by themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
             )
@@ -133,7 +141,11 @@ class MainActivity : FragmentActivity() {
             val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
                 initialValue = InteractionState(),
             )
-            CompositionLocalProvider(LocalTagColors provides tagColors) {
+            CompositionLocalProvider(
+                LocalTagColors provides tagColors,
+                LocalSystemWindowAdaptiveInfo provides systemWindowAdaptiveInfo,
+                LocalSystemPaneScaffoldDirective provides systemPaneScaffoldDirective,
+            ) {
                 RememberTheme(
                     themeState = themeState,
                     hapticFeedbackEnabled = interactionState.hapticFeedbackEnabled,

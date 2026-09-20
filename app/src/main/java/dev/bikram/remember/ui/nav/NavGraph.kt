@@ -29,6 +29,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.IntOffset
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -53,8 +54,11 @@ import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.googletasks.GoogleTasksImportRoute
+import dev.bikram.remember.ui.common.LocalSystemPaneScaffoldDirective
+import dev.bikram.remember.ui.common.LocalSystemWindowAdaptiveInfo
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.common.rememberShareAppAction
+import dev.bikram.remember.ui.common.supportsMultiPaneLayout
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.components.alertChromeSummary
 import dev.bikram.remember.ui.edit.EditListRoute
@@ -329,9 +333,20 @@ fun RememberNavGraph(
     var createNoteInPane by remember { mutableStateOf<(() -> Unit)?>(null) }
     var createListInPane by remember { mutableStateOf<(() -> Unit)?>(null) }
     val shareApp = rememberShareAppAction()
-    val windowAdaptiveInfo = currentWindowAdaptiveInfoV2()
-    val paneScaffoldDirective = calculatePaneScaffoldDirective(windowAdaptiveInfo)
-    val useDualPaneMode = paneScaffoldDirective.maxHorizontalPartitions > 1
+    val windowAdaptiveInfo = LocalSystemWindowAdaptiveInfo.current ?: currentWindowAdaptiveInfoV2()
+    val paneScaffoldDirective =
+        LocalSystemPaneScaffoldDirective.current ?: calculatePaneScaffoldDirective(windowAdaptiveInfo)
+
+    // Lint prefers LocalWindowInfo.current.containerSize, but converting that to dp needs
+    // LocalDensity, which the theme replaces for visual scaling - the exact distortion this gate
+    // exists to defend against. Configuration reports the OS width directly.
+    @Suppress("ConfigurationScreenWidthHeight")
+    val systemWindowWidthDp = LocalConfiguration.current.screenWidthDp
+    val useDualPaneMode =
+        supportsMultiPaneLayout(
+            maxHorizontalPartitions = paneScaffoldDirective.maxHorizontalPartitions,
+            screenWidthDp = systemWindowWidthDp,
+        )
 
     if (currentOnboardingState == null) {
         Box(modifier = Modifier.fillMaxSize())
@@ -647,6 +662,7 @@ fun RememberNavGraph(
                     ) {
                         if (useDualPaneMode) {
                             NotesTwoPaneRoute(
+                                paneScaffoldDirective = paneScaffoldDirective,
                                 interactionPrefs = interactionPrefs,
                                 appScope = appScope,
                                 closeRevealRequest = closeNotesRevealRequest.value,
@@ -685,6 +701,7 @@ fun RememberNavGraph(
                     ) {
                         if (useDualPaneMode) {
                             HistoryTwoPaneRoute(
+                                paneScaffoldDirective = paneScaffoldDirective,
                                 interactionPrefs = interactionPrefs,
                                 appScope = appScope,
                                 onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
@@ -724,6 +741,7 @@ fun RememberNavGraph(
                     ) {
                         if (useDualPaneMode) {
                             SettingsTwoPaneRoute(
+                                paneScaffoldDirective = paneScaffoldDirective,
                                 onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
                                 onOpenHelp = { navController.navigate(Routes.HELP) },
                                 onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },

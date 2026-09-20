@@ -62,6 +62,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -807,11 +808,15 @@ private fun PermissionStatusCard(
         animationSpec = colorSpec,
         label = "permissionCardBorder",
     )
+    // Pre-blended against the page backdrop (GradientBackground paints scheme.surface as its
+    // base) instead of left translucent: a see-through card container lets the content layers
+    // re-blend the backdrop inside their own bounds, which shows up as lighter rectangles
+    // behind the card's text.
     val containerColor =
         if (granted) {
-            scheme.surfaceContainer.copy(alpha = 0.72f)
+            scheme.surfaceContainer.copy(alpha = 0.72f).compositeOver(scheme.surface)
         } else {
-            scheme.surfaceContainerHigh.copy(alpha = 0.92f)
+            scheme.surfaceContainerHigh.copy(alpha = 0.92f).compositeOver(scheme.surface)
         }
     val titleColor = if (granted) scheme.onSurface.copy(alpha = 0.70f) else scheme.onSurface
     val bodyColor = if (granted) scheme.onSurfaceVariant.copy(alpha = 0.70f) else scheme.onSurfaceVariant
@@ -857,6 +862,7 @@ private fun PermissionStatusCard(
                         },
                     emphasized = primaryAction && !granted,
                     enabled = granted,
+                    cardColor = containerColor,
                 )
             }
             Spacer(Modifier.height(topBodySpacing))
@@ -962,6 +968,7 @@ private fun StatusPill(
     text: String,
     emphasized: Boolean,
     enabled: Boolean,
+    cardColor: Color,
 ) {
     val scheme = MaterialTheme.colorScheme
     val enabledStatusGreen =
@@ -974,7 +981,7 @@ private fun StatusPill(
         shape = MaterialTheme.shapes.extraExtraLarge,
         color =
             if (enabled) {
-                scheme.surfaceContainerHighest.copy(alpha = 0.78f)
+                scheme.surfaceContainerHighest.copy(alpha = 0.78f).compositeOver(cardColor)
             } else if (emphasized) {
                 scheme.primaryContainer
             } else {
