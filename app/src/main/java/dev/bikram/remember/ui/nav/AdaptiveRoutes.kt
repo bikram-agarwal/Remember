@@ -119,6 +119,7 @@ private const val NEW_LIST_DETAIL_ID = -11L
 
 @Composable
 fun NotesTwoPaneRoute(
+    paneScaffoldDirective: PaneScaffoldDirective,
     interactionPrefs: InteractionPrefs,
     appScope: CoroutineScope,
     closeRevealRequest: Int,
@@ -130,7 +131,10 @@ fun NotesTwoPaneRoute(
     onRegisterCreateNoteInPane: ((() -> Unit)?) -> Unit,
     onRegisterCreateListInPane: ((() -> Unit)?) -> Unit,
 ) {
-    val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
+    val navigator =
+        rememberListDetailPaneScaffoldNavigator<Long>(
+            scaffoldDirective = paneScaffoldDirective,
+        )
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
     val isLandscape = isLandscape()
 
@@ -434,6 +438,7 @@ fun NotesTwoPaneRoute(
 
 @Composable
 fun SettingsTwoPaneRoute(
+    paneScaffoldDirective: PaneScaffoldDirective,
     onOpenIntro: () -> Unit,
     onOpenHelp: () -> Unit,
     onOpenDevOptions: () -> Unit,
@@ -443,7 +448,10 @@ fun SettingsTwoPaneRoute(
     highlightSectionKey: String?,
     onHighlightHandled: () -> Unit,
 ) {
-    val navigator = rememberListDetailPaneScaffoldNavigator<String>()
+    val navigator =
+        rememberListDetailPaneScaffoldNavigator<String>(
+            scaffoldDirective = paneScaffoldDirective,
+        )
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
     val isLandscape = isLandscape()
     val isSmallLandscape = isSmallLandscape()
@@ -559,6 +567,7 @@ fun SettingsTwoPaneRoute(
 
 @Composable
 fun HistoryTwoPaneRoute(
+    paneScaffoldDirective: PaneScaffoldDirective,
     interactionPrefs: InteractionPrefs,
     appScope: CoroutineScope,
     onOpenIntro: () -> Unit,
@@ -567,7 +576,10 @@ fun HistoryTwoPaneRoute(
     onVisibleItemCountChange: (Int) -> Unit,
     onOpenNoteInSinglePane: (NoteWithItems, Boolean) -> Unit,
 ) {
-    val navigator = rememberListDetailPaneScaffoldNavigator<Long>()
+    val navigator =
+        rememberListDetailPaneScaffoldNavigator<Long>(
+            scaffoldDirective = paneScaffoldDirective,
+        )
     val isMultiPane = navigator.scaffoldDirective.maxHorizontalPartitions > 1
     val isLandscape = isLandscape()
 
