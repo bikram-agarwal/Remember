@@ -917,9 +917,9 @@ private fun PermissionStatusCard(
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.extraExtraLarge,
                             contentPadding = PaddingValues(horizontal = 20.dp, vertical = actionVerticalPadding),
+                            // Tonal rather than neutral: surfaceContainerHighest is one tonal
+                            // step from the card it sits on, so the button all but disappears.
                             colors =
-                                // Tonal rather than neutral: surfaceContainerHighest is one tonal
-                                // step from the card it sits on, so the button all but disappears.
                                 ButtonDefaults.buttonColors(
                                     containerColor = scheme.secondaryContainer,
                                     contentColor = scheme.onSecondaryContainer,

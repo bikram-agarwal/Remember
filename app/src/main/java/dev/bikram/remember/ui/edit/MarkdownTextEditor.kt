@@ -101,27 +101,26 @@ internal fun MarkdownTextEditor(
         }
     val styler = rememberMarkdownStyler(editorTextStyle)
 
-    // For bodies at/above LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS, only refresh highlighting once
-    // typing has paused for LIVE_PREVIEW_DEBOUNCE_DELAY_MS, instead of re-parsing on every
-    // keystroke. Below the threshold this mirrors state.markdown immediately (no debounce).
-    var settledMarkdownForHighlighting by remember { mutableStateOf(state.markdown) }
-    LaunchedEffect(state.markdown) {
-        if (state.markdown.length < LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS) {
-            settledMarkdownForHighlighting = state.markdown
-        } else {
-            kotlinx.coroutines.delay(LIVE_PREVIEW_DEBOUNCE_DELAY_MS)
-            settledMarkdownForHighlighting = state.markdown
-        }
-    }
-
+    // Must stay one instance while typing: a new OutputTransformation restarts the IME session.
     val outputTransformation =
-        remember(displayMode, styler, settledMarkdownForHighlighting) {
+        remember(displayMode, styler) {
             if (displayMode == MarkdownEditorDisplayMode.LivePreview) {
-                MarkdownOutputTransformation(styler, settledSource = settledMarkdownForHighlighting)
+                MarkdownOutputTransformation(styler, initialSettledSource = state.markdown)
             } else {
                 null
             }
         }
+
+    // For bodies at/above LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS, only refresh highlighting once
+    // typing has paused for LIVE_PREVIEW_DEBOUNCE_DELAY_MS, instead of re-parsing on every
+    // keystroke. Below the threshold this mirrors state.markdown immediately (no debounce).
+    LaunchedEffect(outputTransformation, state.markdown) {
+        if (outputTransformation == null) return@LaunchedEffect
+        if (state.markdown.length >= LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS) {
+            kotlinx.coroutines.delay(LIVE_PREVIEW_DEBOUNCE_DELAY_MS)
+        }
+        outputTransformation.settledSource = state.markdown
+    }
     var focused by remember { mutableStateOf(false) }
     var editorCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
     var textLayoutResult by remember { mutableStateOf<TextLayoutResult?>(null) }
@@ -131,7 +130,7 @@ internal fun MarkdownTextEditor(
     // draw phase keeps parsing off the draw path, and bodies without any dash run never parse at
     // all (markdownHorizontalRuleLineStarts short-circuits on them).
     val horizontalRuleTransformedOffsets =
-        remember(displayMode, outputTransformation, state.markdown) {
+        remember(displayMode, outputTransformation, outputTransformation?.settledSource, state.markdown) {
             if (displayMode != MarkdownEditorDisplayMode.LivePreview) {
                 emptyList()
             } else {

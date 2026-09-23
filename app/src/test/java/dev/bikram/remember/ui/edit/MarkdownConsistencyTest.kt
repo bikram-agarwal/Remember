@@ -407,7 +407,7 @@ class MarkdownConsistencyTest {
         for (size in listOf(3_999, 4_000, 20_000, 20_001)) {
             val source = "**" + "w".repeat(size - 4) + "**"
             val typing = MarkdownOutputTransformation(styler).preview(source)
-            val settled = MarkdownOutputTransformation(styler, settledSource = source).preview(source)
+            val settled = MarkdownOutputTransformation(styler, initialSettledSource = source).preview(source)
             assertEquals(if (size < 4_000) size - 4 else size, typing.text.length)
             assertEquals(if (size <= 20_000) size - 4 else size, settled.text.length)
             if (size >= 4_000) {
@@ -417,6 +417,15 @@ class MarkdownConsistencyTest {
             }
             if (size > 20_000) assertTrue(settled.edits.isEmpty())
         }
+    }
+
+    @Test
+    fun settlingSourceOnSameTransformationRefreshesDebouncedPreview() {
+        val source = "**" + "w".repeat(LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS) + "**"
+        val transformation = MarkdownOutputTransformation(styler)
+        assertEquals(source, transformation.preview(source).text.text)
+        transformation.settledSource = source
+        assertEquals(source.length - 4, transformation.preview(source).text.length)
     }
 
     private fun assertInlineConsistency(
