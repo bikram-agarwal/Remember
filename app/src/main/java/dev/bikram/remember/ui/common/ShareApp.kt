@@ -20,7 +20,9 @@ fun rememberShareAppAction(): () -> Unit {
     val shareUrl =
         when {
             BuildConfig.FLAVOR == "playstore" -> playStoreListingUrl
-            BuildConfig.FLAVOR == "fdroid" || BuildConfig.FLAVOR == "github" -> portfolioUrl
+            BuildConfig.FLAVOR == "fdroid" ||
+                BuildConfig.FLAVOR == "github" ||
+                BuildConfig.FLAVOR == "offline" -> portfolioUrl
             githubRepoForSourceLink.isNotEmpty() -> "https://github.com/$githubRepoForSourceLink/releases/latest"
             else -> playStoreListingUrl
         }

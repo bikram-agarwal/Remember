@@ -189,7 +189,8 @@ fun canonicalSettingsSectionRouteKey(storedKey: String): String? =
 val settingsPaneSections: List<SettingsSectionKey>
     get() =
         SettingsSectionKey.entries.filter { sectionKey ->
-            sectionKey != SettingsSectionKey.DevOptions
+            sectionKey != SettingsSectionKey.DevOptions &&
+                (sectionKey != SettingsSectionKey.Updates || BuildConfig.SHOW_UPDATES)
         }
 
 // Resolved from the enum rather than a hand-maintained `when`, so a routeKey has exactly one home.
@@ -521,7 +522,7 @@ fun SettingsRoute(
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pillInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
     LaunchedEffect(showUpdateSheet) {
-        if (showUpdateSheet) {
+        if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
             updateVm.loadChangelog()
         }
     }
@@ -538,6 +539,7 @@ fun SettingsRoute(
         }
     }
     LaunchedEffect(openSheetRequested) {
+        if (!BuildConfig.SHOW_UPDATES) return@LaunchedEffect
         if (openSheetRequested) {
             updateVm.markOpenSheetHandled()
             updateVm.openSheetAndCheck()
@@ -631,7 +633,7 @@ fun SettingsRoute(
     val backupHighlightAlpha = rememberSectionHighlightPulseAlpha(backupHighlightActive)
     val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlightActive)
 
-    if (showUpdateSheet) {
+    if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
         val updateSheetState =
             rememberBottomSheetState(
                 initialValue = SheetValue.Expanded,
@@ -947,7 +949,7 @@ fun SettingsRoute(
                         }
                     }
 
-                    if (includeSettingsSection(SettingsSectionKey.Updates)) {
+                    if (BuildConfig.SHOW_UPDATES && includeSettingsSection(SettingsSectionKey.Updates)) {
                         item(key = "updates") {
                             SettingsExpandableSection(
                                 sectionKey = SettingsSectionKey.Updates.routeKey,

@@ -214,11 +214,15 @@ private fun AboutSettingsBlock(
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
     val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
     val profileUrl = stringResource(R.string.about_author_github_profile_url)
-    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
+    val useGithubLikeAboutLinks =
+        BuildConfig.FLAVOR == "github" ||
+            BuildConfig.FLAVOR == "fdroid" ||
+            BuildConfig.FLAVOR == "offline"
     val buildFlavorLabel =
         when (BuildConfig.FLAVOR) {
             "github" -> stringResource(R.string.build_flavor_github)
             "fdroid" -> stringResource(R.string.build_flavor_fdroid)
+            "offline" -> stringResource(R.string.build_flavor_offline)
             "playstore" -> stringResource(R.string.build_flavor_playstore)
             else -> BuildConfig.FLAVOR
         }
@@ -589,7 +593,10 @@ private fun AboutOtherAppsAndLinks(
     copyAboutLink: (String) -> Unit,
     isSmallLandscape: Boolean,
 ) {
-    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
+    val useGithubLikeAboutLinks =
+        BuildConfig.FLAVOR == "github" ||
+            BuildConfig.FLAVOR == "fdroid" ||
+            BuildConfig.FLAVOR == "offline"
     val filePipeRoute =
         AboutAppRoute(
             packageId = FILEPIPE_FDROID_PACKAGE_ID,

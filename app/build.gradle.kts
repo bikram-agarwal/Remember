@@ -80,8 +80,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 10801
-        versionName = "1.8.1"
+        versionCode = 10900
+        versionName = "1.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -161,6 +161,17 @@ extensions.configure<ApplicationExtension>("android") {
             buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
             buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
+        create("offline") {
+            dimension = "distribution"
+            applicationIdSuffix = ".offline"
+            buildConfigField("String", "GITHUB_REPO", "\"\"")
+            buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
+            buildConfigField("Boolean", "SHOW_UPDATES", "false")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "false")
+            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"\"")
+            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"\"")
+        }
         create("playstore") {
             dimension = "distribution"
             buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
@@ -198,13 +209,19 @@ extensions.configure<ApplicationExtension>("android") {
         getByName("androidTest") {
             assets.directories.add("$projectDir/schemas")
         }
+        getByName("fdroid") {
+            java.directories.add("src/github/java")
+            kotlin.directories.add("src/github/java")
+        }
         getByName("github") {
             java.directories.add("src/nonfdroid/java")
             kotlin.directories.add("src/nonfdroid/java")
         }
-        getByName("fdroid") {
+        getByName("offline") {
             java.directories.add("src/github/java")
             kotlin.directories.add("src/github/java")
+            java.directories.add("src/fdroid/java")
+            kotlin.directories.add("src/fdroid/java")
         }
         getByName("playstore") {
             java.directories.add("src/nonfdroid/java")

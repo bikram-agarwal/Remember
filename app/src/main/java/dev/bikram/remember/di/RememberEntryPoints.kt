@@ -20,9 +20,7 @@ import dev.bikram.remember.reminders.ReminderScheduler
 import dev.bikram.remember.update.AppReviewLauncher
 import dev.bikram.remember.update.PlayInAppUpdateProgressController
 import dev.bikram.remember.update.PlayInAppUpdateStarter
-import dev.bikram.remember.update.PlayStoreUpdateChecker
 import dev.bikram.remember.update.PlayUpdateSessionHandle
-import dev.bikram.remember.update.RememberUpdateChecker
 import dev.bikram.remember.update.RememberUpdateState
 import dev.bikram.remember.update.UpdateAvailableNotifier
 import dev.bikram.remember.update.UpdateCheckWorkScheduler
@@ -54,10 +52,6 @@ interface SettingsDependenciesEntryPoint {
     fun noteRepository(): NoteRepository
 
     fun updatePrefs(): UpdatePrefs
-
-    fun rememberUpdateChecker(): RememberUpdateChecker
-
-    fun playStoreUpdateChecker(): PlayStoreUpdateChecker
 
     fun playInAppUpdateStarter(): PlayInAppUpdateStarter
 

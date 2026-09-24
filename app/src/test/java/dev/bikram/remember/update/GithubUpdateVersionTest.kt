@@ -51,6 +51,10 @@ class GithubUpdateVersionTest {
                         name = "remember-v1.8.0-github.apk",
                         browserDownloadUrl = "https://example.com/github.apk",
                     ),
+                    GithubAsset(
+                        name = "remember-v1.8.0-offline.apk",
+                        browserDownloadUrl = "https://example.com/offline.apk",
+                    ),
                 ),
             )
         assertEquals("remember-v1.8.0-github.apk", selected?.name)
@@ -65,6 +69,10 @@ class GithubUpdateVersionTest {
                     GithubAsset(
                         name = "remember-v1.8.0-fdroid.apk",
                         browserDownloadUrl = "https://example.com/fdroid.apk",
+                    ),
+                    GithubAsset(
+                        name = "remember-v1.8.0-offline.apk",
+                        browserDownloadUrl = "https://example.com/offline.apk",
                     ),
                 ),
             )

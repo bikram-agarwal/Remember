@@ -5,6 +5,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
+import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.data.UpdatePrefs
 import dev.bikram.remember.worker.UpdateCheckWorker
@@ -25,6 +26,10 @@ class UpdateCheckWorkScheduler
         private val updatePrefs: UpdatePrefs,
     ) {
         suspend fun syncFromPreferences() {
+            if (!BuildConfig.SHOW_UPDATES) {
+                cancel()
+                return
+            }
             val schedule = updatePrefs.snapshot().updateCheckSchedule
             when (schedule) {
                 UpdateCheckSchedule.DAILY_AT_21 -> enqueueOneTime(delayMillis = millisUntilNextDailyNinePm())

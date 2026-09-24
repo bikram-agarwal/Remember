@@ -174,8 +174,8 @@ private fun JsonObject.longOrNull(key: String): Long? {
 }
 
 /**
- * Prefer the GitHub-flavor sideload APK (`*-github.apk`). Releases also ship `*-fdroid.apk`;
- * GitHub API asset order often lists fdroid first.
+ * Prefer the GitHub-flavor sideload APK (`*-github.apk`). Releases also ship `*-fdroid.apk`
+ * and `*-offline.apk`; GitHub API asset order often lists fdroid first.
  */
 internal fun selectGithubReleaseApkAsset(assets: List<GithubAsset>): GithubAsset? =
     assets.firstOrNull { asset ->
