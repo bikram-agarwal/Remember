@@ -6,6 +6,7 @@ import java.time.DayOfWeek
 import java.time.LocalTime
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 internal data class SnoozePreset(
@@ -16,6 +17,58 @@ internal data class SnoozePreset(
     val symbolName: String,
     val dividerBefore: Boolean = false,
 )
+
+internal data class ReminderDurationChip(
+    val amount: Int,
+    val unit: ChronoUnit,
+    val titlePluralRes: Int,
+)
+
+// Every duration chip shares one glyph: unlike the named presets, these differ
+// only by length, so a varying icon would read as a meaning that isn't there.
+internal const val REMINDER_DURATION_CHIP_SYMBOL = "timer"
+
+internal val REMINDER_DURATION_CHIPS =
+    listOf(
+        ReminderDurationChip(30, ChronoUnit.MINUTES, R.plurals.reminder_duration_preset_minutes),
+        ReminderDurationChip(1, ChronoUnit.HOURS, R.plurals.reminder_duration_preset_hours),
+        ReminderDurationChip(6, ChronoUnit.HOURS, R.plurals.reminder_duration_preset_hours),
+        ReminderDurationChip(12, ChronoUnit.HOURS, R.plurals.reminder_duration_preset_hours),
+        ReminderDurationChip(24, ChronoUnit.HOURS, R.plurals.reminder_duration_preset_hours),
+        ReminderDurationChip(7, ChronoUnit.DAYS, R.plurals.reminder_duration_preset_days),
+    )
+
+internal fun applyReminderDurationChip(
+    now: ZonedDateTime,
+    chip: ReminderDurationChip,
+): ZonedDateTime =
+    when (chip.unit) {
+        ChronoUnit.MINUTES -> now.plusMinutes(chip.amount.toLong())
+        ChronoUnit.HOURS -> now.plusHours(chip.amount.toLong())
+        ChronoUnit.DAYS -> now.plusDays(chip.amount.toLong())
+        else -> error("Unsupported reminder duration unit: ${chip.unit}")
+    }
+
+/**
+ * Fixed offsets for the reminder sheet when Duration is selected in
+ * Reminder/Snooze type. Unlike named snooze presets, these do not round to
+ * clock boundaries.
+ */
+internal fun computeReminderDurationPresets(
+    context: Context,
+    now: ZonedDateTime,
+    timeFormatter: DateTimeFormatter,
+): List<SnoozePreset> =
+    REMINDER_DURATION_CHIPS.map { chip ->
+        val target = applyReminderDurationChip(now, chip)
+        SnoozePreset(
+            title = context.resources.getQuantityString(chip.titlePluralRes, chip.amount, chip.amount),
+            subtitle = "",
+            absoluteTime = target.format(timeFormatter),
+            targetMillis = target.toInstant().toEpochMilli(),
+            symbolName = REMINDER_DURATION_CHIP_SYMBOL,
+        )
+    }
 
 /**
  * Build the smart preset list. Adapts to time-of-day:

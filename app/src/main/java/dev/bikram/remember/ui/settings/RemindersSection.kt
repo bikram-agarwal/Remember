@@ -64,8 +64,10 @@ import kotlinx.coroutines.launch
  *   - Reliable-reminders capability: combined exact-alarm permission + battery-
  *     optimisation exemption when the platform offers them as one toggle, otherwise
  *     surfaced as two separate rows.
- *   - Sticky reminder notifications until the note is marked done.
- *   - Snooze sheet style (named presets vs a duration).
+ *   - Restore notifications: re-posts dismissed reminder notifications until
+ *     the note is marked done.
+ *   - Reminder/Snooze type (Timing named times vs Duration lengths on the
+ *     reminder sheet chips and the snooze sheet).
  *   - Reminder summary notification (the persistent multi-reminder summary).
  *   - Quick-capture persistent notification.
  *
@@ -247,8 +249,8 @@ internal fun RemindersSection(
         ) {
             SettingsToggleRow(
                 materialSymbolName = "notification_important",
-                title = stringResource(R.string.settings_keep_reminders_until_done),
-                subtitle = stringResource(R.string.settings_keep_reminders_until_done_desc),
+                title = stringResource(R.string.settings_restore_notifications),
+                subtitle = stringResource(R.string.settings_restore_notifications_desc),
                 checked = reminderState.keepReminderNotificationsUntilDone,
                 onCheckedChange = { enabled ->
                     scope.launch {
@@ -350,7 +352,7 @@ private fun SnoozeTypeRow(
     var expanded by rememberSaveable { mutableStateOf(false) }
     val selectedLabelRes =
         when (snoozeType) {
-            SnoozeType.RELATIVE -> R.string.settings_snooze_type_presets
+            SnoozeType.RELATIVE -> R.string.settings_snooze_type_timing
             SnoozeType.ABSOLUTE -> R.string.settings_snooze_type_duration
         }
     Row(
@@ -362,7 +364,7 @@ private fun SnoozeTypeRow(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         RememberMaterialRoundedSymbol(
-            name = "snooze",
+            name = "acute",
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             weight = FontWeight.Medium,
         )
@@ -371,17 +373,25 @@ private fun SnoozeTypeRow(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Text(
-                stringResource(R.string.settings_snooze_type_title),
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Text(
-                stringResource(R.string.settings_snooze_type_desc),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    stringResource(R.string.settings_snooze_type_title),
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                SettingsInfoDropdown(
+                    tipText = stringResource(R.string.settings_snooze_type_tooltip),
+                    contentDescription = stringResource(R.string.settings_snooze_type_info_cd),
+                    bulletItems =
+                        listOf(
+                            stringResource(R.string.settings_snooze_type_tooltip_timing),
+                            stringResource(R.string.settings_snooze_type_tooltip_duration),
+                        ),
+                )
+            }
         }
         Spacer(Modifier.width(8.dp))
         RememberOutlinedButton(onClick = { expanded = true }) {
@@ -394,7 +404,7 @@ private fun SnoozeTypeRow(
                 SnoozeType.entries.forEach { option ->
                     val optionLabelRes =
                         when (option) {
-                            SnoozeType.RELATIVE -> R.string.settings_snooze_type_presets
+                            SnoozeType.RELATIVE -> R.string.settings_snooze_type_timing
                             SnoozeType.ABSOLUTE -> R.string.settings_snooze_type_duration
                         }
                     RememberDropdownMenuItem(

@@ -41,17 +41,21 @@ reliable reminder -> Notification permission and reliability
 high importance -> Importance: Low, Normal, and High
 heads-up reminder -> Importance: Low, Normal, and High
 
-# --- Keep until done / persistent reminders ---
-keep reminding -> Keep reminders until done
-remind again -> Keep reminders until done
-keep notifying -> Keep reminders until done
-persistent reminder -> Keep reminders until done
-reminder keeps coming back -> Keep reminders until done
-re-post reminder -> Keep reminders until done
-sticky reminder -> Keep reminders until done
-annoying reminder -> Keep reminders until done
+# --- Restore notifications / persistent reminders ---
+keep reminding -> Restore notifications
+remind again -> Restore notifications
+keep notifying -> Restore notifications
+persistent reminder -> Restore notifications
+reminder keeps coming back -> Restore notifications
+re-post reminder -> Restore notifications
+sticky reminder -> Restore notifications
+annoying reminder -> Restore notifications
+restore notifications -> Restore notifications
+dismissed reminder -> Restore notifications
+keep until done -> Restore notifications
+keep reminders until done -> Restore notifications
 
-# --- Snooze ---
+# --- Snooze / reminder type ---
 delay reminder -> Snooze
 postpone reminder -> Snooze
 remind me later -> Snooze
@@ -61,7 +65,11 @@ push reminder -> Snooze
 absolute snooze -> Snooze
 snooze duration -> Snooze
 snooze minutes -> Snooze
-snooze type -> Snooze
+snooze type -> Snooze | How reminders work
+reminder type -> How reminders work | Snooze
+timing preset -> How reminders work | Snooze
+soon later today -> How reminders work | Snooze
+duration chips -> How reminders work
 
 # --- Defaults ---
 new note defaults -> Defaults
