@@ -67,10 +67,10 @@ import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.theme.pillShape
+import dev.bikram.remember.update.OBTAINX_PACKAGE_ID
 import kotlinx.coroutines.launch
 
 private const val FILEPIPE_FDROID_PACKAGE_ID = "dev.bikram.filepipe.gh"
-private const val OBTAINX_FDROID_PACKAGE_ID = "dev.bikram.obtainx"
 
 private data class AboutAppRoute(
     val packageId: String,
@@ -605,7 +605,7 @@ private fun AboutOtherAppsAndLinks(
         )
     val obtainXRoute =
         AboutAppRoute(
-            packageId = OBTAINX_FDROID_PACKAGE_ID,
+            packageId = OBTAINX_PACKAGE_ID,
             portfolioUrl = stringResource(R.string.settings_about_obtainx_website_url),
         )
     val websiteUrl = stringResource(R.string.settings_about_remember_website_url)
@@ -758,25 +758,28 @@ private fun openAboutAppRoute(
 ) {
     when (BuildConfig.FLAVOR) {
         "fdroid" -> {
-            val fdroidIntent =
-                Intent(Intent.ACTION_VIEW, "fdroid.app:${route.packageId}".toUri())
             try {
-                context.startActivity(fdroidIntent)
+                context.startActivity(crossPromoViewIntent("fdroid.app:${route.packageId}"))
             } catch (_: ActivityNotFoundException) {
-                context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
+                context.startActivity(crossPromoViewIntent(route.portfolioUrl))
             }
         }
 
         "playstore" -> {
             val targetUrl = route.playStoreUrl.ifBlank { route.portfolioUrl }
-            context.startActivity(Intent(Intent.ACTION_VIEW, targetUrl.toUri()))
+            context.startActivity(crossPromoViewIntent(targetUrl))
         }
 
         else -> {
-            context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
+            context.startActivity(crossPromoViewIntent(route.portfolioUrl))
         }
     }
 }
+
+// NEW_TASK so the store client or browser opens in its own task instead of being stacked inside
+// Remember's, where it would show up as Remember in Recents and Back would return here.
+private fun crossPromoViewIntent(uri: String): Intent =
+    Intent(Intent.ACTION_VIEW, uri.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
 @Composable
 private fun AboutTextLink(

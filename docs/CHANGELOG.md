@@ -1,3 +1,23 @@
+## v1.9.0 Offline version, Reminder duration presets
+
+### ✨ New Features
+- **Offline version**: a new build with no internet access at all. It has no update checks and no Google account connection for Tasks import; importing from a Google Takeout or Tasks.org file still works. It installs alongside the other versions and is available from GitHub Releases.
+
+### 🛠 Improved Features
+- **Reminder/Snooze type** (formerly "Snooze type") now also sets the quick options when you add a reminder. Choose **Timing** for named times (Soon, Later today, This evening…) or **Duration** for lengths of time (30 mins, 1 hour, 6 hours, 12 hours, 24 hours, 7 days). An info button in Settings explains both.
+- "Keep reminder notifications until done" is now called **Restore notifications**, with a clearer description of what it does.
+
+### 🐛 Bug Fixes
+- Updating from inside the GitHub version no longer downloads the F-Droid version by mistake.
+- On the Play Store version, daily and weekly scheduled update checks now actually run.
+- If an update check fails (for example, when you're offline), the update screen now says "*Could not check for updates*" instead of wrongly saying "*You're up to date*".
+- Typing in notes with live preview no longer interrupts your keyboard's autocorrect and word suggestions.
+- The two-panel layout no longer appears on phones in portrait mode.
+- Fixed cases where Display size settings made the whole app look too small on some devices.
+- Checkboxes are a little bigger than their text again, and the same size in lists and notes.
+
+---
+
 ## v1.8.1 Defaults, snooze type
 
 ### ✨ New Features

@@ -1029,6 +1029,10 @@
     <string name="settings_update_schedule_never">Never</string>
     <string name="settings_save_update_apk_to_downloads">Save update APK to Download folder</string>
     <string name="settings_notify_new_updates">Get notification for new updates</string>
+    <string name="settings_track_updates_via_obtainx">Track updates via ObtainX</string>
+    <string name="settings_track_updates_via_obtainx_desc">Let ObtainX track and install updates for this app</string>
+    <string name="settings_track_updates_via_obtainx_desc_fdroid">Let ObtainX check F-Droid for updates of this app</string>
+    <string name="settings_track_updates_via_obtainx_get_desc">Get ObtainX to receive updates automatically</string>
     <string name="settings_notify_updates_need_auto_check">Enable \"Automatically check for updates\" first</string>
     <string name="settings_notify_updates_enable_notifications">Allow notifications for Remember</string>
     <string name="settings_update_available_button">Update available - %1$s</string>

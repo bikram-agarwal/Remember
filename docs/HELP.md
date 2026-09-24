@@ -249,3 +249,11 @@ Reveal mode holds six of the seven available actions, and its editor rearranges 
 Available actions for either mode: Pin, Star, Duplicate, Mark done, Archive, Trash, Edit.
 
 Haptic feedback at swipe thresholds can be turned on or off independently of the mode.
+
+## Updates
+
+### Keeping Remember up to date
+
+On the GitHub, F-Droid, and Play Store versions, Settings -> Updates checks for new versions automatically or when you tap **Check for updates**.
+
+The Offline version has no internet access, so it can't check for updates itself. Use **Track updates via ObtainX** on the Settings page (under Updates on tablets) to let ObtainX keep it up to date, or install a newer offline APK from GitHub Releases by hand. On the GitHub and F-Droid versions, the same option is in Settings -> Updates.

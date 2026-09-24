@@ -30,7 +30,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,7 +40,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -83,6 +81,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
@@ -186,12 +185,36 @@ fun canonicalSettingsSectionRouteKey(storedKey: String): String? =
         .firstOrNull { section -> section.routeKey == storedKey || storedKey in section.legacyRouteKeys }
         ?.routeKey
 
+// The two-pane section list. On offline it keeps Updates for the ObtainX row, which the single-list
+// page shows as a standalone card instead (showsUpdatesSection / showsStandaloneObtainXCard).
 val settingsPaneSections: List<SettingsSectionKey>
     get() =
         SettingsSectionKey.entries.filter { sectionKey ->
             sectionKey != SettingsSectionKey.DevOptions &&
-                (sectionKey != SettingsSectionKey.Updates || BuildConfig.SHOW_UPDATES)
+                (sectionKey != SettingsSectionKey.Updates || showsUpdatesSection(singleList = false))
         }
+
+/**
+ * About gets 24dp of extra room only where it directly follows a section on the single-list page.
+ * After a standalone item (the dev options entry, offline's ObtainX card) the list's normal spacing
+ * is enough.
+ */
+private fun aboutSectionTopPadding(
+    singleList: Boolean,
+    devModeEnabled: Boolean,
+): Dp = if (singleList && !devModeEnabled && !showsStandaloneObtainXCard(singleList)) 24.dp else 0.dp
+
+/**
+ * Route keys of the sections the page emits with a collapse control. About has none, and Updates is
+ * left out wherever it isn't emitted, so "all sections collapsed" can still become true.
+ */
+private fun expandableSettingsSectionKeys(singleList: Boolean): Set<String> =
+    settingsPaneSections
+        .filter { sectionKey ->
+            sectionKey != SettingsSectionKey.About &&
+                (sectionKey != SettingsSectionKey.Updates || showsUpdatesSection(singleList))
+        }.map { sectionKey -> sectionKey.routeKey }
+        .toSet()
 
 // Resolved from the enum rather than a hand-maintained `when`, so a routeKey has exactly one home.
 // settingsPaneSections already excludes DevOptions, which is precisely the set this used to accept.
@@ -410,13 +433,8 @@ fun SettingsRoute(
         mutableStateOf(NotificationManagerCompat.from(context).areNotificationsEnabled())
     }
     var pendingEnableUpdateNotificationsAfterPermission by rememberSaveable { mutableStateOf(false) }
-    val settingsExpandableSectionKeys =
-        remember {
-            settingsPaneSections
-                .filter { sectionKey -> sectionKey != SettingsSectionKey.About }
-                .map { sectionKey -> sectionKey.routeKey }
-                .toSet()
-        }
+    val singleList = selectedSectionKey == null
+    val settingsExpandableSectionKeys = remember(singleList) { expandableSettingsSectionKeys(singleList) }
     var collapsedSettingsSectionKeys by rememberSaveable {
         mutableStateOf<Set<String>?>(null)
     }
@@ -949,7 +967,7 @@ fun SettingsRoute(
                         }
                     }
 
-                    if (BuildConfig.SHOW_UPDATES && includeSettingsSection(SettingsSectionKey.Updates)) {
+                    if (showsUpdatesSection(singleList) && includeSettingsSection(SettingsSectionKey.Updates)) {
                         item(key = "updates") {
                             SettingsExpandableSection(
                                 sectionKey = SettingsSectionKey.Updates.routeKey,
@@ -960,117 +978,84 @@ fun SettingsRoute(
                                 showHeader = showSectionHeaders,
                             ) {
                                 GroupedListColumn {
-                                    GroupedListItem(position = GroupPosition.FIRST) {
-                                        UpdateCheckScheduleDropdown(
-                                            selected = updateState.updateCheckSchedule,
-                                            onSelect = { schedule ->
-                                                scope.launch {
-                                                    updatePrefs.setUpdateCheckSchedule(schedule)
-                                                    updateCheckWorkScheduler.syncFromPreferences()
-                                                }
-                                            },
-                                            modifier = Modifier.fillMaxWidth(),
-                                        )
-                                    }
-                                    if (BuildConfig.FLAVOR == "github") {
-                                        GroupedListItem(position = GroupPosition.MIDDLE) {
-                                            UpdateSettingsToggleItem(
-                                                title = stringResource(R.string.settings_save_update_apk_to_downloads),
-                                                checked = updateState.saveUpdateApkToDownloads,
-                                                onCheckedChange = { enabled ->
-                                                    scope.launch { updatePrefs.setSaveUpdateApkToDownloads(enabled) }
+                                    if (BuildConfig.SHOW_UPDATES) {
+                                        GroupedListItem(position = GroupPosition.FIRST) {
+                                            UpdateCheckScheduleDropdown(
+                                                selected = updateState.updateCheckSchedule,
+                                                onSelect = { schedule ->
+                                                    scope.launch {
+                                                        updatePrefs.setUpdateCheckSchedule(schedule)
+                                                        updateCheckWorkScheduler.syncFromPreferences()
+                                                    }
                                                 },
+                                                modifier = Modifier.fillMaxWidth(),
                                             )
                                         }
-                                    }
-                                    GroupedListItem(position = GroupPosition.MIDDLE) {
-                                        UpdateSettingsToggleItem(
-                                            title = stringResource(R.string.settings_notify_new_updates),
-                                            checked = updateState.notifyOnNewUpdates,
-                                            onCheckedChange = { enabled ->
-                                                when {
-                                                    !enabled -> {
-                                                        pendingEnableUpdateNotificationsAfterPermission = false
-                                                        scope.launch { updatePrefs.setNotifyOnNewUpdates(false) }
-                                                    }
-                                                    updateState.updateCheckSchedule == UpdateCheckSchedule.NEVER -> {
-                                                        scope.launch {
-                                                            snackbarHostState.showSnackbar(
-                                                                resources.getString(R.string.settings_notify_updates_need_auto_check),
-                                                            )
-                                                        }
-                                                    }
-                                                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                                                        ContextCompat.checkSelfPermission(
-                                                            context,
-                                                            Manifest.permission.POST_NOTIFICATIONS,
-                                                        ) != PackageManager.PERMISSION_GRANTED -> {
-                                                        pendingEnableUpdateNotificationsAfterPermission = true
-                                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                                    }
-                                                    !NotificationManagerCompat.from(context).areNotificationsEnabled() -> {
-                                                        scope.launch {
-                                                            snackbarHostState.showSnackbar(
-                                                                resources.getString(R.string.settings_notify_updates_enable_notifications),
-                                                            )
-                                                        }
-                                                        context.startActivity(notificationsAppSettingsIntent(context))
-                                                    }
-                                                    else -> scope.launch { updatePrefs.setNotifyOnNewUpdates(true) }
-                                                }
-                                            },
-                                        )
-                                    }
-                                    GroupedListItem(position = GroupPosition.LAST) {
-                                        val availableUpdate = updateInfo
-                                        Row(
-                                            modifier =
-                                                Modifier
-                                                    .fillMaxWidth()
-                                                    .appClickable {
-                                                        beginUpdateCheck(true)
-                                                    }.padding(horizontal = 16.dp, vertical = 10.dp),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                        ) {
-                                            RememberMaterialRoundedSymbol(
-                                                name = "new_releases",
-                                                tint = MaterialTheme.colorScheme.primary,
-                                                weight = FontWeight.Medium,
-                                            )
-                                            Spacer(Modifier.width(16.dp))
-                                            Column(
-                                                modifier = Modifier.weight(1f),
-                                                verticalArrangement = Arrangement.spacedBy(2.dp),
-                                            ) {
-                                                Text(
-                                                    text =
-                                                        if (availableUpdate != null) {
-                                                            stringResource(
-                                                                R.string.settings_update_available_button,
-                                                                availableUpdate.versionName,
-                                                            )
-                                                        } else {
-                                                            stringResource(R.string.settings_check_for_updates)
-                                                        },
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                )
-                                                Text(
-                                                    text =
-                                                        stringResource(
-                                                            R.string.settings_update_current_version,
-                                                            BuildConfig.VERSION_NAME,
-                                                        ),
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    maxLines = 2,
-                                                    overflow = TextOverflow.Ellipsis,
+                                        if (BuildConfig.FLAVOR == "github") {
+                                            GroupedListItem(position = GroupPosition.MIDDLE) {
+                                                UpdateSettingsToggleItem(
+                                                    title = stringResource(R.string.settings_save_update_apk_to_downloads),
+                                                    checked = updateState.saveUpdateApkToDownloads,
+                                                    onCheckedChange = { enabled ->
+                                                        scope.launch { updatePrefs.setSaveUpdateApkToDownloads(enabled) }
+                                                    },
                                                 )
                                             }
                                         }
+                                        GroupedListItem(position = GroupPosition.MIDDLE) {
+                                            UpdateSettingsToggleItem(
+                                                title = stringResource(R.string.settings_notify_new_updates),
+                                                checked = updateState.notifyOnNewUpdates,
+                                                onCheckedChange = { enabled ->
+                                                    when {
+                                                        !enabled -> {
+                                                            pendingEnableUpdateNotificationsAfterPermission = false
+                                                            scope.launch { updatePrefs.setNotifyOnNewUpdates(false) }
+                                                        }
+                                                        updateState.updateCheckSchedule == UpdateCheckSchedule.NEVER -> {
+                                                            scope.launch {
+                                                                snackbarHostState.showSnackbar(
+                                                                    resources.getString(R.string.settings_notify_updates_need_auto_check),
+                                                                )
+                                                            }
+                                                        }
+                                                        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                                                            ContextCompat.checkSelfPermission(
+                                                                context,
+                                                                Manifest.permission.POST_NOTIFICATIONS,
+                                                            ) != PackageManager.PERMISSION_GRANTED -> {
+                                                            pendingEnableUpdateNotificationsAfterPermission = true
+                                                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                        }
+                                                        !NotificationManagerCompat.from(context).areNotificationsEnabled() -> {
+                                                            scope.launch {
+                                                                snackbarHostState.showSnackbar(
+                                                                    resources.getString(R.string.settings_notify_updates_enable_notifications),
+                                                                )
+                                                            }
+                                                            context.startActivity(notificationsAppSettingsIntent(context))
+                                                        }
+                                                        else -> scope.launch { updatePrefs.setNotifyOnNewUpdates(true) }
+                                                    }
+                                                },
+                                            )
+                                        }
+                                        GroupedListItem(position = checkForUpdatesRowPosition()) {
+                                            CheckForUpdatesRow(
+                                                availableUpdate = updateInfo,
+                                                onClick = { beginUpdateCheck(true) },
+                                            )
+                                        }
                                     }
+                                    TrackUpdatesViaObtainXItem()
                                 }
                             }
+                        }
+                    }
+
+                    if (showsStandaloneObtainXCard(singleList)) {
+                        item(key = "track_updates_via_obtainx") {
+                            StandaloneTrackUpdatesViaObtainXCard()
                         }
                     }
 
@@ -1085,12 +1070,7 @@ fun SettingsRoute(
                     if (includeSettingsSection(SettingsSectionKey.About)) {
                         item(key = "about") {
                             AboutSection(
-                                modifier =
-                                    if (devModeEnabled || selectedSectionKey != null) {
-                                        Modifier
-                                    } else {
-                                        Modifier.padding(top = 24.dp)
-                                    },
+                                modifier = Modifier.padding(top = aboutSectionTopPadding(singleList, devModeEnabled)),
                                 onOpenIntro = onOpenIntro,
                                 devModeEnabled = devModeEnabled,
                                 onDevModeActivated = {
@@ -1309,21 +1289,27 @@ private fun DevOptionsSettingsEntry(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        Box(
-            modifier =
-                Modifier
-                    .size(32.dp)
-                    .clip(MaterialTheme.shapes.extraExtraLarge)
-                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
-            contentAlignment = Alignment.Center,
-        ) {
-            RememberMaterialRoundedSymbol(
-                name = "arrow_outward",
-                size = 20.dp,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                weight = FontWeight.Medium,
-            )
-        }
+        SettingsArrowOutwardBadge()
+    }
+}
+
+/** Trailing badge for settings rows that leave the settings list (Developer options, ObtainX). */
+@Composable
+internal fun SettingsArrowOutwardBadge(modifier: Modifier = Modifier) {
+    Box(
+        modifier =
+            modifier
+                .size(32.dp)
+                .clip(MaterialTheme.shapes.extraExtraLarge)
+                .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+        contentAlignment = Alignment.Center,
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = "arrow_outward",
+            size = 20.dp,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            weight = FontWeight.Medium,
+        )
     }
 }
 
