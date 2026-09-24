@@ -129,13 +129,9 @@ class RememberApp :
             playInAppUpdateProgressController.ensureInstallStateListenerRegistered()
             return
         }
-        if (!UpdateCheckWorkScheduler.supportsSilentChecks()) return
         val updateInfo =
             withContext(kotlinx.coroutines.Dispatchers.IO) {
-                rememberUpdateChecker.checkGithubReleaseForUpdate(
-                    repositoryName = BuildConfig.GITHUB_REPO,
-                    currentVersionName = BuildConfig.VERSION_NAME,
-                )
+                rememberUpdateChecker.checkForUpdate()
             } ?: return
         rememberUpdateState.showUpdate(updateInfo)
         updateAvailableNotifier.notifyIfNewUpdateAvailable(updateInfo, prefs)

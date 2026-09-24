@@ -5,7 +5,6 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import dagger.hilt.android.qualifiers.ApplicationContext
-import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.data.UpdatePrefs
 import dev.bikram.remember.worker.UpdateCheckWorker
@@ -78,9 +77,5 @@ class UpdateCheckWorkScheduler
                 candidate = candidate.plusWeeks(1)
             }
             return Duration.between(now, candidate).toMillis()
-        }
-
-        companion object {
-            fun supportsSilentChecks(): Boolean = !BuildConfig.USE_PLAY_IN_APP_UPDATES
         }
     }

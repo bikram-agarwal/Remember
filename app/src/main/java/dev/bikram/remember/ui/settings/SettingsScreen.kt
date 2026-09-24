@@ -311,6 +311,7 @@ fun SettingsRoute(
     val showUpdateSheet by updateVm.showUpdateSheet.collectAsStateWithLifecycle()
     val isCheckingUpdate by updateVm.isCheckingUpdate.collectAsStateWithLifecycle()
     val updateCheckFinishedWithoutResult by updateVm.updateCheckFinishedWithoutResult.collectAsStateWithLifecycle()
+    val updateCheckFailed by updateVm.updateCheckFailed.collectAsStateWithLifecycle()
     val downloadProgress by updateVm.downloadProgress.collectAsStateWithLifecycle()
     val updateInfo by updateVm.updateInfo.collectAsStateWithLifecycle()
     val updateSheetChangelog by updateVm.updateSheetChangelog.collectAsStateWithLifecycle()
@@ -659,6 +660,7 @@ fun SettingsRoute(
                 isCheckingUpdate = isCheckingUpdate,
                 updateInfo = updateInfo,
                 updateCheckFinishedWithoutResult = updateCheckFinishedWithoutResult,
+                updateCheckFailed = updateCheckFailed,
                 downloadProgress = downloadProgress,
                 changelogState = updateSheetChangelog,
                 showGithubExtraUi = BuildConfig.FLAVOR == "github",

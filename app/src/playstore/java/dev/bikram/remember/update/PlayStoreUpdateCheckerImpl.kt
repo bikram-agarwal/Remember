@@ -21,9 +21,9 @@ class PlayStoreUpdateCheckerImpl
             val updateInfo =
                 try {
                     appUpdateManager.requestAppUpdateInfo()
-                } catch (_: Exception) {
+                } catch (error: Exception) {
                     playInAppUpdateSession.clearPendingPlayUpdate()
-                    return null
+                    throw error
                 }
             return when (updateInfo.updateAvailability()) {
                 UpdateAvailability.UPDATE_AVAILABLE -> {
