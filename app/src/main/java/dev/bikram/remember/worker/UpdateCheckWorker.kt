@@ -30,7 +30,7 @@ class UpdateCheckWorker
         private val updateCheckWorkScheduler: UpdateCheckWorkScheduler,
     ) : CoroutineWorker(appContext, workerParams) {
         override suspend fun doWork(): Result {
-            if (!BuildConfig.SHOW_UPDATES) {
+            if (!BuildConfig.CHECK_UPDATES) {
                 updateCheckWorkScheduler.syncFromPreferences()
                 return Result.success()
             }

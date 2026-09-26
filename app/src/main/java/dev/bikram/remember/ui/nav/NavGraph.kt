@@ -39,7 +39,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
-import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -244,6 +243,10 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.mainTabEnterTransi
     // Tab to tab: slide in from the edge we are travelling from, per tab order.
     if (initialOrdinal != null && targetOrdinal != null) {
         if (reducedMotion) return EnterTransition.None
+        // The same tab on both sides means the back stack was rebuilt under us, not that the user
+        // moved between tabs. There is no relative position to convey, so either slide direction
+        // would be a lie about where the screen came from.
+        if (initialOrdinal == targetOrdinal) return fadeIn(animationSpec = fadeInSpec)
         val offset: (Int) -> Int = if (targetOrdinal > initialOrdinal) { size -> size } else { size -> -size }
         return if (verticalMotion) {
             slideInVertically(animationSpec = spatialSpec, initialOffsetY = offset)
@@ -273,6 +276,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.mainTabExitTransit
 
     if (initialOrdinal != null && targetOrdinal != null) {
         if (reducedMotion) return ExitTransition.None
+        if (initialOrdinal == targetOrdinal) return fadeOut(animationSpec = fadeOutSpec)
         val offset: (Int) -> Int =
             if (targetOrdinal > initialOrdinal) { size -> -size / 3 } else { size -> size }
         return if (verticalMotion) {
@@ -415,26 +419,46 @@ fun RememberNavGraph(
         }
     }
 
+    // Latched on the first composition that has a loaded onboarding state - the null branch above
+    // returns before this point, so there is no default-value frame to guard against.
+    //
+    // It must be the launch-time value, never the live one: NavHost rebuilds its graph whenever
+    // startDestination changes, and NavController.setGraph reacts to a graph with a different start
+    // destination by clearing the whole back stack and re-navigating to the new start. Finishing
+    // onboarding flips hasSeenIntro, so keying on it tore Notes down and re-entered it mid-flight,
+    // which is why the home screen slid in from the left instead of from the right.
+    //
+    // PARITY: FilePipe latches the same value as `introSeenAtLaunch` in AppNavigation.kt.
+    val introSeenAtLaunch = remember { currentOnboardingState.hasSeenIntro }
     val initialExternalLaunch =
-        remember(launchFlow, currentOnboardingState.hasSeenIntro) {
-            currentOnboardingState.hasSeenIntro &&
+        remember(launchFlow, introSeenAtLaunch) {
+            introSeenAtLaunch &&
                 launchFlow?.value?.let { action ->
                     action is LaunchAction.OpenNote && action.externalLaunch
                 } == true
         }
     val lockedStartDestination =
-        remember(currentOnboardingState.hasSeenIntro, initialExternalLaunch) {
+        remember(introSeenAtLaunch, initialExternalLaunch) {
             when {
-                !currentOnboardingState.hasSeenIntro -> Routes.ONBOARDING_TITLE
+                !introSeenAtLaunch -> Routes.ONBOARDING_TITLE
                 initialExternalLaunch -> Routes.EXTERNAL_LAUNCH
                 else -> Routes.NOTES
             }
         }
 
-    /** Select a main tab. Identical to FilePipe's bottom-nav / navigation-rail click handler. */
+    /**
+     * Select a main tab. Identical to FilePipe's bottom-nav / navigation-rail click handler.
+     *
+     * Pops to [Routes.NOTES] rather than to `graph.findStartDestination()`. Notes is always the root
+     * of the back stack once tabs are reachable - both the onboarding hand-off and an external note
+     * launch re-root onto it - but the graph's *nominal* start destination is whatever the app
+     * launched into, which after either of those paths is no longer on the back stack at all. A
+     * popUpTo that matches nothing silently pops nothing, so tab taps would stack up instead of
+     * returning to the root.
+     */
     val openMainTab: (MainTab) -> Unit = { selectedTab ->
         navController.navigate(selectedTab.route) {
-            popUpTo(navController.graph.findStartDestination().id) {
+            popUpTo(Routes.NOTES) {
                 saveState = true
             }
             launchSingleTop = true
@@ -448,7 +472,7 @@ fun RememberNavGraph(
             val poppedToSettings = navController.popBackStack(Routes.SETTINGS, inclusive = false)
             if (!poppedToSettings) {
                 navController.navigate(Routes.SETTINGS) {
-                    popUpTo(navController.graph.findStartDestination().id) {
+                    popUpTo(Routes.NOTES) {
                         saveState = true
                     }
                     launchSingleTop = true
@@ -478,7 +502,7 @@ fun RememberNavGraph(
                             if (note == null) {
                                 if (action.externalLaunch) {
                                     navController.navigate(Routes.NOTES) {
-                                        popUpTo(navController.graph.findStartDestination().id) {
+                                        popUpTo(navController.graph.id) {
                                             inclusive = true
                                         }
                                         launchSingleTop = true

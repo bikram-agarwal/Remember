@@ -55,9 +55,11 @@ class ObtainXTrackingTest {
     }
 
     @Test
-    fun noPayloadOverridesTheSourceDetectedFromTheUrl() {
+    fun noPayloadOverridesTheSourceOrPinsAnApkIndex() {
         for ((flavor, appId) in listOf("github" to "a.gh", "offline" to "a.offline", "fdroid" to "a.gh")) {
-            assertFalse(payload(flavor, appId).containsKey("overrideSource"))
+            val payload = payload(flavor, appId)
+            assertFalse(payload.containsKey("overrideSource"))
+            assertFalse(payload.containsKey("preferredApkIndex"))
         }
     }
 

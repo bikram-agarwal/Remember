@@ -540,7 +540,7 @@ fun SettingsRoute(
     val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val pillInset = navBarInset + PillBottomBarHeight + PillBottomScrimExtra
     LaunchedEffect(showUpdateSheet) {
-        if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
+        if (showUpdateSheet && BuildConfig.CHECK_UPDATES) {
             updateVm.loadChangelog()
         }
     }
@@ -557,7 +557,7 @@ fun SettingsRoute(
         }
     }
     LaunchedEffect(openSheetRequested) {
-        if (!BuildConfig.SHOW_UPDATES) return@LaunchedEffect
+        if (!BuildConfig.CHECK_UPDATES) return@LaunchedEffect
         if (openSheetRequested) {
             updateVm.markOpenSheetHandled()
             updateVm.openSheetAndCheck()
@@ -651,7 +651,7 @@ fun SettingsRoute(
     val backupHighlightAlpha = rememberSectionHighlightPulseAlpha(backupHighlightActive)
     val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlightActive)
 
-    if (showUpdateSheet && BuildConfig.SHOW_UPDATES) {
+    if (showUpdateSheet && BuildConfig.CHECK_UPDATES) {
         val updateSheetState =
             rememberBottomSheetState(
                 initialValue = SheetValue.Expanded,
@@ -978,7 +978,7 @@ fun SettingsRoute(
                                 showHeader = showSectionHeaders,
                             ) {
                                 GroupedListColumn {
-                                    if (BuildConfig.SHOW_UPDATES) {
+                                    if (BuildConfig.CHECK_UPDATES) {
                                         GroupedListItem(position = GroupPosition.FIRST) {
                                             UpdateCheckScheduleDropdown(
                                                 selected = updateState.updateCheckSchedule,

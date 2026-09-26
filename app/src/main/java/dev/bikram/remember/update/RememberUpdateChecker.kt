@@ -74,7 +74,6 @@ class RememberUpdateChecker
             repositoryName: String,
             currentVersionName: String,
         ): RememberUpdateInfo? {
-            if (repositoryName.isBlank()) return null
             val connection =
                 URL("https://api.github.com/repos/$repositoryName/releases/latest").openConnection() as HttpURLConnection
             connection.instanceFollowRedirects = true

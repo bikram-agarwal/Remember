@@ -26,7 +26,7 @@ class UpdateCheckWorkScheduler
         private val updatePrefs: UpdatePrefs,
     ) {
         suspend fun syncFromPreferences() {
-            if (!BuildConfig.SHOW_UPDATES) {
+            if (!BuildConfig.CHECK_UPDATES) {
                 cancel()
                 return
             }

@@ -813,8 +813,7 @@ internal fun UpdateSettingsToggleItem(
 }
 
 /** The check-for-updates row is last unless the ObtainX row follows it. */
-internal fun checkForUpdatesRowPosition(): GroupPosition =
-    if (supportsObtainXTracking) GroupPosition.MIDDLE else GroupPosition.LAST
+internal fun checkForUpdatesRowPosition(): GroupPosition = if (supportsObtainXTracking) GroupPosition.MIDDLE else GroupPosition.LAST
 
 /** Updates-section row that runs a manual check, or opens the available update. */
 @Composable
@@ -868,11 +867,10 @@ internal fun CheckForUpdatesRow(
  * two-pane layout keeps that Updates section, because its section list is how the option is reached.
  */
 private val obtainXIsOnlyUpdateOption: Boolean
-    get() = supportsObtainXTracking && !BuildConfig.SHOW_UPDATES
+    get() = supportsObtainXTracking && !BuildConfig.CHECK_UPDATES
 
 /** Whether the Updates section is emitted. [singleList] is the phone layout, with no section selected. */
-internal fun showsUpdatesSection(singleList: Boolean): Boolean =
-    BuildConfig.SHOW_UPDATES || (obtainXIsOnlyUpdateOption && !singleList)
+internal fun showsUpdatesSection(singleList: Boolean): Boolean = BuildConfig.CHECK_UPDATES || (obtainXIsOnlyUpdateOption && !singleList)
 
 /** Whether the ObtainX card stands on its own on the settings page. See [showsUpdatesSection]. */
 internal fun showsStandaloneObtainXCard(singleList: Boolean): Boolean = obtainXIsOnlyUpdateOption && singleList
@@ -884,7 +882,7 @@ internal fun showsStandaloneObtainXCard(singleList: Boolean): Boolean = obtainXI
 @Composable
 internal fun TrackUpdatesViaObtainXItem() {
     if (!supportsObtainXTracking) return
-    GroupedListItem(position = if (BuildConfig.SHOW_UPDATES) GroupPosition.LAST else GroupPosition.ONLY) {
+    GroupedListItem(position = if (BuildConfig.CHECK_UPDATES) GroupPosition.LAST else GroupPosition.ONLY) {
         TrackUpdatesViaObtainXRow()
     }
 }

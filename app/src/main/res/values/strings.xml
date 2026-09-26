@@ -826,7 +826,6 @@
     <string name="settings_defaults_recurrence_monthly">Monthly</string>
     <string name="settings_defaults_recurrence_yearly">Yearly</string>
     <string name="settings_snooze_type_title">Reminder/Snooze type</string>
-    <string name="settings_snooze_type_desc">Choose smart presets or a duration</string>
     <string name="settings_snooze_type_timing">Timing</string>
     <string name="settings_snooze_type_duration">Duration</string>
     <string name="settings_snooze_type_tooltip">Choose how preset options are offered when you set a reminder or snooze one.</string>

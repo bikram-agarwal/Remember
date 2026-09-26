@@ -42,7 +42,7 @@ class RememberUpdateState
         }
 
         fun devReleaseMockShowUpdateAvailable() {
-            if (!BuildConfig.SHOW_UPDATES) return
+            if (!BuildConfig.CHECK_UPDATES) return
             _updateInfo.value =
                 RememberUpdateInfo(
                     versionName = "9.9.9",

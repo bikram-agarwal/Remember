@@ -220,7 +220,7 @@ class MainActivity : FragmentActivity() {
         val lastSeenVersion = updatePrefs.getLastSeenAppVersion()
         val currentVersion = BuildConfig.VERSION_NAME
         val wasUpdated = !lastSeenVersion.isNullOrBlank() && lastSeenVersion != currentVersion
-        if (wasUpdated && BuildConfig.SHOW_UPDATES) {
+        if (wasUpdated && BuildConfig.CHECK_UPDATES) {
             pendingLaunch.value = LaunchAction.OpenSettingsUpdates
         }
         updatePrefs.setLastSeenAppVersion(currentVersion)
@@ -306,7 +306,7 @@ private fun AppRoot(
         ) {
             val currentUpdateInfo = updateInfo
             val updateKey = currentUpdateInfo?.notificationDedupeKey()
-            val updateAvailable = BuildConfig.SHOW_UPDATES && currentUpdateInfo != null
+            val updateAvailable = BuildConfig.CHECK_UPDATES && currentUpdateInfo != null
             val updateBarState =
                 when (val currentPlayState = playBannerState) {
                     is PlayInAppUpdateBannerUiState.Downloading ->

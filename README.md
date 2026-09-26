@@ -21,7 +21,7 @@
   <br/>
   <!-- Distribution Badges -->
   <a href="https://github.com/bikram-agarwal/Remember/releases/latest"><img alt="Release" src="https://img.shields.io/github/v/release/bikram-agarwal/Remember?color=a1168e&include_prereleases&logo=github&style=for-the-badge&labelColor=700f63"/></a>
-  <a href="https://play.google.com/store/apps/details?id=dev.bikram.remember"><img alt="Play Store" src="https://img.shields.io/badge/Play%20Store-v1.8.1-a1168e?logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
+  <a href="https://play.google.com/store/apps/details?id=dev.bikram.remember"><img alt="Play Store" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fplaybadges.pavi2410.com%2Fapp%2Fdetails%3Fid%3Ddev.bikram.remember&query=%24.version&prefix=v&label=Play%20Store&color=a1168e&logo=google-play&style=for-the-badge&labelColor=700f63"/></a>
   <a href="https://f-droid.org/packages/dev.bikram.remember.gh"><img alt="F-Droid" src="https://img.shields.io/f-droid/v/dev.bikram.remember.gh?color=a1168e&logo=FDROID&style=for-the-badge&labelColor=700f63"/></a>
   <br/>
   <a href="https://trendshift.io/repositories/72537" target="_blank" rel="noopener noreferrer"><img src="https://trendshift.io/api/badge/trendshift/repositories/72537/daily?language=Kotlin" alt="bikram-agarwal%2FRemember | Trendshift" width="250" height="55"/></a>
@@ -36,8 +36,10 @@ If a reminder notification gets swiped away without being marked Done, Remember 
 ## 📦 Downloads
 
 [<img src="docs/assets/badge_playstore.png" alt="Get Remember on Play Store" height="80">](https://play.google.com/store/apps/details?id=dev.bikram.remember)
-[<img src="docs/assets/badge_fdroid.png" alt="Get FilePipe on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.remember.gh)
+[<img src="docs/assets/badge_fdroid.png" alt="Get Remember on F-Droid" height="80">](https://f-droid.org/packages/dev.bikram.remember.gh)
 [<img src="docs/assets/badge_github.png" alt="Get Remember on GitHub" height="80">](https://github.com/bikram-agarwal/Remember/releases/latest)
+
+[Differences](docs/FLAVOR_DIFFERENCES.md)
 
 ## ✨ Features
 

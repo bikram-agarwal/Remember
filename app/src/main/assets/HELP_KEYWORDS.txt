@@ -189,4 +189,9 @@ new version -> Keeping Remember up to date
 app update -> Keeping Remember up to date
 auto update -> Keeping Remember up to date
 obtainium -> Keeping Remember up to date
-offline update -> Keeping Remember up to date
+
+# --- Offline flavor ---
+offline -> What's different in the Offline flavor
+no internet -> What's different in the Offline flavor
+without internet -> What's different in the Offline flavor
+internet permission -> What's different in the Offline flavor

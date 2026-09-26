@@ -84,6 +84,13 @@ extensions.configure<ApplicationExtension>("android") {
         versionName = "1.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
+        buildConfigField(
+            "String",
+            "PLAY_STORE_URL",
+            "\"https://play.google.com/store/apps/details?id=$rememberApplicationId\"",
+        )
     }
 
     androidResources {
@@ -142,45 +149,29 @@ extensions.configure<ApplicationExtension>("android") {
         create("github") {
             dimension = "distribution"
             applicationIdSuffix = ".gh"
-            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "CHECK_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
             buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "true")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
         create("fdroid") {
             dimension = "distribution"
             applicationIdSuffix = ".gh"
-            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "CHECK_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
             buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "false")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
         create("offline") {
             dimension = "distribution"
             applicationIdSuffix = ".offline"
-            buildConfigField("String", "GITHUB_REPO", "\"\"")
-            buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "false")
+            buildConfigField("Boolean", "CHECK_UPDATES", "false")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
             buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "false")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"\"")
         }
         create("playstore") {
             dimension = "distribution"
-            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "CHECK_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
             buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "true")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
     }
 

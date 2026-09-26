@@ -283,11 +283,6 @@ class RememberUpdateViewModel
         }
 
         fun loadChangelog() {
-            if (BuildConfig.CHANGELOG_GITHUB_REPO.isBlank()) {
-                _updateSheetChangelog.value =
-                    ChangelogUiState.Failed(appContext.getString(R.string.settings_changelog_load_failed))
-                return
-            }
             _updateSheetChangelog.value = ChangelogUiState.Loading
             viewModelScope.launch {
                 val loaded = withContext(ioDispatcher) { runCatching { fetchRawChangelog() } }
@@ -303,10 +298,9 @@ class RememberUpdateViewModel
         }
 
         private fun fetchRawChangelog(): String {
-            val repo = BuildConfig.CHANGELOG_GITHUB_REPO
-            val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
+            val repo = BuildConfig.GITHUB_REPO
             val connection =
-                URL("https://raw.githubusercontent.com/$repo/$branch/docs/CHANGELOG.md").openConnection() as HttpURLConnection
+                URL("https://raw.githubusercontent.com/$repo/main/docs/CHANGELOG.md").openConnection() as HttpURLConnection
             connection.instanceFollowRedirects = true
             connection.connectTimeout = 15_000
             connection.readTimeout = 20_000

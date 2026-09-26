@@ -250,10 +250,13 @@ Available actions for either mode: Pin, Star, Duplicate, Mark done, Archive, Tra
 
 Haptic feedback at swipe thresholds can be turned on or off independently of the mode.
 
-## Updates
+## Offline flavor
 
-### Keeping Remember up to date
+### What's different in the Offline flavor
 
-On the GitHub, F-Droid, and Play Store versions, Settings -> Updates checks for new versions automatically or when you tap **Check for updates**.
-
-The Offline version has no internet access, so it can't check for updates itself. Use **Track updates via ObtainX** on the Settings page (under Updates on tablets) to let ObtainX keep it up to date, or install a newer offline APK from GitHub Releases by hand. On the GitHub and F-Droid versions, the same option is in Settings -> Updates.
+The Offline flavor is a separate build of Remember with no internet permission at all. It's available from GitHub Releases as `remember-v<version>-offline.apk`. Compared with the other versions:
+- **No internet permission.** Remember can't connect to internet.
+- **No update checks.** Remember can't look for new versions itself. Use **Track updates via ObtainX** on the Settings page (under Updates on tablets), or install a newer offline APK from GitHub Releases by hand.
+- **No changelog after an update.** The other versions show what's new the first time you open them after updating.
+- **No Connect Google.** Import tasks from a Google Takeout or Tasks.org file instead.
+- **Installs alongside the other versions** as a separate app, with its own notes and settings. To move your notes over, make a backup in one and restore it in the other, then grant permissions such as notifications again.
