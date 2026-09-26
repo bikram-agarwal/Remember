@@ -733,6 +733,12 @@ internal class MarkdownInlineInteractionBuilder(
     }
 }
 
+/**
+ * List rows and note markdown checklists share this: a 24dp box on 16sp bodyLarge, so 1.5x the
+ * text. Notes used to clamp to 18dp (barely larger than the text) and looked small next to lists.
+ */
+internal const val CHECKLIST_CHECKBOX_TO_TEXT_RATIO = 1.5f
+
 internal fun markdownChecklistCheckboxSize(
     style: TextStyle,
     density: Density,
@@ -741,8 +747,8 @@ internal fun markdownChecklistCheckboxSize(
     if (!style.fontSize.isSpecified || style.fontSize.value <= 0f) {
         return fallbackSize
     }
-    val requestedSize = with(density) { style.fontSize.toDp() }
-    return if (requestedSize > 0.dp) maxOf(requestedSize, 18.dp) else fallbackSize
+    val textSize = with(density) { style.fontSize.toDp() }
+    return if (textSize > 0.dp) textSize * CHECKLIST_CHECKBOX_TO_TEXT_RATIO else fallbackSize
 }
 
 internal data class MarkdownRenderedContent(

@@ -39,6 +39,22 @@ import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 
 private const val MAX_APP_DISPLAY_SCALE = 1.15f
 
+// ro.sf.lcd_density is optional, and DENSITY_DEVICE_STABLE falls back to 160 dpi when a ROM leaves
+// it unset. Android's display-size setting stays within 1.5x of the real default, so a larger gap
+// means the stable value is not the default and capping against it would shrink the whole app.
+// Kept in parity with FilePipe.
+private const val MAX_SYSTEM_DISPLAY_SIZE_SCALE = 1.5f
+
+internal fun appDisplayDensity(
+    systemDensity: Float,
+    stableDensity: Float,
+): Float =
+    if (systemDensity > stableDensity * MAX_SYSTEM_DISPLAY_SIZE_SCALE) {
+        systemDensity
+    } else {
+        systemDensity.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE)
+    }
+
 // Modest cap so text on extreme OS font settings stays large enough to honor the user's
 // choice, but not so large that sheets/lists balloon far past the (necessarily shrunk)
 // date/time pickers. Kept in parity with FilePipe.
@@ -86,9 +102,8 @@ fun RememberTheme(
         }
     val responsiveDensity =
         remember(baseDensity.density, baseDensity.fontScale, responsiveTextScale, stableDensity, themeState.uiScale) {
-            val cappedDisplayDensity = baseDensity.density.coerceAtMost(stableDensity * MAX_APP_DISPLAY_SCALE)
             Density(
-                density = cappedDisplayDensity * themeState.uiScale,
+                density = appDisplayDensity(baseDensity.density, stableDensity) * themeState.uiScale,
                 fontScale = (baseDensity.fontScale * responsiveTextScale).coerceAtMost(MAX_APP_FONT_SCALE),
             )
         }

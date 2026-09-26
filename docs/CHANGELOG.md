@@ -1,4 +1,26 @@
-## v1.8.0 Your defaults, snooze type
+## v1.9.0 Offline version, Reminder duration presets
+
+### ✨ New Features
+- **Offline version**: a new build with no internet access at all. It has no update checks and no Google account connection for Tasks import; importing from a Google Takeout or Tasks.org file still works. It installs alongside the other versions and is available from GitHub Releases.
+- **Track updates via ObtainX**: add Remember to ObtainX, which then checks for new versions and installs them for you. On the F-Droid version, ObtainX follows its F-Droid listing; on the GitHub and Offline versions, it follows GitHub Releases. If ObtainX isn't installed, it opens the ObtainX website.
+
+### 🛠 Improved Features
+- **Reminder/Snooze type** (formerly "Snooze type") now also sets the quick options when you add a reminder. Choose **Timing** for named times (Soon, Later today, This evening…) or **Duration** for lengths of time (30 mins, 1 hour, 6 hours, 12 hours, 24 hours, 7 days). An info button in Settings explains both.
+- "Keep reminder notifications until done" is now called **Restore notifications**, with a clearer description of what it does.
+- Checkboxes are a little bigger than their text again, and the same size in lists and notes.
+
+### 🐛 Bug Fixes
+- Updating from inside the GitHub version no longer downloads the F-Droid version by mistake.
+- On the Play Store version, daily and weekly scheduled update checks now actually run.
+- If an update check fails (for example, when you're offline), the update screen now says "*Could not check for updates*" instead of wrongly saying "*You're up to date*".
+- Typing in notes with live preview no longer interrupts your keyboard's autocorrect and word suggestions.
+- The two-panel layout no longer appears on phones in portrait mode.
+- Fixed cases where Display size settings made the whole app look too small on some devices.
+- Links opened from About (GitHub, Play Store, other apps) open in their own task, so the browser or store no longer shows up as Remember in the recent-apps list.
+
+---
+
+## v1.8.0 Note defaults, snooze type
 
 ### ✨ New Features
 - **Defaults** in Settings: choose the default visibility, importance, reminder time, and the recurrence; so new notes and lists start the way you work.

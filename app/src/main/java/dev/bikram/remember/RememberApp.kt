@@ -118,6 +118,7 @@ class RememberApp :
     }
 
     private suspend fun runStartupUpdateCheck() {
+        if (!BuildConfig.CHECK_UPDATES) return
         val prefs = updatePrefs.snapshot()
         if (prefs.updateCheckSchedule != UpdateCheckSchedule.AT_APP_START) return
         if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
@@ -129,13 +130,9 @@ class RememberApp :
             playInAppUpdateProgressController.ensureInstallStateListenerRegistered()
             return
         }
-        if (!UpdateCheckWorkScheduler.supportsSilentChecks()) return
         val updateInfo =
             withContext(kotlinx.coroutines.Dispatchers.IO) {
-                rememberUpdateChecker.checkGithubReleaseForUpdate(
-                    repositoryName = BuildConfig.GITHUB_REPO,
-                    currentVersionName = BuildConfig.VERSION_NAME,
-                )
+                rememberUpdateChecker.checkForUpdate()
             } ?: return
         rememberUpdateState.showUpdate(updateInfo)
         updateAvailableNotifier.notifyIfNewUpdateAvailable(updateInfo, prefs)

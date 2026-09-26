@@ -4,6 +4,9 @@ package dev.bikram.remember.ui.edit
 
 import androidx.compose.foundation.text.input.OutputTransformation
 import androidx.compose.foundation.text.input.TextFieldBuffer
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import dev.bikram.remember.ui.common.MarkdownBlockKind
@@ -21,7 +24,7 @@ private const val LIVE_PREVIEW_QUOTE_MARKER = "| "
 internal const val LIVE_PREVIEW_HIGHLIGHT_MAX_CHARS = 20_000
 
 // Below this size, highlighting recomputes on every keystroke (cheap enough to feel instant).
-// At or above it, callers should debounce the `settledSource` they pass in so highlighting only
+// At or above it, callers should debounce updates to `settledSource` so highlighting only
 // recomputes once typing pauses instead of on every keystroke; see MarkdownTextEditor.
 internal const val LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS = 4_000
 
@@ -37,8 +40,12 @@ internal fun markdownHorizontalRuleLineStarts(source: String): List<Int> {
  */
 internal class MarkdownOutputTransformation(
     private val styler: MarkdownStyler,
-    private val settledSource: String = "",
+    initialSettledSource: String = "",
 ) : OutputTransformation {
+    // Snapshot state, not a constructor value: BasicTextField restarts the IME session whenever it
+    // receives a new OutputTransformation instance, which makes autocorrect keyboards drop the
+    // word being composed. Compose re-runs transformOutput when this state changes instead.
+    var settledSource by mutableStateOf(initialSettledSource)
     private var lastSource: String? = null
     private var lastHighlighted: Boolean? = null
     private var lastPreview: MarkdownPreview? = null

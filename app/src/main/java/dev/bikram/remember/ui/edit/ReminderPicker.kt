@@ -128,7 +128,7 @@ import dev.bikram.remember.data.RecurrenceEndKind
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RecurrenceUnit
 import dev.bikram.remember.domain.formatTimeOfDay
-import dev.bikram.remember.reminders.SnoozePreset
+import dev.bikram.remember.reminders.computeReminderDurationPresets
 import dev.bikram.remember.reminders.computeSnoozePresets
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
@@ -477,6 +477,7 @@ fun ReminderPickerSheet(
     onDismiss: () -> Unit,
     defaultReminderMinutesOfDay: Int = DEFAULT_REMINDER_MINUTES_OF_DAY,
     defaultRecurrence: RecurrenceRule? = null,
+    useDurationPresets: Boolean = false,
 ) {
     val now = remember { System.currentTimeMillis() }
     var drafts by rememberSaveable(stateSaver = ReminderDraftListSaver) {
@@ -693,6 +694,7 @@ fun ReminderPickerSheet(
                                         QuickReminderChipsRow(
                                             draft = draft,
                                             enabled = controlsEnabled,
+                                            useDurationPresets = useDurationPresets,
                                             onSelectPreset = { targetMillis ->
                                                 val zone = ZoneId.systemDefault()
                                                 val zdt = ZonedDateTime.ofInstant(Instant.ofEpochMilli(targetMillis), zone)
@@ -2622,6 +2624,7 @@ private fun timeFormatterFor(context: Context): java.time.format.DateTimeFormatt
 private fun QuickReminderChipsRow(
     draft: ReminderDraft,
     enabled: Boolean,
+    useDurationPresets: Boolean,
     onSelectPreset: (targetMillis: Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -2635,7 +2638,14 @@ private fun QuickReminderChipsRow(
         }
     }
     val timeFormatter = remember(context) { timeFormatterFor(context) }
-    val presets = remember(presetsNow, timeFormatter) { computeSnoozePresets(context, presetsNow, timeFormatter) }
+    val presets =
+        remember(presetsNow, timeFormatter, useDurationPresets) {
+            if (useDurationPresets) {
+                computeReminderDurationPresets(context, presetsNow, timeFormatter)
+            } else {
+                computeSnoozePresets(context, presetsNow, timeFormatter)
+            }
+        }
     val zone = presetsNow.zone
 
     Row(

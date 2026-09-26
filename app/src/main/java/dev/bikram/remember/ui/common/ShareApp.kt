@@ -15,12 +15,14 @@ import dev.bikram.remember.R
 fun rememberShareAppAction(): () -> Unit {
     val context = LocalContext.current
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
-    val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
+    val playStoreListingUrl = BuildConfig.PLAY_STORE_URL
     val portfolioUrl = stringResource(R.string.settings_about_remember_website_url)
     val shareUrl =
         when {
             BuildConfig.FLAVOR == "playstore" -> playStoreListingUrl
-            BuildConfig.FLAVOR == "fdroid" || BuildConfig.FLAVOR == "github" -> portfolioUrl
+            BuildConfig.FLAVOR == "fdroid" ||
+                BuildConfig.FLAVOR == "github" ||
+                BuildConfig.FLAVOR == "offline" -> portfolioUrl
             githubRepoForSourceLink.isNotEmpty() -> "https://github.com/$githubRepoForSourceLink/releases/latest"
             else -> playStoreListingUrl
         }

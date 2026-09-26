@@ -70,6 +70,9 @@ class RememberUpdateViewModel
         private val _updateCheckFinishedWithoutResult = MutableStateFlow(false)
         val updateCheckFinishedWithoutResult: StateFlow<Boolean> = _updateCheckFinishedWithoutResult.asStateFlow()
 
+        private val _updateCheckFailed = MutableStateFlow(false)
+        val updateCheckFailed: StateFlow<Boolean> = _updateCheckFailed.asStateFlow()
+
         /** null = idle. 0f..100f = determinate. -2f = indeterminate download. -1f = installing. */
         private val _downloadProgress = MutableStateFlow<Float?>(null)
         val downloadProgress: StateFlow<Float?> = _downloadProgress.asStateFlow()
@@ -111,6 +114,7 @@ class RememberUpdateViewModel
         private fun runUpdateCheck() {
             _isCheckingUpdate.value = true
             _updateCheckFinishedWithoutResult.value = false
+            _updateCheckFailed.value = false
             _downloadProgress.value = null
             if (BuildConfig.USE_PLAY_IN_APP_UPDATES) {
                 viewModelScope.launch {
@@ -131,8 +135,7 @@ class RememberUpdateViewModel
                         onFailure = { throwable ->
                             DiagnosticLog.record(appContext, "Play Store update check failed from Settings", throwable)
                             _updateInfo.value = null
-                            _updateCheckFinishedWithoutResult.value = true
-                            toast(R.string.settings_update_check_failed)
+                            _updateCheckFailed.value = true
                         },
                     )
                 }
@@ -140,12 +143,7 @@ class RememberUpdateViewModel
                 viewModelScope.launch {
                     val checkedUpdate =
                         withContext(ioDispatcher) {
-                            runCatching {
-                                rememberUpdateChecker.checkGithubReleaseForUpdate(
-                                    repositoryName = BuildConfig.GITHUB_REPO,
-                                    currentVersionName = BuildConfig.VERSION_NAME,
-                                )
-                            }
+                            runCatching { rememberUpdateChecker.checkForUpdate() }
                         }
                     _isCheckingUpdate.value = false
                     checkedUpdate.fold(
@@ -160,8 +158,7 @@ class RememberUpdateViewModel
                         onFailure = { throwable ->
                             DiagnosticLog.record(appContext, "GitHub update check failed from Settings", throwable)
                             _updateInfo.value = null
-                            _updateCheckFinishedWithoutResult.value = true
-                            toast(R.string.settings_update_check_failed)
+                            _updateCheckFailed.value = true
                         },
                     )
                 }
@@ -286,11 +283,6 @@ class RememberUpdateViewModel
         }
 
         fun loadChangelog() {
-            if (BuildConfig.CHANGELOG_GITHUB_REPO.isBlank()) {
-                _updateSheetChangelog.value =
-                    ChangelogUiState.Failed(appContext.getString(R.string.settings_changelog_load_failed))
-                return
-            }
             _updateSheetChangelog.value = ChangelogUiState.Loading
             viewModelScope.launch {
                 val loaded = withContext(ioDispatcher) { runCatching { fetchRawChangelog() } }
@@ -306,10 +298,9 @@ class RememberUpdateViewModel
         }
 
         private fun fetchRawChangelog(): String {
-            val repo = BuildConfig.CHANGELOG_GITHUB_REPO
-            val branch = BuildConfig.CHANGELOG_GITHUB_BRANCH
+            val repo = BuildConfig.GITHUB_REPO
             val connection =
-                URL("https://raw.githubusercontent.com/$repo/$branch/docs/CHANGELOG.md").openConnection() as HttpURLConnection
+                URL("https://raw.githubusercontent.com/$repo/main/docs/CHANGELOG.md").openConnection() as HttpURLConnection
             connection.instanceFollowRedirects = true
             connection.connectTimeout = 15_000
             connection.readTimeout = 20_000

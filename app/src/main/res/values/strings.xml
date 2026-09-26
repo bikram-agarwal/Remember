@@ -6,8 +6,9 @@
     <string name="app_tagline">Notes, tasks, reminders - done right</string>
     <string name="app_version_format">%1$s v%2$s</string>
     <string name="about_build_variant_format">%1$s, %2$s</string>
-    <string name="build_flavor_github">GitHub</string>
     <string name="build_flavor_fdroid">F-Droid</string>
+    <string name="build_flavor_github">GitHub</string>
+    <string name="build_flavor_offline">Offline</string>
     <string name="build_flavor_playstore">PlayStore</string>
     <string name="build_type_debug">Debug</string>
     <string name="build_type_dev_release">devRelease</string>
@@ -807,7 +808,7 @@
     <string name="help_no_results">No results</string>
     <string name="help_action_notification_settings">Go to notification settings</string>
     <string name="help_action_reminder_settings">Go to Reminders setting</string>
-    <string name="help_action_snooze_settings">Go to Snooze setting</string>
+    <string name="help_action_snooze_settings">Go to Reminder/Snooze types</string>
     <string name="help_action_backup_settings">Go to Backup settings</string>
     <string name="help_action_security_settings">Go to Security settings</string>
 
@@ -824,10 +825,25 @@
     <string name="settings_defaults_recurrence_weekly">Weekly</string>
     <string name="settings_defaults_recurrence_monthly">Monthly</string>
     <string name="settings_defaults_recurrence_yearly">Yearly</string>
-    <string name="settings_snooze_type_title">Snooze type</string>
-    <string name="settings_snooze_type_desc">Choose smart presets or a duration</string>
-    <string name="settings_snooze_type_presets">Presets</string>
+    <string name="settings_snooze_type_title">Reminder/Snooze type</string>
+    <string name="settings_snooze_type_timing">Timing</string>
     <string name="settings_snooze_type_duration">Duration</string>
+    <string name="settings_snooze_type_tooltip">Choose how preset options are offered when you set a reminder or snooze one.</string>
+    <string name="settings_snooze_type_tooltip_timing">Timing offers named times: Soon, Later today, This evening etc.</string>
+    <string name="settings_snooze_type_tooltip_duration">Duration offers lengths of time: 30 mins, 6 hours, 12 hours, 7 days etc.</string>
+    <string name="settings_snooze_type_info_cd">Explain Reminder/Snooze type</string>
+    <plurals name="reminder_duration_preset_minutes">
+        <item quantity="one">%1$d min</item>
+        <item quantity="other">%1$d mins</item>
+    </plurals>
+    <plurals name="reminder_duration_preset_hours">
+        <item quantity="one">%1$d hour</item>
+        <item quantity="other">%1$d hours</item>
+    </plurals>
+    <plurals name="reminder_duration_preset_days">
+        <item quantity="one">%1$d day</item>
+        <item quantity="other">%1$d days</item>
+    </plurals>
     <string name="snooze_duration_minutes">Minutes</string>
     <string name="snooze_duration_hours">Hours</string>
     <string name="snooze_duration_days">Days</string>
@@ -839,8 +855,8 @@
     <string name="settings_notifications_section">Notifications</string>
     <string name="settings_notifications">Notifications</string>
     <string name="settings_notifications_desc">Reminders and system alerts</string>
-    <string name="settings_keep_reminders_until_done">Keep reminder notifications until done</string>
-    <string name="settings_keep_reminders_until_done_desc">Persistent alerts. Re-posts reminders until marked done.</string>
+    <string name="settings_restore_notifications">Restore notifications</string>
+    <string name="settings_restore_notifications_desc">Re-posts dismissed reminder notifications until marked done.</string>
     <string name="settings_reminder_summary_notification">Reminder summary notification</string>
     <string name="settings_reminder_summary_notification_desc">Silent overview of overdue and upcoming reminders</string>
     <string name="settings_reliable_reminders">Reliable reminders</string>
@@ -1012,6 +1028,10 @@
     <string name="settings_update_schedule_never">Never</string>
     <string name="settings_save_update_apk_to_downloads">Save update APK to Download folder</string>
     <string name="settings_notify_new_updates">Get notification for new updates</string>
+    <string name="settings_track_updates_via_obtainx">Track updates via ObtainX</string>
+    <string name="settings_track_updates_via_obtainx_desc">Let ObtainX track and install updates for this app</string>
+    <string name="settings_track_updates_via_obtainx_desc_fdroid">Let ObtainX check F-Droid for updates of this app</string>
+    <string name="settings_track_updates_via_obtainx_get_desc">Get ObtainX to receive updates automatically</string>
     <string name="settings_notify_updates_need_auto_check">Enable \"Automatically check for updates\" first</string>
     <string name="settings_notify_updates_enable_notifications">Allow notifications for Remember</string>
     <string name="settings_update_available_button">Update available - %1$s</string>
@@ -1109,7 +1129,7 @@
     <string name="dev_options_notif_big_text">BigText</string>
     <string name="dev_options_notif_summary">Summary</string>
     <string name="dev_options_notif_overdue">Overdue (keep-until-done)</string>
-    <string name="dev_options_toast_keep_until_done_enabled">Temporarily enabled \'Keep reminders until done\'</string>
+    <string name="dev_options_toast_keep_until_done_enabled">Temporarily enabled \'Restore notifications\'</string>
     <string name="dev_options_notif_mock_update">Mock update flow</string>
     <string name="dev_options_notif_mock_play">Mock PlayStore update flow</string>
 
@@ -1223,7 +1243,8 @@
     <string name="diagnostics_font_scale_format">Font scale: %1$.2f</string>
     <string name="diagnostics_screen_dp_format">Screen dp: %1$d x %2$d, smallest=%3$d</string>
     <string name="diagnostics_display_pixels_format">Display pixels: %1$d x %2$d</string>
-    <string name="diagnostics_display_density_format">Display density: density=%1$.2f, scaledDensity=%2$.2f, dpi=%3$d</string>
+    <string name="diagnostics_display_density_format">Display density: density=%1$.2f, scaledDensity=%2$.2f, dpi=%3$d, stableDensity=%4$.2f</string>
+    <string name="diagnostics_adaptive_layout_format">Adaptive layout input: width=%1$d dp, smallest=%2$d dp, multiPane=%3$b</string>
     <string name="diagnostics_target_sdk_format">Target SDK: %1$s</string>
     <string name="diagnostics_first_install_format">First install: %1$s</string>
     <string name="diagnostics_last_update_format">Last update: %1$s</string>
@@ -1253,13 +1274,13 @@
     <string name="diagnostics_swipe_gesture_mode_format">Swipe gesture mode: %1$s</string>
     <string name="diagnostics_swipe_start_to_end_format">Swipe start-to-end: %1$s</string>
     <string name="diagnostics_swipe_end_to_start_format">Swipe end-to-start: %1$s</string>
-    <string name="diagnostics_keep_reminders_until_done_format">Keep reminders until done: %1$s</string>
+    <string name="diagnostics_keep_reminders_until_done_format">Restore notifications: %1$s</string>
     <string name="diagnostics_reminder_summary_enabled_format">Reminder summary notification: %1$s</string>
     <string name="diagnostics_default_visibility_format">Default visibility: %1$s</string>
     <string name="diagnostics_default_importance_format">Default importance: %1$s</string>
     <string name="diagnostics_default_reminder_time_format">Default reminder time (minutes): %1$s</string>
     <string name="diagnostics_default_recurrence_format">Default recurrence: %1$s</string>
-    <string name="diagnostics_snooze_type_format">Snooze type: %1$s</string>
+    <string name="diagnostics_snooze_type_format">Reminder/Snooze type: %1$s</string>
     <string name="diagnostics_auto_export_on_change_format">Auto export on change: %1$s</string>
     <string name="diagnostics_scheduled_export_enabled_format">Scheduled export enabled: %1$s</string>
     <string name="diagnostics_include_media_in_backup_format">Include media in backup: %1$s</string>

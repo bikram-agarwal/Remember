@@ -47,13 +47,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.isSpecified
 import dev.bikram.remember.R
 import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.markdownChecklistCheckboxSize
 import dev.bikram.remember.ui.common.rememberLocalTextFieldValueState
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
@@ -165,6 +164,11 @@ internal fun ChecklistRow(
     // Animate the indent so reparenting slides visibly instead of snapping.
     val animatedIndent by androidx.compose.animation.core
         .animateDpAsState(depthIndent, label = "checklistDepthIndent")
+    val checkboxSize =
+        markdownChecklistCheckboxSize(
+            style = MaterialTheme.typography.bodyLarge,
+            density = LocalDensity.current,
+        )
     val checkedMutedColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
     val checkboxTint =
         if (item.checked) {
@@ -410,7 +414,7 @@ internal fun ChecklistRow(
                     ) {
                         RememberMaterialRoundedSymbol(
                             name = if (item.checked) "check_box" else "check_box_outline_blank",
-                            size = checklistTitleFontSizeDp(),
+                            size = checkboxSize,
                             tint = checkboxTint,
                             weight = FontWeight.Medium,
                         )
@@ -690,19 +694,11 @@ internal fun ChecklistRow(
  * away from the row's leading edge. The height stays a full tap target and is what the title's
  * first line is centered against.
  */
-private val CHECKLIST_GUTTER_WIDTH = 28.dp
+private val CHECKLIST_GUTTER_WIDTH = 32.dp
 private val CHECKLIST_GUTTER_HEIGHT = 40.dp
 
 /** Trailing remove button; sized to its 24dp glyph plus a 4dp inset. */
 private val CHECKLIST_ROW_TRAILING_BUTTON_SIZE = 32.dp
-
-/** Glyph height of checklist title text. The checkbox is drawn at this size so it matches the text. */
-@Composable
-private fun checklistTitleFontSizeDp(): Dp {
-    val fontSize = MaterialTheme.typography.bodyLarge.fontSize
-    if (!fontSize.isSpecified) return 16.dp
-    return with(LocalDensity.current) { fontSize.toDp() }
-}
 
 /**
  * Read-only header that stands in for the real parent when the parent lives in the opposite
@@ -723,11 +719,16 @@ internal fun GhostParentHeaderRow(
      * false and sit flush at depth 0.
      */
     showDragHandleGutter: Boolean,
-    showCheckbox: Boolean = true,
     childrenExpanded: Boolean,
     onToggleChildren: () -> Unit,
     modifier: Modifier = Modifier,
+    showCheckbox: Boolean = true,
 ) {
+    val checkboxSize =
+        markdownChecklistCheckboxSize(
+            style = MaterialTheme.typography.bodyLarge,
+            density = LocalDensity.current,
+        )
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = modifier.fillMaxWidth(),
@@ -754,7 +755,7 @@ internal fun GhostParentHeaderRow(
                 ) {
                     RememberMaterialRoundedSymbol(
                         name = if (isParentChecked) "check_box" else "check_box_outline_blank",
-                        size = checklistTitleFontSizeDp(),
+                        size = checkboxSize,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         weight = FontWeight.Medium,
                     )

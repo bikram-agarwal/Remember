@@ -14,6 +14,8 @@
         android:required="false" />
 
     <queries>
+        <!-- ObtainX: Settings -> Updates checks it is installed before handing this app to it. -->
+        <package android:name="dev.bikram.obtainx" />
         <intent>
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />

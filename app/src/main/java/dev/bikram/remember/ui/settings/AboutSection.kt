@@ -67,10 +67,10 @@ import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
 import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.theme.pillShape
+import dev.bikram.remember.update.OBTAINX_PACKAGE_ID
 import kotlinx.coroutines.launch
 
 private const val FILEPIPE_FDROID_PACKAGE_ID = "dev.bikram.filepipe.gh"
-private const val OBTAINX_FDROID_PACKAGE_ID = "dev.bikram.obtainx"
 
 private data class AboutAppRoute(
     val packageId: String,
@@ -212,13 +212,17 @@ private fun AboutSettingsBlock(
     val context = LocalContext.current
     val resources = LocalResources.current
     val githubRepoForSourceLink = BuildConfig.GITHUB_REPO.trim()
-    val playStoreListingUrl = BuildConfig.PLAY_STORE_LISTING_URL
+    val playStoreListingUrl = BuildConfig.PLAY_STORE_URL
     val profileUrl = stringResource(R.string.about_author_github_profile_url)
-    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
+    val useGithubLikeAboutLinks =
+        BuildConfig.FLAVOR == "github" ||
+            BuildConfig.FLAVOR == "fdroid" ||
+            BuildConfig.FLAVOR == "offline"
     val buildFlavorLabel =
         when (BuildConfig.FLAVOR) {
             "github" -> stringResource(R.string.build_flavor_github)
             "fdroid" -> stringResource(R.string.build_flavor_fdroid)
+            "offline" -> stringResource(R.string.build_flavor_offline)
             "playstore" -> stringResource(R.string.build_flavor_playstore)
             else -> BuildConfig.FLAVOR
         }
@@ -373,11 +377,7 @@ private fun AboutSettingsBlock(
                                     .size(if (isSmallLandscape) 64.dp else 84.dp)
                                     .clip(authorShape)
                                     .appCombinedClickable(
-                                        onClick = {
-                                            runCatching {
-                                                context.startActivity(Intent(Intent.ACTION_VIEW, profileUrl.toUri()))
-                                            }
-                                        },
+                                        onClick = { openAboutUrl(context, profileUrl) },
                                         onLongClick = { copyAboutLink(profileUrl) },
                                     ),
                         )
@@ -405,13 +405,7 @@ private fun AboutSettingsBlock(
                                     Modifier
                                         .clip(aboutPillShape)
                                         .appCombinedClickable(
-                                            onClick = {
-                                                runCatching {
-                                                    context.startActivity(
-                                                        Intent(Intent.ACTION_VIEW, playStoreListingUrl.toUri()),
-                                                    )
-                                                }
-                                            },
+                                            onClick = { openAboutUrl(context, playStoreListingUrl) },
                                             onLongClick = { copyAboutLink(playStoreListingUrl) },
                                         ),
                             ) {
@@ -432,45 +426,39 @@ private fun AboutSettingsBlock(
                                     )
                                 }
                             }
-                            if (githubRepoForSourceLink.isNotEmpty()) {
-                                val repoUrl = "https://github.com/$githubRepoForSourceLink"
-                                Surface(
-                                    shape = aboutPillShape,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary,
-                                    modifier =
-                                        Modifier
-                                            .clip(aboutPillShape)
-                                            .appCombinedClickable(
-                                                onClick = {
-                                                    runCatching {
-                                                        context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
-                                                    }
-                                                },
-                                                onLongClick = { copyAboutLink(repoUrl) },
-                                            ),
+                            val repoUrl = "https://github.com/$githubRepoForSourceLink"
+                            Surface(
+                                shape = aboutPillShape,
+                                color = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary,
+                                modifier =
+                                    Modifier
+                                        .clip(aboutPillShape)
+                                        .appCombinedClickable(
+                                            onClick = { openAboutUrl(context, repoUrl) },
+                                            onLongClick = { copyAboutLink(repoUrl) },
+                                        ),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(pillPadding),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(pillPadding),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center,
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_github_mark),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(pillIconSize),
-                                            tint = MaterialTheme.colorScheme.onPrimary,
-                                        )
-                                        Spacer(Modifier.width(pillIconSpacer))
-                                        Text(
-                                            text = stringResource(R.string.settings_star_on_github),
-                                            style = pillTextStyle,
-                                            color = MaterialTheme.colorScheme.onPrimary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            softWrap = false,
-                                        )
-                                    }
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_github_mark),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(pillIconSize),
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                    )
+                                    Spacer(Modifier.width(pillIconSpacer))
+                                    Text(
+                                        text = stringResource(R.string.settings_star_on_github),
+                                        style = pillTextStyle,
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        softWrap = false,
+                                    )
                                 }
                             }
                         } else {
@@ -484,11 +472,7 @@ private fun AboutSettingsBlock(
                                         .appCombinedClickable(
                                             onClick = {
                                                 if (playStoreAboutUsesListingOnly) {
-                                                    runCatching {
-                                                        context.startActivity(
-                                                            Intent(Intent.ACTION_VIEW, playStoreListingUrl.toUri()),
-                                                        )
-                                                    }
+                                                    openAboutUrl(context, playStoreListingUrl)
                                                 } else {
                                                     onLaunchPlayReview {
                                                         playStoreAboutUsesListingOnly = true
@@ -515,45 +499,39 @@ private fun AboutSettingsBlock(
                                     )
                                 }
                             }
-                            if (githubRepoForSourceLink.isNotEmpty()) {
-                                val repoUrl = "https://github.com/$githubRepoForSourceLink"
-                                Surface(
-                                    shape = aboutPillShape,
-                                    color = Color.Transparent,
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
-                                    modifier =
-                                        Modifier
-                                            .clip(aboutPillShape)
-                                            .appCombinedClickable(
-                                                onClick = {
-                                                    runCatching {
-                                                        context.startActivity(Intent(Intent.ACTION_VIEW, repoUrl.toUri()))
-                                                    }
-                                                },
-                                                onLongClick = { copyAboutLink(repoUrl) },
-                                            ),
+                            val repoUrl = "https://github.com/$githubRepoForSourceLink"
+                            Surface(
+                                shape = aboutPillShape,
+                                color = Color.Transparent,
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                                modifier =
+                                    Modifier
+                                        .clip(aboutPillShape)
+                                        .appCombinedClickable(
+                                            onClick = { openAboutUrl(context, repoUrl) },
+                                            onLongClick = { copyAboutLink(repoUrl) },
+                                        ),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(pillPadding),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center,
                                 ) {
-                                    Row(
-                                        modifier = Modifier.padding(pillPadding),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.Center,
-                                    ) {
-                                        Icon(
-                                            painter = painterResource(R.drawable.ic_github_mark),
-                                            contentDescription = null,
-                                            modifier = Modifier.size(pillIconSize),
-                                            tint = MaterialTheme.colorScheme.primary,
-                                        )
-                                        Spacer(Modifier.width(pillIconSpacer))
-                                        Text(
-                                            text = stringResource(R.string.settings_star_on_github),
-                                            style = pillTextStyle,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            softWrap = false,
-                                        )
-                                    }
+                                    Icon(
+                                        painter = painterResource(R.drawable.ic_github_mark),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(pillIconSize),
+                                        tint = MaterialTheme.colorScheme.primary,
+                                    )
+                                    Spacer(Modifier.width(pillIconSpacer))
+                                    Text(
+                                        text = stringResource(R.string.settings_star_on_github),
+                                        style = pillTextStyle,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        softWrap = false,
+                                    )
                                 }
                             }
                         }
@@ -589,7 +567,10 @@ private fun AboutOtherAppsAndLinks(
     copyAboutLink: (String) -> Unit,
     isSmallLandscape: Boolean,
 ) {
-    val useGithubLikeAboutLinks = BuildConfig.FLAVOR == "github" || BuildConfig.FLAVOR == "fdroid"
+    val useGithubLikeAboutLinks =
+        BuildConfig.FLAVOR == "github" ||
+            BuildConfig.FLAVOR == "fdroid" ||
+            BuildConfig.FLAVOR == "offline"
     val filePipeRoute =
         AboutAppRoute(
             packageId = FILEPIPE_FDROID_PACKAGE_ID,
@@ -598,7 +579,7 @@ private fun AboutOtherAppsAndLinks(
         )
     val obtainXRoute =
         AboutAppRoute(
-            packageId = OBTAINX_FDROID_PACKAGE_ID,
+            packageId = OBTAINX_PACKAGE_ID,
             portfolioUrl = stringResource(R.string.settings_about_obtainx_website_url),
         )
     val websiteUrl = stringResource(R.string.settings_about_remember_website_url)
@@ -751,25 +732,37 @@ private fun openAboutAppRoute(
 ) {
     when (BuildConfig.FLAVOR) {
         "fdroid" -> {
-            val fdroidIntent =
-                Intent(Intent.ACTION_VIEW, "fdroid.app:${route.packageId}".toUri())
             try {
-                context.startActivity(fdroidIntent)
+                context.startActivity(aboutViewIntent("fdroid.app:${route.packageId}"))
             } catch (_: ActivityNotFoundException) {
-                context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
+                context.startActivity(aboutViewIntent(route.portfolioUrl))
             }
         }
 
         "playstore" -> {
             val targetUrl = route.playStoreUrl.ifBlank { route.portfolioUrl }
-            context.startActivity(Intent(Intent.ACTION_VIEW, targetUrl.toUri()))
+            context.startActivity(aboutViewIntent(targetUrl))
         }
 
         else -> {
-            context.startActivity(Intent(Intent.ACTION_VIEW, route.portfolioUrl.toUri()))
+            context.startActivity(aboutViewIntent(route.portfolioUrl))
         }
     }
 }
+
+private fun openAboutUrl(
+    context: Context,
+    url: String,
+) {
+    runCatching {
+        context.startActivity(aboutViewIntent(url))
+    }
+}
+
+// Every About link opens with NEW_TASK, so the store client or browser gets its own task instead of
+// being stacked inside Remember's, where it would show up as Remember in Recents and Back would
+// return here. PARITY: FilePipe's AboutSection does the same.
+private fun aboutViewIntent(uri: String): Intent = Intent(Intent.ACTION_VIEW, uri.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
 @Composable
 private fun AboutTextLink(
@@ -786,11 +779,7 @@ private fun AboutTextLink(
             modifier
                 .padding(horizontal = 4.dp, vertical = 2.dp)
                 .appCombinedClickable(
-                    onClick = {
-                        runCatching {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
-                        }
-                    },
+                    onClick = { openAboutUrl(context, url) },
                     onLongClick = { copyAboutLink(url) },
                 ),
         style = if (isSmallLandscape) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium,

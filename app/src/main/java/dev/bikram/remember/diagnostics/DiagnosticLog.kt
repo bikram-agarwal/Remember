@@ -13,6 +13,7 @@ import android.os.Environment
 import android.os.PowerManager
 import android.os.SystemClock
 import android.os.storage.StorageManager
+import android.util.DisplayMetrics
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import dev.bikram.remember.BuildConfig
@@ -26,6 +27,7 @@ import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.ThemePrefs
 import dev.bikram.remember.data.UpdatePrefs
+import dev.bikram.remember.ui.common.MIN_MULTI_PANE_WIDTH_DP
 import dev.bikram.remember.widget.NotesWidgetReceiver
 import dev.bikram.remember.widget.QuickCaptureWidgetReceiver
 import dev.bikram.remember.widget.SelectedWidgetReceiver
@@ -339,6 +341,15 @@ object DiagnosticLog {
                 displayMetrics.density,
                 displayMetrics.density * configuration.fontScale,
                 displayMetrics.densityDpi,
+                DisplayMetrics.DENSITY_DEVICE_STABLE.toFloat() / DisplayMetrics.DENSITY_DEFAULT,
+            ),
+        )
+        appendLine(
+            context.getString(
+                R.string.diagnostics_adaptive_layout_format,
+                configuration.screenWidthDp,
+                configuration.smallestScreenWidthDp,
+                configuration.screenWidthDp >= MIN_MULTI_PANE_WIDTH_DP,
             ),
         )
     }

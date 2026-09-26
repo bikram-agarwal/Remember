@@ -3,8 +3,9 @@
 # - Main/tag build: creates stable v{versionName}.
 # - Non-main branch build: creates draft prerelease v{versionName}-Preview-{run number}.
 # - Build toggles:
-#     - build_github: remember-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
 #     - build_fdroid: remember-v{version}-fdroid.apk   (F-Droid distribution flavor)
+#     - build_github: remember-v{version}-github.apk   (GitHub Releases / sideload; GitHub distribution flavor)
+#     - build_offline: remember-v{version}-offline.apk (no INTERNET; offline distribution flavor)
 #     - build_playstore: remember-v{version}-playstore.aab (Play Store upload; playstore distribution flavor)
 # - GitHub Release: always draft; publish from the Releases UI when ready.
 # - Run from any branch (e.g. main); the tagged commit is the commit that was built.
@@ -22,13 +23,18 @@ name: Build and release
 on:
   workflow_dispatch:
     inputs:
+      build_fdroid:
+        description: "Build F-Droid APK."
+        required: true
+        default: true
+        type: boolean
       build_github:
         description: "Build GitHub APK."
         required: true
         default: true
         type: boolean
-      build_fdroid:
-        description: "Build F-Droid APK."
+      build_offline:
+        description: "Build Offline APK"
         required: true
         default: true
         type: boolean
@@ -68,7 +74,7 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "21"
@@ -87,12 +93,12 @@ jobs:
           fi
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v6
 
       - name: Validate build target
         run: |
           set -euo pipefail
-          if [ "${{ inputs.build_github }}" != "true" ] && [ "${{ inputs.build_fdroid }}" != "true" ] && [ "${{ inputs.build_playstore }}" != "true" ]; then
+          if [ "${{ inputs.build_fdroid }}" != "true" ] && [ "${{ inputs.build_github }}" != "true" ] && [ "${{ inputs.build_offline }}" != "true" ] && [ "${{ inputs.build_playstore }}" != "true" ]; then
             echo "Enable at least one build toggle."
             exit 1
           fi
@@ -130,11 +136,14 @@ jobs:
           set -euo pipefail
           gradle_tasks=()
           gradle_arguments=()
+          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
+            gradle_tasks+=(":app:assembleFdroidRelease")
+          fi
           if [ "${{ inputs.build_github }}" = "true" ]; then
             gradle_tasks+=(":app:assembleGithubRelease")
           fi
-          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
-            gradle_tasks+=(":app:assembleFdroidRelease")
+          if [ "${{ inputs.build_offline }}" = "true" ]; then
+            gradle_tasks+=(":app:assembleOfflineRelease")
           fi
           if [ "${{ inputs.build_playstore }}" = "true" ]; then
             gradle_tasks+=(":app:bundlePlaystoreRelease")
@@ -151,9 +160,19 @@ jobs:
           out="release-assets"
           mkdir -p "$out"
 
-          github_apk="app/build/outputs/apk/github/release/app-github-release.apk"
           fdroid_apk="app/build/outputs/apk/fdroid/release/app-fdroid-release.apk"
+          github_apk="app/build/outputs/apk/github/release/app-github-release.apk"
+          offline_apk="app/build/outputs/apk/offline/release/app-offline-release.apk"
           play_aab="app/build/outputs/bundle/playstoreRelease/app-playstore-release.aab"
+
+          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
+            if [ ! -f "$fdroid_apk" ]; then
+              echo "Expected F-Droid flavor APK not found: $fdroid_apk"
+              find app/build/outputs/apk -name '*.apk' -print || true
+              exit 1
+            fi
+            cp "$fdroid_apk" "$out/remember-v${version}-fdroid.apk"
+          fi
 
           if [ "${{ inputs.build_github }}" = "true" ]; then
             if [ ! -f "$github_apk" ]; then
@@ -164,13 +183,13 @@ jobs:
             cp "$github_apk" "$out/remember-v${version}-github.apk"
           fi
 
-          if [ "${{ inputs.build_fdroid }}" = "true" ]; then
-            if [ ! -f "$fdroid_apk" ]; then
-              echo "Expected F-Droid flavor APK not found: $fdroid_apk"
+          if [ "${{ inputs.build_offline }}" = "true" ]; then
+            if [ ! -f "$offline_apk" ]; then
+              echo "Expected Offline flavor APK not found: $offline_apk"
               find app/build/outputs/apk -name '*.apk' -print || true
               exit 1
             fi
-            cp "$fdroid_apk" "$out/remember-v${version}-fdroid.apk"
+            cp "$offline_apk" "$out/remember-v${version}-offline.apk"
           fi
 
           if [ "${{ inputs.build_playstore }}" = "true" ]; then
@@ -190,7 +209,7 @@ jobs:
           subject-path: 'release-assets/*'
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: remember-v${{ steps.version.outputs.version }}-release
           path: release-assets/*
@@ -223,13 +242,12 @@ jobs:
           name: v${{ steps.version.outputs.version }}-Preview-${{ github.run_number }}
           target_commitish: ${{ github.sha }}
           body: |
+            ### In preview
+            - one
+            - two
             > [!WARNING]
-            > This is a preview build intended for testing. It may contain bugs,
-            > unfinished changes, or regressions. Do not install it if you want a
-            > stable experience.
-
-            Back up your Remember data before installing and report any problems
-            through the repository's issue tracker.
+            > This is a preview build intended for testing. It may contain bugs, unfinished changes, or regressions. Do not install it if you want a stable experience.
+            > Back up your Remember data before installing and report any problems through the repository's issue tracker.
 
             Built from `${{ github.ref_name }}` at commit `${{ github.sha }}`.
           files: release-assets/*

@@ -72,6 +72,10 @@ Archived and trashed notes are hidden from the main Notes tab intentionally. Ope
 
 Add a reminder date and time to any note or list. When the time arrives, Remember posts a notification. Tapping it opens the note directly.
 
+The reminder sheet quick chips follow **Reminder/Snooze type** in Settings -> Notifications.
+- **Timing** offers named times: Soon, Later today, This evening etc.
+- **Duration** offers lengths of time: 30 mins, 6 hours, 12 hours, 7 days etc.
+
 Reminder notifications can include the title, note content or list items, a picture, snooze, mark done, and one custom action button.
 
 ### Importance: Low, Normal, and High
@@ -90,7 +94,7 @@ When you mark a recurring reminder done, Remember advances it to the next schedu
 
 ### Keep reminders until done
 
-**Keep reminders until done** is a Settings option for persistent reminders, saving them from being accidentally swiped away. When enabled, a dismissed reminder notification will come back immediately if the note or list is still not marked done.
+**Restore notifications** is a Settings option for persistent reminders, saving them from being accidentally swiped away. When enabled, a dismissed reminder notification will come back immediately if the note or list is still not marked done.
 
 ### Reminder summary
 
@@ -102,8 +106,8 @@ Android requires notification permission before Remember can post reminder alert
 
 ### Snooze
 
-Snooze moves a reminder to a later time without opening the app. The snooze sheet follows **Snooze type** in Settings -> Notifications.
-- **Presets** offers named times: soon, later today, this evening, tomorrow, next week.
+Snooze moves a reminder to a later time without opening the app. The snooze sheet follows **Reminder/Snooze type** in Settings -> Notifications.
+- **Timing** offers named times: soon, later today, this evening, tomorrow, next week.
 - **Duration** replaces those with a duration: 1-60 minutes, 1-24 hours, or 1-30 days. Choose the number and unit, then tap **Snooze**.
 **Pick a specific time** stays available in both modes, with a date and time picker.
 
@@ -245,3 +249,14 @@ Reveal mode holds six of the seven available actions, and its editor rearranges 
 Available actions for either mode: Pin, Star, Duplicate, Mark done, Archive, Trash, Edit.
 
 Haptic feedback at swipe thresholds can be turned on or off independently of the mode.
+
+## Offline flavor
+
+### What's different in the Offline flavor
+
+The Offline flavor is a separate build of Remember with no internet permission at all. It's available from GitHub Releases as `remember-v<version>-offline.apk`. Compared with the other versions:
+- **No internet permission.** Remember can't connect to internet.
+- **No update checks.** Remember can't look for new versions itself. Use **Track updates via ObtainX** on the Settings page (under Updates on tablets), or install a newer offline APK from GitHub Releases by hand.
+- **No changelog after an update.** The other versions show what's new the first time you open them after updating.
+- **No Connect Google.** Import tasks from a Google Takeout or Tasks.org file instead.
+- **Installs alongside the other versions** as a separate app, with its own notes and settings. To move your notes over, make a backup in one and restore it in the other, then grant permissions such as notifications again.

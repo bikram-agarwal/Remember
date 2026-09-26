@@ -75,7 +75,7 @@ val helpSubsectionActions: Map<String, List<HelpAction>> =
             listOf(
                 HelpAction.OpenAppSection(R.string.help_action_notification_settings, "notifications"),
             ),
-        "Keep reminders until done" to
+        "Restore notifications" to
             listOf(
                 HelpAction.OpenAppSection(R.string.help_action_reminder_settings, "notifications.keep_until_done"),
             ),
@@ -86,6 +86,10 @@ val helpSubsectionActions: Map<String, List<HelpAction>> =
         "App lock" to
             listOf(
                 HelpAction.OpenAppSection(R.string.help_action_security_settings, "security"),
+            ),
+        "How reminders work" to
+            listOf(
+                HelpAction.OpenAppSection(R.string.help_action_snooze_settings, "notifications.snooze_type"),
             ),
         "Snooze" to
             listOf(

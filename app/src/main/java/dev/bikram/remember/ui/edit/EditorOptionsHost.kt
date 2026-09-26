@@ -16,6 +16,8 @@ import dev.bikram.remember.data.NoteAction
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteReminder
+import dev.bikram.remember.data.ReminderPreferencesState
+import dev.bikram.remember.data.SnoozeType
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.ui.common.FullScreenHeroImageOverlay
 import dev.bikram.remember.ui.common.HeroFraming
@@ -130,22 +132,27 @@ fun EditorOptionSheets(
     onDismissPictureViewer: () -> Unit,
 ) {
     val context = LocalContext.current
-    val defaultNotePrefs =
+    val settingsDependencies =
         remember(context) {
-            EntryPointAccessors
-                .fromApplication(
-                    context.applicationContext,
-                    SettingsDependenciesEntryPoint::class.java,
-                ).defaultNotePrefs()
+            EntryPointAccessors.fromApplication(
+                context.applicationContext,
+                SettingsDependenciesEntryPoint::class.java,
+            )
         }
+    val defaultNotePrefs = remember(settingsDependencies) { settingsDependencies.defaultNotePrefs() }
+    val reminderPrefs = remember(settingsDependencies) { settingsDependencies.reminderPrefs() }
     val defaultNoteState by defaultNotePrefs.state.collectAsStateWithLifecycle(
         initialValue = DefaultNotePreferencesState(),
+    )
+    val reminderState by reminderPrefs.state.collectAsStateWithLifecycle(
+        initialValue = ReminderPreferencesState(),
     )
     if (reminderPickerOpen) {
         ReminderPickerSheet(
             initialReminders = currentReminders,
             defaultReminderMinutesOfDay = defaultNoteState.defaultReminderMinutesOfDay,
             defaultRecurrence = defaultNoteState.defaultRecurrence,
+            useDurationPresets = reminderState.snoozeType == SnoozeType.ABSOLUTE,
             onConfirm = { reminders ->
                 onReminderChange(reminders)
                 onDismissReminder()

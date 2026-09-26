@@ -26,6 +26,10 @@ class UpdateCheckWorkScheduler
         private val updatePrefs: UpdatePrefs,
     ) {
         suspend fun syncFromPreferences() {
+            if (!BuildConfig.CHECK_UPDATES) {
+                cancel()
+                return
+            }
             val schedule = updatePrefs.snapshot().updateCheckSchedule
             when (schedule) {
                 UpdateCheckSchedule.DAILY_AT_21 -> enqueueOneTime(delayMillis = millisUntilNextDailyNinePm())
@@ -78,9 +82,5 @@ class UpdateCheckWorkScheduler
                 candidate = candidate.plusWeeks(1)
             }
             return Duration.between(now, candidate).toMillis()
-        }
-
-        companion object {
-            fun supportsSilentChecks(): Boolean = !BuildConfig.USE_PLAY_IN_APP_UPDATES
         }
     }

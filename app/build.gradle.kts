@@ -80,10 +80,17 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = rememberApplicationId
         minSdk = 31
         targetSdk = 37
-        versionCode = 10800
-        versionName = "1.8.0"
+        versionCode = 10900
+        versionName = "1.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
+
+        buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
+        buildConfigField(
+            "String",
+            "PLAY_STORE_URL",
+            "\"https://play.google.com/store/apps/details?id=$rememberApplicationId\"",
+        )
     }
 
     androidResources {
@@ -142,34 +149,29 @@ extensions.configure<ApplicationExtension>("android") {
         create("github") {
             dimension = "distribution"
             applicationIdSuffix = ".gh"
-            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "CHECK_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
             buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "true")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
         create("fdroid") {
             dimension = "distribution"
             applicationIdSuffix = ".gh"
-            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "CHECK_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
             buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "false")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
+        }
+        create("offline") {
+            dimension = "distribution"
+            applicationIdSuffix = ".offline"
+            buildConfigField("Boolean", "CHECK_UPDATES", "false")
+            buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "false")
+            buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "false")
         }
         create("playstore") {
             dimension = "distribution"
-            buildConfigField("String", "GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "PLAY_STORE_LISTING_URL", "\"https://play.google.com/store/apps/details?id=dev.bikram.remember\"")
-            buildConfigField("Boolean", "SHOW_UPDATES", "true")
+            buildConfigField("Boolean", "CHECK_UPDATES", "true")
             buildConfigField("Boolean", "USE_PLAY_IN_APP_UPDATES", "true")
             buildConfigField("Boolean", "GOOGLE_TASKS_CONNECT_ENABLED", "true")
-            buildConfigField("String", "CHANGELOG_GITHUB_REPO", "\"bikram-agarwal/Remember\"")
-            buildConfigField("String", "CHANGELOG_GITHUB_BRANCH", "\"main\"")
         }
     }
 
@@ -198,13 +200,19 @@ extensions.configure<ApplicationExtension>("android") {
         getByName("androidTest") {
             assets.directories.add("$projectDir/schemas")
         }
+        getByName("fdroid") {
+            java.directories.add("src/github/java")
+            kotlin.directories.add("src/github/java")
+        }
         getByName("github") {
             java.directories.add("src/nonfdroid/java")
             kotlin.directories.add("src/nonfdroid/java")
         }
-        getByName("fdroid") {
+        getByName("offline") {
             java.directories.add("src/github/java")
             kotlin.directories.add("src/github/java")
+            java.directories.add("src/fdroid/java")
+            kotlin.directories.add("src/fdroid/java")
         }
         getByName("playstore") {
             java.directories.add("src/nonfdroid/java")
