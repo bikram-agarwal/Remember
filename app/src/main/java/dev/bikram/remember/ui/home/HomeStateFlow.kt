@@ -2,11 +2,9 @@ package dev.bikram.remember.ui.home
 
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.NotesFilter
-import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.data.matches
 import dev.bikram.remember.ui.components.NoteCardUiModel
-import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.toPersistentList
 import kotlinx.collections.immutable.toPersistentSet
 import kotlinx.coroutines.CoroutineDispatcher
@@ -25,24 +23,19 @@ internal fun homeStateFlow(
     selectedIds: Flow<Set<Long>>,
     archivedSearchSource: Flow<List<NoteWithItems>>,
     trashedSearchSource: Flow<List<NoteWithItems>>,
+    availableTagNames: Flow<List<String>>,
     computationDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ): Flow<HomeState> {
-    // Tags depend on active notes only, not the current search, layout, or selection.
-    val activeSummary =
+    // The tag menu comes from the tags table, so two casings of one tag cannot become two rows.
+    val activeCount =
         allActiveNotes
-            .map { notes ->
-                ActiveNotesSummary(
-                    totalActive = notes.size,
-                    availableTags =
-                        notes
-                            .asSequence()
-                            .flatMap { RememberReservedTags.userVisibleTags(it.note.tags) }
-                            .distinct()
-                            .sorted()
-                            .toList()
-                            .toPersistentList(),
-                )
-            }.distinctUntilChanged()
+            .map { notes -> notes.size }
+            .distinctUntilChanged()
+            .flowOn(computationDispatcher)
+    val canonicalTags =
+        availableTagNames
+            .distinctUntilChanged()
+            .map { tagNames -> tagNames.toPersistentList() }
             .flowOn(computationDispatcher)
 
     // Prepare list content and its selection lookup once per content change. Selection
@@ -90,7 +83,7 @@ internal fun homeStateFlow(
             )
         }.flowOn(computationDispatcher)
 
-    return combine(content, activeSummary, selectedIds) { prepared, summary, selected ->
+    return combine(content, activeCount, canonicalTags, selectedIds) { prepared, totalActive, tagNames, selected ->
         val prunedSelection = selected.filter { it in prepared.cardsById }.toPersistentSet()
         var canPinSelected = false
         var canStarSelected = false
@@ -101,8 +94,8 @@ internal fun homeStateFlow(
             if (canPinSelected && canStarSelected) break
         }
         prepared.state.copy(
-            totalActive = summary.totalActive,
-            availableTags = summary.availableTags,
+            totalActive = totalActive,
+            availableTags = tagNames,
             selectedIds = prunedSelection,
             inSelectionMode = prunedSelection.isNotEmpty(),
             canPinSelected = canPinSelected,
@@ -110,11 +103,6 @@ internal fun homeStateFlow(
         )
     }
 }
-
-private data class ActiveNotesSummary(
-    val totalActive: Int,
-    val availableTags: PersistentList<String>,
-)
 
 private data class PreparedHomeContent(
     val state: HomeState,

@@ -416,6 +416,15 @@ internal fun BulkTagSheet(
                         )
                     }
 
+                    if (draftIsDuplicate) {
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            text = stringResource(R.string.tag_editor_duplicate_existing),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+
                     Spacer(Modifier.height(12.dp))
 
                     TagColorSlider(

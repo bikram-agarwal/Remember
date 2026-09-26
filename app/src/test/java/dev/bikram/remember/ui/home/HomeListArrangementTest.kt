@@ -285,6 +285,24 @@ class HomeListArrangementTest {
     }
 
     @Test
+    fun tag_grouping_uses_one_section_for_spellings_of_the_same_tag() {
+        val items =
+            arrangeItems(
+                notes =
+                    listOf(
+                        note(id = 1L, tags = listOf("Errands")),
+                        note(id = 2L, tags = listOf("errands")),
+                    ),
+                opts = ViewOptions(groupBy = GroupBy.TAG),
+            )
+        val headers = items.filterIsInstance<HomeListItem.Header>()
+
+        assertEquals(listOf("Errands"), headers.map { header -> header.label })
+        assertEquals(listOf(1L, 2L), noteRows(items).map { row -> row.card.id })
+        assertEquals(setOf("TAG_errands"), noteRows(items).map { row -> row.groupKey }.toSet())
+    }
+
+    @Test
     fun ordinary_grouping_sections_get_no_badge() {
         val items =
             arrangeItems(

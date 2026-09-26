@@ -8,6 +8,17 @@ import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
+data class NoteTagCacheRow(
+    val id: Long,
+    val tags: List<String>,
+)
+
+data class NoteTagLink(
+    val noteId: Long,
+    val name: String,
+    val sortOrder: Int,
+)
+
 data class NoteWithItems(
     @androidx.room.Embedded val note: NoteEntity,
     @androidx.room.Relation(parentColumn = "id", entityColumn = "noteId")
@@ -183,6 +194,19 @@ interface NoteDao {
     @Query("SELECT id FROM notes")
     suspend fun allNoteIds(): List<Long>
 
+    @Query("SELECT id, tags FROM notes ORDER BY id ASC")
+    suspend fun noteTagCaches(): List<NoteTagCacheRow>
+
+    @Query(
+        """
+        SELECT note_tags.noteId AS noteId, tags.name AS name, note_tags.sortOrder AS sortOrder
+        FROM note_tags
+        INNER JOIN tags ON tags.id = note_tags.tagId
+        ORDER BY note_tags.noteId ASC, note_tags.sortOrder ASC, tags.normalizedName ASC
+        """,
+    )
+    suspend fun noteTagLinks(): List<NoteTagLink>
+
     @Query("SELECT COUNT(*) FROM notes WHERE pictureUri = :uri")
     suspend fun countPictureUri(uri: String): Int
 
@@ -254,6 +278,9 @@ interface AttachmentDao {
 interface TagDao {
     @Query("SELECT * FROM tags ORDER BY normalizedName ASC")
     fun observeAllTags(): Flow<List<TagEntity>>
+
+    @Query("SELECT * FROM tags")
+    suspend fun allTags(): List<TagEntity>
 
     @Query(
         """

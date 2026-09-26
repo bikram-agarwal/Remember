@@ -274,6 +274,7 @@ class AppStartupWarmup(
         // happening, so the first fullscreen Home frame is less likely to render before Room
         // has produced the active notes list.
         applicationScope.launch(ioDispatcher) {
+            noteRepository.alignStoredTagSpellings()
             noteRepository.observeActive().first()
         }
     }

@@ -30,6 +30,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.LinearWavyProgressIndicator
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.SwitchDefaults
@@ -815,49 +817,38 @@ internal fun UpdateSettingsToggleItem(
 /** The check-for-updates row is last unless the ObtainX row follows it. */
 internal fun checkForUpdatesRowPosition(): GroupPosition = if (supportsObtainXTracking) GroupPosition.MIDDLE else GroupPosition.LAST
 
-/** Updates-section row that runs a manual check, or opens the available update. */
+/**
+ * Updates-section row that runs a manual check, or opens the available update.
+ *
+ * PARITY: the same row as FilePipe's check row, which is inline in its SettingsScreen. It's a
+ * function here because SettingsRoute is at detekt's complexity limit.
+ */
 @Composable
 internal fun CheckForUpdatesRow(
     availableUpdate: RememberUpdateInfo?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .appClickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    ListItem(
+        leadingContent = {
+            RememberMaterialRoundedSymbol(
+                name = "new_releases",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        modifier = modifier.appClickable(onClick = onClick),
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
     ) {
-        RememberMaterialRoundedSymbol(
-            name = "new_releases",
-            tint = MaterialTheme.colorScheme.primary,
-            weight = FontWeight.Medium,
+        Text(
+            text =
+                if (availableUpdate != null) {
+                    stringResource(R.string.settings_update_available_button, availableUpdate.versionName)
+                } else {
+                    stringResource(R.string.settings_check_for_updates)
+                },
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.SemiBold,
         )
-        Spacer(Modifier.width(16.dp))
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(
-                text =
-                    if (availableUpdate != null) {
-                        stringResource(R.string.settings_update_available_button, availableUpdate.versionName)
-                    } else {
-                        stringResource(R.string.settings_check_for_updates)
-                    },
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Text(
-                text = stringResource(R.string.settings_update_current_version, BuildConfig.VERSION_NAME),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
     }
 }
 

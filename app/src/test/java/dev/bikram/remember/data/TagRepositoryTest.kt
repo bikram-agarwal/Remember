@@ -26,4 +26,26 @@ class TagRepositoryTest {
 
         assertEquals(listOf("Work", "Personal"), cleanedTags)
     }
+
+    @Test
+    fun `keeps the stored spelling when a tag already exists`() {
+        assertEquals(
+            listOf("Errands", "Travel"),
+            tagNamesUsingStoredSpellings(
+                requestedNames = listOf(" errands ", "errands", "Travel"),
+                storedNames = listOf("Errands"),
+            ),
+        )
+    }
+
+    @Test
+    fun `keeps a new tag spelling when nothing is stored`() {
+        assertEquals(
+            listOf("Errands"),
+            tagNamesUsingStoredSpellings(
+                requestedNames = listOf("Errands"),
+                storedNames = emptyList(),
+            ),
+        )
+    }
 }

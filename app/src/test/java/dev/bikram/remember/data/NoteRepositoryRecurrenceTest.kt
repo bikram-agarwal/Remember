@@ -653,6 +653,10 @@ class NoteRepositoryRecurrenceTest {
 
         override suspend fun allNoteIds(): List<Long> = listOf(stored.note.id)
 
+        override suspend fun noteTagCaches(): List<NoteTagCacheRow> = emptyList()
+
+        override suspend fun noteTagLinks(): List<NoteTagLink> = emptyList()
+
         override suspend fun countPictureUri(uri: String): Int = 0
 
         override suspend fun trashedNoteIds(): List<Long> = emptyList()

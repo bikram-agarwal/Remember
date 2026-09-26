@@ -12,6 +12,14 @@ plugins {
     alias(libs.plugins.ktlint)
 }
 
+val rememberApplicationId = "dev.bikram.remember"
+val rememberCompileSdk = 37
+val rememberCompileSdkMinor = 2
+val rememberMinSdk = 31
+val rememberTargetSdk = 37
+val versionCode = 10902
+val versionName = "1.9.2"
+
 kotlin {
     jvmToolchain(
         libs.versions.java
@@ -67,21 +75,21 @@ val previewVersionSuffix =
     providers.gradleProperty("previewVersionSuffix").orNull?.takeIf { it.isNotBlank() }
 
 extensions.configure<ApplicationExtension>("android") {
-    val rememberApplicationId = "dev.bikram.remember"
     namespace = rememberApplicationId
     compileSdk {
         version =
-            release(37) {
-                minorApiLevel = 2
+            release(rememberCompileSdk) {
+                minorApiLevel = rememberCompileSdkMinor
             }
     }
 
+    defaultConfig.versionCode = versionCode
+    defaultConfig.versionName = versionName
+
     defaultConfig {
         applicationId = rememberApplicationId
-        minSdk = 31
-        targetSdk = 37
-        versionCode = 10900
-        versionName = "1.9.0"
+        minSdk = rememberMinSdk
+        targetSdk = rememberTargetSdk
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
 

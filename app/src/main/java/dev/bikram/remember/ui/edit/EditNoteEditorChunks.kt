@@ -354,6 +354,7 @@ internal fun EditNoteMarkdownEditorSection(
     scrollState: ScrollState,
     displayMode: MarkdownEditorDisplayMode,
     assignedTags: List<String>,
+    knownTags: List<String>,
     onMarkdownChanged: (String) -> Unit,
     onAddTag: (String, String) -> Unit,
     onBodyFocusChanged: (Boolean) -> Unit,
@@ -391,6 +392,7 @@ internal fun EditNoteMarkdownEditorSection(
             scrollState = scrollState,
             displayMode = displayMode,
             assignedTags = assignedTags,
+            knownTags = knownTags,
             onAddTag = onAddTag,
             onFocusChanged = onBodyFocusChanged,
         )
@@ -583,6 +585,7 @@ internal fun EditNoteScrollableContent(
     val readOnly = shelfState != NoteShelfState.ACTIVE
     val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
     val assignedTags by vm.tags.collectAsStateWithLifecycle()
+    val knownTags by vm.activeTagSuggestions.collectAsStateWithLifecycle()
     EditorContentBodyColumn(
         modifier = modifier,
         horizontalPadding = horizontalPadding,
@@ -608,6 +611,7 @@ internal fun EditNoteScrollableContent(
                 scrollState = scrollState,
                 displayMode = markdownDisplayMode,
                 assignedTags = assignedTags,
+                knownTags = knownTags,
                 onMarkdownChanged = vm::setBody,
                 onAddTag = vm::addTag,
                 onBodyFocusChanged = onBodyFocusChanged,

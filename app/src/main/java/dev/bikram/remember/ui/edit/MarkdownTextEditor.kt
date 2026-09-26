@@ -58,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 import dev.bikram.remember.data.TagPalette
+import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.ui.common.rememberMarkdownStyler
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -77,6 +78,7 @@ internal fun MarkdownTextEditor(
     scrollState: ScrollState? = null,
     displayMode: MarkdownEditorDisplayMode = MarkdownEditorDisplayMode.LivePreview,
     assignedTags: List<String> = emptyList(),
+    knownTags: List<String> = emptyList(),
     onStylusInput: () -> Unit = {},
     onAddTag: (String, String) -> Unit = { _, _ -> },
     onFocusChanged: (Boolean) -> Unit = {},
@@ -163,18 +165,24 @@ internal fun MarkdownTextEditor(
                 cursor = state.textFieldValue.selection.end,
             )
         }
+    val resolvedActiveTag =
+        remember(activeTagToken?.tag, knownTags) {
+            activeTagToken?.tag?.let { typedTag ->
+                knownTags.firstOrNull { knownTag ->
+                    normalizeTagName(knownTag) == normalizeTagName(typedTag)
+                } ?: typedTag
+            }
+        }
     val activeTagColor =
-        remember(activeTagToken?.tokenStart) {
-            activeTagToken
-                ?.tag
-                ?.lowercase()
-                ?.let { tagKey -> TagPalette.defaultFor(tagKey) }
+        remember(resolvedActiveTag) {
+            resolvedActiveTag
+                ?.let { tagName -> TagPalette.defaultFor(normalizeTagName(tagName)) }
                 ?: Color.Transparent
         }
     val activeTagAlreadyAssigned =
-        remember(activeTagToken?.tag, assignedTags) {
-            activeTagToken?.tag?.let { activeTag ->
-                assignedTags.any { assignedTag -> assignedTag.equals(activeTag, ignoreCase = true) }
+        remember(resolvedActiveTag, assignedTags) {
+            resolvedActiveTag?.let { activeTag ->
+                assignedTags.any { assignedTag -> normalizeTagName(assignedTag) == normalizeTagName(activeTag) }
             } ?: false
         }
 
@@ -315,11 +323,11 @@ internal fun MarkdownTextEditor(
             },
         )
         AnimatedVisibility(
-            visible = activeTagToken != null && !activeTagAlreadyAssigned,
+            visible = resolvedActiveTag != null && !activeTagAlreadyAssigned,
             enter = fadeIn(tagPreviewEffectsSpec) + scaleIn(tagPreviewSpatialSpec, initialScale = 0.92f),
             exit = fadeOut(tagPreviewEffectsSpec) + scaleOut(tagPreviewSpatialSpec, targetScale = 0.92f),
         ) {
-            val previewTag = activeTagToken?.tag.orEmpty()
+            val previewTag = resolvedActiveTag.orEmpty()
             TagChipFilled(
                 tag = previewTag,
                 color = activeTagColor,

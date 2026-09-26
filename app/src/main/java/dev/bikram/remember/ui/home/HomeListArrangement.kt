@@ -5,6 +5,7 @@ import dev.bikram.remember.data.GroupBy
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RememberReservedTags
+import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.data.SortDir
 import dev.bikram.remember.data.SortKey
 import dev.bikram.remember.data.ViewOptions
@@ -336,11 +337,15 @@ private fun arrangeByTag(activeNotes: List<NoteWithItems>): List<HomeListItem> {
         activeNotes.filter { noteWithItems ->
             RememberReservedTags.userVisibleTags(noteWithItems.note.tags).isEmpty()
         }
-    val tags =
-        taggedNotes
-            .flatMap { noteWithItems -> RememberReservedTags.userVisibleTags(noteWithItems.note.tags) }
-            .distinct()
-            .sorted()
+    val tagsByKey = LinkedHashMap<String, String>()
+    taggedNotes
+        .flatMap { noteWithItems -> RememberReservedTags.userVisibleTags(noteWithItems.note.tags) }
+        .forEach { tagName ->
+            val trimmedName = tagName.trim()
+            if (trimmedName.isBlank()) return@forEach
+            tagsByKey.putIfAbsent(normalizeTagName(trimmedName), trimmedName)
+        }
+    val tags = tagsByKey.entries.sortedBy { entry -> entry.key }.map { entry -> entry.value }
 
     return buildList {
         tags.forEach { tag ->
@@ -348,10 +353,10 @@ private fun arrangeByTag(activeNotes: List<NoteWithItems>): List<HomeListItem> {
                 taggedNotes.filter { noteWithItems ->
                     RememberReservedTags
                         .userVisibleTags(noteWithItems.note.tags)
-                        .any { tagName -> tagName.equals(tag, ignoreCase = true) }
+                        .any { tagName -> normalizeTagName(tagName) == normalizeTagName(tag) }
                 }
             if (notesInTag.isNotEmpty()) {
-                val sectionKey = "TAG_$tag"
+                val sectionKey = "TAG_${normalizeTagName(tag)}"
                 add(HomeListItem.Header(label = tag, count = notesInTag.size, stableKey = sectionKey))
                 notesInTag.forEach { noteWithItems ->
                     add(

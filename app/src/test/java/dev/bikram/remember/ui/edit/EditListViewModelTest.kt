@@ -8,6 +8,8 @@ import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteAttachmentEntity
 import dev.bikram.remember.data.NoteDao
 import dev.bikram.remember.data.NoteEntity
+import dev.bikram.remember.data.NoteTagCacheRow
+import dev.bikram.remember.data.NoteTagLink
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
@@ -473,6 +475,10 @@ private class FakeNoteDao(
     }
 
     override suspend fun allNoteIds(): List<Long> = store.notes.keys.toList()
+
+    override suspend fun noteTagCaches(): List<NoteTagCacheRow> = emptyList()
+
+    override suspend fun noteTagLinks(): List<NoteTagLink> = emptyList()
 
     override suspend fun countPictureUri(uri: String): Int = 0
 

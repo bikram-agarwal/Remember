@@ -13,6 +13,7 @@ import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
@@ -206,6 +207,29 @@ class HomeStateFlowTest {
         }
 
     @Test
+    fun available_tags_follow_the_supplied_catalog() =
+        runTest {
+            val notes =
+                listOf(
+                    note(id = 1L, tags = listOf("errands")),
+                    note(id = 2L, tags = listOf("Errands", "subscriptions")),
+                )
+            val state =
+                homeStateFlow(
+                    filter = flowOf(NotesFilter()),
+                    notesSource = flowOf(notes),
+                    allActiveNotes = flowOf(notes),
+                    viewOptions = flowOf(ViewOptions()),
+                    selectedIds = flowOf(emptySet()),
+                    archivedSearchSource = flowOf(emptyList()),
+                    trashedSearchSource = flowOf(emptyList()),
+                    availableTagNames = flowOf(listOf("Errands", "Subscriptions")),
+                ).first()
+
+            assertEquals(listOf("Errands", "Subscriptions"), state.availableTags)
+        }
+
+    @Test
     fun list_preparation_uses_a_background_dispatcher_by_default() =
         runTest {
             val collectorThread = Thread.currentThread()
@@ -222,6 +246,7 @@ class HomeStateFlowTest {
                     selectedIds = flowOf(setOf(1L)),
                     archivedSearchSource = flowOf(emptyList()),
                     trashedSearchSource = flowOf(emptyList()),
+                    availableTagNames = flowOf(listOf("Work")),
                 ).first()
 
             assertFalse(state.loading)
@@ -239,6 +264,15 @@ class HomeStateFlowTest {
         val selected = MutableStateFlow(emptySet<Long>())
         val archived = MutableStateFlow(emptyList<NoteWithItems>())
         val trashed = MutableStateFlow(emptyList<NoteWithItems>())
+        val availableTagNames =
+            allActive.map { activeNotes ->
+                activeNotes
+                    .asSequence()
+                    .flatMap { noteWithItems -> RememberReservedTags.userVisibleTags(noteWithItems.note.tags) }
+                    .distinct()
+                    .sorted()
+                    .toList()
+            }
 
         @Suppress("ktlint:standard:function-expression-body")
         fun state(scope: TestScope): StateFlow<HomeState> {
@@ -250,6 +284,7 @@ class HomeStateFlowTest {
                 selectedIds = selected,
                 archivedSearchSource = archived,
                 trashedSearchSource = trashed,
+                availableTagNames = availableTagNames,
                 computationDispatcher = StandardTestDispatcher(scope.testScheduler),
             ).stateIn(scope.backgroundScope, SharingStarted.Eagerly, HomeState())
         }

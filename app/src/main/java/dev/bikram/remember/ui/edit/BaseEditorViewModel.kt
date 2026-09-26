@@ -18,7 +18,9 @@ import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.getActiveReminders
+import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.data.pinned
+import dev.bikram.remember.data.tagNamesUsingStoredSpellings
 import dev.bikram.remember.di.SettingsDependenciesEntryPoint
 import dev.bikram.remember.ui.common.HeroFraming
 import dev.bikram.remember.ui.nav.Routes
@@ -119,8 +121,19 @@ abstract class BaseEditorViewModel(
     val tags: StateFlow<List<String>> = _tags.asStateFlow()
     val activeTagSuggestions: StateFlow<List<String>> =
         repository
-            .observeActiveTagSuggestions()
+            .observeStoredTagNames()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    init {
+        viewModelScope.launch {
+            activeTagSuggestions.collect { storedNames ->
+                val alignedTags = tagNamesUsingStoredSpellings(_tags.value, storedNames)
+                if (alignedTags != _tags.value) {
+                    _tags.value = alignedTags
+                }
+            }
+        }
+    }
 
     private val _attachments = MutableStateFlow<List<NoteAttachmentEntity>>(emptyList())
     val attachments: StateFlow<List<NoteAttachmentEntity>> = _attachments.asStateFlow()
@@ -244,7 +257,11 @@ abstract class BaseEditorViewModel(
         _pictureHeroFraming.value = n.pictureHeroFraming
         _iconKey.value = n.iconKey
         _actions.value = n.actions
-        _tags.value = n.tags.filterNot { it == RememberReservedTags.STARRED }
+        _tags.value =
+            tagNamesUsingStoredSpellings(
+                n.tags.filterNot { it == RememberReservedTags.STARRED },
+                activeTagSuggestions.value,
+            )
         _attachments.value = existing.attachments
         _archived.value = n.archived
         _trashed.value = n.trashed
@@ -407,7 +424,7 @@ abstract class BaseEditorViewModel(
     }
 
     fun setTags(value: List<String>) {
-        val cleaned = value.filterNot { it == RememberReservedTags.STARRED }
+        val cleaned = tagNamesUsingStoredSpellings(value, activeTagSuggestions.value)
         if (_tags.value == cleaned) return
         _tags.value = cleaned
         markDirty()
@@ -419,11 +436,18 @@ abstract class BaseEditorViewModel(
     ) {
         val cleaned = value.trim()
         if (cleaned.isBlank() || cleaned == RememberReservedTags.STARRED) return
-        if (_tags.value.any { tag -> tag.equals(cleaned, ignoreCase = true) }) return
-        _tags.value = _tags.value + cleaned
+        if (RememberReservedTags.isSuggestionReserved(cleaned)) return
+        val storedName =
+            activeTagSuggestions.value.firstOrNull { storedTag ->
+                normalizeTagName(storedTag) == normalizeTagName(cleaned)
+            }
+        val spelling = storedName ?: cleaned
+        if (_tags.value.any { tag -> normalizeTagName(tag) == normalizeTagName(spelling) }) return
+        _tags.value = _tags.value + spelling
         markDirty()
+        if (storedName != null) return
         viewModelScope.launch {
-            repository.tagRepository?.setTagColor(cleaned, colorHex)
+            repository.tagRepository?.setTagColor(spelling, colorHex)
         }
     }
 
@@ -459,7 +483,7 @@ abstract class BaseEditorViewModel(
                 _tags.value
                     .map { tagName ->
                         if (tagName.equals(result.oldName, ignoreCase = true)) result.newName else tagName
-                    }.distinctBy { tagName -> tagName.lowercase() }
+                    }.distinctBy { tagName -> normalizeTagName(tagName) }
             if (_tags.value != updatedTags) {
                 _tags.value = updatedTags
                 markDirty()

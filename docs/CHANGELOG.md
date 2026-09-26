@@ -1,4 +1,4 @@
-## v1.9.0 Offline version, Reminder duration presets
+## v1.9.2 Offline version, Reminder duration presets
 
 ### ✨ New Features
 - **Offline version**: a new build with no internet access at all. It has no update checks and no Google account connection for Tasks import; importing from a Google Takeout or Tasks.org file still works. It installs alongside the other versions and is available from GitHub Releases.
@@ -17,6 +17,8 @@
 - The two-panel layout no longer appears on phones in portrait mode.
 - Fixed cases where Display size settings made the whole app look too small on some devices.
 - Links opened from About (GitHub, Play Store, other apps) open in their own task, so the browser or store no longer shows up as Remember in the recent-apps list.
+- Tags no longer split by letter case; each tag keeps one spelling.
+- Restoring a backup to a phone with no screen lock no longer locks you out.
 
 ---
 

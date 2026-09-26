@@ -7,6 +7,7 @@ import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
+import androidx.biometric.BiometricManager
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -283,7 +284,25 @@ private fun AppRoot(
         return
     }
 
-    if (currentLockState.enabled && !unlocked) {
+    val deviceUnlockAvailable =
+        remember(context) {
+            BiometricManager
+                .from(context)
+                .canAuthenticate(BiometricManager.Authenticators.DEVICE_CREDENTIAL) ==
+                BiometricManager.BIOMETRIC_SUCCESS
+        }
+    val deviceUnlockRequired = currentLockState.enabled && !currentLockState.hasPin
+    LaunchedEffect(deviceUnlockRequired, deviceUnlockAvailable) {
+        if (deviceUnlockRequired && !deviceUnlockAvailable) {
+            lockPrefs.disable()
+        }
+    }
+    val showLockScreen =
+        currentLockState.enabled &&
+            !unlocked &&
+            (currentLockState.hasPin || deviceUnlockAvailable)
+
+    if (showLockScreen) {
         LockScreen(
             biometricEnabled = currentLockState.biometric,
             hasPin = currentLockState.hasPin,

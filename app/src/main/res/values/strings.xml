@@ -1036,7 +1036,6 @@
     <string name="settings_notify_updates_enable_notifications">Allow notifications for Remember</string>
     <string name="settings_update_available_button">Update available - %1$s</string>
     <string name="settings_update_available">v%1$s available</string>
-    <string name="settings_update_current_version">Current version: %1$s</string>
     <string name="settings_up_to_date">You\'re up to date</string>
     <string name="settings_update_skip_version">Skip version</string>
     <string name="settings_changelog_load_failed">Could not load changelog</string>

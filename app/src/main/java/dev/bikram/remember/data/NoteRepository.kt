@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
+import java.util.Locale
 
 data class NoteOptions(
     val reminderAt: Long? = null,
@@ -117,7 +118,7 @@ class NoteRepository(
 
     fun observeActive(): Flow<List<NoteWithItems>> = noteDao.observeActive().flowOn(ioDispatcher)
 
-    /** Distinct tag names from non-trashed notes; for suggestion UIs (sheet-scoped collection preferred). */
+    /** Distinct tag names from non-trashed, non-archived notes; for suggestion UIs. */
     fun observeActiveTagSuggestions(): Flow<List<String>> =
         tagRepository?.observeActiveTagSuggestions()?.flowOn(ioDispatcher)
             ?: observeActive()
@@ -125,9 +126,17 @@ class NoteRepository(
                     notes
                         .flatMap { it.note.tags }
                         .filterNot { RememberReservedTags.isSuggestionReserved(it) }
-                        .distinct()
-                        .sorted()
+                        .distinctBy { tagName -> normalizeTagName(tagName) }
+                        .sortedBy { tagName -> tagName.lowercase(Locale.ROOT) }
                 }.flowOn(defaultDispatcher)
+
+    /** Every stored tag spelling, including tags that are only on archived or trashed notes. */
+    fun observeStoredTagNames(): Flow<List<String>> =
+        tagRepository?.observeStoredTagNames()?.flowOn(ioDispatcher) ?: flowOf(emptyList())
+
+    suspend fun alignStoredTagSpellings() {
+        tagRepository?.alignStoredTagSpellings()
+    }
 
     fun observeTrashed(): Flow<List<NoteWithItems>> = noteDao.observeTrashed().flowOn(ioDispatcher)
 

@@ -228,7 +228,7 @@ fun TagEditorSheet(
                 tagBeingEdited != null &&
                 trimmed.isNotBlank() &&
                 (
-                    !tagBeingEdited.equals(trimmed, ignoreCase = true) ||
+                    tagBeingEdited != trimmed ||
                         !hexForTag(tagBeingEdited).equals(committedHex, ignoreCase = true)
                 )
         val draftTagMatch = knownTagOptions.firstOrNull { tag -> tag.equals(trimmed, ignoreCase = true) }
@@ -245,7 +245,7 @@ fun TagEditorSheet(
                 tags
                     .map { tag ->
                         if (tag.equals(editedTag, ignoreCase = true)) trimmed else tag
-                    }.distinctBy { tag -> tag.lowercase() }
+                    }.distinctByNormalizedName()
             knownTagOptions =
                 knownTagOptions
                     .map { tag ->
@@ -295,10 +295,10 @@ fun TagEditorSheet(
             (knownTagOptions + availableTags + tags + localColors.keys).forEach { raw ->
                 val trim = raw.trim()
                 if (trim.isBlank()) return@forEach
-                val key = trim.lowercase()
+                val key = normalizeTagName(trim)
                 if (!seen.containsKey(key)) seen[key] = trim
             }
-            seen.values.sortedBy { it.lowercase() }
+            seen.values.sortedBy { tagName -> normalizeTagName(tagName) }
         }
     val assignedTags = tags.distinctByNormalizedName()
     val availableDisplayTags =
@@ -311,7 +311,7 @@ fun TagEditorSheet(
             editingTag != null &&
             trimmedDraft.isNotBlank() &&
             (
-                !editingTag.equals(trimmedDraft, ignoreCase = true) ||
+                editingTag != trimmedDraft ||
                     !hexForTag(editingTag.orEmpty()).equals(committedDraftHex, ignoreCase = true)
             )
     val draftDirty = editingTag == null && trimmedDraft.isNotBlank()
@@ -337,8 +337,8 @@ fun TagEditorSheet(
     val draftConflictsWithExistingTag =
         trimmedDraft.isNotBlank() &&
             allTags.any { tag ->
-                tag.equals(trimmedDraft, ignoreCase = true) &&
-                    !tag.equals(editingTag.orEmpty(), ignoreCase = true)
+                normalizeTagName(tag) == normalizeTagName(trimmedDraft) &&
+                    normalizeTagName(tag) != normalizeTagName(editingTag.orEmpty())
             }
     val draftIsReserved =
         trimmedDraft.isNotBlank() && RememberReservedTags.isSuggestionReserved(trimmedDraft)

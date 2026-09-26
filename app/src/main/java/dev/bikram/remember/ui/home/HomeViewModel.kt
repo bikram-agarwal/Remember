@@ -8,8 +8,10 @@ import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteSwipeAction
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.NotesFilter
+import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.data.ViewOptionsPrefs
+import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.data.pinned
 import dev.bikram.remember.ui.common.BulkUndoableAction
 import kotlinx.collections.immutable.persistentSetOf
@@ -114,7 +116,28 @@ class HomeViewModel
                 selectedIds = selectedIds,
                 archivedSearchSource = archivedSearchSource,
                 trashedSearchSource = trashedSearchSource,
+                availableTagNames = repository.observeActiveTagSuggestions(),
             ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
+
+        init {
+            viewModelScope.launch {
+                repository.observeActiveTagSuggestions().collect { storedNames ->
+                    val selectedTags = filter.value.tags
+                    if (selectedTags.isEmpty()) return@collect
+                    val storedNamesByKey = LinkedHashMap<String, String>()
+                    storedNames.forEach { storedName ->
+                        storedNamesByKey.putIfAbsent(normalizeTagName(storedName), storedName)
+                    }
+                    val rewrittenTags =
+                        selectedTags
+                            .map { selectedTag -> storedNamesByKey[normalizeTagName(selectedTag)] ?: selectedTag }
+                            .toPersistentSet()
+                    if (rewrittenTags != selectedTags) {
+                        filter.value = filter.value.copy(tags = rewrittenTags)
+                    }
+                }
+            }
+        }
 
         fun setFilter(value: NotesFilter) {
             filter.value = value
@@ -364,6 +387,7 @@ class HomeViewModel
             val noteIds = visibleSelectedIdsSnapshot().toList()
             if (noteIds.isEmpty()) return
             val additions = addTags - removeTags
+            val removalKeys = removeTags.map { tagName -> normalizeTagName(tagName) }.toSet()
             viewModelScope.launch {
                 newTagColors.forEach { (tagKey, hex) ->
                     repository.tagRepository?.setTagColor(tagKey, hex)
@@ -371,8 +395,23 @@ class HomeViewModel
                 noteIds.forEach { noteId ->
                     val existing = repository.get(noteId) ?: return@forEach
                     val note = existing.note
-                    val updatedTags = (note.tags.toSet() + additions - removeTags).toList()
-                    if (updatedTags.toSet() == note.tags.toSet()) return@forEach
+                    val updatedTags = LinkedHashMap<String, String>()
+                    note.tags.forEach { tagName ->
+                        val trimmedName = tagName.trim()
+                        if (trimmedName.isBlank()) return@forEach
+                        val normalizedName = normalizeTagName(trimmedName)
+                        if (normalizedName in removalKeys) return@forEach
+                        updatedTags.putIfAbsent(normalizedName, trimmedName)
+                    }
+                    additions.forEach { tagName ->
+                        val trimmedName = tagName.trim()
+                        if (trimmedName.isBlank() || trimmedName == RememberReservedTags.STARRED) return@forEach
+                        val normalizedName = normalizeTagName(trimmedName)
+                        if (normalizedName in removalKeys) return@forEach
+                        updatedTags[normalizedName] = trimmedName
+                    }
+                    val nextTags = updatedTags.values.toList()
+                    if (nextTags == note.tags) return@forEach
                     repository.updateNote(
                         id = noteId,
                         title = note.title,
@@ -388,7 +427,7 @@ class HomeViewModel
                                 locked = note.locked,
                                 iconKey = note.iconKey,
                                 actions = note.actions,
-                                tags = updatedTags,
+                                tags = nextTags,
                                 recurrence = note.recurrence,
                             ),
                     )
