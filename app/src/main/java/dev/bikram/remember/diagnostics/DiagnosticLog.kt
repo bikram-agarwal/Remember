@@ -22,6 +22,7 @@ import dev.bikram.remember.data.BackupPrefs
 import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
+import dev.bikram.remember.data.NotesUiPrefs
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.ReminderPrefs
@@ -203,6 +204,7 @@ object DiagnosticLog {
     private suspend fun loadPreferencesSnapshot(context: Context): PreferencesSnapshot? =
         runCatching {
             val theme = ThemePrefs(context).state.first()
+            val notesUi = NotesUiPrefs(context).state.first()
             val interaction = InteractionPrefs(context).state.first()
             val reminder = ReminderPrefs(context).snapshot()
             val defaultNote = DefaultNotePrefs(context).snapshot()
@@ -211,7 +213,7 @@ object DiagnosticLog {
             val quickCapture = QuickCapturePrefs(context).snapshot()
             val onboarding = OnboardingPrefs(context).state.first()
             val lock = LockPrefs(context).state.first()
-            PreferencesSnapshot(theme, interaction, reminder, defaultNote, backup, update, quickCapture, onboarding, lock)
+            PreferencesSnapshot(theme, notesUi, interaction, reminder, defaultNote, backup, update, quickCapture, onboarding, lock)
         }.getOrNull()
 
     private fun StringBuilder.appendPreferencesSnapshot(
@@ -240,9 +242,17 @@ object DiagnosticLog {
         appendLine(context.getString(R.string.diagnostics_gradient_background_format, snapshot.theme.useGradient.toString()))
         appendLine(context.getString(R.string.diagnostics_surface_shading_format, snapshot.theme.shadingIntensity.toString()))
         appendLine(context.getString(R.string.diagnostics_ui_scale_format, snapshot.theme.uiScale.toString()))
-        appendLine(context.getString(R.string.diagnostics_hero_on_cards_format, snapshot.theme.heroOnCards.toString()))
-        appendLine(context.getString(R.string.diagnostics_adaptive_note_themes_format, snapshot.theme.adaptiveNoteThemes.toString()))
         appendLine(context.getString(R.string.diagnostics_blur_bars_format, snapshot.theme.blurBars.toString()))
+
+        // Notes UI.
+        appendLine(context.getString(R.string.diagnostics_adaptive_note_themes_format, snapshot.notesUi.adaptiveNoteThemes.toString()))
+        appendLine(context.getString(R.string.diagnostics_hero_on_cards_format, snapshot.notesUi.heroOnCards.toString()))
+        appendLine(
+            context.getString(
+                R.string.diagnostics_note_content_on_cards_format,
+                snapshot.notesUi.showNoteContentOnCards.toString(),
+            ),
+        )
 
         // Interaction / swipe.
         appendLine(context.getString(R.string.diagnostics_swipe_gesture_mode_format, snapshot.interaction.swipeGestureMode.toString()))
@@ -531,6 +541,7 @@ object DiagnosticLog {
 
     private data class PreferencesSnapshot(
         val theme: dev.bikram.remember.data.ThemeState,
+        val notesUi: dev.bikram.remember.data.NotesUiState,
         val interaction: dev.bikram.remember.data.InteractionState,
         val reminder: dev.bikram.remember.data.ReminderPreferencesState,
         val defaultNote: dev.bikram.remember.data.DefaultNotePreferencesState,

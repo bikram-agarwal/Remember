@@ -82,8 +82,8 @@ import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
+import dev.bikram.remember.ui.theme.LocalAdaptiveNoteThemes
 import dev.bikram.remember.ui.theme.LocalSnackbarHostState
-import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -514,7 +514,7 @@ fun EditListScreen(
         editorActions.saveAndShowToast()
     }
 
-    val adaptiveNoteThemes = LocalThemeState.current.adaptiveNoteThemes
+    val adaptiveNoteThemes = LocalAdaptiveNoteThemes.current
     val imageDerivedColors =
         rememberImageDerivedColors(
             imageUri = if (adaptiveNoteThemes) pictureUri else null,

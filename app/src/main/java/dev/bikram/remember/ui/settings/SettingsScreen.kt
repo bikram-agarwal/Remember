@@ -115,6 +115,7 @@ import dev.bikram.remember.ui.components.rememberResponsiveActionIconSize
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
+import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
 import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
@@ -124,6 +125,7 @@ import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.nav.DEV_OPTIONS_SHARED_BOUNDS_KEY
 import dev.bikram.remember.ui.nav.LocalNavAnimatedVisibilityScope
 import dev.bikram.remember.ui.nav.LocalSharedTransitionScope
+import dev.bikram.remember.ui.theme.LocalNotesUiState
 import dev.bikram.remember.ui.theme.LocalThemeState
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
@@ -162,8 +164,11 @@ enum class SettingsSectionKey(
     val legacyRouteKeys: List<String> = emptyList(),
 ) {
     Appearance("appearance", "palette", R.string.settings_section_appearance),
-    Notifications("notifications", "notifications", R.string.settings_notifications_section),
+
+    // Remember-only. FilePipe has no note cards, so this section is not part of the shared settings list.
+    NotesUi("notes_ui", DEFAULT_NOTE_HEADER_SYMBOL, R.string.settings_section_notes_ui),
     Defaults("defaults", "tune", R.string.settings_defaults_section),
+    Notifications("notifications", "notifications", R.string.settings_notifications_section),
 
     // FilePipe files the same toggle under its broader "Touch & Sound" section. Divergent heading
     // only; the toggle and its behaviour are in parity.
@@ -268,6 +273,7 @@ fun SettingsRoute(
     val backupPrefs = settingsDependencies.backupPrefs()
     val backupIo = settingsDependencies.backupIo()
     val themePrefs = settingsDependencies.themePrefs()
+    val notesUiPrefs = settingsDependencies.notesUiPrefs()
     val viewOptionsPrefs = settingsDependencies.viewOptionsPrefs()
     val updatePrefs = settingsDependencies.updatePrefs()
     val playInAppUpdateProgressController = settingsDependencies.playInAppUpdateProgressController()
@@ -281,6 +287,7 @@ fun SettingsRoute(
         initialValue = LockPrefs.State(),
     )
     val themeState = LocalThemeState.current
+    val notesUiState = LocalNotesUiState.current
     val interactionState by interactionPrefs.state.collectAsStateWithLifecycle(
         initialValue = InteractionState(),
     )
@@ -754,6 +761,43 @@ fun SettingsRoute(
                         }
                     }
 
+                    if (includeSettingsSection(SettingsSectionKey.NotesUi)) {
+                        item(key = "notes_ui") {
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.NotesUi.routeKey,
+                                materialSymbolName = SettingsSectionKey.NotesUi.iconName,
+                                title = stringResource(SettingsSectionKey.NotesUi.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                            ) {
+                                NotesUiSection(
+                                    prefs = notesUiPrefs,
+                                    state = notesUiState,
+                                )
+                            }
+                        }
+                    }
+
+                    if (includeSettingsSection(SettingsSectionKey.Defaults)) {
+                        item(key = "defaults") {
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Defaults.routeKey,
+                                materialSymbolName = SettingsSectionKey.Defaults.iconName,
+                                title = stringResource(SettingsSectionKey.Defaults.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                            ) {
+                                DefaultsSection(
+                                    defaultsState = defaultNoteState,
+                                    defaultNotePrefs = defaultNotePrefs,
+                                    scope = scope,
+                                )
+                            }
+                        }
+                    }
+
                     if (includeSettingsSection(SettingsSectionKey.Notifications)) {
                         item(key = "notifications") {
                             Column(
@@ -792,25 +836,6 @@ fun SettingsRoute(
                                     )
                                 }
                             } // notifications Column
-                        }
-                    }
-
-                    if (includeSettingsSection(SettingsSectionKey.Defaults)) {
-                        item(key = "defaults") {
-                            SettingsExpandableSection(
-                                sectionKey = SettingsSectionKey.Defaults.routeKey,
-                                materialSymbolName = SettingsSectionKey.Defaults.iconName,
-                                title = stringResource(SettingsSectionKey.Defaults.titleRes),
-                                collapsedSectionKeys = visibleCollapsedSectionKeys,
-                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
-                                showHeader = showSectionHeaders,
-                            ) {
-                                DefaultsSection(
-                                    defaultsState = defaultNoteState,
-                                    defaultNotePrefs = defaultNotePrefs,
-                                    scope = scope,
-                                )
-                            }
                         }
                     }
 

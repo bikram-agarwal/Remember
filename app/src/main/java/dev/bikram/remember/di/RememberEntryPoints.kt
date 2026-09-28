@@ -10,6 +10,7 @@ import dev.bikram.remember.data.DevModePrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.NotesUiPrefs
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.ReminderPrefs
@@ -46,6 +47,8 @@ interface SettingsDependenciesEntryPoint {
     fun backupIo(): BackupIo
 
     fun themePrefs(): ThemePrefs
+
+    fun notesUiPrefs(): NotesUiPrefs
 
     fun viewOptionsPrefs(): ViewOptionsPrefs
 
@@ -98,6 +101,8 @@ interface DevOptionsDependenciesEntryPoint {
     fun defaultNotePrefs(): DefaultNotePrefs
 
     fun themePrefs(): ThemePrefs
+
+    fun notesUiPrefs(): NotesUiPrefs
 
     fun viewOptionsPrefs(): ViewOptionsPrefs
 

@@ -1,3 +1,15 @@
+## v1.9.3 Hide content on cards
+
+### ✨ New Features
+- Added an option to hide note and checklist content from note cards while keeping titles and metadata visible.
+
+## 🛠 Improved Features
+- Added a dedicated Notes UI settings section for adaptive themes, card cover images, and card content.
+- Moved Defaults higher in Settings for better logical ordering.
+- Long-pressing a Quick Settings tile now opens Remember instead of the system App Info page.
+
+---
+
 ## v1.9.2 Offline version, Reminder duration presets
 
 ### ✨ New Features

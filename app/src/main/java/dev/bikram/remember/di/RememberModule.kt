@@ -16,6 +16,7 @@ import dev.bikram.remember.data.DevModePrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.NotesUiPrefs
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.RememberDatabase
@@ -84,6 +85,12 @@ object RememberModule {
     fun provideThemePrefs(
         @ApplicationContext context: Context,
     ): ThemePrefs = ThemePrefs(context)
+
+    @Provides
+    @Singleton
+    fun provideNotesUiPrefs(
+        @ApplicationContext context: Context,
+    ): NotesUiPrefs = NotesUiPrefs(context)
 
     @Provides
     @Singleton
@@ -166,6 +173,7 @@ object RememberModule {
         @ApplicationContext context: Context,
         noteRepository: NoteRepository,
         themePrefs: ThemePrefs,
+        notesUiPrefs: NotesUiPrefs,
         viewOptionsPrefs: ViewOptionsPrefs,
         lockPrefs: LockPrefs,
         interactionPrefs: InteractionPrefs,
@@ -180,6 +188,7 @@ object RememberModule {
             context = context,
             repository = noteRepository,
             themePrefs = themePrefs,
+            notesUiPrefs = notesUiPrefs,
             viewOptionsPrefs = viewOptionsPrefs,
             lockPrefs = lockPrefs,
             interactionPrefs = interactionPrefs,

@@ -5,10 +5,10 @@ import dev.bikram.remember.data.GroupBy
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RememberReservedTags
-import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.data.SortDir
 import dev.bikram.remember.data.SortKey
 import dev.bikram.remember.data.ViewOptions
+import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.data.pinned
 import dev.bikram.remember.ui.components.toNoteCardUiModel
 import java.time.ZoneId

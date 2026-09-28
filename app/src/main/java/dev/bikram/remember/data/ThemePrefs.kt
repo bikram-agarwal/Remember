@@ -170,8 +170,6 @@ data class ThemeState(
     val useGradient: Boolean = true,
     val shadingIntensity: Float = DEFAULT_SHADING_INTENSITY,
     val uiScale: Float = DEFAULT_UI_SCALE,
-    val heroOnCards: Boolean = true,
-    val adaptiveNoteThemes: Boolean = true,
     val blurBars: Boolean = true,
     val customFontPath: String = "",
     val customFontName: String = "",
@@ -205,8 +203,6 @@ class ThemePrefs(
         val SHADING_INTENSITY = stringPreferencesKey("shading_intensity")
         val SHADING_INTENSITY_FACTOR = floatPreferencesKey("shading_intensity_factor")
         val UI_SCALE = floatPreferencesKey("ui_scale")
-        val HERO_ON_CARDS = booleanPreferencesKey("hero_on_cards")
-        val ADAPTIVE_NOTE_THEMES = booleanPreferencesKey("adaptive_note_themes")
         val BLUR_BARS = booleanPreferencesKey("blur_bars")
         val CUSTOM_FONT_PATH = stringPreferencesKey("custom_font_path")
         val CUSTOM_FONT_NAME = stringPreferencesKey("custom_font_name")
@@ -240,8 +236,6 @@ class ThemePrefs(
                             if (p[Keys.USE_ENHANCED_SHADING] == true) 0.0f else DEFAULT_SHADING_INTENSITY
                         },
                 uiScale = clampUiScale(p[Keys.UI_SCALE] ?: DEFAULT_UI_SCALE),
-                heroOnCards = p[Keys.HERO_ON_CARDS] ?: true,
-                adaptiveNoteThemes = p[Keys.ADAPTIVE_NOTE_THEMES] ?: true,
                 blurBars = p[Keys.BLUR_BARS] ?: true,
                 customFontPath = p[Keys.CUSTOM_FONT_PATH].orEmpty(),
                 customFontName = p[Keys.CUSTOM_FONT_NAME].orEmpty(),
@@ -356,14 +350,6 @@ class ThemePrefs(
         context.themePrefsDataStore.edit { it[Keys.UI_SCALE] = clampUiScale(scale) }
     }
 
-    suspend fun setHeroOnCards(value: Boolean) {
-        context.themePrefsDataStore.edit { it[Keys.HERO_ON_CARDS] = value }
-    }
-
-    suspend fun setAdaptiveNoteThemes(value: Boolean) {
-        context.themePrefsDataStore.edit { it[Keys.ADAPTIVE_NOTE_THEMES] = value }
-    }
-
     suspend fun setBlurBars(value: Boolean) {
         context.themePrefsDataStore.edit { it[Keys.BLUR_BARS] = value }
     }
@@ -434,8 +420,6 @@ class ThemePrefs(
             put(Keys.USE_GRADIENT.name, prefs[Keys.USE_GRADIENT] ?: true)
             put(Keys.SHADING_INTENSITY_FACTOR.name, (prefs[Keys.SHADING_INTENSITY_FACTOR] ?: DEFAULT_SHADING_INTENSITY).toDouble())
             put(Keys.UI_SCALE.name, clampUiScale(prefs[Keys.UI_SCALE] ?: DEFAULT_UI_SCALE).toDouble())
-            put(Keys.HERO_ON_CARDS.name, prefs[Keys.HERO_ON_CARDS] ?: true)
-            put(Keys.ADAPTIVE_NOTE_THEMES.name, prefs[Keys.ADAPTIVE_NOTE_THEMES] ?: true)
             put(Keys.BLUR_BARS.name, prefs[Keys.BLUR_BARS] ?: true)
             put(Keys.CUSTOM_FONT_PATH.name, prefs[Keys.CUSTOM_FONT_PATH].orEmpty())
             put(Keys.CUSTOM_FONT_NAME.name, prefs[Keys.CUSTOM_FONT_NAME].orEmpty())
@@ -525,12 +509,6 @@ class ThemePrefs(
                 runCatching { json.getDouble(Keys.UI_SCALE.name).toFloat() }.getOrNull()?.let { rawScale ->
                     mutable[Keys.UI_SCALE] = clampUiScale(rawScale)
                 }
-            }
-            booleanOrNull(Keys.HERO_ON_CARDS.name)?.let { value ->
-                mutable[Keys.HERO_ON_CARDS] = value
-            }
-            booleanOrNull(Keys.ADAPTIVE_NOTE_THEMES.name)?.let { value ->
-                mutable[Keys.ADAPTIVE_NOTE_THEMES] = value
             }
             booleanOrNull(Keys.BLUR_BARS.name)?.let { value ->
                 mutable[Keys.BLUR_BARS] = value

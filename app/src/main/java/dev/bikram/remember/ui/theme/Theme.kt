@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.Density
 import androidx.core.view.WindowCompat
+import dev.bikram.remember.data.NotesUiState
 import dev.bikram.remember.data.ThemeState
 import dev.bikram.remember.data.effectiveDarkTheme
 import dev.bikram.remember.ui.common.responsiveTextScaleForWidth
@@ -72,6 +73,7 @@ val LocalIsDark = staticCompositionLocalOf { false }
 @Composable
 fun RememberTheme(
     themeState: ThemeState = ThemeState(),
+    notesUiState: NotesUiState = NotesUiState(),
     paintBackground: Boolean = true,
     hapticFeedbackEnabled: Boolean = true,
     content: @Composable () -> Unit,
@@ -133,7 +135,10 @@ fun RememberTheme(
         LocalDensity provides responsiveDensity,
         LocalIsDark provides darkTheme,
         LocalUseGradient provides effectiveUseGradient,
-        LocalHeroOnCards provides themeState.heroOnCards,
+        LocalHeroOnCards provides notesUiState.heroOnCards,
+        LocalShowNoteContentOnCards provides notesUiState.showNoteContentOnCards,
+        LocalAdaptiveNoteThemes provides notesUiState.adaptiveNoteThemes,
+        LocalNotesUiState provides notesUiState,
         LocalBlurBars provides themeState.blurBars,
         LocalUseEnhancedShading provides themeState.useEnhancedShading,
         LocalThemeState provides themeState,

@@ -141,6 +141,7 @@ class BackupIo(
     private val context: Context,
     private val repository: NoteRepository,
     private val themePrefs: ThemePrefs,
+    private val notesUiPrefs: NotesUiPrefs,
     private val viewOptionsPrefs: ViewOptionsPrefs,
     private val lockPrefs: LockPrefs,
     private val interactionPrefs: InteractionPrefs,
@@ -183,6 +184,7 @@ class BackupIo(
     private suspend fun buildSettingsJson(): JSONObject =
         SettingsBackup.exportJson(
             themePrefs,
+            notesUiPrefs,
             viewOptionsPrefs,
             lockPrefs,
             interactionPrefs,
@@ -198,6 +200,7 @@ class BackupIo(
             SettingsBackup.importJson(
                 settingsJson,
                 themePrefs,
+                notesUiPrefs,
                 viewOptionsPrefs,
                 lockPrefs,
                 interactionPrefs,

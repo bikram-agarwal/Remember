@@ -766,6 +766,8 @@
     <string name="appearance_custom_font_error_invalid">Failed to load: invalid or corrupted font file.</string>
     <string name="appearance_cover_title">Cover image on cards</string>
     <string name="appearance_cover_subtitle">Use the note picture as a faded background of the card</string>
+    <string name="appearance_note_content_title">Note content on cards</string>
+    <string name="appearance_note_content_subtitle">Show the note body or list items under the title</string>
     <string name="appearance_adaptive_note_themes_title">Adaptive note themes</string>
     <string name="appearance_adaptive_note_themes_subtitle">Use color from cover image to tint the note page</string>
     <string name="appearance_shading_intensity_title">Surface shading</string>
@@ -796,6 +798,7 @@
     <string name="settings_expand_all_sections_cd">Expand all settings sections</string>
     <string name="settings_collapse_all_sections_cd">Collapse all settings sections</string>
     <string name="settings_section_appearance">Appearance</string>
+    <string name="settings_section_notes_ui">Notes UI</string>
     <string name="settings_defaults_section">Defaults</string>
     <string name="settings_section_security">Security</string>
     <string name="settings_updates_section">Updates</string>
@@ -1268,6 +1271,7 @@
     <string name="diagnostics_surface_shading_format">Surface shading: %1$s</string>
     <string name="diagnostics_ui_scale_format">UI scale: %1$s</string>
     <string name="diagnostics_hero_on_cards_format">Hero images on cards: %1$s</string>
+    <string name="diagnostics_note_content_on_cards_format">Note content on cards: %1$s</string>
     <string name="diagnostics_adaptive_note_themes_format">Adaptive note themes: %1$s</string>
     <string name="diagnostics_blur_bars_format">Blur bars: %1$s</string>
     <string name="diagnostics_swipe_gesture_mode_format">Swipe gesture mode: %1$s</string>

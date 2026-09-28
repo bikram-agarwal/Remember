@@ -40,33 +40,34 @@ class TagRepository(
      * still has a tag that has never been stored.
      */
     suspend fun alignStoredTagSpellings() {
-        val alignNotes = suspend {
-            val storedNamesByKey = LinkedHashMap<String, String>()
-            tagDao.allTags().forEach { tag ->
-                storedNamesByKey.putIfAbsent(tag.normalizedName, tag.name)
-            }
-            val linksByNoteId =
-                noteDao.noteTagLinks().groupBy(
-                    keySelector = { link -> link.noteId },
-                    valueTransform = { link -> link.name },
-                )
-            noteDao.noteTagCaches().forEach { cache ->
-                val requestedNames = cleanUserVisibleTagNames(cache.tags)
-                val canonicalNames =
-                    requestedNames.map { requestedName ->
-                        val normalizedName = normalizeTagName(requestedName)
-                        storedNamesByKey[normalizedName] ?: requestedName.also {
-                            storedNamesByKey[normalizedName] = requestedName
-                        }
-                    }
-                val reservedTags = cache.tags.filter { tagName -> tagName == RememberReservedTags.STARRED }
-                val linkedNames = linksByNoteId[cache.id].orEmpty()
-                if (linkedNames == canonicalNames && cache.tags == canonicalNames + reservedTags) {
-                    return@forEach
+        val alignNotes =
+            suspend {
+                val storedNamesByKey = LinkedHashMap<String, String>()
+                tagDao.allTags().forEach { tag ->
+                    storedNamesByKey.putIfAbsent(tag.normalizedName, tag.name)
                 }
-                replaceTagsForNoteInTransaction(cache.id, canonicalNames)
+                val linksByNoteId =
+                    noteDao.noteTagLinks().groupBy(
+                        keySelector = { link -> link.noteId },
+                        valueTransform = { link -> link.name },
+                    )
+                noteDao.noteTagCaches().forEach { cache ->
+                    val requestedNames = cleanUserVisibleTagNames(cache.tags)
+                    val canonicalNames =
+                        requestedNames.map { requestedName ->
+                            val normalizedName = normalizeTagName(requestedName)
+                            storedNamesByKey[normalizedName] ?: requestedName.also {
+                                storedNamesByKey[normalizedName] = requestedName
+                            }
+                        }
+                    val reservedTags = cache.tags.filter { tagName -> tagName == RememberReservedTags.STARRED }
+                    val linkedNames = linksByNoteId[cache.id].orEmpty()
+                    if (linkedNames == canonicalNames && cache.tags == canonicalNames + reservedTags) {
+                        return@forEach
+                    }
+                    replaceTagsForNoteInTransaction(cache.id, canonicalNames)
+                }
             }
-        }
         if (database != null) {
             database.withTransaction { alignNotes() }
         } else {

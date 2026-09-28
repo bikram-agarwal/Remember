@@ -210,6 +210,7 @@ fun DevOptionsRoute(
     val noteRepository = deps.noteRepository()
     val notesWidgetUpdater = deps.notesWidgetUpdater()
     val themePrefs = deps.themePrefs()
+    val notesUiPrefs = deps.notesUiPrefs()
     val viewOptionsPrefs = deps.viewOptionsPrefs()
     val interactionPrefs = deps.interactionPrefs()
     val reminderPrefs = deps.reminderPrefs()
@@ -358,6 +359,7 @@ fun DevOptionsRoute(
             onConfirm = {
                 scope.launch {
                     themePrefs.reset()
+                    notesUiPrefs.reset()
                     viewOptionsPrefs.reset()
                     interactionPrefs.reset()
                     reminderPrefs.reset()

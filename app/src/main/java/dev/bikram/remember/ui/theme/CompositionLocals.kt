@@ -3,6 +3,7 @@ package dev.bikram.remember.ui.theme
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.staticCompositionLocalOf
+import dev.bikram.remember.data.NotesUiState
 import dev.bikram.remember.data.ThemeState
 
 val LocalSnackbarHostState = staticCompositionLocalOf<SnackbarHostState> { error("No SnackbarHostState provided") }
@@ -22,6 +23,17 @@ val LocalProgressiveBlurStyle = staticCompositionLocalOf<ProgressiveBlurStyle?> 
 val LocalUseGradient = compositionLocalOf { false }
 
 val LocalHeroOnCards = compositionLocalOf { false }
+
+/** When false, note cards show the title and metadata only. Defaults to showing content. */
+val LocalShowNoteContentOnCards = compositionLocalOf { true }
+
+val LocalAdaptiveNoteThemes = compositionLocalOf { true }
+
+/**
+ * Notes UI preferences, already collected. Provided from [RememberTheme] so settings can read them
+ * on first composition.
+ */
+val LocalNotesUiState = compositionLocalOf { NotesUiState() }
 
 val LocalBlurBars = compositionLocalOf { true }
 

@@ -45,7 +45,7 @@ import dev.bikram.remember.ui.components.NoteActionBottomBarContent
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
-import dev.bikram.remember.ui.theme.LocalThemeState
+import dev.bikram.remember.ui.theme.LocalAdaptiveNoteThemes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.io.File
@@ -358,7 +358,7 @@ fun EditNoteScreen(
         editorActions.saveAndShowToast()
     }
 
-    val adaptiveNoteThemes = LocalThemeState.current.adaptiveNoteThemes
+    val adaptiveNoteThemes = LocalAdaptiveNoteThemes.current
     val imageDerivedColors =
         rememberImageDerivedColors(
             imageUri = if (adaptiveNoteThemes) pictureUri else null,

@@ -131,8 +131,7 @@ class NoteRepository(
                 }.flowOn(defaultDispatcher)
 
     /** Every stored tag spelling, including tags that are only on archived or trashed notes. */
-    fun observeStoredTagNames(): Flow<List<String>> =
-        tagRepository?.observeStoredTagNames()?.flowOn(ioDispatcher) ?: flowOf(emptyList())
+    fun observeStoredTagNames(): Flow<List<String>> = tagRepository?.observeStoredTagNames()?.flowOn(ioDispatcher) ?: flowOf(emptyList())
 
     suspend fun alignStoredTagSpellings() {
         tagRepository?.alignStoredTagSpellings()

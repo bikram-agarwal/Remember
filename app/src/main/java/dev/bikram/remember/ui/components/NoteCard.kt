@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialShapes
@@ -66,6 +67,7 @@ import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.nav.noteMorphContainer
 import dev.bikram.remember.ui.theme.LocalHeroOnCards
+import dev.bikram.remember.ui.theme.LocalShowNoteContentOnCards
 import dev.bikram.remember.ui.theme.MorphPolygonShape
 import dev.bikram.remember.ui.theme.elevatedCardColors
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -117,6 +119,7 @@ fun NoteCard(
     val visibleTags = model.visibleTags
     val hasTagStrip = visibleTags.isNotEmpty()
     val heroEnabled = LocalHeroOnCards.current
+    val showNoteContent = LocalShowNoteContentOnCards.current
     val heroPictureUri = model.pictureUri?.takeIf { heroEnabled }
     val showHero = heroPictureUri != null
     val surface = MaterialTheme.colorScheme.surface
@@ -161,14 +164,16 @@ fun NoteCard(
             model.hasAttachment,
             model.visibleTags,
             selected,
+            showNoteContent,
         ) {
             buildList {
                 add(if (model.kind == NoteKind.LIST) cdListPrefix else cdNotePrefix)
                 if (selected) add(cdSelected)
                 if (model.completed) add(cdCompleted)
                 // Body preview is meaningful for note cards; list cards visually show
-                // checklist items, not the body, so we skip it for those.
-                if (model.kind != NoteKind.LIST && model.body.isNotBlank()) {
+                // checklist items, not the body, so we skip it for those. Hidden entirely
+                // when the user turns off note content on cards.
+                if (showNoteContent && model.kind != NoteKind.LIST && model.body.isNotBlank()) {
                     val firstLine =
                         model.body.lineSequence().firstOrNull { it.isNotBlank() }
                             ?: model.body
@@ -328,6 +333,8 @@ fun NoteCard(
             // the call site), so those affordances always win the corner. The star is
             // ornament-only -- TalkBack ignores it because the parent Surface already
             // declares mergeDescendants and contentDescription includes "Starred".
+            // matchParentSize keeps the 96dp glyph out of the card's height: otherwise
+            // a compact card (title and metadata only) grows to fit the watermark.
             if (model.starred) {
                 RememberMaterialRoundedSymbol(
                     name = "star",
@@ -337,7 +344,8 @@ fun NoteCard(
                     weight = FontWeight.Bold,
                     modifier =
                         Modifier
-                            .align(Alignment.TopEnd)
+                            .matchParentSize()
+                            .wrapContentSize(align = Alignment.TopEnd, unbounded = true)
                             .graphicsLayer {
                                 rotationZ = -15f
                                 alpha = 0.28f
@@ -463,31 +471,33 @@ fun NoteCard(
                         // yellow tint on the card surface; the announcement still
                         // includes "Starred" via the parent contentDescription.
                     }
-                    Spacer(Modifier.height(6.dp))
-                    when (model.kind) {
-                        NoteKind.NOTE -> {
-                            if (model.body.isNotBlank()) {
-                                MarkdownText(
-                                    markdown = model.body,
-                                    style = MaterialTheme.typography.bodyMedium.copy(color = cardContentColor),
-                                    maxLines = 3,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.alpha(0.82f),
-                                )
-                            } else {
-                                Text(
-                                    text = stringResource(R.string.common_empty_note),
-                                    style = MaterialTheme.typography.bodyMedium.copy(color = cardContentColor),
-                                    modifier = Modifier.alpha(0.5f),
-                                )
+                    if (showNoteContent) {
+                        Spacer(Modifier.height(6.dp))
+                        when (model.kind) {
+                            NoteKind.NOTE -> {
+                                if (model.body.isNotBlank()) {
+                                    MarkdownText(
+                                        markdown = model.body,
+                                        style = MaterialTheme.typography.bodyMedium.copy(color = cardContentColor),
+                                        maxLines = 3,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.alpha(0.82f),
+                                    )
+                                } else {
+                                    Text(
+                                        text = stringResource(R.string.common_empty_note),
+                                        style = MaterialTheme.typography.bodyMedium.copy(color = cardContentColor),
+                                        modifier = Modifier.alpha(0.5f),
+                                    )
+                                }
                             }
+                            NoteKind.LIST ->
+                                ChecklistPreview(
+                                    items = model.checklistPreviewItems,
+                                    hiddenCount = model.checklistHiddenItemCount,
+                                    contentColor = cardContentColor,
+                                )
                         }
-                        NoteKind.LIST ->
-                            ChecklistPreview(
-                                items = model.checklistPreviewItems,
-                                hiddenCount = model.checklistHiddenItemCount,
-                                contentColor = cardContentColor,
-                            )
                     }
                     MetadataRow(
                         model = model,

@@ -17,8 +17,8 @@ val rememberCompileSdk = 37
 val rememberCompileSdkMinor = 2
 val rememberMinSdk = 31
 val rememberTargetSdk = 37
-val versionCode = 10902
-val versionName = "1.9.2"
+val versionCode = 10903
+val versionName = "1.9.3"
 
 kotlin {
     jvmToolchain(

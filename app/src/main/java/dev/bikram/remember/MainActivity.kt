@@ -4,11 +4,12 @@ import android.app.Activity
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.service.quicksettings.TileService
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
-import androidx.biometric.BiometricManager
 import androidx.activity.enableEdgeToEdge
+import androidx.biometric.BiometricManager
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,8 @@ import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
 import dev.bikram.remember.data.NoteRepository
+import dev.bikram.remember.data.NotesUiPrefs
+import dev.bikram.remember.data.NotesUiState
 import dev.bikram.remember.data.OnboardingPrefs
 import dev.bikram.remember.data.OnboardingState
 import dev.bikram.remember.data.TagRepository
@@ -73,6 +76,8 @@ class MainActivity : FragmentActivity() {
     @Inject lateinit var tagRepository: TagRepository
 
     @Inject lateinit var themePrefs: ThemePrefs
+
+    @Inject lateinit var notesUiPrefs: NotesUiPrefs
 
     @Inject lateinit var interactionPrefs: InteractionPrefs
 
@@ -119,6 +124,7 @@ class MainActivity : FragmentActivity() {
         )
         handleIntent(intent)
         applicationScope.launch { themePrefs.migrateLegacyColorSourceIfNeeded() }
+        applicationScope.launch { notesUiPrefs.migrateFromThemePrefsIfNeeded() }
         applicationScope.launch { themePrefs.migrateLegacyBlackThemeIfNeeded() }
         applicationScope.launch { openSettingsUpdatesIfAppWasUpdated() }
         setContent {
@@ -126,6 +132,9 @@ class MainActivity : FragmentActivity() {
             val systemPaneScaffoldDirective = calculatePaneScaffoldDirective(systemWindowAdaptiveInfo)
             val themeState by themePrefs.state.collectAsStateWithLifecycle(
                 initialValue = ThemeState(),
+            )
+            val notesUiState by notesUiPrefs.state.collectAsStateWithLifecycle(
+                initialValue = NotesUiState(),
             )
             val systemDark = isSystemInDarkTheme()
             val darkTheme = themeState.themeMode.effectiveDarkTheme(systemDark)
@@ -149,6 +158,7 @@ class MainActivity : FragmentActivity() {
             ) {
                 RememberTheme(
                     themeState = themeState,
+                    notesUiState = notesUiState,
                     hapticFeedbackEnabled = interactionState.hapticFeedbackEnabled,
                 ) {
                     AppRoot(
@@ -198,6 +208,9 @@ class MainActivity : FragmentActivity() {
             ACTION_SHORTCUT_NEW_LIST -> {
                 pendingLaunch.value = LaunchAction.NewList
             }
+            // QS tile long-press. The manifest filter makes the system open Remember
+            // instead of App Info. Bring the current screen forward and do not start a note.
+            TileService.ACTION_QS_TILE_PREFERENCES -> Unit
             Intent.ACTION_VIEW -> {
                 val shortcut = intent.getStringExtra("action")
                 val openId = intent.getLongExtra(EXTRA_OPEN_NOTE_ID, -1L)

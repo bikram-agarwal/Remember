@@ -5,6 +5,7 @@ import dev.bikram.remember.data.BackupSettingsRestoreOutcome
 import dev.bikram.remember.data.DefaultNotePrefs
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.LockPrefs
+import dev.bikram.remember.data.NotesUiPrefs
 import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.ThemePrefs
@@ -14,6 +15,7 @@ import org.json.JSONObject
 
 object SettingsBackup {
     const val KEY_THEME = "theme_prefs"
+    const val KEY_NOTES_UI = "notes_ui_prefs"
     const val KEY_VIEW_OPTIONS = "view_options_prefs"
     const val KEY_LOCK = "lock_prefs"
     const val KEY_INTERACTION = "interaction_prefs"
@@ -25,6 +27,7 @@ object SettingsBackup {
 
     suspend fun exportJson(
         themePrefs: ThemePrefs,
+        notesUiPrefs: NotesUiPrefs,
         viewOptionsPrefs: ViewOptionsPrefs,
         lockPrefs: LockPrefs,
         interactionPrefs: InteractionPrefs,
@@ -36,6 +39,7 @@ object SettingsBackup {
     ): JSONObject =
         JSONObject().apply {
             put(KEY_THEME, themePrefs.exportForBackup())
+            put(KEY_NOTES_UI, notesUiPrefs.exportForBackup())
             put(KEY_VIEW_OPTIONS, viewOptionsPrefs.exportForBackup())
             put(KEY_LOCK, lockPrefs.exportForBackup())
             put(KEY_INTERACTION, interactionPrefs.exportForBackup())
@@ -49,6 +53,7 @@ object SettingsBackup {
     suspend fun importJson(
         root: JSONObject?,
         themePrefs: ThemePrefs,
+        notesUiPrefs: NotesUiPrefs,
         viewOptionsPrefs: ViewOptionsPrefs,
         lockPrefs: LockPrefs,
         interactionPrefs: InteractionPrefs,
@@ -59,7 +64,9 @@ object SettingsBackup {
         updatePrefs: UpdatePrefs,
     ): BackupSettingsRestoreOutcome {
         if (root == null) return BackupSettingsRestoreOutcome()
-        themePrefs.importFromBackup(root.optJSONObject(KEY_THEME))
+        val themeJson = root.optJSONObject(KEY_THEME)
+        themePrefs.importFromBackup(themeJson)
+        notesUiPrefs.importFromBackup(root.optJSONObject(KEY_NOTES_UI), themeJson)
         viewOptionsPrefs.importFromBackup(root.optJSONObject(KEY_VIEW_OPTIONS))
         lockPrefs.importFromBackup(root.optJSONObject(KEY_LOCK))
         interactionPrefs.importFromBackup(root.optJSONObject(KEY_INTERACTION))
