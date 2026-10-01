@@ -2,6 +2,7 @@ package dev.bikram.remember.data
 
 import androidx.room.withTransaction
 import dev.bikram.remember.reminders.ReminderScheduler
+import dev.bikram.remember.reminders.needsCriticalRepeat
 
 /**
  * Everything a note's reminders need once the note itself is stored: resolving which reminder
@@ -80,6 +81,14 @@ internal class NoteReminderCoordinator(
     }
 
     suspend fun reminderSummaryItems(now: Long): List<NoteWithItems> = noteDao.activeRemindersUntil(now + REMINDER_SUMMARY_WINDOW_MILLIS)
+
+    suspend fun refreshCriticalReminderRepeat() {
+        val schedulerNonNull = scheduler ?: return
+        val now = clock()
+        schedulerNonNull.reconcileCriticalRepeat(noteDao.activeRemindersUntil(now).map { row -> row.note }, now)
+    }
+
+    suspend fun criticalRepeatNotes(now: Long): List<NoteWithItems> = noteDao.activeRemindersUntil(now).filter { row -> needsCriticalRepeat(row.note, now) }
 
     /**
      * Consume the currently due recurring occurrence after the user marks it done. Merely

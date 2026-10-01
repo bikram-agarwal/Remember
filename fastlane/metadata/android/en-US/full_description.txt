@@ -3,7 +3,7 @@ Remember is built around one simple idea: if you dismiss a reminder without fini
 Mark the note done, and the reminder is gone for good.
 
 <b>━━ 📌 REMINDERS THAT STICK ━━</b>
-Automatically restore accidentally dismissed reminder notifications until they are actually done. Choose from normal reminders, high-importance reminders with heads-up alerts, or a quiet summary notification that keeps overdue and upcoming items pinned in your notification shade.
+Automatically restore accidentally dismissed reminder notifications until they are actually done. Choose from normal reminders, high-importance reminders with heads-up alerts, critical reminders that ring like an alarm every 15 minutes until done, or a quiet summary notification that keeps overdue and upcoming items pinned in your notification shade.
 
 <b>━━ 🔔 NOTIFICATION ACTIONS ━━</b>
 Add useful one-tap actions directly to reminder notifications so you can act without opening the app:

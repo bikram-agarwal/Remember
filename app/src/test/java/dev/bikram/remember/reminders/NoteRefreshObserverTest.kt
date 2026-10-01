@@ -1,6 +1,7 @@
 package dev.bikram.remember.reminders
 
 import dev.bikram.remember.data.ChecklistItemEntity
+import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
@@ -30,6 +31,7 @@ class NoteRefreshObserverTest {
             assertEquals(1, fixture.widgetRefreshes)
             assertEquals(1, fixture.summaryRefreshes)
             assertEquals(1, fixture.activeNotificationRefreshes)
+            assertEquals(1, fixture.criticalRepeatRefreshes)
             assertEquals(1, fixture.notes.subscriptionCount.value)
             assertEquals(1, fixture.preferences.subscriptionCount.value)
 
@@ -48,6 +50,7 @@ class NoteRefreshObserverTest {
             assertEquals(1, fixture.widgetRefreshes)
             assertEquals(1, fixture.summaryRefreshes)
             assertEquals(1, fixture.activeNotificationRefreshes)
+            assertEquals(1, fixture.criticalRepeatRefreshes)
 
             observer.cancel()
             runCurrent()
@@ -170,6 +173,54 @@ class NoteRefreshObserverTest {
         }
 
     @Test
+    fun critical_reminder_changes_reconcile_the_shared_repeat() =
+        runTest {
+            val critical = note(id = 1L, reminderAt = 1_000L, importance = Importance.CRITICAL)
+            val fixture = RefreshFixture(listOf(critical))
+            fixture.start(this)
+            runCurrent()
+            assertEquals(1, fixture.criticalRepeatRefreshes)
+
+            val lowered = critical.note.copy(importance = Importance.HIGH)
+            val snoozed = critical.note.copy(reminderAt = 2_000L)
+            val completed = critical.note.copy(completedAt = 3_000L)
+            val snapshots =
+                listOf(
+                    listOf(critical.copy(note = lowered)),
+                    listOf(critical),
+                    listOf(critical.copy(note = snoozed)),
+                    listOf(critical.copy(note = completed)),
+                    listOf(critical),
+                    emptyList(), // Archive, trash, or deletion removes the active note.
+                )
+            snapshots.forEachIndexed { index, notes ->
+                fixture.notes.emit(notes)
+                runCurrent()
+                assertEquals(index + 2, fixture.criticalRepeatRefreshes)
+            }
+        }
+
+    @Test
+    fun edits_that_leave_critical_reminders_unchanged_do_not_reconcile_the_repeat() =
+        runTest {
+            val critical = note(id = 1L, reminderAt = 1_000L, importance = Importance.CRITICAL)
+            val high = note(id = 2L, reminderAt = 1_000L, importance = Importance.HIGH)
+            val fixture = RefreshFixture(listOf(critical, high))
+            fixture.start(this)
+            runCurrent()
+
+            fixture.notes.emit(
+                listOf(
+                    critical.copy(note = critical.note.copy(title = "Renamed", pinnedAt = 2_000L)),
+                    high.copy(note = high.note.copy(reminderAt = 5_000L)),
+                ),
+            )
+            runCurrent()
+            assertEquals(2, fixture.widgetRefreshes)
+            assertEquals(1, fixture.criticalRepeatRefreshes)
+        }
+
+    @Test
     fun latest_database_change_is_retained_while_widget_refresh_is_busy() =
         runTest {
             val fixture = RefreshFixture(emptyList())
@@ -201,6 +252,7 @@ class NoteRefreshObserverTest {
         var widgetRefreshes = 0
         var summaryRefreshes = 0
         var activeNotificationRefreshes = 0
+        var criticalRepeatRefreshes = 0
         var widgetRefreshGate: CompletableDeferred<Unit>? = null
         var lastWidgetNoteIds = emptyList<Long>()
 
@@ -221,6 +273,7 @@ class NoteRefreshObserverTest {
                 },
                 refreshSummary = { summaryRefreshes++ },
                 refreshActiveNotifications = { activeNotificationRefreshes++ },
+                refreshCriticalRepeat = { criticalRepeatRefreshes++ },
                 computationDispatcher = StandardTestDispatcher(scope.testScheduler),
             )
         }
@@ -230,6 +283,7 @@ class NoteRefreshObserverTest {
     private fun note(
         id: Long,
         reminderAt: Long? = null,
+        importance: Importance = Importance.DEFAULT,
     ): NoteWithItems {
         return NoteWithItems(
             note =
@@ -244,6 +298,7 @@ class NoteRefreshObserverTest {
                     createdAt = 0L,
                     updatedAt = 0L,
                     reminderAt = reminderAt,
+                    importance = importance,
                 ),
             items = emptyList(),
         )

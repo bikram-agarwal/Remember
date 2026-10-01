@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.SystemClock
 import android.provider.Settings
 import androidx.activity.result.ActivityResultLauncher
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -40,6 +41,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import dev.bikram.remember.R
+import dev.bikram.remember.data.CriticalRingDuration
 import dev.bikram.remember.data.QuickCapturePrefs
 import dev.bikram.remember.data.QuickCaptureState
 import dev.bikram.remember.data.ReminderPreferencesState
@@ -70,6 +72,7 @@ import kotlinx.coroutines.launch
  *     reminder sheet chips and the snooze sheet).
  *   - Reminder summary notification (the persistent multi-reminder summary).
  *   - Quick-capture persistent notification.
+ *   - Critical ring duration: how long each Critical alert rings.
  *
  * Pulled out of [SettingsRoute] in audit 3.1.
  */
@@ -283,6 +286,14 @@ internal fun RemindersSection(
                 },
             )
         }
+        GroupedListItem(position = GroupPosition.MIDDLE) {
+            CriticalRingDurationRow(
+                duration = reminderState.criticalRingDuration,
+                onSelect = { selected ->
+                    scope.launch { reminderPrefs.setCriticalRingDuration(selected) }
+                },
+            )
+        }
         GroupedListItem(
             position = GroupPosition.LAST,
             modifier =
@@ -419,6 +430,71 @@ private fun SnoozeTypeRow(
         }
     }
 }
+
+@Composable
+private fun CriticalRingDurationRow(
+    duration: CriticalRingDuration,
+    onSelect: (CriticalRingDuration) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .appClickable { expanded = true }
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        RememberMaterialRoundedSymbol(
+            name = "alarm",
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            weight = FontWeight.Medium,
+        )
+        Spacer(Modifier.width(16.dp))
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                stringResource(R.string.settings_critical_ring_duration_title),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Text(
+                stringResource(R.string.settings_critical_ring_duration_desc),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        RememberOutlinedButton(onClick = { expanded = true }) {
+            Text(stringResource(duration.labelRes()))
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false },
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            ) {
+                CriticalRingDuration.entries.forEach { option ->
+                    RememberDropdownMenuItem(
+                        text = { Text(stringResource(option.labelRes())) },
+                        onClick = {
+                            onSelect(option)
+                            expanded = false
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+@StringRes
+private fun CriticalRingDuration.labelRes(): Int =
+    when (this) {
+        CriticalRingDuration.THIRTY_SECONDS -> R.string.settings_critical_ring_duration_30_seconds
+        CriticalRingDuration.ONE_MINUTE -> R.string.settings_critical_ring_duration_1_minute
+        CriticalRingDuration.TWO_MINUTES -> R.string.settings_critical_ring_duration_2_minutes
+        CriticalRingDuration.FIVE_MINUTES -> R.string.settings_critical_ring_duration_5_minutes
+    }
 
 /**
  * Builds the intent that opens the system "app notifications" settings page for this

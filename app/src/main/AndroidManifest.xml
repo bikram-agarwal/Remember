@@ -138,6 +138,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".reminders.CriticalReminderRepeatReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".reminders.BootReceiver"
             android:exported="true">
             <intent-filter>

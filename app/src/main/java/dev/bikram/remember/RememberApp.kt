@@ -102,6 +102,7 @@ class RememberApp :
             refreshWidgets = notesWidgetUpdater::refreshAll,
             refreshSummary = noteRepository::refreshReminderSummaryNotification,
             refreshActiveNotifications = noteRepository::refreshActiveReminderNotifications,
+            refreshCriticalRepeat = noteRepository::refreshCriticalReminderRepeat,
         )
         observeQuickCapturePref()
         backupExportCoordinator.start()
@@ -180,27 +181,30 @@ class RememberApp :
         // sound. A silent or sound-less HIGH channel does not heads-up. The audio
         // attributes use USAGE_NOTIFICATION_RINGTONE so the system treats this as a
         // user-attention sound that bypasses normal media-volume ducking rules.
-        val highChannel =
-            NotificationChannel(
-                ReminderScheduler.CHANNEL_ID_HIGH,
-                getString(R.string.notification_channel_reminders_high),
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = getString(R.string.notification_channel_reminders_high_desc)
-                enableVibration(true)
-                vibrationPattern = longArrayOf(0, 250, 200, 250)
-                enableLights(true)
-                setBypassDnd(true)
-                setSound(
-                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
-                    AudioAttributes
-                        .Builder()
-                        .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build(),
-                )
-            }
-        notificationManager.createNotificationChannel(highChannel)
+        notificationManager.createNotificationChannel(
+            alertingReminderChannel(
+                id = ReminderScheduler.CHANNEL_ID_HIGH,
+                name = getString(R.string.notification_channel_reminders_high),
+                description = getString(R.string.notification_channel_reminders_high_desc),
+                soundType = RingtoneManager.TYPE_NOTIFICATION,
+                soundUsage = AudioAttributes.USAGE_NOTIFICATION_RINGTONE,
+            ),
+        )
+        // Critical is configured like High but plays on the alarm stream: its volume is the
+        // alarm volume, which silent and vibrate ringer modes do not mute. Critical alerts loop
+        // their sound, so the default is the user's alarm tone, which is made to loop; a short
+        // notification tone would loop as a run of separate pings. An alarm-stream channel also
+        // makes the system sound picker offer alarm tones. The separate channel lets its sound be
+        // customised in system settings without changing High.
+        notificationManager.createNotificationChannel(
+            alertingReminderChannel(
+                id = ReminderScheduler.CHANNEL_ID_CRITICAL,
+                name = getString(R.string.notification_channel_reminders_critical),
+                description = getString(R.string.notification_channel_reminders_critical_desc),
+                soundType = RingtoneManager.TYPE_ALARM,
+                soundUsage = AudioAttributes.USAGE_ALARM,
+            ),
+        )
 
         val summaryChannel =
             NotificationChannel(
@@ -214,4 +218,27 @@ class RememberApp :
             }
         notificationManager.createNotificationChannel(summaryChannel)
     }
+
+    private fun alertingReminderChannel(
+        id: String,
+        name: String,
+        description: String,
+        soundType: Int,
+        soundUsage: Int,
+    ): NotificationChannel =
+        NotificationChannel(id, name, NotificationManager.IMPORTANCE_HIGH).apply {
+            this.description = description
+            enableVibration(true)
+            vibrationPattern = longArrayOf(0, 250, 200, 250)
+            enableLights(true)
+            setBypassDnd(true)
+            setSound(
+                RingtoneManager.getDefaultUri(soundType),
+                AudioAttributes
+                    .Builder()
+                    .setUsage(soundUsage)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build(),
+            )
+        }
 }

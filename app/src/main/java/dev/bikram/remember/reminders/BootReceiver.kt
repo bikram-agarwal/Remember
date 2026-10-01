@@ -48,6 +48,9 @@ class BootReceiver : BroadcastReceiver() {
                     )
                 }
                 noteRepository.refreshReminderSummaryNotification()
+                // Alarms do not survive a reboot, and a backwards clock change can leave the
+                // pending repeat far out; reconciling re-books it within one interval.
+                noteRepository.refreshCriticalReminderRepeat()
                 // Re-post the quick-capture notification if the user has it enabled. The
                 // notification is cleared by the OS on reboot, and the flow-based observer
                 // may not fire quickly enough before the broadcast's pending-result window

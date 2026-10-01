@@ -15,10 +15,21 @@ enum class SnoozeType {
     ABSOLUTE,
 }
 
+/** How long a Critical reminder rings each time it alerts. Stored by name. */
+enum class CriticalRingDuration(
+    val millis: Long,
+) {
+    THIRTY_SECONDS(30_000L),
+    ONE_MINUTE(60_000L),
+    TWO_MINUTES(120_000L),
+    FIVE_MINUTES(300_000L),
+}
+
 data class ReminderPreferencesState(
     val keepReminderNotificationsUntilDone: Boolean = false,
     val reminderSummaryNotificationEnabled: Boolean = false,
     val snoozeType: SnoozeType = SnoozeType.RELATIVE,
+    val criticalRingDuration: CriticalRingDuration = CriticalRingDuration.ONE_MINUTE,
 )
 
 private val Context.reminderDataStore by preferencesDataStore(name = "reminder_prefs")
@@ -30,6 +41,7 @@ class ReminderPrefs(
         val KEEP_UNTIL_DONE = booleanPreferencesKey("keep_reminder_notifications_until_done")
         val SUMMARY_NOTIFICATION = booleanPreferencesKey("reminder_summary_notification")
         val SNOOZE_TYPE = stringPreferencesKey("snooze_type")
+        val CRITICAL_RING_DURATION = stringPreferencesKey("critical_ring_duration")
     }
 
     val state: Flow<ReminderPreferencesState> =
@@ -41,6 +53,10 @@ class ReminderPrefs(
                     prefs[Keys.SNOOZE_TYPE]?.let { raw ->
                         runCatching { SnoozeType.valueOf(raw) }.getOrNull()
                     } ?: SnoozeType.RELATIVE,
+                criticalRingDuration =
+                    prefs[Keys.CRITICAL_RING_DURATION]?.let { raw ->
+                        runCatching { CriticalRingDuration.valueOf(raw) }.getOrNull()
+                    } ?: CriticalRingDuration.ONE_MINUTE,
             )
         }
 
@@ -64,6 +80,12 @@ class ReminderPrefs(
         }
     }
 
+    suspend fun setCriticalRingDuration(duration: CriticalRingDuration) {
+        context.reminderDataStore.edit { prefs ->
+            prefs[Keys.CRITICAL_RING_DURATION] = duration.name
+        }
+    }
+
     suspend fun exportForBackup(): JSONObject {
         val prefs = context.reminderDataStore.data.first()
         return JSONObject().apply {
@@ -72,6 +94,10 @@ class ReminderPrefs(
             put(
                 Keys.SNOOZE_TYPE.name,
                 prefs[Keys.SNOOZE_TYPE] ?: SnoozeType.RELATIVE.name,
+            )
+            put(
+                Keys.CRITICAL_RING_DURATION.name,
+                prefs[Keys.CRITICAL_RING_DURATION] ?: CriticalRingDuration.ONE_MINUTE.name,
             )
         }
     }
@@ -90,6 +116,13 @@ class ReminderPrefs(
                     runCatching { SnoozeType.valueOf(json.getString(Keys.SNOOZE_TYPE.name)) }.getOrNull()
                 if (snoozeType != null) {
                     mutable[Keys.SNOOZE_TYPE] = snoozeType.name
+                }
+            }
+            if (json.has(Keys.CRITICAL_RING_DURATION.name) && !json.isNull(Keys.CRITICAL_RING_DURATION.name)) {
+                val duration =
+                    runCatching { CriticalRingDuration.valueOf(json.getString(Keys.CRITICAL_RING_DURATION.name)) }.getOrNull()
+                if (duration != null) {
+                    mutable[Keys.CRITICAL_RING_DURATION] = duration.name
                 }
             }
         }

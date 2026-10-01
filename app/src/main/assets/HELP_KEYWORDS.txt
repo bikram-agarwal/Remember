@@ -38,8 +38,18 @@ battery saver -> Troubleshooting reminders | Notification permission and reliabi
 background restriction -> Notification permission and reliability
 reliable reminder -> Notification permission and reliability
 
-high importance -> Importance: Low, Normal, and High
-heads-up reminder -> Importance: Low, Normal, and High
+high importance -> Importance: Low, Normal, High, and Critical
+heads-up reminder -> Importance: Low, Normal, High, and Critical
+critical importance -> Importance: Low, Normal, High, and Critical
+critical reminder -> Importance: Low, Normal, High, and Critical
+repeating alert -> Importance: Low, Normal, High, and Critical
+nag until done -> Importance: Low, Normal, High, and Critical
+alarm volume -> Importance: Low, Normal, High, and Critical
+ring on silent -> Importance: Low, Normal, High, and Critical
+ring duration -> Importance: Low, Normal, High, and Critical
+ring like an alarm -> Importance: Low, Normal, High, and Critical
+alarm tone -> Importance: Low, Normal, High, and Critical
+keeps ringing -> Importance: Low, Normal, High, and Critical
 
 # --- Restore notifications / persistent reminders ---
 keep reminding -> Restore notifications

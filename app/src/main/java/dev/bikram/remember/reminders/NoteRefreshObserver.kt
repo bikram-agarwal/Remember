@@ -1,8 +1,10 @@
 package dev.bikram.remember.reminders
 
+import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.ReminderPreferencesState
 import dev.bikram.remember.data.Visibility
+import dev.bikram.remember.data.getActiveReminders
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +32,7 @@ internal fun CoroutineScope.observeNoteRefreshes(
     refreshWidgets: suspend () -> Unit,
     refreshSummary: suspend () -> Unit,
     refreshActiveNotifications: suspend () -> Unit,
+    refreshCriticalRepeat: suspend () -> Unit,
     computationDispatcher: CoroutineDispatcher = Dispatchers.Default,
 ): Job {
     return launch {
@@ -79,6 +82,24 @@ internal fun CoroutineScope.observeNoteRefreshes(
                 }.distinctUntilChanged()
                     .conflate()
                     .collect { refreshSummary() }
+            }
+            launch {
+                // Includes the first snapshot so each process start restores, or clears, the
+                // shared repeat. Afterwards only changes to the Critical notes' reminders
+                // matter: done, snooze, importance, archive, and trash all alter this map.
+                notes
+                    .map { rows ->
+                        buildMap {
+                            for (row in rows) {
+                                val note = row.note
+                                if (note.importance != Importance.CRITICAL || note.completedAt != null) continue
+                                put(note.id, note.getActiveReminders().map { reminder -> reminder.reminderAt })
+                            }
+                        }
+                    }.distinctUntilChanged()
+                    .flowOn(computationDispatcher)
+                    .conflate()
+                    .collect { refreshCriticalRepeat() }
             }
             launch {
                 preferences

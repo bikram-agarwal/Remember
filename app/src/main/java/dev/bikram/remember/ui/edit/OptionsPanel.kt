@@ -1075,6 +1075,7 @@ private fun Importance.description(): String =
             Importance.LOW -> R.string.importance_low_description
             Importance.DEFAULT -> R.string.importance_default_description
             Importance.HIGH -> R.string.importance_high_description
+            Importance.CRITICAL -> R.string.importance_critical_description
         },
     )
 

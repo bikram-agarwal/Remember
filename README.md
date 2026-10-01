@@ -27,6 +27,7 @@ See [the differences between the Play Store, F-Droid, and GitHub versions](docs/
 - **Multiple reminders per note.** Add up to three reminders to the same note, each with its own time and repeat pattern.
 - **Action buttons in the notification.** A reminder to call someone shows a call button right there. A reminder to pick something up shows directions. You can act on the reminder right from the notification.
 - **High-importance mode.** Heads-up alerts, sound, and vibration for the things that cannot wait.
+- **Critical mode.** For the things you must not miss: rings like an alarm — your alarm tone, at alarm volume, even on silent — for as long as you choose, then again every 15 minutes until you mark it done. Gets through Do Not Disturb when it allows alarms.
 - **Recurring reminders.** Simple intervals (*daily, weekly, monthly, yearly*) or calendar-grade patterns like *the last Friday of every month* — the kind most reminder apps can't do. With an end date or repeat count. When you mark one done, the next is automatically scheduled.
 - **Reminder summary.** A silent, persistent notification in the shade showing everything overdue and coming up — no sound, no interruption, just always there to keep you informed.
 - **Reliable on Android.** Remember requests the permissions that make scheduled reminders actually fire — exact alarm access, battery optimization exemptions — and walks you through enabling them.

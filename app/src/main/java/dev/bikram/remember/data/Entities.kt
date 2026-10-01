@@ -12,8 +12,13 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class NoteKind { NOTE, LIST }
 
+/**
+ * Stored by [name] in Room and backups, so constants may be appended but never renamed.
+ * [CRITICAL] behaves like [HIGH] when it fires and then re-alerts every 15 minutes until the
+ * note is done (see `CriticalReminderRepeat.kt`).
+ */
 @Serializable
-enum class Importance { LOW, DEFAULT, HIGH }
+enum class Importance { LOW, DEFAULT, HIGH, CRITICAL }
 
 @StringRes
 fun Importance.labelRes(): Int =
@@ -21,7 +26,12 @@ fun Importance.labelRes(): Int =
         Importance.LOW -> R.string.importance_low
         Importance.DEFAULT -> R.string.importance_default
         Importance.HIGH -> R.string.importance_high
+        Importance.CRITICAL -> R.string.importance_critical
     }
+
+/** HIGH and CRITICAL both fire as alarm clocks with heads-up, sound, and vibration. */
+val Importance.alertsAsAlarm: Boolean
+    get() = this == Importance.HIGH || this == Importance.CRITICAL
 
 @Serializable
 enum class Visibility { DEFAULT, PRIVATE, SECRET }

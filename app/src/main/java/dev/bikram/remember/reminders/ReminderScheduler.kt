@@ -17,11 +17,14 @@ import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.Visibility
+import dev.bikram.remember.data.alertsAsAlarm
 import dev.bikram.remember.data.getActiveReminders
 import dev.bikram.remember.diagnostics.DiagnosticLog
 import dev.bikram.remember.notifications.canPostNotifications
 import dev.bikram.remember.notifications.postNotificationIfAllowed
 import dev.bikram.remember.ui.edit.iconEmojiPayload
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -29,6 +32,8 @@ class ReminderScheduler(
     private val context: Context,
     private val reminderPrefs: ReminderPrefs? = null,
 ) {
+    private val criticalRepeatStore = CriticalRepeatStore(context)
+
     @SuppressLint("MissingPermission")
     fun schedule(
         noteId: Long,
@@ -42,7 +47,7 @@ class ReminderScheduler(
         scheduleWithExactAlarmFallback(
             canScheduleExactAlarms = am.canScheduleExactAlarms(),
             scheduleExact = {
-                if (importance == Importance.HIGH) {
+                if (importance.alertsAsAlarm) {
                     // Alarm clocks bypass Doze and expose the system's next-alarm indicator,
                     // but still require exact-alarm access, just like setExactAndAllowWhileIdle.
                     am.setAlarmClock(AlarmManager.AlarmClockInfo(whenMillis, openAppPendingIntent()), pi)
@@ -102,6 +107,107 @@ class ReminderScheduler(
         for (index in 0 until MAX_REMINDERS_PER_NOTE) {
             am.cancel(pendingIntent(noteId, index))
         }
+    }
+
+    /**
+     * Starts or stops the shared Critical repeat to match [notes], which may be any superset of
+     * the notes that still need it. Cheap to call on every change: a pending tick keeps its time.
+     */
+    suspend fun reconcileCriticalRepeat(
+        notes: List<NoteEntity>,
+        now: Long,
+    ) {
+        if (notes.any { note -> needsCriticalRepeat(note, now) }) {
+            ensureCriticalRepeat(now)
+        } else {
+            cancelCriticalRepeat()
+        }
+    }
+
+    /**
+     * Books the shared Critical repeat unless a tick is already pending. A pending tick is
+     * re-registered at its stored time, which also restores an alarm the system dropped.
+     */
+    suspend fun ensureCriticalRepeat(now: Long) =
+        criticalRepeatMutex.withLock {
+            setCriticalRepeatAlarm(nextCriticalRepeatAt(criticalRepeatStore.nextAt(), now))
+        }
+
+    /** Books the tick after the one that just fired. */
+    suspend fun scheduleNextCriticalRepeat(now: Long) =
+        criticalRepeatMutex.withLock {
+            setCriticalRepeatAlarm(now + CRITICAL_REPEAT_INTERVAL_MILLIS)
+        }
+
+    /** Ends the shared repeat and any pending ring stop: no Critical note still needs either. */
+    suspend fun cancelCriticalRepeat() =
+        criticalRepeatMutex.withLock {
+            val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+            am.cancel(criticalAlarmPendingIntent(ACTION_REPEAT_CRITICAL, CRITICAL_REPEAT_REQUEST_CODE))
+            am.cancel(criticalAlarmPendingIntent(ACTION_STOP_CRITICAL_RING, CRITICAL_RING_STOP_REQUEST_CODE))
+            criticalRepeatStore.clear()
+        }
+
+    /**
+     * Books the end of the current Critical ring. One shared timer, like the repeat: a later
+     * ring replaces it, so the most recent ring always gets its full duration. Nothing is
+     * persisted because a ring cannot outlive the alarm - reboots and force stops clear the
+     * notification, and with it the sound.
+     */
+    fun scheduleCriticalRingStop(whenMillis: Long) {
+        setCriticalAlarmClock(
+            whenMillis,
+            criticalAlarmPendingIntent(ACTION_STOP_CRITICAL_RING, CRITICAL_RING_STOP_REQUEST_CODE),
+            "critical reminder ring stop",
+        )
+    }
+
+    private suspend fun setCriticalRepeatAlarm(whenMillis: Long) {
+        setCriticalAlarmClock(
+            whenMillis,
+            criticalAlarmPendingIntent(ACTION_REPEAT_CRITICAL, CRITICAL_REPEAT_REQUEST_CODE),
+            "critical reminder repeat",
+        )
+        criticalRepeatStore.setNextAt(whenMillis)
+    }
+
+    // Alarm clocks, like the first fire: the user chose Critical to be woken by it, so neither
+    // the repeat nor the end of a ring may drift under Doze - a late stop would keep ringing.
+    // The cost is the system's next-alarm indicator.
+    @SuppressLint("MissingPermission")
+    private fun setCriticalAlarmClock(
+        whenMillis: Long,
+        pi: PendingIntent,
+        label: String,
+    ) {
+        val am = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        scheduleWithExactAlarmFallback(
+            canScheduleExactAlarms = am.canScheduleExactAlarms(),
+            scheduleExact = {
+                am.setAlarmClock(AlarmManager.AlarmClockInfo(whenMillis, openAppPendingIntent()), pi)
+            },
+            scheduleInexact = {
+                am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, whenMillis, pi)
+                Log.w(TAG, "Scheduled $label with inexact alarm fallback")
+                DiagnosticLog.record(context, "Scheduled $label with inexact alarm fallback")
+            },
+        )
+    }
+
+    private fun criticalAlarmPendingIntent(
+        action: String,
+        requestCode: Int,
+    ): PendingIntent {
+        val intent =
+            Intent(context, CriticalReminderRepeatReceiver::class.java).apply {
+                this.action = action
+            }
+        return PendingIntent.getBroadcast(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     fun cancelNotification(noteId: Long) {
@@ -340,10 +446,19 @@ class ReminderScheduler(
         private const val TAG = "ReminderScheduler"
         const val MAX_REMINDERS_PER_NOTE = dev.bikram.remember.data.MAX_REMINDERS_PER_NOTE
         private val inexactFallbackScheduleCounter = AtomicInteger(0)
+        private val criticalRepeatMutex = Mutex()
 
         const val ACTION_FIRE_REMINDER = "dev.bikram.remember.reminders.FIRE"
         const val EXTRA_NOTE_ID = "note_id"
         const val EXTRA_REMINDER_INDEX = "reminder_index"
+        const val ACTION_REPEAT_CRITICAL = "dev.bikram.remember.reminders.REPEAT_CRITICAL"
+        const val ACTION_STOP_CRITICAL_RING = "dev.bikram.remember.reminders.STOP_CRITICAL_RING"
+
+        // Fixed: one shared repeat and one shared ring stop serve every Critical note. Their
+        // intents target a different receiver and action than the per-note alarms, so they
+        // cannot match one of those codes.
+        private const val CRITICAL_REPEAT_REQUEST_CODE = 0x43524954
+        private const val CRITICAL_RING_STOP_REQUEST_CODE = 0x43525354
 
         // Channel IDs are versioned (_v2 suffix) because Android freezes channel
         // settings - importance, sound, vibration - the moment a channel is first
@@ -354,6 +469,7 @@ class ReminderScheduler(
         const val CHANNEL_ID_LOW = "reminder_low_v2"
         const val CHANNEL_ID_DEFAULT = "reminder_default_v2"
         const val CHANNEL_ID_HIGH = "reminder_high_v2"
+        const val CHANNEL_ID_CRITICAL = "reminder_critical_v1"
         const val CHANNEL_ID_SUMMARY = "reminder_summary_v1"
         const val SUMMARY_NOTIFICATION_ID = 0x524D4452
         private const val SUMMARY_MAX_LINES = 7

@@ -677,6 +677,11 @@ class NoteRepository(
 
     suspend fun reminderSummaryItems(now: Long = clock()): List<NoteWithItems> = reminderCoordinator.reminderSummaryItems(now)
 
+    suspend fun refreshCriticalReminderRepeat() = reminderCoordinator.refreshCriticalReminderRepeat()
+
+    /** Active Critical notes with a due reminder, which the shared repeat re-alerts. */
+    suspend fun criticalRepeatNotes(now: Long = clock()): List<NoteWithItems> = reminderCoordinator.criticalRepeatNotes(now)
+
     suspend fun toggleItemChecked(item: ChecklistItemEntity) {
         itemDao.update(item.copy(checked = !item.checked))
     }

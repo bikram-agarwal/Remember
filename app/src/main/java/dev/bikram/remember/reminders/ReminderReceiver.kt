@@ -1,5 +1,7 @@
 package dev.bikram.remember.reminders
 
+import android.app.Notification
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -10,6 +12,7 @@ import android.graphics.ImageDecoder
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
 import android.net.Uri
+import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.IconCompat
@@ -26,6 +29,7 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.data.Visibility
+import dev.bikram.remember.data.alertsAsAlarm
 import dev.bikram.remember.data.getActiveReminders
 import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.data.toNoteActionIconBitmap
@@ -48,6 +52,8 @@ class ReminderReceiver : BroadcastReceiver() {
 
     @Inject lateinit var reminderPrefs: ReminderPrefs
 
+    @Inject lateinit var reminderScheduler: ReminderScheduler
+
     @ApplicationScope @Inject
     lateinit var applicationScope: CoroutineScope
 
@@ -65,19 +71,22 @@ class ReminderReceiver : BroadcastReceiver() {
             try {
                 val noteWithItems = noteRepository.get(noteId) ?: return@launch
                 val note = noteWithItems.note
-                if (!isReminderDeliveryCurrent(note, reminderIndex, System.currentTimeMillis())) return@launch
+                val now = System.currentTimeMillis()
+                if (!isReminderDeliveryCurrent(note, reminderIndex, now)) return@launch
 
-                val keepUntilDone =
-                    reminderPrefs
-                        .snapshot()
-                        .keepReminderNotificationsUntilDone
+                val prefs = reminderPrefs.snapshot()
                 showNotification(
                     context = context,
                     note = note,
                     items = noteWithItems.items,
                     reminderIndex = reminderIndex,
-                    keepUntilDone = keepUntilDone,
+                    keepUntilDone = prefs.keepReminderNotificationsUntilDone,
+                    scheduledAlert = true,
                 )
+                if (needsCriticalRepeat(note, now)) {
+                    reminderScheduler.ensureCriticalRepeat(now)
+                    reminderScheduler.scheduleCriticalRingStop(now + prefs.criticalRingDuration.millis)
+                }
             } finally {
                 pendingResult.finish()
             }
@@ -108,6 +117,15 @@ class ReminderReceiver : BroadcastReceiver() {
         private val notificationMarkdownUnderlineOpenRegex = Regex("""<u>""", RegexOption.IGNORE_CASE)
         private val notificationMarkdownUnderlineCloseRegex = Regex("""</u>""", RegexOption.IGNORE_CASE)
 
+        /**
+         * Posts or refreshes [note]'s reminder notification.
+         *
+         * [scheduledAlert] marks the reminder's own fire and the Critical repeat ticks. For a
+         * Critical note those posts ring continuously until the ring-stop timer, Done, Snooze,
+         * or the user opening the notification shade ends it. Every other alerting Critical post
+         * (edit, restore after dismissal, posting from the editor) sounds once like High; see
+         * [channelImportance].
+         */
         fun showNotification(
             context: Context,
             note: NoteEntity,
@@ -116,6 +134,7 @@ class ReminderReceiver : BroadcastReceiver() {
             keepUntilDone: Boolean = false,
             onlyAlertOnce: Boolean = false,
             silent: Boolean = false,
+            scheduledAlert: Boolean = false,
         ) {
             if (note.trashed) return
 
@@ -125,9 +144,10 @@ class ReminderReceiver : BroadcastReceiver() {
             }
 
             val channelId =
-                when (note.importance) {
+                when (channelImportance(note.importance, scheduledAlert, silent)) {
                     Importance.LOW -> ReminderScheduler.CHANNEL_ID_LOW
                     Importance.HIGH -> ReminderScheduler.CHANNEL_ID_HIGH
+                    Importance.CRITICAL -> ReminderScheduler.CHANNEL_ID_CRITICAL
                     Importance.DEFAULT -> ReminderScheduler.CHANNEL_ID_DEFAULT
                 }
 
@@ -139,7 +159,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setSmallIcon(R.drawable.ic_stat_remember)
                     .setContentTitle(notificationTitle(context, note))
                     .setPriority(priorityFor(note.importance))
-                    .setCategory(androidx.core.app.NotificationCompat.CATEGORY_REMINDER)
+                    .setCategory(notificationCategory(note.importance))
                     .setVisibility(notificationVisibility(note))
                     .setSilent(silent)
                     .setContentIntent(openNotePendingIntent(context, note.id))
@@ -147,6 +167,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setOngoing(false)
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(onlyAlertOnce)
+                    .addExtras(Bundle().apply { putLong(NOTIFICATION_EXTRA_NOTE_ID, note.id) })
 
             if (collapsedSummary.isNotBlank()) {
                 builder.setContentText(collapsedSummary)
@@ -175,7 +196,7 @@ class ReminderReceiver : BroadcastReceiver() {
                 )
             }
 
-            if (note.importance == Importance.HIGH) {
+            if (note.importance.alertsAsAlarm) {
                 // Heads-up + on-lockscreen popup. setDefaults provides the sound /
                 // vibration / lights pattern when the per-channel sound has been
                 // overridden by the user; the channel itself still drives behavior on
@@ -202,14 +223,44 @@ class ReminderReceiver : BroadcastReceiver() {
             builder.addAction(actionButton(context, note.id, 1, snoozeAction, shareText))
             builder.addAction(actionButton(context, note.id, 2, markDoneAction, shareText))
 
+            val notificationId = ReminderScheduler.pendingRequestCodeForNote(note.id)
+            val notification = builder.build()
+            if (ringsContinuously(note.importance, scheduledAlert, silent, onlyAlertOnce)) {
+                notification.flags = notification.flags or Notification.FLAG_INSISTENT
+            } else {
+                stopRinging(context, notificationId)
+            }
             ReminderScheduler.cancelReminderSlotNotifications(context, note.id)
             postNotificationIfAllowed(
                 context = context,
-                notificationId = ReminderScheduler.pendingRequestCodeForNote(note.id),
-                notification = builder.build(),
+                notificationId = notificationId,
+                notification = notification,
                 source = "Reminder noteId=${note.id} reminderIndex=$reminderIndex",
             )
         }
+
+        /**
+         * Ends a looping Critical ring before [notificationId] is re-posted. Android keeps an
+         * insistent sound playing through in-place updates, even silent ones; only cancelling
+         * the notification stops it. Programmatic cancels do not fire the delete intent, so
+         * Restore notifications does not treat this as a dismissal.
+         */
+        private fun stopRinging(
+            context: Context,
+            notificationId: Int,
+        ) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val ringing =
+                runCatching {
+                    notificationManager.activeNotifications.any { active ->
+                        active.id == notificationId && active.notification.flags and Notification.FLAG_INSISTENT != 0
+                    }
+                }.getOrDefault(false)
+            if (ringing) notificationManager.cancel(notificationId)
+        }
+
+        /** Note row id carried in every reminder notification's extras. */
+        const val NOTIFICATION_EXTRA_NOTE_ID = "dev.bikram.remember.reminders.NOTE_ID"
 
         private fun decodeNotificationHeroBitmap(
             context: Context,
@@ -473,6 +524,17 @@ class ReminderReceiver : BroadcastReceiver() {
                 Importance.LOW -> NotificationCompat.PRIORITY_LOW
                 Importance.DEFAULT -> NotificationCompat.PRIORITY_DEFAULT
                 Importance.HIGH -> NotificationCompat.PRIORITY_HIGH
+                Importance.CRITICAL -> NotificationCompat.PRIORITY_MAX
+            }
+
+        // Do Not Disturb lets alarms through by default, but only honours a channel's own
+        // bypass request when the user grants it. Filing Critical as an alarm is what lets it
+        // wake the user overnight - the reason to pick Critical over High.
+        private fun notificationCategory(importance: Importance): String =
+            if (importance == Importance.CRITICAL) {
+                NotificationCompat.CATEGORY_ALARM
+            } else {
+                NotificationCompat.CATEGORY_REMINDER
             }
 
         private fun openNotePendingIntent(
@@ -726,6 +788,27 @@ class ReminderReceiver : BroadcastReceiver() {
         private const val NOTIFICATION_ACTION_ICON_SIZE_PX = 96
     }
 }
+
+/**
+ * Which importance's channel a post uses; the channel fixes the sound. A Critical note rings on
+ * its own channel for its own alerts and stays there when posted silently. Its other alerting
+ * posts use High's channel: on the Critical channel they would play the whole alarm tone once,
+ * and some tones run 30 seconds or more. Everything else about the post (priority, alarm
+ * category, heads-up) stays Critical.
+ */
+internal fun channelImportance(
+    importance: Importance,
+    scheduledAlert: Boolean,
+    silent: Boolean,
+): Importance = if (importance == Importance.CRITICAL && !scheduledAlert && !silent) Importance.HIGH else importance
+
+/** Only a Critical note's own alerts ring continuously; quiet or refresh posts never do. */
+internal fun ringsContinuously(
+    importance: Importance,
+    scheduledAlert: Boolean,
+    silent: Boolean,
+    onlyAlertOnce: Boolean,
+): Boolean = scheduledAlert && importance == Importance.CRITICAL && !silent && !onlyAlertOnce
 
 internal fun isReminderDeliveryCurrent(
     note: NoteEntity,

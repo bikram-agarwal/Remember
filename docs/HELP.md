@@ -78,12 +78,13 @@ The reminder sheet quick chips follow **Reminder/Snooze type** in Settings -> No
 
 Reminder notifications can include the title, note content or list items, a picture, snooze, mark done, and one custom action button.
 
-### Importance: Low, Normal, and High
+### Importance: Low, Normal, High, and Critical
 
 Importance controls how loud a reminder is when it fires - not when it fires.
 - **Low** is silent, with no status bar icon or vibration.
 - **Normal** uses the standard sound and vibration.
 - **High** pops up as a heads-up alert and is treated as an alarm. Use it when a reminder needs to be immediately noticeable.
+- **Critical** is for things you must not miss. It rings like an alarm - your alarm tone, at alarm volume, even when the phone is on silent or vibrate - for the **Critical ring duration** in Settings -> Notifications (1 minute unless you change it). Then it rings again every 15 minutes until you mark it done. Opening the notification shade quiets the current ring early; to stop the repeats, snooze it, mark it done, or lower its importance. Swiping the notification away does not stop them. Critical reminders are treated as alarms, so Do Not Disturb lets them through whenever it allows alarms - including overnight. If several are overdue at once, they ring together. To use a different tone, change the sound of the **Reminders (Critical)** notification category in Android's settings for Remember.
 
 ### Recurring reminders
 
