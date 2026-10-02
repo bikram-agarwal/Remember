@@ -487,12 +487,10 @@ fun SettingsRoute(
             initialFirstVisibleItemIndex = SettingsScreenSessionState.listFirstVisibleItemIndex,
             initialFirstVisibleItemScrollOffset = SettingsScreenSessionState.listFirstVisibleItemScrollOffset,
         )
-    var notificationsHighlight by rememberSaveable { mutableStateOf(false) }
-    var notificationsHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
-    var backupHighlight by rememberSaveable { mutableStateOf(false) }
-    var backupHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
-    var securityHighlight by rememberSaveable { mutableStateOf(false) }
-    var securityHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
+    // The section a Help deep link last pointed at, and when its pulse ends. One at a time: a newer
+    // link moves it. SettingsExpandableSection draws the outline, so every section can be a target.
+    var sectionHighlightKey by rememberSaveable { mutableStateOf<String?>(null) }
+    var sectionHighlightExpiresAtMillis by rememberSaveable { mutableLongStateOf(0L) }
     val notificationPermissionLauncher =
         rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission(),
@@ -607,21 +605,8 @@ fun SettingsRoute(
             }
         settingsListState.animateScrollToItem(index)
         if (highlightItem == null) {
-            val highlightExpiresAtMillis = SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
-            when (sectionRouteKey) {
-                "notifications" -> {
-                    notificationsHighlight = true
-                    notificationsHighlightExpiresAtMillis = highlightExpiresAtMillis
-                }
-                "backup" -> {
-                    backupHighlight = true
-                    backupHighlightExpiresAtMillis = highlightExpiresAtMillis
-                }
-                "security" -> {
-                    securityHighlight = true
-                    securityHighlightExpiresAtMillis = highlightExpiresAtMillis
-                }
-            }
+            sectionHighlightKey = sectionRouteKey
+            sectionHighlightExpiresAtMillis = SystemClock.elapsedRealtime() + SETTINGS_SECTION_HIGHLIGHT_DURATION_MS
             onHighlightHandled()
         } else {
             activeHighlightItem = highlightItem
@@ -629,34 +614,15 @@ fun SettingsRoute(
             onHighlightHandled()
         }
     }
-    LaunchedEffect(notificationsHighlight, notificationsHighlightExpiresAtMillis) {
-        if (!notificationsHighlight) return@LaunchedEffect
-        val remainingHighlightMillis = notificationsHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
+    LaunchedEffect(sectionHighlightKey, sectionHighlightExpiresAtMillis) {
+        if (sectionHighlightKey == null) return@LaunchedEffect
+        val remainingHighlightMillis = sectionHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
         if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
-        notificationsHighlight = false
-        notificationsHighlightExpiresAtMillis = 0L
+        sectionHighlightKey = null
+        sectionHighlightExpiresAtMillis = 0L
     }
-    LaunchedEffect(backupHighlight, backupHighlightExpiresAtMillis) {
-        if (!backupHighlight) return@LaunchedEffect
-        val remainingHighlightMillis = backupHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
-        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
-        backupHighlight = false
-        backupHighlightExpiresAtMillis = 0L
-    }
-    LaunchedEffect(securityHighlight, securityHighlightExpiresAtMillis) {
-        if (!securityHighlight) return@LaunchedEffect
-        val remainingHighlightMillis = securityHighlightExpiresAtMillis - SystemClock.elapsedRealtime()
-        if (remainingHighlightMillis > 0) delay(remainingHighlightMillis)
-        securityHighlight = false
-        securityHighlightExpiresAtMillis = 0L
-    }
-    val highlightNowMillis = SystemClock.elapsedRealtime()
-    val notificationsHighlightActive = notificationsHighlight && notificationsHighlightExpiresAtMillis > highlightNowMillis
-    val backupHighlightActive = backupHighlight && backupHighlightExpiresAtMillis > highlightNowMillis
-    val securityHighlightActive = securityHighlight && securityHighlightExpiresAtMillis > highlightNowMillis
-    val notificationsHighlightAlpha = rememberSectionHighlightPulseAlpha(notificationsHighlightActive)
-    val backupHighlightAlpha = rememberSectionHighlightPulseAlpha(backupHighlightActive)
-    val securityHighlightAlpha = rememberSectionHighlightPulseAlpha(securityHighlightActive)
+    val activeSectionHighlightKey =
+        sectionHighlightKey.takeIf { sectionHighlightExpiresAtMillis > SystemClock.elapsedRealtime() }
 
     if (showUpdateSheet && BuildConfig.CHECK_UPDATES) {
         val updateSheetState =
@@ -751,6 +717,7 @@ fun SettingsRoute(
                                 collapsedSectionKeys = visibleCollapsedSectionKeys,
                                 onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                                 showHeader = showSectionHeaders,
+                                highlightedSectionKey = activeSectionHighlightKey,
                             ) {
                                 AppearanceSection(
                                     prefs = themePrefs,
@@ -770,6 +737,7 @@ fun SettingsRoute(
                                 collapsedSectionKeys = visibleCollapsedSectionKeys,
                                 onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                                 showHeader = showSectionHeaders,
+                                highlightedSectionKey = activeSectionHighlightKey,
                             ) {
                                 NotesUiSection(
                                     prefs = notesUiPrefs,
@@ -788,6 +756,7 @@ fun SettingsRoute(
                                 collapsedSectionKeys = visibleCollapsedSectionKeys,
                                 onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                                 showHeader = showSectionHeaders,
+                                highlightedSectionKey = activeSectionHighlightKey,
                             ) {
                                 DefaultsSection(
                                     defaultsState = defaultNoteState,
@@ -800,42 +769,30 @@ fun SettingsRoute(
 
                     if (includeSettingsSection(SettingsSectionKey.Notifications)) {
                         item(key = "notifications") {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .pulsingSectionHighlightOutline(
-                                            active = notificationsHighlightActive,
-                                            outlineColor =
-                                                MaterialTheme.colorScheme.primary.copy(
-                                                    alpha = notificationsHighlightAlpha,
-                                                ),
-                                        ),
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Notifications.routeKey,
+                                materialSymbolName = SettingsSectionKey.Notifications.iconName,
+                                title = stringResource(SettingsSectionKey.Notifications.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                                highlightedSectionKey = activeSectionHighlightKey,
                             ) {
-                                SettingsExpandableSection(
-                                    sectionKey = SettingsSectionKey.Notifications.routeKey,
-                                    materialSymbolName = SettingsSectionKey.Notifications.iconName,
-                                    title = stringResource(SettingsSectionKey.Notifications.titleRes),
-                                    collapsedSectionKeys = visibleCollapsedSectionKeys,
-                                    onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
-                                    showHeader = showSectionHeaders,
-                                ) {
-                                    RemindersSection(
-                                        reminderState = reminderState,
-                                        reminderPrefs = reminderPrefs,
-                                        quickCaptureState = quickCaptureState,
-                                        quickCapturePrefs = quickCapturePrefs,
-                                        notificationsGranted = notificationsGranted,
-                                        notificationPermissionLauncher = notificationPermissionLauncher,
-                                        permissionLinked = permissionLinked,
-                                        canScheduleExactAlarms = canScheduleExactAlarms,
-                                        isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
-                                        scope = scope,
-                                        highlightItemKey = activeHighlightItem,
-                                        highlightItemRequestId = activeHighlightItemRequestId,
-                                    )
-                                }
-                            } // notifications Column
+                                RemindersSection(
+                                    reminderState = reminderState,
+                                    reminderPrefs = reminderPrefs,
+                                    quickCaptureState = quickCaptureState,
+                                    quickCapturePrefs = quickCapturePrefs,
+                                    notificationsGranted = notificationsGranted,
+                                    notificationPermissionLauncher = notificationPermissionLauncher,
+                                    permissionLinked = permissionLinked,
+                                    canScheduleExactAlarms = canScheduleExactAlarms,
+                                    isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
+                                    scope = scope,
+                                    highlightItemKey = activeHighlightItem,
+                                    highlightItemRequestId = activeHighlightItemRequestId,
+                                )
+                            }
                         }
                     }
 
@@ -848,6 +805,7 @@ fun SettingsRoute(
                                 collapsedSectionKeys = visibleCollapsedSectionKeys,
                                 onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                                 showHeader = showSectionHeaders,
+                                highlightedSectionKey = activeSectionHighlightKey,
                             ) {
                                 GroupedListColumn {
                                     GroupedListItem(position = GroupPosition.ONLY) {
@@ -875,6 +833,7 @@ fun SettingsRoute(
                                 collapsedSectionKeys = visibleCollapsedSectionKeys,
                                 onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                                 showHeader = showSectionHeaders,
+                                highlightedSectionKey = activeSectionHighlightKey,
                             ) {
                                 GroupedListColumn {
                                     GroupedListItem(position = GroupPosition.ONLY) {
@@ -907,88 +866,64 @@ fun SettingsRoute(
 
                     if (includeSettingsSection(SettingsSectionKey.Security)) {
                         item(key = "security") {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .pulsingSectionHighlightOutline(
-                                            active = securityHighlightActive,
-                                            outlineColor =
-                                                MaterialTheme.colorScheme.primary.copy(
-                                                    alpha = securityHighlightAlpha,
-                                                ),
-                                        ),
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Security.routeKey,
+                                materialSymbolName = SettingsSectionKey.Security.iconName,
+                                title = stringResource(SettingsSectionKey.Security.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                                highlightedSectionKey = activeSectionHighlightKey,
                             ) {
-                                SettingsExpandableSection(
-                                    sectionKey = SettingsSectionKey.Security.routeKey,
-                                    materialSymbolName = SettingsSectionKey.Security.iconName,
-                                    title = stringResource(SettingsSectionKey.Security.titleRes),
-                                    collapsedSectionKeys = visibleCollapsedSectionKeys,
-                                    onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
-                                    showHeader = showSectionHeaders,
-                                ) {
-                                    LockSection(
-                                        lockState = lockState,
-                                        lockPrefs = lockPrefs,
-                                        biometricAvailable = biometricAvailable,
-                                        deviceCredentialAvailable = deviceCredentialAvailable,
-                                        snackbarHostState = snackbarHostState,
-                                        scope = scope,
-                                    )
-                                }
-                            } // security Column
+                                LockSection(
+                                    lockState = lockState,
+                                    lockPrefs = lockPrefs,
+                                    biometricAvailable = biometricAvailable,
+                                    deviceCredentialAvailable = deviceCredentialAvailable,
+                                    snackbarHostState = snackbarHostState,
+                                    scope = scope,
+                                )
+                            }
                         }
                     }
 
                     if (includeSettingsSection(SettingsSectionKey.Backup)) {
                         item(key = "backup") {
-                            Column(
-                                modifier =
-                                    Modifier
-                                        .fillMaxWidth()
-                                        .pulsingSectionHighlightOutline(
-                                            active = backupHighlightActive,
-                                            outlineColor =
-                                                MaterialTheme.colorScheme.primary.copy(
-                                                    alpha = backupHighlightAlpha,
-                                                ),
-                                        ),
+                            SettingsExpandableSection(
+                                sectionKey = SettingsSectionKey.Backup.routeKey,
+                                materialSymbolName = SettingsSectionKey.Backup.iconName,
+                                title = stringResource(SettingsSectionKey.Backup.titleRes),
+                                collapsedSectionKeys = visibleCollapsedSectionKeys,
+                                onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
+                                showHeader = showSectionHeaders,
+                                highlightedSectionKey = activeSectionHighlightKey,
                             ) {
-                                SettingsExpandableSection(
-                                    sectionKey = SettingsSectionKey.Backup.routeKey,
-                                    materialSymbolName = SettingsSectionKey.Backup.iconName,
-                                    title = stringResource(SettingsSectionKey.Backup.titleRes),
-                                    collapsedSectionKeys = visibleCollapsedSectionKeys,
-                                    onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
-                                    showHeader = showSectionHeaders,
-                                ) {
-                                    BackupSection(
-                                        backupState = backupState,
-                                        backupPrefs = backupPrefs,
-                                        backupIo = backupIo,
-                                        snackbarHostState = snackbarHostState,
-                                        scope = scope,
-                                        onPickLocalFolder = {
-                                            pendingBackupFolderTarget = BackupFolderTarget.Local
-                                            folderLauncher.launch(null)
-                                        },
-                                        onPickCloudFolder = {
-                                            pendingBackupFolderTarget = BackupFolderTarget.Cloud
-                                            folderLauncher.launch(null)
-                                        },
-                                        onLaunchImportMerge = {
-                                            importMergeLauncher.launch(
-                                                arrayOf("application/zip", "application/json"),
-                                            )
-                                        },
-                                        onLaunchImportReplace = {
-                                            importReplaceLauncher.launch(
-                                                arrayOf("application/zip", "application/json"),
-                                            )
-                                        },
-                                    )
-                                }
-                            } // backup Column
+                                BackupSection(
+                                    backupState = backupState,
+                                    backupPrefs = backupPrefs,
+                                    backupIo = backupIo,
+                                    snackbarHostState = snackbarHostState,
+                                    scope = scope,
+                                    onPickLocalFolder = {
+                                        pendingBackupFolderTarget = BackupFolderTarget.Local
+                                        folderLauncher.launch(null)
+                                    },
+                                    onPickCloudFolder = {
+                                        pendingBackupFolderTarget = BackupFolderTarget.Cloud
+                                        folderLauncher.launch(null)
+                                    },
+                                    onLaunchImportMerge = {
+                                        importMergeLauncher.launch(
+                                            arrayOf("application/zip", "application/json"),
+                                        )
+                                    },
+                                    onLaunchImportReplace = {
+                                        importReplaceLauncher.launch(
+                                            arrayOf("application/zip", "application/json"),
+                                        )
+                                    },
+                                )
+                            }
                         }
                     }
 
@@ -1001,6 +936,7 @@ fun SettingsRoute(
                                 collapsedSectionKeys = visibleCollapsedSectionKeys,
                                 onCollapsedSectionKeysChange = ::updateCollapsedSettingsSectionKeys,
                                 showHeader = showSectionHeaders,
+                                highlightedSectionKey = activeSectionHighlightKey,
                             ) {
                                 GroupedListColumn {
                                     if (BuildConfig.CHECK_UPDATES) {

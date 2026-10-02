@@ -68,11 +68,11 @@ import kotlinx.coroutines.launch
  *     surfaced as two separate rows.
  *   - Restore notifications: re-posts dismissed reminder notifications until
  *     the note is marked done.
- *   - Reminder/Snooze type (Timing named times vs Duration lengths on the
+ *   - Preset type (Timing named times vs Duration lengths on the
  *     reminder sheet chips and the snooze sheet).
  *   - Reminder summary notification (the persistent multi-reminder summary).
  *   - Quick-capture persistent notification.
- *   - Critical ring duration: how long each Critical alert rings.
+ *   - Critical alert style: how long each Critical alert rings, or a single High chime.
  *
  * Pulled out of [SettingsRoute] in audit 3.1.
  */
@@ -363,8 +363,8 @@ private fun SnoozeTypeRow(
     var expanded by rememberSaveable { mutableStateOf(false) }
     val selectedLabelRes =
         when (snoozeType) {
-            SnoozeType.RELATIVE -> R.string.settings_snooze_type_timing
-            SnoozeType.ABSOLUTE -> R.string.settings_snooze_type_duration
+            SnoozeType.RELATIVE -> R.string.settings_preset_type_timing
+            SnoozeType.ABSOLUTE -> R.string.settings_preset_type_duration
         }
     Row(
         modifier =
@@ -389,17 +389,17 @@ private fun SnoozeTypeRow(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    stringResource(R.string.settings_snooze_type_title),
+                    stringResource(R.string.settings_preset_type_title),
                     style = MaterialTheme.typography.bodyLarge,
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 SettingsInfoDropdown(
-                    tipText = stringResource(R.string.settings_snooze_type_tooltip),
-                    contentDescription = stringResource(R.string.settings_snooze_type_info_cd),
+                    tipText = stringResource(R.string.settings_preset_type_tooltip),
+                    contentDescription = stringResource(R.string.settings_preset_type_info_cd),
                     bulletItems =
                         listOf(
-                            stringResource(R.string.settings_snooze_type_tooltip_timing),
-                            stringResource(R.string.settings_snooze_type_tooltip_duration),
+                            stringResource(R.string.settings_preset_type_tooltip_timing),
+                            stringResource(R.string.settings_preset_type_tooltip_duration),
                         ),
                 )
             }
@@ -415,8 +415,8 @@ private fun SnoozeTypeRow(
                 SnoozeType.entries.forEach { option ->
                     val optionLabelRes =
                         when (option) {
-                            SnoozeType.RELATIVE -> R.string.settings_snooze_type_timing
-                            SnoozeType.ABSOLUTE -> R.string.settings_snooze_type_duration
+                            SnoozeType.RELATIVE -> R.string.settings_preset_type_timing
+                            SnoozeType.ABSOLUTE -> R.string.settings_preset_type_duration
                         }
                     RememberDropdownMenuItem(
                         text = { Text(stringResource(optionLabelRes)) },
@@ -456,18 +456,20 @@ private fun CriticalRingDurationRow(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Text(
-                stringResource(R.string.settings_critical_ring_duration_title),
+                stringResource(R.string.settings_critical_reminder_type_title),
                 style = MaterialTheme.typography.bodyLarge,
             )
             Text(
-                stringResource(R.string.settings_critical_ring_duration_desc),
+                stringResource(R.string.settings_critical_reminder_type_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Spacer(Modifier.width(8.dp))
         RememberOutlinedButton(onClick = { expanded = true }) {
-            Text(stringResource(duration.labelRes()))
+            // The button shows the short label so it stays narrow next to the title and
+            // subtitle; the menu spells each option out.
+            Text(stringResource(duration.buttonLabelRes()), maxLines = 1)
             DropdownMenu(
                 expanded = expanded,
                 onDismissRequest = { expanded = false },
@@ -475,7 +477,7 @@ private fun CriticalRingDurationRow(
             ) {
                 CriticalRingDuration.entries.forEach { option ->
                     RememberDropdownMenuItem(
-                        text = { Text(stringResource(option.labelRes())) },
+                        text = { Text(stringResource(option.menuLabelRes())) },
                         onClick = {
                             onSelect(option)
                             expanded = false
@@ -488,12 +490,23 @@ private fun CriticalRingDurationRow(
 }
 
 @StringRes
-private fun CriticalRingDuration.labelRes(): Int =
+private fun CriticalRingDuration.buttonLabelRes(): Int =
     when (this) {
-        CriticalRingDuration.THIRTY_SECONDS -> R.string.settings_critical_ring_duration_30_seconds
-        CriticalRingDuration.ONE_MINUTE -> R.string.settings_critical_ring_duration_1_minute
-        CriticalRingDuration.TWO_MINUTES -> R.string.settings_critical_ring_duration_2_minutes
-        CriticalRingDuration.FIVE_MINUTES -> R.string.settings_critical_ring_duration_5_minutes
+        CriticalRingDuration.NO_RING -> R.string.settings_critical_reminder_type_chime_short
+        CriticalRingDuration.THIRTY_SECONDS -> R.string.settings_critical_reminder_type_30_seconds_short
+        CriticalRingDuration.ONE_MINUTE -> R.string.settings_critical_reminder_type_1_minute_short
+        CriticalRingDuration.TWO_MINUTES -> R.string.settings_critical_reminder_type_2_minutes_short
+        CriticalRingDuration.FIVE_MINUTES -> R.string.settings_critical_reminder_type_5_minutes_short
+    }
+
+@StringRes
+private fun CriticalRingDuration.menuLabelRes(): Int =
+    when (this) {
+        CriticalRingDuration.NO_RING -> R.string.settings_critical_reminder_type_chime
+        CriticalRingDuration.THIRTY_SECONDS -> R.string.settings_critical_reminder_type_30_seconds
+        CriticalRingDuration.ONE_MINUTE -> R.string.settings_critical_reminder_type_1_minute
+        CriticalRingDuration.TWO_MINUTES -> R.string.settings_critical_reminder_type_2_minutes
+        CriticalRingDuration.FIVE_MINUTES -> R.string.settings_critical_reminder_type_5_minutes
     }
 
 /**

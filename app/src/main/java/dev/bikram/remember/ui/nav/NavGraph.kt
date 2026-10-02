@@ -64,6 +64,7 @@ import dev.bikram.remember.ui.edit.EditListRoute
 import dev.bikram.remember.ui.edit.EditNoteRoute
 import dev.bikram.remember.ui.help.HelpScreen
 import dev.bikram.remember.ui.help.HelpViewModel
+import dev.bikram.remember.ui.help.LocalOpenHelp
 import dev.bikram.remember.ui.history.HistoryRoute
 import dev.bikram.remember.ui.history.HistorySection
 import dev.bikram.remember.ui.home.HomeRoute
@@ -117,8 +118,15 @@ object Routes {
     const val ARG_TYPE = "type"
     const val ARG_PREFILL = "prefill"
     const val ARG_FORCE_EDIT = "forceEdit"
+    const val ARG_FOCUS_SECTION = "focusSection"
     const val TYPE_NOTE = "note"
     const val TYPE_LIST = "checklist"
+
+    /**
+     * Help, optionally opened at the subsection a HELP_FOCUS_* id names. Same shape as FilePipe's
+     * `Screen.Faq.createRoute(focusSection)`.
+     */
+    fun help(focusSection: String = ""): String = "$HELP?$ARG_FOCUS_SECTION=$focusSection"
 
     fun editContent(
         id: Long?,
@@ -767,7 +775,7 @@ fun RememberNavGraph(
                             SettingsTwoPaneRoute(
                                 paneScaffoldDirective = paneScaffoldDirective,
                                 onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
-                                onOpenHelp = { navController.navigate(Routes.HELP) },
+                                onOpenHelp = { navController.navigate(Routes.help()) },
                                 onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
                                 updateVm = updateVm,
                                 onUpdateCheckStarted = handleUpdateCheckStarted,
@@ -778,7 +786,7 @@ fun RememberNavGraph(
                         } else {
                             SettingsRoute(
                                 onOpenIntro = { navController.navigate(Routes.ONBOARDING_TITLE) },
-                                onOpenHelp = { navController.navigate(Routes.HELP) },
+                                onOpenHelp = { navController.navigate(Routes.help()) },
                                 onOpenDevOptions = { navController.navigate(Routes.DEV_OPTIONS) },
                                 updateVm = updateVm,
                                 onUpdateCheckStarted = handleUpdateCheckStarted,
@@ -909,7 +917,14 @@ fun RememberNavGraph(
                 }
 
                 composable(
-                    route = Routes.HELP,
+                    route = "${Routes.HELP}?${Routes.ARG_FOCUS_SECTION}={${Routes.ARG_FOCUS_SECTION}}",
+                    arguments =
+                        listOf(
+                            navArgument(Routes.ARG_FOCUS_SECTION) {
+                                type = NavType.StringType
+                                defaultValue = ""
+                            },
+                        ),
                     enterTransition = {
                         if (reducedMotion) {
                             EnterTransition.None
@@ -942,7 +957,7 @@ fun RememberNavGraph(
                                 fadeOut(animationSpec = navFadeOutSpec)
                         }
                     },
-                ) {
+                ) { helpEntry ->
                     /**
                      * Open the Settings section a help deep link points at, dismissing the help
                      * screen on the way.
@@ -968,6 +983,7 @@ fun RememberNavGraph(
                             goToSettingsFromHelp()
                         },
                         helpVm = helpVm,
+                        initialFocusSectionId = helpEntry.arguments?.getString(Routes.ARG_FOCUS_SECTION).orEmpty(),
                     )
                 }
 
@@ -1088,7 +1104,13 @@ fun RememberNavGraph(
                 alertBarsExpanded = alertBarsExpanded,
                 onAlertBarsExpandedChange = { expanded -> alertBarsExpanded = expanded },
             ) { closeRevealRequest ->
-                navHostContent(rememberUpdatedState(closeRevealRequest))
+                // Lets the editor's Behavior sheet open Help at a subsection; see LocalOpenHelp.
+                // Pushed on top, so Back returns to the editor with its state intact.
+                androidx.compose.runtime.CompositionLocalProvider(
+                    LocalOpenHelp provides { focusSection -> navController.navigate(Routes.help(focusSection)) },
+                ) {
+                    navHostContent(rememberUpdatedState(closeRevealRequest))
+                }
             }
         }
     }

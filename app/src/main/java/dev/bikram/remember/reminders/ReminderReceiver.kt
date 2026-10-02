@@ -81,11 +81,13 @@ class ReminderReceiver : BroadcastReceiver() {
                     items = noteWithItems.items,
                     reminderIndex = reminderIndex,
                     keepUntilDone = prefs.keepReminderNotificationsUntilDone,
-                    scheduledAlert = true,
+                    ringCritical = prefs.criticalRingDuration.ringsLikeAlarm,
                 )
                 if (needsCriticalRepeat(note, now)) {
                     reminderScheduler.ensureCriticalRepeat(now)
-                    reminderScheduler.scheduleCriticalRingStop(now + prefs.criticalRingDuration.millis)
+                    prefs.criticalRingDuration.ringMillis?.let { ringMillis ->
+                        reminderScheduler.scheduleCriticalRingStop(now + ringMillis)
+                    }
                 }
             } finally {
                 pendingResult.finish()
@@ -120,11 +122,12 @@ class ReminderReceiver : BroadcastReceiver() {
         /**
          * Posts or refreshes [note]'s reminder notification.
          *
-         * [scheduledAlert] marks the reminder's own fire and the Critical repeat ticks. For a
-         * Critical note those posts ring continuously until the ring-stop timer, Done, Snooze,
-         * or the user opening the notification shade ends it. Every other alerting Critical post
-         * (edit, restore after dismissal, posting from the editor) sounds once like High; see
-         * [channelImportance].
+         * [ringCritical] marks the reminder's own fire and the Critical repeat ticks, unless the
+         * Critical alert style is a single chime. For a Critical note those posts ring
+         * continuously until the ring-stop timer, Done, Snooze, or the user opening the
+         * notification shade ends it. Every other alerting Critical post (edit, restore after
+         * dismissal, posting from the editor, or any alert when set not to ring) sounds once
+         * like High; see [channelImportance].
          */
         fun showNotification(
             context: Context,
@@ -134,7 +137,7 @@ class ReminderReceiver : BroadcastReceiver() {
             keepUntilDone: Boolean = false,
             onlyAlertOnce: Boolean = false,
             silent: Boolean = false,
-            scheduledAlert: Boolean = false,
+            ringCritical: Boolean = false,
         ) {
             if (note.trashed) return
 
@@ -144,7 +147,7 @@ class ReminderReceiver : BroadcastReceiver() {
             }
 
             val channelId =
-                when (channelImportance(note.importance, scheduledAlert, silent)) {
+                when (channelImportance(note.importance, ringCritical, silent)) {
                     Importance.LOW -> ReminderScheduler.CHANNEL_ID_LOW
                     Importance.HIGH -> ReminderScheduler.CHANNEL_ID_HIGH
                     Importance.CRITICAL -> ReminderScheduler.CHANNEL_ID_CRITICAL
@@ -225,7 +228,7 @@ class ReminderReceiver : BroadcastReceiver() {
 
             val notificationId = ReminderScheduler.pendingRequestCodeForNote(note.id)
             val notification = builder.build()
-            if (ringsContinuously(note.importance, scheduledAlert, silent, onlyAlertOnce)) {
+            if (ringsContinuously(note.importance, ringCritical, silent, onlyAlertOnce)) {
                 notification.flags = notification.flags or Notification.FLAG_INSISTENT
             } else {
                 stopRinging(context, notificationId)
@@ -791,24 +794,24 @@ class ReminderReceiver : BroadcastReceiver() {
 
 /**
  * Which importance's channel a post uses; the channel fixes the sound. A Critical note rings on
- * its own channel for its own alerts and stays there when posted silently. Its other alerting
+ * its own channel when [ringCritical] and stays there when posted silently. Its other alerting
  * posts use High's channel: on the Critical channel they would play the whole alarm tone once,
  * and some tones run 30 seconds or more. Everything else about the post (priority, alarm
  * category, heads-up) stays Critical.
  */
 internal fun channelImportance(
     importance: Importance,
-    scheduledAlert: Boolean,
+    ringCritical: Boolean,
     silent: Boolean,
-): Importance = if (importance == Importance.CRITICAL && !scheduledAlert && !silent) Importance.HIGH else importance
+): Importance = if (importance == Importance.CRITICAL && !ringCritical && !silent) Importance.HIGH else importance
 
 /** Only a Critical note's own alerts ring continuously; quiet or refresh posts never do. */
 internal fun ringsContinuously(
     importance: Importance,
-    scheduledAlert: Boolean,
+    ringCritical: Boolean,
     silent: Boolean,
     onlyAlertOnce: Boolean,
-): Boolean = scheduledAlert && importance == Importance.CRITICAL && !silent && !onlyAlertOnce
+): Boolean = ringCritical && importance == Importance.CRITICAL && !silent && !onlyAlertOnce
 
 internal fun isReminderDeliveryCurrent(
     note: NoteEntity,

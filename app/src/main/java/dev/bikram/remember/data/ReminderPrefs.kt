@@ -15,14 +15,23 @@ enum class SnoozeType {
     ABSOLUTE,
 }
 
-/** How long a Critical reminder rings each time it alerts. Stored by name. */
+/**
+ * How long a Critical reminder rings each time it alerts. Stored by name. [NO_RING] skips the
+ * alarm: each alert plays High's notification tone once instead, and still repeats.
+ */
 enum class CriticalRingDuration(
-    val millis: Long,
+    /** Length of each ring; null for [NO_RING], which does not ring. */
+    val ringMillis: Long?,
 ) {
+    NO_RING(null),
     THIRTY_SECONDS(30_000L),
     ONE_MINUTE(60_000L),
     TWO_MINUTES(120_000L),
     FIVE_MINUTES(300_000L),
+    ;
+
+    val ringsLikeAlarm: Boolean
+        get() = ringMillis != null
 }
 
 data class ReminderPreferencesState(

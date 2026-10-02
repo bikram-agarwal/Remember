@@ -61,6 +61,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.currentStateAsState
 import dev.bikram.remember.R
 import dev.bikram.remember.data.ActionType
 import dev.bikram.remember.data.AppMediaStorage
@@ -80,11 +83,15 @@ import dev.bikram.remember.ui.common.ResponsiveActionLayout
 import dev.bikram.remember.ui.common.rememberBottomSheetStateWithUnsavedChanges
 import dev.bikram.remember.ui.common.responsiveActionLayout
 import dev.bikram.remember.ui.components.RememberButton
+import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
 import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.feedback.appCombinedClickable
+import dev.bikram.remember.ui.help.HELP_FOCUS_IMPORTANCE
+import dev.bikram.remember.ui.help.HELP_FOCUS_VISIBILITY
+import dev.bikram.remember.ui.help.LocalOpenHelp
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import java.text.DateFormat
 import java.util.Date
@@ -125,6 +132,12 @@ fun OptionsPanel(
     updatedAt: Long? = null,
 ) {
     var behaviorOpen by rememberSaveable { mutableStateOf(false) }
+    // The Behavior sheet's unconfirmed choices. Held here rather than in the sheet so they
+    // survive the sheet leaving the screen while Help is open; see the sheet below.
+    var draftVisibility by rememberSaveable { mutableStateOf(visibility) }
+    var draftImportance by rememberSaveable { mutableStateOf(importance) }
+    val openHelp = LocalOpenHelp.current
+    val lifecycleState by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
     val context = LocalContext.current
     val storedAttachmentCount =
         attachments.count { attachment ->
@@ -267,7 +280,16 @@ fun OptionsPanel(
                         symbolName = "visibility",
                         title = stringResource(R.string.options_behavior),
                         summary = "",
-                        onClick = if (readOnly) null else ({ behaviorOpen = true }),
+                        onClick =
+                            if (readOnly) {
+                                null
+                            } else {
+                                {
+                                    draftVisibility = visibility
+                                    draftImportance = importance
+                                    behaviorOpen = true
+                                }
+                            },
                         modifier = Modifier.fillMaxWidth(),
                         summaryContent = { BehaviorOptionSummary(visibility, importance) },
                     )
@@ -349,10 +371,19 @@ fun OptionsPanel(
         }
     }
 
-    if (behaviorOpen) {
+    // The sheet draws in its own window, above any navigation, so it is only shown while this
+    // screen is the resumed one. Opening Help from it takes it off screen as Help slides in;
+    // coming back resumes this screen and shows it again with the drafts intact. The editor
+    // itself autosaves when it stops, so nothing typed is lost either.
+    if (behaviorOpen && lifecycleState.isAtLeast(Lifecycle.State.RESUMED)) {
         BehaviorSheet(
             visibility = visibility,
             importance = importance,
+            draftVisibility = draftVisibility,
+            draftImportance = draftImportance,
+            onDraftVisibilityChange = { draftVisibility = it },
+            onDraftImportanceChange = { draftImportance = it },
+            onOpenHelp = openHelp,
             onConfirm = { nextVisibility, nextImportance ->
                 if (nextVisibility != visibility) {
                     onSetVisibility(nextVisibility)
@@ -947,11 +978,14 @@ private data class ChoiceOption<T>(
 private fun BehaviorSheet(
     visibility: NoteVisibility,
     importance: Importance,
+    draftVisibility: NoteVisibility,
+    draftImportance: Importance,
+    onDraftVisibilityChange: (NoteVisibility) -> Unit,
+    onDraftImportanceChange: (Importance) -> Unit,
+    onOpenHelp: ((focusSection: String) -> Unit)?,
     onConfirm: (NoteVisibility, Importance) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var draftVisibility by remember(visibility) { mutableStateOf(visibility) }
-    var draftImportance by remember(importance) { mutableStateOf(importance) }
     var showUnsavedDialog by rememberSaveable { mutableStateOf(false) }
 
     val hasChanges = draftVisibility != visibility || draftImportance != importance
@@ -986,24 +1020,32 @@ private fun BehaviorSheet(
             }
         },
     ) {
-        ChoiceSectionHeader(stringResource(R.string.options_visibility))
+        ChoiceSectionHeader(
+            title = stringResource(R.string.options_visibility),
+            helpContentDescription = stringResource(R.string.options_visibility_help_cd),
+            onHelp = onOpenHelp?.let { open -> { open(HELP_FOCUS_VISIBILITY) } },
+        )
         NoteVisibility.entries.forEach { option ->
             ChoiceOptionRow(
                 option = ChoiceOption(option, option.label(), option.description()),
                 selected = draftVisibility,
-                onSelect = { draftVisibility = it },
+                onSelect = onDraftVisibilityChange,
             )
         }
         HorizontalDivider(
             modifier = Modifier.padding(vertical = 12.dp),
             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
         )
-        ChoiceSectionHeader(stringResource(R.string.options_importance))
+        ChoiceSectionHeader(
+            title = stringResource(R.string.options_importance),
+            helpContentDescription = stringResource(R.string.options_importance_help_cd),
+            onHelp = onOpenHelp?.let { open -> { open(HELP_FOCUS_IMPORTANCE) } },
+        )
         Importance.entries.forEach { option ->
             ChoiceOptionRow(
                 option = ChoiceOption(option, option.label(), option.description()),
                 selected = draftImportance,
-                onSelect = { draftImportance = it },
+                onSelect = onDraftImportanceChange,
             )
         }
     }
@@ -1020,14 +1062,39 @@ private fun BehaviorSheet(
 }
 
 @Composable
-private fun ChoiceSectionHeader(title: String) {
-    Text(
-        text = title.uppercase(),
-        style = MaterialTheme.typography.labelSmall,
-        color = MaterialTheme.colorScheme.primary,
-        fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(top = 4.dp, bottom = 4.dp),
-    )
+private fun ChoiceSectionHeader(
+    title: String,
+    helpContentDescription: String,
+    onHelp: (() -> Unit)?,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = title.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.weight(1f).padding(top = 4.dp, bottom = 4.dp),
+        )
+        if (onHelp != null) {
+            // A compact form of the "?" button in Settings' top bar.
+            RememberFilledTonalIconButton(
+                onClick = onHelp,
+                modifier =
+                    Modifier
+                        .size(32.dp)
+                        .semantics { contentDescription = helpContentDescription },
+                tooltipLabel = helpContentDescription,
+            ) {
+                Text(
+                    text = "?",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Normal),
+                )
+            }
+        }
+    }
 }
 
 @Composable

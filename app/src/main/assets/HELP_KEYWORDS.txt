@@ -50,6 +50,8 @@ ring duration -> Importance: Low, Normal, High, and Critical
 ring like an alarm -> Importance: Low, Normal, High, and Critical
 alarm tone -> Importance: Low, Normal, High, and Critical
 keeps ringing -> Importance: Low, Normal, High, and Critical
+single chime -> Importance: Low, Normal, High, and Critical
+alert style -> Importance: Low, Normal, High, and Critical
 
 # --- Restore notifications / persistent reminders ---
 keep reminding -> Restore notifications
@@ -129,11 +131,11 @@ new phone -> Import vs. restore | What a backup includes
 reinstall -> Import vs. restore | What a backup includes
 
 # --- Google Tasks ---
-import google -> Importing from Google Tasks
-google tasks -> Importing from Google Tasks
-takeout -> Importing from Google Tasks
-tasks.json -> Importing from Google Tasks
-import failed -> Importing from Google Tasks
+import google -> Importing from Google Tasks or Tasks.org
+google tasks -> Importing from Google Tasks or Tasks.org
+takeout -> Importing from Google Tasks or Tasks.org
+tasks.json -> Importing from Google Tasks or Tasks.org
+import failed -> Importing from Google Tasks or Tasks.org
 
 # --- Privacy / security ---
 encrypt -> Where notes are stored
@@ -164,17 +166,17 @@ quick note -> Quick capture notification
 capture shortcut -> Quick capture notification
 
 # --- Tags / organization ---
-organize -> Tags, stars, archive, and trash
-label -> Tags, stars, archive, and trash
-category -> Tags, stars, archive, and trash
-folder -> Tags, stars, archive, and trash
+organize -> Tags, stars, pins, archive, and trash
+label -> Tags, stars, pins, archive, and trash
+category -> Tags, stars, pins, archive, and trash
+folder -> Tags, stars, pins, archive, and trash
 find note -> Search | Finding archived or trashed notes
 deleted note -> Finding archived or trashed notes
 archived note -> Finding archived or trashed notes
 note disappeared -> Finding archived or trashed notes
 note missing -> Finding archived or trashed notes | Search
-trash -> Tags, stars, archive, and trash
-archive -> Tags, stars, archive, and trash
+trash -> Tags, stars, pins, archive, and trash
+archive -> Tags, stars, pins, archive, and trash
 recover note -> Finding archived or trashed notes
 restore note -> Finding archived or trashed notes
 

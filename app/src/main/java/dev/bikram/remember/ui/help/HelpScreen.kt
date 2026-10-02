@@ -41,7 +41,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -73,6 +77,7 @@ import dev.bikram.remember.ui.modifiers.applyToScrollableList
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
+import kotlinx.coroutines.flow.first
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -80,6 +85,7 @@ fun HelpScreen(
     onBack: () -> Unit,
     onOpenAppSection: (sectionKey: String) -> Unit,
     helpVm: HelpViewModel,
+    initialFocusSectionId: String = "",
 ) {
     val expandedKeys by helpVm.expandedKeys.collectAsStateWithLifecycle()
     val searchQuery by helpVm.searchQuery.collectAsStateWithLifecycle()
@@ -142,6 +148,35 @@ fun HelpScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(Unit) {
         onDispose { helpVm.saveScrollState(listState.firstVisibleItemIndex, listState.firstVisibleItemScrollOffset) }
+    }
+
+    // Opened at a subsection: expand it and bring it to the top, once per visit. The flag is
+    // saveable so rotating keeps the user's own scrolling instead of jumping back. Help keeps
+    // its search between visits, so an old query is cleared first and the focus waits for the
+    // unfiltered list.
+    var focusHandled by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(initialFocusSectionId, searchQuery, filteredSections) {
+        if (focusHandled || initialFocusSectionId.isEmpty()) return@LaunchedEffect
+        if (searchQuery.isNotEmpty()) {
+            helpVm.setSearchQuery("")
+            return@LaunchedEffect
+        }
+        if (filteredSections !== helpVm.sections) return@LaunchedEffect
+        val target =
+            helpFocusSubsectionTitles[initialFocusSectionId]
+                ?.let { title -> helpFocusTarget(filteredSections, title) }
+        if (target != null) {
+            helpVm.setExpanded(target.expandedKey, true)
+            listState.scrollToItem(target.listIndex)
+        }
+        // Set only once the scroll is done, so a run cancelled midway is retried. FilePipe's
+        // FaqScreen guards its focus the same way.
+        focusHandled = true
+        if (target == null) return@LaunchedEffect
+        // Scrolling in code bypasses the app bar's scroll connection; collapse it to match, as
+        // the scroll restore above does.
+        val heightOffsetLimit = snapshotFlow { scrollBehavior.state.heightOffsetLimit }.first { it != 0f }
+        scrollBehavior.state.heightOffset = heightOffsetLimit
     }
     DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
         val observer =

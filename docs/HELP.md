@@ -72,7 +72,7 @@ Archived and trashed notes are hidden from the main Notes tab intentionally. Ope
 
 Add a reminder date and time to any note or list. When the time arrives, Remember posts a notification. Tapping it opens the note directly.
 
-The reminder sheet quick chips follow **Reminder/Snooze type** in Settings -> Notifications.
+The reminder sheet quick chips follow **Preset type** in Settings -> Notifications.
 - **Timing** offers named times: Soon, Later today, This evening etc.
 - **Duration** offers lengths of time: 30 mins, 6 hours, 12 hours, 7 days etc.
 
@@ -84,7 +84,10 @@ Importance controls how loud a reminder is when it fires - not when it fires.
 - **Low** is silent, with no status bar icon or vibration.
 - **Normal** uses the standard sound and vibration.
 - **High** pops up as a heads-up alert and is treated as an alarm. Use it when a reminder needs to be immediately noticeable.
-- **Critical** is for things you must not miss. It rings like an alarm - your alarm tone, at alarm volume, even when the phone is on silent or vibrate - for the **Critical ring duration** in Settings -> Notifications (1 minute unless you change it). Then it rings again every 15 minutes until you mark it done. Opening the notification shade quiets the current ring early; to stop the repeats, snooze it, mark it done, or lower its importance. Swiping the notification away does not stop them. Critical reminders are treated as alarms, so Do Not Disturb lets them through whenever it allows alarms - including overnight. If several are overdue at once, they ring together. To use a different tone, change the sound of the **Reminders (Critical)** notification category in Android's settings for Remember.
+- **Critical** re-alerts every 15 minutes until snoozed, marked done, or lowered in importance. Overdue items ring together. Swiping the notification away will not stop repeats. Opening the notification shade quiets an active alert early.
+  - Alarm Mode (30 sec, 1 min, etc.): Acts as a full system alarm using your alarm volume and tone. It overrides silent/vibrate modes and passes through Do Not Disturb (if DND allows alarms).
+  - Chime Mode (Single chime): Plays your High-importance notification sound once per 15-minute alert cycle. It respects silent mode and DND limits.
+  - Configuration: Switch modes or change alarm duration in Settings → Notifications → Critical reminder type. To customize the alarm sound itself, edit the Reminders (Critical) channel in Android System Settings.
 
 ### Recurring reminders
 
@@ -93,7 +96,7 @@ Recurring reminders can repeat daily, weekly, monthly, or yearly. You can end th
 When you mark a recurring reminder done, Remember advances it to the next scheduled occurrence. If there is no future occurrence, the item moves to done.
 
 
-### Keep reminders until done
+### Restore notifications
 
 **Restore notifications** is a Settings option for persistent reminders, saving them from being accidentally swiped away. When enabled, a dismissed reminder notification will come back immediately if the note or list is still not marked done.
 
@@ -107,7 +110,7 @@ Android requires notification permission before Remember can post reminder alert
 
 ### Snooze
 
-Snooze moves a reminder to a later time without opening the app. The snooze sheet follows **Reminder/Snooze type** in Settings -> Notifications.
+Snooze moves a reminder to a later time without opening the app. The snooze sheet follows **Preset type** in Settings -> Notifications.
 - **Timing** offers named times: soon, later today, this evening, tomorrow, next week.
 - **Duration** replaces those with a duration: 1-60 minutes, 1-24 hours, or 1-30 days. Choose the number and unit, then tap **Snooze**.
 **Pick a specific time** stays available in both modes, with a date and time picker.
@@ -243,6 +246,15 @@ Controls how Material 3 expands your seed color into a full palette. The same se
 - **Adaptive note themes** — tints the note page with color taken from its cover image.
 - **Cover image on cards** — shows a note's picture as a soft background on the note card, not just inside the note.
 - **Note content on cards** — shows the note body or list items on the note card.
+
+### Defaults
+
+**Defaults** in Settings sets how new notes and lists start, so you don't have to change the same options every time:
+- **Default visibility** and **Default importance** apply to every new note and list.
+- **Default reminder time** is the time of day used for new reminders.
+- **Default recurrence** is the repeat rule preselected when you turn on repeat for a reminder.
+
+Changing a default does not change notes and lists you already have.
 
 ### Swipe actions
 

@@ -434,6 +434,8 @@
     <string name="options_actions">Notification action</string>
     <string name="options_importance">Importance</string>
     <string name="options_visibility">Visibility</string>
+    <string name="options_importance_help_cd">Help about importance</string>
+    <string name="options_visibility_help_cd">Help about visibility</string>
     <string name="options_behavior">Behavior</string>
     <string name="options_behavior_subtitle">How this note\'s notification appears and behaves</string>
     <string name="options_behavior_visibility_label">Visibility: %1$s</string>
@@ -815,9 +817,10 @@
     <string name="help_no_results">No results</string>
     <string name="help_action_notification_settings">Go to notification settings</string>
     <string name="help_action_reminder_settings">Go to Reminders setting</string>
-    <string name="help_action_snooze_settings">Go to Reminder/Snooze types</string>
+    <string name="help_action_snooze_settings">Go to Preset type</string>
     <string name="help_action_backup_settings">Go to Backup settings</string>
     <string name="help_action_security_settings">Go to Security settings</string>
+    <string name="help_action_defaults_settings">Go to Defaults settings</string>
 
     <!-- Settings: note defaults for new notes and lists -->
     <string name="settings_defaults_visibility_title">Default visibility</string>
@@ -832,13 +835,13 @@
     <string name="settings_defaults_recurrence_weekly">Weekly</string>
     <string name="settings_defaults_recurrence_monthly">Monthly</string>
     <string name="settings_defaults_recurrence_yearly">Yearly</string>
-    <string name="settings_snooze_type_title">Reminder/Snooze type</string>
-    <string name="settings_snooze_type_timing">Timing</string>
-    <string name="settings_snooze_type_duration">Duration</string>
-    <string name="settings_snooze_type_tooltip">Choose how preset options are offered when you set a reminder or snooze one.</string>
-    <string name="settings_snooze_type_tooltip_timing">Timing offers named times: Soon, Later today, This evening etc.</string>
-    <string name="settings_snooze_type_tooltip_duration">Duration offers lengths of time: 30 mins, 6 hours, 12 hours, 7 days etc.</string>
-    <string name="settings_snooze_type_info_cd">Explain Reminder/Snooze type</string>
+    <string name="settings_preset_type_title">Preset type</string>
+    <string name="settings_preset_type_timing">Timing</string>
+    <string name="settings_preset_type_duration">Duration</string>
+    <string name="settings_preset_type_tooltip">Choose how preset options are offered when you set a reminder or snooze one.</string>
+    <string name="settings_preset_type_tooltip_timing">Timing offers named times: Soon, Later today, This evening etc.</string>
+    <string name="settings_preset_type_tooltip_duration">Duration offers lengths of time: 30 mins, 6 hours, 12 hours, 7 days etc.</string>
+    <string name="settings_preset_type_info_cd">Explain Preset type</string>
     <plurals name="reminder_duration_preset_minutes">
         <item quantity="one">%1$d min</item>
         <item quantity="other">%1$d mins</item>
@@ -864,12 +867,20 @@
     <string name="settings_notifications_desc">Reminders and system alerts</string>
     <string name="settings_restore_notifications">Restore notifications</string>
     <string name="settings_restore_notifications_desc">Re-posts dismissed reminder notifications until marked done.</string>
-    <string name="settings_critical_ring_duration_title">Critical ring duration</string>
-    <string name="settings_critical_ring_duration_desc">How long a Critical reminder rings each time it alerts</string>
-    <string name="settings_critical_ring_duration_30_seconds">30 seconds</string>
-    <string name="settings_critical_ring_duration_1_minute">1 minute</string>
-    <string name="settings_critical_ring_duration_2_minutes">2 minutes</string>
-    <string name="settings_critical_ring_duration_5_minutes">5 minutes</string>
+    <string name="settings_critical_reminder_type_title">Critical reminder type</string>
+    <string name="settings_critical_reminder_type_desc">Choose alarm ring duration or single chime</string>
+    <!-- Dropdown menu items: the full option names. -->
+    <string name="settings_critical_reminder_type_chime">One chime (High\'s tone)</string>
+    <string name="settings_critical_reminder_type_30_seconds">30-second alarm</string>
+    <string name="settings_critical_reminder_type_1_minute">1-minute alarm</string>
+    <string name="settings_critical_reminder_type_2_minutes">2-minute alarm</string>
+    <string name="settings_critical_reminder_type_5_minutes">5-minute alarm</string>
+    <!-- Dropdown button: the selected option, kept short so the row does not wrap. -->
+    <string name="settings_critical_reminder_type_chime_short">One chime</string>
+    <string name="settings_critical_reminder_type_30_seconds_short">30 sec</string>
+    <string name="settings_critical_reminder_type_1_minute_short">1 min</string>
+    <string name="settings_critical_reminder_type_2_minutes_short">2 min</string>
+    <string name="settings_critical_reminder_type_5_minutes_short">5 min</string>
     <string name="settings_reminder_summary_notification">Reminder summary notification</string>
     <string name="settings_reminder_summary_notification_desc">Silent overview of overdue and upcoming reminders</string>
     <string name="settings_reliable_reminders">Reliable reminders</string>
@@ -1293,8 +1304,8 @@
     <string name="diagnostics_default_importance_format">Default importance: %1$s</string>
     <string name="diagnostics_default_reminder_time_format">Default reminder time (minutes): %1$s</string>
     <string name="diagnostics_default_recurrence_format">Default recurrence: %1$s</string>
-    <string name="diagnostics_snooze_type_format">Reminder/Snooze type: %1$s</string>
-    <string name="diagnostics_critical_ring_duration_format">Critical ring duration: %1$s</string>
+    <string name="diagnostics_snooze_type_format">Preset type: %1$s</string>
+    <string name="diagnostics_critical_ring_duration_format">Critical alert style: %1$s</string>
     <string name="diagnostics_auto_export_on_change_format">Auto export on change: %1$s</string>
     <string name="diagnostics_scheduled_export_enabled_format">Scheduled export enabled: %1$s</string>
     <string name="diagnostics_include_media_in_backup_format">Include media in backup: %1$s</string>

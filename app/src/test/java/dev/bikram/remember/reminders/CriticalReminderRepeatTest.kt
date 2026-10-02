@@ -1,5 +1,6 @@
 package dev.bikram.remember.reminders
 
+import dev.bikram.remember.data.CriticalRingDuration
 import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
@@ -81,42 +82,56 @@ class CriticalReminderRepeatTest {
     }
 
     @Test
-    fun onlyScheduledCriticalAlertsRingContinuously() {
-        assertTrue(ringsContinuously(Importance.CRITICAL, scheduledAlert = true, silent = false, onlyAlertOnce = false))
+    fun onlyRingingCriticalAlertsRingContinuously() {
+        assertTrue(ringsContinuously(Importance.CRITICAL, ringCritical = true, silent = false, onlyAlertOnce = false))
         Importance.entries.filter { it != Importance.CRITICAL }.forEach { importance ->
-            assertFalse(importance.name, ringsContinuously(importance, scheduledAlert = true, silent = false, onlyAlertOnce = false))
+            assertFalse(importance.name, ringsContinuously(importance, ringCritical = true, silent = false, onlyAlertOnce = false))
         }
     }
 
     @Test
     fun refreshAndQuietCriticalPostsDoNotRing() {
         // Edits, restores after dismissal, and the ring stop all re-post without ringing.
-        assertFalse(ringsContinuously(Importance.CRITICAL, scheduledAlert = false, silent = false, onlyAlertOnce = false))
-        assertFalse(ringsContinuously(Importance.CRITICAL, scheduledAlert = true, silent = true, onlyAlertOnce = false))
-        assertFalse(ringsContinuously(Importance.CRITICAL, scheduledAlert = true, silent = false, onlyAlertOnce = true))
+        assertFalse(ringsContinuously(Importance.CRITICAL, ringCritical = false, silent = false, onlyAlertOnce = false))
+        assertFalse(ringsContinuously(Importance.CRITICAL, ringCritical = true, silent = true, onlyAlertOnce = false))
+        assertFalse(ringsContinuously(Importance.CRITICAL, ringCritical = true, silent = false, onlyAlertOnce = true))
     }
 
     @Test
     fun criticalAlertsOutsideItsOwnRingSoundLikeHigh() {
         // Restores after a swipe, saves of an overdue note, and posts from the editor.
-        assertEquals(Importance.HIGH, channelImportance(Importance.CRITICAL, scheduledAlert = false, silent = false))
+        assertEquals(Importance.HIGH, channelImportance(Importance.CRITICAL, ringCritical = false, silent = false))
     }
 
     @Test
     fun criticalRingsAndQuietPostsStayOnTheCriticalChannel() {
-        assertEquals(Importance.CRITICAL, channelImportance(Importance.CRITICAL, scheduledAlert = true, silent = false))
+        assertEquals(Importance.CRITICAL, channelImportance(Importance.CRITICAL, ringCritical = true, silent = false))
         // Ring stops and the reboot restore.
-        assertEquals(Importance.CRITICAL, channelImportance(Importance.CRITICAL, scheduledAlert = false, silent = true))
+        assertEquals(Importance.CRITICAL, channelImportance(Importance.CRITICAL, ringCritical = false, silent = true))
     }
 
     @Test
     fun otherImportancesAlwaysUseTheirOwnChannel() {
         Importance.entries.filter { it != Importance.CRITICAL }.forEach { importance ->
-            listOf(true, false).forEach { scheduledAlert ->
+            listOf(true, false).forEach { ringCritical ->
                 listOf(true, false).forEach { silent ->
-                    assertEquals(importance.name, importance, channelImportance(importance, scheduledAlert, silent))
+                    assertEquals(importance.name, importance, channelImportance(importance, ringCritical, silent))
                 }
             }
+        }
+    }
+
+    @Test
+    fun onlyNoRingSkipsTheAlarm() {
+        CriticalRingDuration.entries.forEach { duration ->
+            assertEquals(duration.name, duration != CriticalRingDuration.NO_RING, duration.ringsLikeAlarm)
+        }
+    }
+
+    @Test
+    fun everyRingEndsBeforeTheNextRepeat() {
+        CriticalRingDuration.entries.mapNotNull { it.ringMillis }.forEach { ringMillis ->
+            assertTrue(ringMillis in 1 until CRITICAL_REPEAT_INTERVAL_MILLIS)
         }
     }
 

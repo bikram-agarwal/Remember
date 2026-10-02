@@ -23,6 +23,9 @@ internal const val SETTINGS_SECTION_HIGHLIGHT_DURATION_MS = 4_500L
 
 @Composable
 internal fun rememberSectionHighlightPulseAlpha(active: Boolean): Float {
+    // A running infinite transition requests every frame even when nothing reads it, so only the
+    // highlighted section starts one.
+    if (!active) return 1f
     val infiniteTransition = rememberInfiniteTransition(label = "settingsSectionHighlight")
     val pulse by infiniteTransition.animateFloat(
         initialValue = 0.42f,
@@ -34,7 +37,7 @@ internal fun rememberSectionHighlightPulseAlpha(active: Boolean): Float {
             ),
         label = "pulse",
     )
-    return if (active) pulse else 1f
+    return pulse
 }
 
 internal fun Modifier.pulsingSectionHighlightOutline(

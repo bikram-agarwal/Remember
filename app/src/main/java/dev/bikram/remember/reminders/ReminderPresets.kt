@@ -51,7 +51,7 @@ internal fun applyReminderDurationChip(
 
 /**
  * Fixed offsets for the reminder sheet when Duration is selected in
- * Reminder/Snooze type. Unlike named snooze presets, these do not round to
+ * Preset type. Unlike named snooze presets, these do not round to
  * clock boundaries.
  */
 internal fun computeReminderDurationPresets(

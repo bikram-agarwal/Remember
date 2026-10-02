@@ -44,14 +44,26 @@ internal fun SettingsExpandableSection(
     onCollapsedSectionKeysChange: (Set<String>) -> Unit,
     modifier: Modifier = Modifier,
     showHeader: Boolean = true,
+    highlightedSectionKey: String? = null,
     content: @Composable () -> Unit,
 ) {
     val collapsed = sectionKey in collapsedSectionKeys
+    // Pulses while a Help deep link points at this section; see SettingsRoute.
+    val highlighted = sectionKey == highlightedSectionKey
+    val highlightAlpha = rememberSectionHighlightPulseAlpha(highlighted)
     val spatialSpec =
         reducedMotionAwareSpec(MaterialTheme.motionScheme.slowSpatialSpec<androidx.compose.ui.unit.IntSize>())
     val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
     val fadeOutSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.fastEffectsSpec<Float>())
-    Column(modifier = modifier) {
+    Column(
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .pulsingSectionHighlightOutline(
+                    active = highlighted,
+                    outlineColor = MaterialTheme.colorScheme.primary.copy(alpha = highlightAlpha),
+                ),
+    ) {
         if (showHeader) {
             RememberExpandableSectionHeader(
                 iconName = materialSymbolName,

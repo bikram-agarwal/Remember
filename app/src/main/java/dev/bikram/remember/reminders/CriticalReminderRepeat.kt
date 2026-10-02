@@ -32,9 +32,10 @@ import javax.inject.Inject
  * cancels the alarm straight away instead of leaving the alarm-clock icon up until the next tick.
  *
  * Each alert - the reminder's own fire and every tick - rings continuously (an insistent
- * notification on the alarm stream) for the user's Critical ring duration. A second shared
+ * notification on the alarm stream) for the duration set in Critical alert style. A second shared
  * alarm then re-posts the ringing notifications quietly, leaving them in the shade until the
- * next tick rings again.
+ * next tick rings again. With the duration set not to ring, each alert plays High's tone once
+ * instead and no ring stop is booked.
  */
 
 const val CRITICAL_REPEAT_INTERVAL_MILLIS = 15L * 60L * 1000L
@@ -140,10 +141,12 @@ class CriticalReminderRepeatReceiver : BroadcastReceiver() {
                 items = noteWithItems.items,
                 reminderIndex = latestDueReminderIndex(note, now) ?: 0,
                 keepUntilDone = prefs.keepReminderNotificationsUntilDone,
-                scheduledAlert = true,
+                ringCritical = prefs.criticalRingDuration.ringsLikeAlarm,
             )
         }
-        reminderScheduler.scheduleCriticalRingStop(now + prefs.criticalRingDuration.millis)
+        prefs.criticalRingDuration.ringMillis?.let { ringMillis ->
+            reminderScheduler.scheduleCriticalRingStop(now + ringMillis)
+        }
         reminderScheduler.scheduleNextCriticalRepeat(now)
     }
 

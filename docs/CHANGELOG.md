@@ -1,13 +1,13 @@
 ## v1.10.0 Critical reminders, Hide content on cards
 
 ### ✨ New Features
-- **Critical reminders**: a new level above High for things you must not miss. A Critical reminder rings like an alarm — your alarm tone, at alarm volume, even when your phone is on silent or vibrate — and gets through Do Not Disturb when it allows alarms. It rings for 1 minute (or your chosen uration), then rings again every 15 minutes until you mark it done. Set how long each ring lasts (30 seconds to 5 minutes) with **Critical ring duration** in Settings → Notifications. Opening the notification shade quiets the current ring; snooze it, mark it done, or lower its importance to stop the repeats.
-- Added an option to hide note and checklist content from note cards while keeping titles and metadata visible.
+- **Critical reminders**: a new level above High for things you must not miss. A Critical reminder rings like an alarm — your alarm tone, at alarm volume, even when your phone is on silent or vibrate — and gets through Do Not Disturb when it allows alarms. It rings for 1 minute (or your chosen duration), then rings again every 15 minutes until you mark it done. See more details in-app. 
+- Added an option to hide note and checklist content from note cards while keeping titles and metadata visible (**Note content on cards** in Settings → Notes UI).
 
 ### 🛠 Improved Features
-- Added a dedicated Notes UI settings section for adaptive themes, card cover images, and card content.
 - Moved Defaults higher in Settings for better logical ordering.
 - Long-pressing a Quick Settings tile now opens Remember instead of the system App Info page.
+- In a note's **Behavior** options, Visibility and Importance now have a **?** button that opens the matching Help section. Choices you haven't confirmed yet are still there when you come back.
 
 ---
 
