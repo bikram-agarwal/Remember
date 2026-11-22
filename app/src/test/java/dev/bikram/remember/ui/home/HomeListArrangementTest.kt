@@ -1,6 +1,7 @@
 package dev.bikram.remember.ui.home
 
 import dev.bikram.remember.data.GroupBy
+import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
@@ -354,6 +355,116 @@ class HomeListArrangementTest {
         assertTrue(noteRows(items).all { it.groupKey == PINNED_SECTION_KEY })
     }
 
+    @Test
+    fun sort_by_importance_desc_orders_pinned_notes_highest_first() {
+        val items =
+            arrangeItems(
+                notes =
+                    listOf(
+                        note(id = 1L, pinned = true, importance = Importance.LOW),
+                        note(id = 2L, pinned = true, importance = Importance.CRITICAL),
+                        note(id = 3L, pinned = true, importance = Importance.DEFAULT),
+                        note(id = 4L, pinned = true, importance = Importance.HIGH),
+                    ),
+                opts = ViewOptions(sortKey = SortKey.IMPORTANCE, sortDir = SortDir.DESC),
+            )
+
+        assertEquals(listOf(2L, 4L, 3L, 1L), noteIdsIn(items, PINNED_SECTION_KEY))
+    }
+
+    @Test
+    fun sort_by_importance_asc_orders_pinned_notes_lowest_first() {
+        val items =
+            arrangeItems(
+                notes =
+                    listOf(
+                        note(id = 1L, pinned = true, importance = Importance.HIGH),
+                        note(id = 2L, pinned = true, importance = Importance.LOW),
+                        note(id = 3L, pinned = true, importance = Importance.CRITICAL),
+                        note(id = 4L, pinned = true, importance = Importance.DEFAULT),
+                    ),
+                opts = ViewOptions(sortKey = SortKey.IMPORTANCE, sortDir = SortDir.ASC),
+            )
+
+        assertEquals(listOf(2L, 4L, 1L, 3L), noteIdsIn(items, PINNED_SECTION_KEY))
+    }
+
+    @Test
+    fun group_by_importance_splits_active_notes_by_level_and_omits_empty_sections() {
+        val items =
+            arrangeItems(
+                notes =
+                    listOf(
+                        note(id = 1L, importance = Importance.LOW),
+                        note(id = 2L, importance = Importance.CRITICAL),
+                        note(id = 3L, importance = Importance.DEFAULT),
+                    ),
+                opts = ViewOptions(groupBy = GroupBy.IMPORTANCE),
+            )
+
+        assertEquals(
+            listOf("IMPORTANCE_CRITICAL", "IMPORTANCE_DEFAULT", "IMPORTANCE_LOW"),
+            headerKeys(items),
+        )
+        assertEquals(listOf(2L), noteIdsIn(items, "IMPORTANCE_CRITICAL"))
+        assertEquals(listOf(3L), noteIdsIn(items, "IMPORTANCE_DEFAULT"))
+        assertEquals(listOf(1L), noteIdsIn(items, "IMPORTANCE_LOW"))
+    }
+
+    @Test
+    fun group_by_importance_follows_ascending_direction_when_sorting_by_importance_asc() {
+        val items =
+            arrangeItems(
+                notes =
+                    listOf(
+                        note(id = 1L, importance = Importance.CRITICAL),
+                        note(id = 2L, importance = Importance.LOW),
+                    ),
+                opts =
+                    ViewOptions(
+                        sortKey = SortKey.IMPORTANCE,
+                        sortDir = SortDir.ASC,
+                        groupBy = GroupBy.IMPORTANCE,
+                    ),
+            )
+
+        assertEquals(listOf("IMPORTANCE_LOW", "IMPORTANCE_CRITICAL"), headerKeys(items))
+    }
+
+    @Test
+    fun sort_by_reminder_tie_breaks_equal_and_null_reminders_by_highest_importance_first() {
+        val items =
+            arrangeItems(
+                notes =
+                    listOf(
+                        note(id = 1L, pinned = true, reminderAt = null, importance = Importance.LOW),
+                        note(id = 2L, pinned = true, reminderAt = null, importance = Importance.CRITICAL),
+                        note(id = 3L, pinned = true, reminderAt = 5_000L, importance = Importance.LOW),
+                        note(id = 4L, pinned = true, reminderAt = 5_000L, importance = Importance.HIGH),
+                    ),
+                opts = ViewOptions(sortKey = SortKey.REMINDER, sortDir = SortDir.ASC),
+            )
+
+        assertEquals(listOf(4L, 3L, 2L, 1L), noteIdsIn(items, PINNED_SECTION_KEY))
+    }
+
+    @Test
+    fun sort_by_importance_tie_breaks_equal_importance_by_soonest_reminder_with_nulls_last() {
+        val items =
+            arrangeItems(
+                notes =
+                    listOf(
+                        note(id = 1L, pinned = true, importance = Importance.HIGH, reminderAt = null),
+                        note(id = 2L, pinned = true, importance = Importance.HIGH, reminderAt = 9_000L),
+                        note(id = 3L, pinned = true, importance = Importance.HIGH, reminderAt = 3_000L),
+                        note(id = 4L, pinned = true, importance = Importance.CRITICAL, reminderAt = null),
+                    ),
+                opts = ViewOptions(sortKey = SortKey.IMPORTANCE, sortDir = SortDir.DESC),
+            )
+
+        assertEquals(listOf(4L, 3L, 2L, 1L), noteIdsIn(items, PINNED_SECTION_KEY))
+    }
+
     private fun headerKeys(items: List<HomeListItem>): List<String> = items.filterIsInstance<HomeListItem.Header>().map { it.stableKey }
 
     private fun noteRows(items: List<HomeListItem>): List<HomeListItem.NoteRow> = items.filterIsInstance<HomeListItem.NoteRow>()
@@ -370,6 +481,7 @@ class HomeListArrangementTest {
         pinned: Boolean = false,
         completedAt: Long? = null,
         reminderAt: Long? = null,
+        importance: Importance = Importance.DEFAULT,
         createdAt: Long = 0L,
         tags: List<String> = emptyList(),
     ): NoteWithItems {
@@ -386,6 +498,7 @@ class HomeListArrangementTest {
                     createdAt = createdAt,
                     updatedAt = createdAt,
                     reminderAt = reminderAt,
+                    importance = importance,
                     tags = tags,
                     completedAt = completedAt,
                     pinnedAt = if (pinned) 1_000L else null,

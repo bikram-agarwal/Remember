@@ -2,7 +2,9 @@ package dev.bikram.remember.ui.home
 
 import dev.bikram.remember.R
 import dev.bikram.remember.data.GroupBy
+import dev.bikram.remember.data.Importance
 import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.data.labelRes
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.RememberReservedTags
 import dev.bikram.remember.data.SortDir
@@ -281,6 +283,7 @@ private fun arrangeByGroupBy(
             }
         GroupBy.TYPE -> arrangeByType(activeNotes)
         GroupBy.TAG -> arrangeByTag(activeNotes)
+        GroupBy.IMPORTANCE -> arrangeByImportance(activeNotes, opts)
     }
 
 private fun arrangeByType(activeNotes: List<NoteWithItems>): List<HomeListItem> {
@@ -323,6 +326,50 @@ private fun arrangeByType(activeNotes: List<NoteWithItems>): List<HomeListItem> 
                         groupKey = "TYPE_LIST",
                     ),
                 )
+            }
+        }
+    }
+}
+
+private fun arrangeByImportance(
+    activeNotes: List<NoteWithItems>,
+    opts: ViewOptions,
+): List<HomeListItem> {
+    val descendingLevels =
+        listOf(
+            Importance.CRITICAL,
+            Importance.HIGH,
+            Importance.DEFAULT,
+            Importance.LOW,
+        )
+    val orderedLevels =
+        if (opts.sortKey == SortKey.IMPORTANCE && opts.sortDir == SortDir.ASC) {
+            descendingLevels.reversed()
+        } else {
+            descendingLevels
+        }
+    return buildList {
+        orderedLevels.forEach { level ->
+            val notesInLevel = activeNotes.filter { it.note.importance == level }
+            if (notesInLevel.isNotEmpty()) {
+                val sectionKey = "IMPORTANCE_${level.name}"
+                add(
+                    HomeListItem.Header(
+                        label = "",
+                        count = notesInLevel.size,
+                        stableKey = sectionKey,
+                        labelRes = level.labelRes(),
+                    ),
+                )
+                notesInLevel.forEach { noteWithItems ->
+                    add(
+                        HomeListItem.NoteRow(
+                            note = noteWithItems,
+                            card = noteWithItems.toNoteCardUiModel(),
+                            groupKey = sectionKey,
+                        ),
+                    )
+                }
             }
         }
     }
@@ -464,6 +511,7 @@ private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
                 compareBy(String.CASE_INSENSITIVE_ORDER) { noteWithItems ->
                     normalizeForAlphabeticalSort(noteWithItems.note.title)
                 }
+            SortKey.IMPORTANCE -> compareBy { noteWithItems -> noteWithItems.note.importance.ordinal }
         }
     val createdTieBreaker: Comparator<NoteWithItems> =
         compareBy<NoteWithItems> { noteWithItems -> noteWithItems.note.createdAt }
@@ -483,13 +531,20 @@ private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
     return when (opts.sortKey) {
         SortKey.REMINDER ->
             Comparator { firstNote, secondNote ->
-                val firstHasNoReminder = firstNote.note.reminderAt == null
-                val secondHasNoReminder = secondNote.note.reminderAt == null
-                when {
-                    firstHasNoReminder && secondHasNoReminder -> 0
-                    firstHasNoReminder -> 1
-                    secondHasNoReminder -> -1
-                    else -> directed.compare(firstNote, secondNote)
+                val reminderComp = compareReminderNullsLast(firstNote, secondNote, opts.sortDir)
+                if (reminderComp != 0) {
+                    reminderComp
+                } else {
+                    secondNote.note.importance.ordinal.compareTo(firstNote.note.importance.ordinal)
+                }
+            }
+        SortKey.IMPORTANCE ->
+            Comparator { firstNote, secondNote ->
+                val importanceComp = directed.compare(firstNote, secondNote)
+                if (importanceComp != 0) {
+                    importanceComp
+                } else {
+                    compareReminderNullsLast(firstNote, secondNote, SortDir.ASC)
                 }
             }
         SortKey.ALPHABETICAL ->
@@ -497,5 +552,21 @@ private fun buildComparator(opts: ViewOptions): Comparator<NoteWithItems> {
                 compareAlphabetically(firstNote, secondNote, opts.sortDir, directedCreatedTieBreaker)
             }
         else -> directed
+    }
+}
+
+private fun compareReminderNullsLast(
+    firstNote: NoteWithItems,
+    secondNote: NoteWithItems,
+    sortDir: SortDir,
+): Int {
+    val firstReminder = firstNote.note.reminderAt
+    val secondReminder = secondNote.note.reminderAt
+    return when {
+        firstReminder == null && secondReminder == null -> 0
+        firstReminder == null -> 1
+        secondReminder == null -> -1
+        sortDir == SortDir.DESC -> secondReminder.compareTo(firstReminder)
+        else -> firstReminder.compareTo(secondReminder)
     }
 }
