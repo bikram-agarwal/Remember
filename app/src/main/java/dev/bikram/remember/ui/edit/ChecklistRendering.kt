@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -24,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -33,6 +35,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -460,9 +468,25 @@ internal fun ChecklistRow(
                 }
             }
             if (isEditMode) {
+                val currentOnNext by rememberUpdatedState(onNext)
                 BasicTextField(
                     state = titleTextFieldState,
                     lineLimits = TextFieldLineLimits.Default,
+                    inputTransformation =
+                        InputTransformation {
+                            val proposed = asCharSequence()
+                            if (proposed.contains('\n') || proposed.contains('\r')) {
+                                val result =
+                                    resolveChecklistTitleNewlineInput(
+                                        previousText = originalText.toString(),
+                                        proposedText = proposed.toString(),
+                                    )
+                                replace(0, length, result.sanitizedText)
+                                if (result.advanceToNextItem) {
+                                    currentOnNext()
+                                }
+                            }
+                        },
                     textStyle =
                         MaterialTheme.typography.bodyLarge.copy(
                             color =
@@ -489,6 +513,17 @@ internal fun ChecklistRow(
                     modifier =
                         Modifier
                             .weight(1f)
+                            .onPreviewKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown &&
+                                    (keyEvent.key == Key.Enter || keyEvent.key == Key.NumPadEnter) &&
+                                    !keyEvent.isShiftPressed
+                                ) {
+                                    onNext()
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
                             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
                     decorator = { innerTextField ->
                         if (item.text.isEmpty()) {
@@ -975,4 +1010,21 @@ internal fun buildActiveEntries(
         out += ActiveEntry.Row(item = item, sortKey = item.sortOrder)
     }
     return out
+}
+
+internal data class ChecklistTitleNewlineResult(
+    val sanitizedText: String,
+    val advanceToNextItem: Boolean,
+)
+
+internal fun resolveChecklistTitleNewlineInput(
+    previousText: String,
+    proposedText: String,
+): ChecklistTitleNewlineResult {
+    val stripped = proposedText.replace("\r\n", "").replace("\n", "").replace("\r", "")
+    if (stripped == previousText) {
+        return ChecklistTitleNewlineResult(sanitizedText = stripped, advanceToNextItem = true)
+    }
+    val singleLine = proposedText.replace("\r\n", " ").replace('\n', ' ').replace('\r', ' ')
+    return ChecklistTitleNewlineResult(sanitizedText = singleLine, advanceToNextItem = false)
 }
