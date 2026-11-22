@@ -4,6 +4,8 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
@@ -15,6 +17,8 @@ internal fun rememberHoistedStringTextFieldState(
     onTextChange: (String) -> Unit,
 ): TextFieldState {
     val textFieldState = rememberTextFieldState(initialText = text)
+    val currentText by rememberUpdatedState(text)
+    val currentOnTextChange by rememberUpdatedState(onTextChange)
     LaunchedEffect(text) {
         val currentText = textFieldState.text.toString()
         if (currentText != text) {
@@ -34,8 +38,8 @@ internal fun rememberHoistedStringTextFieldState(
         snapshotFlow { textFieldState.text.toString() }
             .distinctUntilChanged()
             .collect { updatedText ->
-                if (updatedText != text) {
-                    onTextChange(updatedText)
+                if (updatedText != currentText) {
+                    currentOnTextChange(updatedText)
                 }
             }
     }

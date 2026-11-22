@@ -1,6 +1,8 @@
 package dev.bikram.remember.ui.edit
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -29,6 +31,7 @@ import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -55,6 +59,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -96,8 +101,10 @@ import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.feedback.performRejectHaptic
 import dev.bikram.remember.ui.tags.LocalTagColors
+import dev.bikram.remember.ui.theme.LocalReducedMotion
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 private val FieldHeight = 40.dp
@@ -526,6 +533,7 @@ fun TagEditorSheet(
                                     TAG_NAME_MAX_LENGTH,
                                 ),
                             counterHighlighted = draftName.length >= TAG_NAME_MAX_LENGTH,
+                            inputTransformation = TagNameInputTransformation,
                             modifier = Modifier.weight(1f),
                         )
                         EditableTagHexChip(
@@ -775,13 +783,36 @@ internal fun CompactOutlinedField(
     leading: (@Composable () -> Unit)? = null,
     counterText: String? = null,
     counterHighlighted: Boolean = false,
+    inputTransformation: InputTransformation? = null,
 ) {
     val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
     val pillShape = MaterialTheme.shapes.medium
     val textFieldState = rememberHoistedStringTextFieldState(text = value, onTextChange = onValueChange)
+    val buzzOffset = remember { Animatable(0f) }
+    val buzzScope = rememberCoroutineScope()
+    val reducedMotion by rememberUpdatedState(LocalReducedMotion.current)
+    // Same tiny, fast horizontal jitter Remember's editor title plays at its width limit, and that
+    // FilePipe's group name field plays at 10 characters.
+    val limitAwareTransformation =
+        remember(inputTransformation) {
+            val delegate = inputTransformation ?: return@remember null
+            InputTransformation {
+                val grew = length > originalText.length
+                with(delegate) { transformInput() }
+                if (grew && length >= TAG_NAME_MAX_LENGTH && !reducedMotion) {
+                    buzzScope.launch {
+                        buzzOffset.snapTo(0f)
+                        buzzOffset.animateTo(targetValue = -3f, animationSpec = tween(durationMillis = 25))
+                        buzzOffset.animateTo(targetValue = 3f, animationSpec = tween(durationMillis = 50))
+                        buzzOffset.animateTo(targetValue = 0f, animationSpec = tween(durationMillis = 25))
+                    }
+                }
+            }
+        }
     Row(
         modifier =
             modifier
+                .graphicsLayer { translationX = buzzOffset.value }
                 .height(FieldHeight)
                 .clip(pillShape)
                 .border(width = 1.dp, color = borderColor, shape = pillShape)
@@ -798,6 +829,7 @@ internal fun CompactOutlinedField(
         ) {
             BasicTextField(
                 state = textFieldState,
+                inputTransformation = limitAwareTransformation,
                 lineLimits = TextFieldLineLimits.SingleLine,
                 textStyle =
                     MaterialTheme.typography.bodyLarge.copy(
@@ -865,6 +897,18 @@ internal fun sanitizeTagNameInput(value: String): String =
     value
         .filter { ch -> ch != '\n' }
         .take(TAG_NAME_MAX_LENGTH)
+
+internal val TagNameInputTransformation =
+    InputTransformation {
+        var newlineIndex = asCharSequence().indexOf('\n')
+        while (newlineIndex >= 0) {
+            replace(newlineIndex, newlineIndex + 1, "")
+            newlineIndex = asCharSequence().indexOf('\n')
+        }
+        if (length > TAG_NAME_MAX_LENGTH) {
+            replace(TAG_NAME_MAX_LENGTH, length, "")
+        }
+    }
 
 @Composable
 internal fun EditableTagHexChip(

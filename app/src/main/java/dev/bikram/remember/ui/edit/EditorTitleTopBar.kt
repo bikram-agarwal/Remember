@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -266,56 +267,67 @@ internal fun EditorTitleTopBar(
                         rememberLocalTextFieldValueState(
                             value = titleFieldValue,
                             onValueChange = { updatedValue ->
-                                val nextText = sanitizeEditorTitle(updatedValue.text)
-                                val nextValue = updatedValue.withEditorTitleText(nextText)
+                                titleFieldValue = updatedValue
+                                if (updatedValue.text != title) {
+                                    onTitleChange(updatedValue.text)
+                                }
+                            },
+                        )
+                    val titleInputTransformation =
+                        remember(textMeasurer, titleStyle, titleTextWidth) {
+                            InputTransformation {
+                                val sanitizedText = sanitizeEditorTitle(asCharSequence().toString())
+                                val isShortening = sanitizedText.length < originalText.length
                                 val fullTextFits =
                                     titleFitsEditorHeader(
-                                        text = nextText,
+                                        text = sanitizedText,
                                         textMeasurer = textMeasurer,
                                         style = titleStyle,
                                         maxWidth = titleTextWidth,
                                     )
-                                val isShortening = nextText.length < titleFieldValue.text.length
-                                val acceptedValue =
-                                    when {
-                                        fullTextFits || isShortening -> nextValue
-                                        else ->
-                                            longestFittingEditorTitleValue(
-                                                current = titleFieldValue,
-                                                attempted = nextValue,
-                                                textMeasurer = textMeasurer,
-                                                style = titleStyle,
-                                                maxWidth = titleTextWidth,
-                                            )
+                                if (fullTextFits || isShortening) {
+                                    if (sanitizedText != asCharSequence().toString()) {
+                                        val sanitizedSelection = selection
+                                        replace(0, length, sanitizedText)
+                                        selection = sanitizedSelection
                                     }
-                                if (acceptedValue != null) {
-                                    titleFieldValue = acceptedValue
-                                    if (acceptedValue.text != title) {
-                                        onTitleChange(acceptedValue.text)
-                                    }
+                                    return@InputTransformation
                                 }
-                                if (!fullTextFits && !isShortening) {
-                                    titleBoundaryCueScope.launch {
-                                        titleBoundaryOffset.snapTo(0f)
-                                        titleBoundaryOffset.animateTo(
-                                            targetValue = -3f,
-                                            animationSpec = tween(durationMillis = 25),
-                                        )
-                                        titleBoundaryOffset.animateTo(
-                                            targetValue = 3f,
-                                            animationSpec = tween(durationMillis = 50),
-                                        )
-                                        titleBoundaryOffset.animateTo(
-                                            targetValue = 0f,
-                                            animationSpec = tween(durationMillis = 25),
-                                        )
-                                    }
+                                val fittingValue =
+                                    longestFittingEditorTitleValue(
+                                        current = TextFieldValue(originalText.toString(), originalSelection),
+                                        attempted = TextFieldValue(sanitizedText, selection),
+                                        textMeasurer = textMeasurer,
+                                        style = titleStyle,
+                                        maxWidth = titleTextWidth,
+                                    )
+                                if (fittingValue == null) {
+                                    revertAllChanges()
+                                } else {
+                                    replace(0, length, fittingValue.text)
+                                    selection = fittingValue.selection
                                 }
-                            },
-                        )
+                                titleBoundaryCueScope.launch {
+                                    titleBoundaryOffset.snapTo(0f)
+                                    titleBoundaryOffset.animateTo(
+                                        targetValue = -3f,
+                                        animationSpec = tween(durationMillis = 25),
+                                    )
+                                    titleBoundaryOffset.animateTo(
+                                        targetValue = 3f,
+                                        animationSpec = tween(durationMillis = 50),
+                                    )
+                                    titleBoundaryOffset.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = tween(durationMillis = 25),
+                                    )
+                                }
+                            }
+                        }
                     if (titleEditable) {
                         BasicTextField(
                             state = titleTextFieldState,
+                            inputTransformation = titleInputTransformation,
                             textStyle = titleStyle,
                             enabled = !readOnly,
                             keyboardOptions =
@@ -403,16 +415,6 @@ private fun Modifier.verticalCollapse(progress: Float): Modifier =
     }
 
 private fun sanitizeEditorTitle(text: String): String = text.replace('\r', ' ').replace('\n', ' ')
-
-private fun TextFieldValue.withEditorTitleText(text: String): TextFieldValue =
-    copy(
-        text = text,
-        selection =
-            TextRange(
-                start = selection.start.coerceIn(0, text.length),
-                end = selection.end.coerceIn(0, text.length),
-            ),
-    )
 
 private fun longestFittingEditorTitleValue(
     current: TextFieldValue,

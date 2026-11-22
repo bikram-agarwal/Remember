@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilledTonalButton
@@ -68,6 +69,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.rememberHoistedStringTextFieldState
 import dev.bikram.remember.ui.components.RememberFilledTonalIconButton
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.settings.GroupPosition
@@ -259,9 +261,13 @@ fun HelpScreen(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             item(key = "search") {
+                val searchFieldState =
+                    rememberHoistedStringTextFieldState(
+                        text = searchQuery,
+                        onTextChange = helpVm::setSearchQuery,
+                    )
                 OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = helpVm::setSearchQuery,
+                    state = searchFieldState,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
                     placeholder = { Text(stringResource(R.string.help_search_placeholder)) },
                     leadingIcon = {
@@ -291,7 +297,7 @@ fun HelpScreen(
                             }
                         }
                     },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     shape = MaterialTheme.shapes.extraExtraLarge,
                 )
             }
