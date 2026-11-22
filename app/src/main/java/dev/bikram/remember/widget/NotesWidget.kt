@@ -1181,13 +1181,15 @@ private fun noteWidgetTitle(
         }
     }
 
-private fun noteWidgetSubline(note: NoteWithItems): String =
+internal fun noteWidgetSubline(note: NoteWithItems): String =
     if (note.note.visibility == Visibility.DEFAULT) {
         note.note.body.toWidgetPlainText().ifBlank {
             note.items
-                .firstOrNull()
-                ?.text
-                ?.toWidgetPlainText()
+                .asSequence()
+                .filter { !it.checked }
+                .sortedBy { it.sortOrder }
+                .map { it.text.toWidgetPlainText() }
+                .firstOrNull { it.isNotBlank() }
                 .orEmpty()
         }
     } else {

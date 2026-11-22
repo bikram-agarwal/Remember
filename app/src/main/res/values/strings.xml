@@ -36,6 +36,9 @@
     <!-- Common labels -->
     <string name="action_reset">Reset</string>
     <string name="notification_created">Notification created</string>
+    <string name="notification_posted_hint">Notification posted · Long-press Notify to pin that</string>
+    <string name="notification_pinned_hint">Notification pinned · Tap Notify to dismiss that</string>
+    <string name="notification_removed">Notification removed</string>
     <string name="notification_channel_reminders_low">Reminders (Low)</string>
     <string name="notification_channel_reminders_low_desc">Silent note reminders</string>
     <string name="notification_channel_reminders_normal">Reminders (Normal)</string>

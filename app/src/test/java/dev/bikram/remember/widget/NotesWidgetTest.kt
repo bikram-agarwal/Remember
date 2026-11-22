@@ -1,5 +1,6 @@
 package dev.bikram.remember.widget
 
+import dev.bikram.remember.data.ChecklistItemEntity
 import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
@@ -163,6 +164,91 @@ class NotesWidgetTest {
             )
 
         assertEquals(listOf(2L, 3L, 1L), ascending.map { it.note.id })
+    }
+
+    @Test
+    fun note_widget_subline_shows_first_unchecked_list_item_by_sort_order() {
+        val listNote =
+            NoteWithItems(
+                note =
+                    NoteEntity(
+                        id = 1L,
+                        kind = NoteKind.LIST,
+                        title = "Groceries",
+                        body = "",
+                        colorIndex = 0,
+                        starred = false,
+                        trashed = false,
+                        createdAt = 1000L,
+                        updatedAt = 1000L,
+                        visibility = Visibility.DEFAULT,
+                    ),
+                items =
+                    listOf(
+                        ChecklistItemEntity(
+                            id = 2L,
+                            noteId = 1L,
+                            text = "Second item",
+                            checked = false,
+                            sortOrder = 1.0,
+                        ),
+                        ChecklistItemEntity(
+                            id = 1L,
+                            noteId = 1L,
+                            text = "First item",
+                            checked = true,
+                            sortOrder = 0.0,
+                        ),
+                        ChecklistItemEntity(
+                            id = 3L,
+                            noteId = 1L,
+                            text = "Third item",
+                            checked = false,
+                            sortOrder = 2.0,
+                        ),
+                    ),
+            )
+
+        assertEquals("Second item", noteWidgetSubline(listNote))
+    }
+
+    @Test
+    fun note_widget_subline_returns_empty_when_all_list_items_are_checked() {
+        val listNote =
+            NoteWithItems(
+                note =
+                    NoteEntity(
+                        id = 1L,
+                        kind = NoteKind.LIST,
+                        title = "Groceries",
+                        body = "",
+                        colorIndex = 0,
+                        starred = false,
+                        trashed = false,
+                        createdAt = 1000L,
+                        updatedAt = 1000L,
+                        visibility = Visibility.DEFAULT,
+                    ),
+                items =
+                    listOf(
+                        ChecklistItemEntity(
+                            id = 1L,
+                            noteId = 1L,
+                            text = "First item",
+                            checked = true,
+                            sortOrder = 0.0,
+                        ),
+                        ChecklistItemEntity(
+                            id = 2L,
+                            noteId = 1L,
+                            text = "Second item",
+                            checked = true,
+                            sortOrder = 1.0,
+                        ),
+                    ),
+            )
+
+        assertEquals("", noteWidgetSubline(listNote))
     }
 
     private fun createTestNote(

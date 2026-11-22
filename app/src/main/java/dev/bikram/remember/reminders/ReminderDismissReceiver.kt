@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import dagger.hilt.android.AndroidEntryPoint
+import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.ReminderPrefs
 import dev.bikram.remember.di.ApplicationScope
@@ -30,15 +31,28 @@ class ReminderDismissReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         applicationScope.launch {
             try {
-                val keepUntilDone =
+                val isManualPinned = ManualPinnedNotificationStore.isPinned(context, noteId)
+                val keepUntilDonePref =
                     reminderPrefs
                         .snapshot()
                         .keepReminderNotificationsUntilDone
-                if (!keepUntilDone) return@launch
+                if (!isManualPinned && !keepUntilDonePref) return@launch
 
                 val noteWithItems = noteRepository.get(noteId) ?: return@launch
                 val note = noteWithItems.note
-                val reminderIndex = latestDueReminderIndex(note, System.currentTimeMillis()) ?: return@launch
+                val reminderIndex =
+                    resolveDismissRestoreReminderIndex(
+                        note = note,
+                        nowMillis = System.currentTimeMillis(),
+                        isManualPinned = isManualPinned,
+                        keepUntilDonePref = keepUntilDonePref,
+                    )
+                if (reminderIndex == null) {
+                    if (isManualPinned) {
+                        ManualPinnedNotificationStore.setPinned(context, noteId, pinned = false)
+                    }
+                    return@launch
+                }
                 ReminderReceiver.showNotification(
                     context = context,
                     note = note,
@@ -57,4 +71,18 @@ class ReminderDismissReceiver : BroadcastReceiver() {
         const val ACTION_DISMISSED = "dev.bikram.remember.reminders.REMINDER_DISMISSED"
         const val EXTRA_NOTE_ID = "note_id"
     }
+}
+
+internal fun resolveDismissRestoreReminderIndex(
+    note: NoteEntity,
+    nowMillis: Long,
+    isManualPinned: Boolean,
+    keepUntilDonePref: Boolean,
+): Int? {
+    if (note.trashed || note.completedAt != null) return null
+    if (isManualPinned) {
+        return latestDueReminderIndex(note, nowMillis) ?: 0
+    }
+    if (!keepUntilDonePref) return null
+    return latestDueReminderIndex(note, nowMillis)
 }

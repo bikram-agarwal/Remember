@@ -253,6 +253,8 @@ fun EditNoteScreen(
             unarchiveCurrent = vm::unarchiveCurrent,
             restoreFromTrashCurrent = vm::restoreFromTrashCurrent,
             deleteForeverCurrent = vm::deleteForeverCurrent,
+            hasActiveNotification = vm::hasActiveNotification,
+            dismissActiveNotification = vm::dismissActiveNotification,
             fireNotification = vm::fireNotification,
             flushPendingEdits = bridge::flush,
         )
@@ -265,12 +267,19 @@ fun EditNoteScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val notificationActive by vm.notificationActive.collectAsStateWithLifecycle()
+    LaunchedEffect(persistedForToolbar) {
+        vm.refreshNotificationActive(context)
+    }
+    DisposableEffect(lifecycleOwner, focusManager, keyboardController, context) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_PAUSE) {
                     focusManager.clearFocus(force = true)
                     keyboardController?.hide()
+                } else if (event == Lifecycle.Event.ON_RESUME) {
+                    vm.refreshNotificationActive(context)
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -488,11 +497,13 @@ fun EditNoteScreen(
                                 },
                                 onArchive = editorActions.archiveAndBack,
                                 onNotification = editorActions.notifyOrRequestPermission,
+                                onPinNotification = editorActions.pinNotificationOrRequestPermission,
                                 onUnarchive = editorActions.unarchive,
                                 onTrash = editorActions.trashAndBack,
                                 onRestore = editorActions.restore,
                                 onDeleteForever = { deleteForeverConfirmOpen = true },
                                 showEditAction = false,
+                                notificationActive = notificationActive,
                             )
                         },
                     )

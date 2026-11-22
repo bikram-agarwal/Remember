@@ -210,10 +210,20 @@ class ReminderScheduler(
         )
     }
 
+    fun isNotificationActive(noteId: Long): Boolean {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val activeIds = notificationManager.activeNotifications.map { notification -> notification.id }.toSet()
+        if (pendingRequestCodeForNote(noteId) in activeIds) return true
+        return (0 until MAX_REMINDERS_PER_NOTE).any { index ->
+            pendingRequestCodeForNoteReminder(noteId, index) in activeIds
+        }
+    }
+
     fun cancelNotification(noteId: Long) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(pendingRequestCodeForNote(noteId))
         cancelReminderSlotNotifications(context, noteId)
+        ManualPinnedNotificationStore.setPinned(context, noteId, pinned = false)
     }
 
     suspend fun refreshNotificationIfActive(
@@ -222,7 +232,9 @@ class ReminderScheduler(
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val activeNotificationIds = notificationManager.activeNotifications.map { notification -> notification.id }.toSet()
-        val keepUntilDone = keepReminderNotificationsUntilDone()
+        val keepUntilDone =
+            keepReminderNotificationsUntilDone() ||
+                ManualPinnedNotificationStore.isPinned(context, note.id)
         if (pendingRequestCodeForNote(note.id) in activeNotificationIds) {
             ReminderReceiver.showNotification(
                 context = context,

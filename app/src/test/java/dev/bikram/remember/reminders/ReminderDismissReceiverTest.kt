@@ -50,9 +50,67 @@ class ReminderDismissReceiverTest {
         assertEquals(1, latestDueReminderIndex(note, now = 2_000L))
     }
 
+    @Test
+    fun manualPinnedNotificationRestoresWithoutDueReminderEvenWhenPrefOff() {
+        val note = note(reminderAt = null, reminders = emptyList())
+
+        assertEquals(
+            0,
+            resolveDismissRestoreReminderIndex(
+                note = note,
+                nowMillis = 2_000L,
+                isManualPinned = true,
+                keepUntilDonePref = false,
+            ),
+        )
+    }
+
+    @Test
+    fun manualPinnedNotificationDoesNotRestoreWhenTrashedOrCompleted() {
+        val trashed = note(reminderAt = null, reminders = emptyList(), trashed = true)
+        val completed = note(reminderAt = null, reminders = emptyList(), completedAt = 1_000L)
+
+        assertNull(
+            resolveDismissRestoreReminderIndex(
+                note = trashed,
+                nowMillis = 2_000L,
+                isManualPinned = true,
+                keepUntilDonePref = false,
+            ),
+        )
+        assertNull(
+            resolveDismissRestoreReminderIndex(
+                note = completed,
+                nowMillis = 2_000L,
+                isManualPinned = true,
+                keepUntilDonePref = false,
+            ),
+        )
+    }
+
+    @Test
+    fun normalNotificationDoesNotRestoreWhenPrefOff() {
+        val note =
+            note(
+                reminderAt = 1_000L,
+                reminders = listOf(NoteReminder(reminderAt = 1_000L)),
+            )
+
+        assertNull(
+            resolveDismissRestoreReminderIndex(
+                note = note,
+                nowMillis = 2_000L,
+                isManualPinned = false,
+                keepUntilDonePref = false,
+            ),
+        )
+    }
+
     private fun note(
         reminderAt: Long?,
         reminders: List<NoteReminder>,
+        trashed: Boolean = false,
+        completedAt: Long? = null,
     ): NoteEntity =
         NoteEntity(
             id = 1L,
@@ -61,10 +119,11 @@ class ReminderDismissReceiverTest {
             body = "",
             colorIndex = 0,
             starred = false,
-            trashed = false,
+            trashed = trashed,
             createdAt = 0L,
             updatedAt = 0L,
             reminderAt = reminderAt,
             reminders = reminders,
+            completedAt = completedAt,
         )
 }

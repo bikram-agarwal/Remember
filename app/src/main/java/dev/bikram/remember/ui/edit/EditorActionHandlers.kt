@@ -21,6 +21,7 @@ internal class EditorActionHandlers(
     val saveAndNavigateUp: () -> Unit,
     val archiveAndBack: () -> Unit,
     val notifyOrRequestPermission: () -> Unit,
+    val pinNotificationOrRequestPermission: () -> Unit,
     val unarchive: () -> Unit,
     val trashAndBack: () -> Unit,
     val restore: () -> Unit,
@@ -52,7 +53,9 @@ internal fun rememberEditorActionHandlers(
     unarchiveCurrent: suspend () -> Unit,
     restoreFromTrashCurrent: suspend () -> Unit,
     deleteForeverCurrent: suspend () -> Unit,
-    fireNotification: suspend (Context, String) -> Unit,
+    hasActiveNotification: (Context) -> Boolean,
+    dismissActiveNotification: (Context) -> Unit,
+    fireNotification: suspend (Context, String, Boolean) -> Unit,
     flushPendingEdits: () -> Unit = {},
 ): EditorActionHandlers {
     val context = LocalContext.current
@@ -146,7 +149,19 @@ internal fun rememberEditorActionHandlers(
         notifyOrRequestPermission = {
             flushPendingEdits()
             if (canPostNotifications(context)) {
-                appScope.launch { fireNotification(context, untitledName) }
+                if (hasActiveNotification(context)) {
+                    dismissActiveNotification(context)
+                } else {
+                    appScope.launch { fireNotification(context, untitledName, false) }
+                }
+            } else {
+                onNotificationPermissionRequired()
+            }
+        },
+        pinNotificationOrRequestPermission = {
+            flushPendingEdits()
+            if (canPostNotifications(context)) {
+                appScope.launch { fireNotification(context, untitledName, true) }
             } else {
                 onNotificationPermissionRequired()
             }
