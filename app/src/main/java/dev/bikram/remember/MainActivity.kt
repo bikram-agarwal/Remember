@@ -1,18 +1,34 @@
 package dev.bikram.remember
 
 import android.app.Activity
+import android.content.ClipDescription
 import android.content.Intent
 import android.graphics.Color
+import android.net.Uri
 import android.os.Bundle
 import android.service.quicksettings.TileService
+import android.widget.Toast
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.biometric.BiometricManager
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.background
+import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
@@ -26,8 +42,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draganddrop.DragAndDropEvent
+import androidx.compose.ui.draganddrop.DragAndDropTarget
+import androidx.compose.ui.draganddrop.toAndroidDragEvent
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
@@ -36,6 +59,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
+import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NotesUiPrefs
 import dev.bikram.remember.data.NotesUiState
@@ -52,13 +76,20 @@ import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.ui.InAppRatingAutoPromptHost
 import dev.bikram.remember.ui.common.LocalSystemPaneScaffoldDirective
 import dev.bikram.remember.ui.common.LocalSystemWindowAdaptiveInfo
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.UpdateChromeState
+import dev.bikram.remember.ui.edit.MAX_NOTE_MARKDOWN_KB
+import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
+import dev.bikram.remember.ui.edit.importMarkdownFromUri
+import dev.bikram.remember.ui.edit.isMarkdownFileUri
 import dev.bikram.remember.ui.lock.AppLockSession
 import dev.bikram.remember.ui.lock.LockScreen
 import dev.bikram.remember.ui.nav.RememberNavGraph
 import dev.bikram.remember.ui.settings.RememberUpdateViewModel
 import dev.bikram.remember.ui.tags.LocalTagColors
 import dev.bikram.remember.ui.theme.RememberTheme
+import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 import dev.bikram.remember.update.AppReviewLauncher
 import dev.bikram.remember.update.PlayInAppUpdateBannerUiState
 import dev.bikram.remember.update.PlayInAppUpdateProgressController
@@ -241,6 +272,7 @@ class MainActivity : FragmentActivity() {
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun AppRoot(
     noteRepository: NoteRepository,
@@ -336,6 +368,103 @@ private fun AppRoot(
         androidx.compose.runtime.CompositionLocalProvider(
             dev.bikram.remember.ui.theme.LocalSnackbarHostState provides snackbarHostState,
         ) {
+            var isMarkdownDragOver by remember { mutableStateOf(false) }
+            val dragAndDropTarget =
+                remember(context, activity, noteRepository, appScope, launchFlow) {
+                    object : DragAndDropTarget {
+                        override fun onEntered(event: DragAndDropEvent) {
+                            isMarkdownDragOver = true
+                        }
+
+                        override fun onExited(event: DragAndDropEvent) {
+                            isMarkdownDragOver = false
+                        }
+
+                        override fun onEnded(event: DragAndDropEvent) {
+                            isMarkdownDragOver = false
+                        }
+
+                        override fun onDrop(event: DragAndDropEvent): Boolean {
+                            isMarkdownDragOver = false
+                            val androidEvent = event.toAndroidDragEvent()
+                            val clipData = androidEvent.clipData ?: return false
+                            var droppedUri: Uri? = null
+                            for (index in 0 until clipData.itemCount) {
+                                val uri = clipData.getItemAt(index).uri
+                                if (uri != null) {
+                                    droppedUri = uri
+                                    break
+                                }
+                            }
+                            val uri = droppedUri ?: return false
+                            val dragPermissions = activity?.requestDragAndDropPermissions(androidEvent)
+                            appScope.launch {
+                                try {
+                                    if (!isMarkdownFileUri(context, uri)) {
+                                        Toast
+                                            .makeText(
+                                                context,
+                                                context.getString(R.string.toast_import_md_unsupported),
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                        return@launch
+                                    }
+                                    when (val result = importMarkdownFromUri(context, uri)) {
+                                        is NoteMarkdownImportResult.Success -> {
+                                            val noteTitle =
+                                                result.suggestedTitle
+                                                    ?: context.getString(R.string.edit_note_title_new)
+                                            val newId =
+                                                noteRepository.createNote(
+                                                    title = noteTitle,
+                                                    body = result.markdown,
+                                                    colorIndex = 0,
+                                                    options = NoteOptions(),
+                                                )
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(R.string.toast_import_md_success),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                            launchFlow.value = LaunchAction.OpenNote(newId)
+                                        }
+                                        NoteMarkdownImportResult.TooLarge -> {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(
+                                                        R.string.toast_import_md_too_large,
+                                                        MAX_NOTE_MARKDOWN_KB,
+                                                    ),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
+                                        NoteMarkdownImportResult.Empty -> {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(R.string.toast_import_md_empty),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
+                                        NoteMarkdownImportResult.Failed -> {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(R.string.toast_import_md_failed),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
+                                    }
+                                } finally {
+                                    dragPermissions?.release()
+                                }
+                            }
+                            return true
+                        }
+                    }
+                }
             val currentUpdateInfo = updateInfo
             val updateKey = currentUpdateInfo?.notificationDedupeKey()
             val updateAvailable = BuildConfig.CHECK_UPDATES && currentUpdateInfo != null
@@ -355,36 +484,93 @@ private fun AppRoot(
                             UpdateChromeState.Hidden
                         }
                 }
-            RememberNavGraph(
-                repository = noteRepository,
-                onboardingPrefs = onboardingPrefs,
-                interactionPrefs = interactionPrefs,
-                appScope = appScope,
-                launchFlow = launchFlow,
-                openSettingsRequest = openSettingsRequest,
-                updateVm = updateVm,
-                onUpdateCheckStarted = { dismissedUpdateBarKey = null },
-                updateBarState = updateBarState,
-                updateSignalEpoch = updateSignalEpoch,
-                onUpdateClick = {
-                    if (updateBarState == UpdateChromeState.Available) {
-                        dismissedUpdateBarKey = updateKey
-                    }
-                    // Check only surfaces the update sheet; starting the actual
-                    // download is the sheet's job.
-                    openSettingsRequest += 1
-                    updateVm.requestOpenSheet()
-                },
-                onDismissUpdateAvailable = { dismissedUpdateBarKey = updateKey },
-                onInstallUpdate = {
-                    if (!rememberUpdateState.devReleaseCompletePlayUpdateIfReady()) {
-                        val activity = context as? Activity
-                        if (activity != null) {
-                            playInAppUpdateProgressController.completeFlexibleUpdateIfReady(activity)
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .dragAndDropTarget(
+                            shouldStartDragAndDrop = { event ->
+                                val description = event.toAndroidDragEvent().clipDescription
+                                description == null ||
+                                    description.hasMimeType("text/markdown") ||
+                                    description.hasMimeType("text/x-markdown") ||
+                                    description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
+                                    description.hasMimeType("application/octet-stream") ||
+                                    description.hasMimeType("*/*")
+                            },
+                            target = dragAndDropTarget,
+                        ),
+            ) {
+                RememberNavGraph(
+                    repository = noteRepository,
+                    onboardingPrefs = onboardingPrefs,
+                    interactionPrefs = interactionPrefs,
+                    appScope = appScope,
+                    launchFlow = launchFlow,
+                    openSettingsRequest = openSettingsRequest,
+                    updateVm = updateVm,
+                    onUpdateCheckStarted = { dismissedUpdateBarKey = null },
+                    updateBarState = updateBarState,
+                    updateSignalEpoch = updateSignalEpoch,
+                    onUpdateClick = {
+                        if (updateBarState == UpdateChromeState.Available) {
+                            dismissedUpdateBarKey = updateKey
+                        }
+                        // Check only surfaces the update sheet; starting the actual
+                        // download is the sheet's job.
+                        openSettingsRequest += 1
+                        updateVm.requestOpenSheet()
+                    },
+                    onDismissUpdateAvailable = { dismissedUpdateBarKey = updateKey },
+                    onInstallUpdate = {
+                        if (!rememberUpdateState.devReleaseCompletePlayUpdateIfReady()) {
+                            val activity = context as? Activity
+                            if (activity != null) {
+                                playInAppUpdateProgressController.completeFlexibleUpdateIfReady(activity)
+                            }
+                        }
+                    },
+                )
+                val dropOverlaySpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
+                AnimatedVisibility(
+                    visible = isMarkdownDragOver,
+                    enter = fadeIn(dropOverlaySpec),
+                    exit = fadeOut(dropOverlaySpec),
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Surface(
+                            shape = MaterialTheme.shapes.extraLarge,
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            tonalElevation = 6.dp,
+                            shadowElevation = 6.dp,
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                RememberMaterialRoundedSymbol(
+                                    name = "upload_file",
+                                    size = 24.dp,
+                                    weight = FontWeight.Medium,
+                                )
+                                Text(
+                                    text = stringResource(R.string.drag_drop_markdown_hint),
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                            }
                         }
                     }
-                },
-            )
+                }
+            }
         }
     }
 }

@@ -38,7 +38,7 @@ import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 @Composable
 internal fun HomeSelectionActionBar(
     visible: Boolean,
-    onClearSelection: () -> Unit,
+    onExportSelected: () -> Unit,
     onTagSelected: () -> Unit,
     onPinSelected: () -> Unit,
     pinEnabled: Boolean,
@@ -75,13 +75,9 @@ internal fun HomeSelectionActionBar(
                 tonalElevation = 3.dp,
                 shadowElevation = 3.dp,
             ) {
-                val exitLabel = stringResource(R.string.home_select_exit_cd)
-                val exitInteractionSource = remember { MutableInteractionSource() }
-                val exitColors =
-                    IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
-                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                val exportLabel = stringResource(R.string.home_bulk_export)
+                val contentDescriptionExport = stringResource(R.string.home_bulk_export_cd)
+                val exportInteractionSource = remember { MutableInteractionSource() }
                 val tagLabel = stringResource(R.string.home_bulk_tag)
                 val contentDescriptionTag = stringResource(R.string.home_bulk_tag_cd)
                 val tagInteractionSource = remember { MutableInteractionSource() }
@@ -115,24 +111,23 @@ internal fun HomeSelectionActionBar(
                     customItem(
                         buttonGroupContent = {
                             RememberFilledTonalIconButton(
-                                onClick = onClearSelection,
-                                modifier = Modifier.size(actionButtonSize).animateWidth(exitInteractionSource),
-                                interactionSource = exitInteractionSource,
-                                tooltipLabel = exitLabel,
-                                colors = exitColors,
+                                onClick = onExportSelected,
+                                modifier = Modifier.size(actionButtonSize).animateWidth(exportInteractionSource),
+                                interactionSource = exportInteractionSource,
+                                tooltipLabel = exportLabel,
                             ) {
                                 RememberMaterialRoundedSymbol(
-                                    name = "close",
+                                    name = "download",
                                     weight = FontWeight.Medium,
-                                    modifier = Modifier.semantics { contentDescription = exitLabel },
+                                    modifier = Modifier.semantics { contentDescription = contentDescriptionExport },
                                 )
                             }
                         },
                         menuContent = { menuState ->
                             RememberDropdownMenuItem(
-                                text = { Text(exitLabel) },
+                                text = { Text(exportLabel) },
                                 onClick = {
-                                    onClearSelection()
+                                    onExportSelected()
                                     menuState.dismiss()
                                 },
                             )

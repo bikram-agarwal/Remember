@@ -79,6 +79,14 @@
 
     <!-- Toasts and transient feedback -->
     <string name="toast_export_failed">Export failed</string>
+    <string name="toast_export_md_success">Markdown exported</string>
+    <string name="toast_export_zip_success">Notes exported as ZIP</string>
+    <string name="toast_import_md_success">Markdown imported</string>
+    <string name="toast_import_md_empty">Selected Markdown file is empty</string>
+    <string name="toast_import_md_failed">Could not import Markdown file</string>
+    <string name="toast_import_md_too_large">File is too large (max %1$d KB)</string>
+    <string name="toast_import_md_unsupported">Only Markdown (.md) files are supported</string>
+    <string name="drag_drop_markdown_hint">Drop Markdown file to create note</string>
     <plurals name="toast_exported_to_destinations">
         <item quantity="one">Backup exported to %1$d folder</item>
         <item quantity="other">Backup exported to %1$d folders</item>
@@ -240,6 +248,9 @@
     <string name="cd_numbered_list">Numbered List</string>
     <string name="cd_switch_to_live_preview">Switch to live preview</string>
     <string name="cd_switch_to_markdown_code">Switch to markdown code</string>
+    <string name="cd_note_more_options">More options</string>
+    <string name="note_menu_import_markdown">Import MD</string>
+    <string name="note_menu_export_markdown">Export MD</string>
     <string name="cd_reorder_drag_handle">Reorder</string>
     <string name="cd_checklist_expand_children">Expand sub-items</string>
     <string name="cd_checklist_collapse_children">Collapse sub-items</string>
@@ -312,6 +323,8 @@
     <string name="home_select_exit_cd">Exit selection</string>
     <string name="home_select_all">Select all</string>
     <string name="home_unselect_all">Unselect all</string>
+    <string name="home_bulk_export">Export</string>
+    <string name="home_bulk_export_cd">Export selected as Markdown ZIP</string>
     <string name="home_section_pinned">Pinned</string>
     <string name="home_section_overdue">Overdue</string>
     <string name="home_section_active">Active</string>

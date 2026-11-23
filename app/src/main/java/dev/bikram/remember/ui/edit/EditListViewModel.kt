@@ -145,6 +145,13 @@ class EditListViewModel
             )
         }
 
+        fun replaceItemsFromImport(importedItems: List<EditableItem>) {
+            _items.value = importedItems
+            val minLocalId = importedItems.minOfOrNull { it.localId } ?: 0L
+            nextLocalId = minOf(nextLocalId, minLocalId - 1L)
+            markDirty()
+        }
+
         private var draggingItemId: Long? = null
         private var originalSortOrder: Double? = null
 

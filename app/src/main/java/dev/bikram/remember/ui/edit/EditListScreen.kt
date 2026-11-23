@@ -1,6 +1,9 @@
 package dev.bikram.remember.ui.edit
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -531,6 +535,82 @@ fun EditListScreen(
         )
     val imageResolution = rememberImageDerivedColorScheme(imageDerivedColors)
     var showChecked by rememberSaveable { mutableStateOf(true) }
+    val uiScope = rememberCoroutineScope()
+    val hasPersistedEditorRow = existing || persistedForToolbar
+    val hasListBodyContent = items.any { it.text.isNotBlank() || it.details.isNotBlank() }
+    val canImportMarkdown = !hasPersistedEditorRow && !hasListBodyContent && !readOnly
+    val canExportMarkdown = hasListBodyContent
+    val importMarkdownLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            uiScope.launch {
+                when (val result = importMarkdownFromUri(context, uri)) {
+                    is NoteMarkdownImportResult.Success -> {
+                        val importedItems = markdownToChecklistItems(result.markdown)
+                        if (importedItems.isEmpty()) {
+                            Toast
+                                .makeText(
+                                    context,
+                                    context.getString(R.string.toast_import_md_empty),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                        } else {
+                            vm.replaceItemsFromImport(importedItems)
+                            result.suggestedTitle?.let(vm::setTitle)
+                            Toast
+                                .makeText(
+                                    context,
+                                    context.getString(R.string.toast_import_md_success),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                        }
+                    }
+                    NoteMarkdownImportResult.TooLarge -> {
+                        Toast
+                            .makeText(
+                                context,
+                                context.getString(R.string.toast_import_md_too_large, MAX_NOTE_MARKDOWN_KB),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                    NoteMarkdownImportResult.Empty -> {
+                        Toast
+                            .makeText(
+                                context,
+                                context.getString(R.string.toast_import_md_empty),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                    NoteMarkdownImportResult.Failed -> {
+                        Toast
+                            .makeText(
+                                context,
+                                context.getString(R.string.toast_import_md_failed),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                }
+            }
+        }
+    val exportMarkdownLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("text/markdown"),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            val contentToExport = checklistToMarkdown(items)
+            appScope.launch {
+                val exported = exportMarkdownToUri(context, uri, contentToExport)
+                val messageRes =
+                    if (exported) {
+                        R.string.toast_export_md_success
+                    } else {
+                        R.string.toast_export_failed
+                    }
+                Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_SHORT).show()
+            }
+        }
 
     NoteAdaptiveTheme(imageResolution) {
         Box(Modifier.fillMaxSize()) {
@@ -566,6 +646,22 @@ fun EditListScreen(
                         titleCollapseProgress = titleCollapseProgress,
                         onSave = saveAndExitEditMode,
                         onOpenIcon = { iconPickerOpen = true },
+                        overflowActions = {
+                            EditorMarkdownOverflowMenu(
+                                canImportMarkdown = canImportMarkdown,
+                                canExportMarkdown = canExportMarkdown,
+                                onImportMarkdown = {
+                                    importMarkdownLauncher.launch(
+                                        arrayOf("text/markdown", "text/x-markdown", "text/plain", "*/*"),
+                                    )
+                                },
+                                onExportMarkdown = {
+                                    exportMarkdownLauncher.launch(
+                                        buildMarkdownExportFileName(title, untitledName),
+                                    )
+                                },
+                            )
+                        },
                     )
                 },
                 bottomBar = {
