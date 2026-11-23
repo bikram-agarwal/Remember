@@ -1,5 +1,82 @@
 # Remember Help Guide
 
+## Bring your existing data
+
+### Importing from Google Tasks
+
+Remember can import your tasks from Google Tasks in two ways - by signing in directly or by loading a Google Takeout file. Both methods are strictly read-only, so Remember never edits, completes, or deletes anything in Google Tasks.
+
+**Option 1: Connect Google (requires internet)**
+1. On the Notes tab, tap `+` -> **Import**.
+2. On the **Google Tasks** tab, tap **Choose Google account** (or **Continue as ...** if you have signed in before) and grant read-only access.
+3. Once your tasks load, you can search, filter by task list, and check or uncheck individual tasks.
+4. Choose how your tasks should be created in Remember:
+   - **One note per task**: Creates a separate note for each task with its title, notes/details, and due date/reminder.
+   - **One note per list**: Combines all selected tasks from each list into a single note.
+   - **List as checklist**: Turns each task list into an interactive checklist in Remember.
+5. Tap **Import** to add the selected items.
+
+**Option 2: Google Takeout (no sign-in required; works in the Offline flavor)**
+1. On the **Google Tasks** tab, tap **Open Google Takeout**, tap **Next step**, and then **Create export**.
+2. Check your email for Google's download link, download the archive, and extract it on your device.
+3. Return to Remember's Import screen, tap **Choose JSON file**, and select the `Tasks.json` file from the extracted Takeout folder.
+4. Review your tasks, pick an import mode (**One note per task**, **One note per list**, or **List as checklist**), and tap **Import**.
+
+### Importing from Tasks.org
+
+1. In Tasks.org, open **Settings** -> **Backup** and create a backup. This saves a `user….json` file to your device.
+2. In Remember, tap `+` -> **Import** and switch to the **Tasks.org & more** tab.
+3. Tap **Choose files** and select the saved `user….json` backup file.
+4. Just like Google Tasks, you can search, filter by list, choose whether to **Skip imported** or **Overwrite imported**, pick an import mode (**One note per task**, **One note per list**, or **List as checklist**), and tap **Import**.
+
+### Importing and exporting Markdown
+
+Remember supports `.md`, `.markdown`, and `.txt` files (up to 512 KB per file) for both notes and checklists:
+
+- **Bulk import from the Import screen**:
+  1. Tap `+` -> **Import** and switch to the **Tasks.org & more** tab.
+  2. Tap **Choose files** and select one or more `.md` or `.markdown` files, plain-text `.txt` files, `.zip` archives containing Markdown files.
+  3. Each file's name (without the `.md`, `.markdown`, or `.txt` extension) becomes the title of the imported note or list.
+  4. **Automatic checklist detection**: If an imported Markdown file contains only checklist items (`- [ ]` or `- [x]`, with optional one-level nesting and indented detail lines, and no headings, code blocks, quotes, tables, or dividers), Remember automatically creates it as an interactive **checklist** instead of a note.
+- **Import into a new note or checklist**: On a new, empty note or checklist, tap the top-right `⋮` menu and choose **Import MD** to load a `.md` or `.markdown` file into it.
+- **Export a single note or checklist**: Open any note or checklist with content and tap `⋮` -> **Export MD** to save it as a `.md` file to your device storage.
+- **Bulk ZIP export**: Long-press any item on the Notes tab to enter multi-select mode, select the notes and checklists you want, and tap **Export** in the bottom selection bar to save a `.zip` archive containing a `.md` file for each selected item.
+
+### Importing/Restoring Remember backup
+
+You can create, import, and restore Remember backup `.zip` files from **Settings** -> **Backup**, or load a backup `.zip` directly via **Tasks.org & more -> Choose files** or **Drag and drop**.
+
+#### What a backup includes
+
+Backups include notes, lists, checklist items, tags, reminder details, visibility, importance, icons, actions, archive/trash/done state, attachment metadata, and app settings.
+
+Enable **Include media in backup** to embed pictures and attachment files in the backup. This makes the file larger but means images and attachments will restore correctly on another device.
+
+#### Import vs. restore
+
+**Import backup** adds the backup's notes to your existing collection. If the same notes already exist, importing again creates duplicates. Use import when you want to merge data.
+
+**Restore backup** replaces all current app data with the backup. It is destructive - current notes and lists are wiped before the backup loads. Use restore when you want to replace your data, not add to it.
+
+**If media is missing after restore:** the backup may not have included media files. If media was stored only as file links, those links may not resolve on a different device. Create future backups with **Include media in backup** enabled.
+
+### Drag and drop
+
+On tablets, foldables, ChromeOS, or Android split-screen/multi-window, you can drag files directly from a file manager or another app and drop them onto the unlocked Remember window:
+
+- **Single `.md`, `.markdown`, or `.txt` file**: Immediately creates a new note (or checklist if the file only contains `- [ ]` / `- [x]` checklist items) and opens it right away.
+- **Single Remember backup `.zip` file**: Prompts you to either **Import** its notes into your existing collection or **Restore** (replace all current notes, lists, and settings).
+- **Multiple files or `.zip` archives**: Imports all valid `.md`, `.markdown`, plain-text, zipped Markdown files, and Remember backup `.zip` files (merged additively) in bulk, then shows how many notes were imported.
+- **Single `.json` file**: Opens the Import screen with your Google Tasks Takeout (`Tasks.json`) or Tasks.org (`user….json`) backup already loaded so you can review and choose what to import.
+
+### If an import fails
+
+- **Connect Google**: Check your internet connection, or try **Switch account** if sign-in or consent fails.
+- **JSON files**: Make sure you select the `Tasks.json` file from an extracted Google Takeout archive or a Tasks.org `user….json` backup - Remember does not accept generic JSON files.
+- **Markdown, text, and ZIP files**: Each `.md`, `.markdown`, or `.txt` file must be non-empty and under 512 KB. If a `.zip` archive fails, verify that it contains valid `.md` / `.markdown` files or a Remember backup.
+
+---
+
 ## Getting started
 
 ### Notes vs. lists
@@ -36,6 +113,15 @@ Notes support Markdown-style writing: headings, bold, italic, underline, striket
 
 Lists contain checkable items you can reorder, and supports one level of nesting. Indent an item under a parent to group related subtasks. Checking a parent item checks its children. If every child under a parent becomes checked, the parent checks itself too. Completed items can be separated from active ones.
 
+### Converting between notes and checklists
+
+You can convert an existing note into a checklist or a checklist into a note from the top-right `⋮` menu:
+
+- **Convert to checklist**: Available on notes whose body contains only list items — either Markdown checkboxes (`- [ ]` / `- [x]`) or plain bulleted/numbered items (`-`, `*`, `+`, or `1.`), with up to one level of nesting and optional indented detail lines. If the note contains headings, code blocks, quotes, tables, dividers, or regular paragraphs, **Convert to checklist** is hidden so formatting isn't lost.
+- **Convert to note**: Available on any checklist. Converts all checklist items (preserving checked state, one-level nesting, and item details) into `- [ ]` / `- [x]` Markdown checklist syntax inside a standard note.
+
+Your title, star state, reminder, tags, importance, visibility, icon, picture, attachments, and notification action are all preserved when converting.
+
 ---
 
 ## Organization
@@ -55,6 +141,10 @@ Pinned notes and lists collect in a **Pinned** section at the very top of the No
 - Searching or filtering can hide a pinned item, because those narrow down what the list contains. Changing the sort or grouping never will. 
 - Marking a pinned item done moves it to the **Done** section at the bottom, like anything else. It stays pinned, so it returns to the top if you mark it not done again.
 - Duplicating a pinned item does not pin the copy.
+
+### Sorting and grouping
+
+Use the **Sort** and **Group** chips on the Notes tab to organize your notes and checklists. You can sort or group by dates, title, reminders, and importance, and toggle the sort direction (Ascending / Descending) from the Sort menu.
 
 ### Search
 
@@ -99,6 +189,10 @@ When you mark a recurring reminder done, Remember advances it to the next schedu
 ### Restore notifications
 
 **Restore notifications** is a Settings option for persistent reminders, saving them from being accidentally swiped away. When enabled, a dismissed reminder notification will come back immediately if the note or list is still not marked done.
+
+### Pinning notifications
+
+You can also manually pin a note or list's notification from its bottom bar. A manually pinned notification stays active and is automatically restored if dismissed, until you unpin it or mark the item done.
 
 ### Reminder summary
 
@@ -167,35 +261,6 @@ The **quick capture notification** is a persistent shortcut for creating a new n
 - Private notes' content is always hidden in the widget.
 - Widgets show active items only — archived and trashed items do not appear.
 - The agenda widget shows reminder items due now or within next 7 days, not every note.
-
----
-
-## Import, backup, and restore
-
-### Importing from Google Tasks or Tasks.org
-
-Remember can import tasks from Google Tasks or a Tasks.org backup. Tap the `+` -> Import, and then:
-- **Connect Google** to sign into your account and select tasks to import. OR
-- **Manual import**, to pick a JSON file. No sign-in required. Use either:
-  - Google Takeout: open Google Takeout for Tasks, create an export, download and extract the archive, then choose the `Tasks.json` file.
-  - Tasks.org: in Tasks.org, open Settings, then Backup, create a backup, then choose the saved json file.
-The import is read-only — Remember never edits Google Tasks or Tasks.org. Imported tasks can become individual notes, grouped notes, or checklist-style lists depending on the import mode you choose.
-
-**If import fails:** check your internet connection for Connect Google, or try switching accounts if sign-in fails. For manual import, choose the `Tasks.json` file from the extracted Takeout archive, or a Tasks.org `user….json` backup — Remember does not accept a generic JSON file.
-
-### What a backup includes
-
-Backups include notes, lists, checklist items, tags, reminder details, visibility, importance, icons, actions, archive/trash/done state, attachment metadata, and app settings.
-
-Enable **Include media in backup** to embed pictures and attachment files in the backup. This makes the file larger but means images and attachments will restore correctly on another device.
-
-### Import vs. restore
-
-**Import backup** adds the backup's notes to your existing collection. If the same notes already exist, importing again creates duplicates. Use import when you want to merge data.
-
-**Restore backup** replaces all current app data with the backup. It is destructive — current notes and lists are wiped before the backup loads. Use restore when you want to replace your data, not add to it.
-
-**If media is missing after restore:** the backup may not have included media files. If media was stored only as file links, those links may not resolve on a different device. Create future backups with **Include media in backup** enabled.
 
 ---
 

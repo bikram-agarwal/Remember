@@ -39,6 +39,7 @@ Reminders are more useful when they carry information. Remember's notes and list
 
 - **Markdown notes** with headings, formatting, links, and code blocks — so a reminder about a meeting can include the agenda.
 - **Checklists** with nested items and drag-to-reorder — so a grocery run or a packing list can live inside the reminder itself.
+- **Note & checklist conversion**: Convert list-formatted notes into interactive checklists or convert checklists into Markdown notes while keeping titles, reminders, tags, and attachments intact.
 - **Attachments and pictures** show up on the note card and inside reminder notifications. Cover images can be repositioned to frame exactly how you want.
 - **Note icons** from hundreds of Material Symbols or the full emoji set — so every note is visually distinct at a glance.
 
@@ -76,7 +77,9 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 - **Manual backup and restore**: export to any folder, including cloud drives.
 - **Auto-export** on every change, or on a schedule via background worker.
 - **Media inclusion**: optionally embed pictures and attachments in the backup file.
-- **Flexible imports**: bring over your data from Google Tasks or Tasks.org (via direct account sync, Google Takeout JSON, or local backup files). Customize your layout using three import modes: single note per task, grouped by list, or rendered as a task checklist.
+- **Flexible imports**: Bring over your data from Google Tasks (direct account sync or Google Takeout JSON), Tasks.org backups, or local `.md`, `.markdown`, `.txt`, and `.zip` files. Customize task imports with three modes: single note per task, grouped by list, or list as checklist.
+- **Markdown export**: Export any note or checklist as `.md`, or bulk-export selected items as a `.zip` archive.
+- **Drag and drop**: Drop `.md`, `.txt`, `.json`, or `.zip` files directly onto the Remember window.
 
 
 ### 🏠 Widgets and shortcuts

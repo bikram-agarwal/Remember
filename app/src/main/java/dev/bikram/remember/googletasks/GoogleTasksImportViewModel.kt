@@ -10,6 +10,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
+import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.di.IoDispatcher
 import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
@@ -54,6 +55,7 @@ class GoogleTasksImportViewModel
         private val appContext: Context,
         private val repository: GoogleTasksRepository,
         private val noteRepository: NoteRepository,
+        private val backupIo: BackupIo,
         private val importer: GoogleTasksImporter,
         private val prefs: GoogleTasksImportPrefs,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -220,6 +222,16 @@ class GoogleTasksImportViewModel
                 return
             }
             viewModelScope.launch {
+                if (uris.size == 1 && isZipFileUri(appContext, uris.first()) && backupIo.isBackupZip(uris.first())) {
+                    _state.update {
+                        it.copy(
+                            selectedMethod = ImportMethod.TasksOrgAndMd,
+                            pendingBackupZip = PendingBackupZip(uri = uris.first()),
+                            error = null,
+                        )
+                    }
+                    return@launch
+                }
                 _state.update {
                     it.copy(
                         selectedMethod = ImportMethod.TasksOrgAndMd,
@@ -241,28 +253,38 @@ class GoogleTasksImportViewModel
                             }
                             isZipFileUri(appContext, uri) -> {
                                 sawZip = true
-                                val entriesResult =
-                                    runCatching {
-                                        appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
-                                            readMarkdownEntriesFromZip(inputStream)
-                                        } ?: throw IllegalArgumentException("Could not open archive")
-                                    }
-                                entriesResult
-                                    .onSuccess { entries ->
-                                        if (entries.isNotEmpty()) {
-                                            sawZipMarkdownEntry = true
-                                        }
-                                        entries.forEach { entry ->
-                                            createImportedMarkdownNote(
-                                                noteRepository = noteRepository,
-                                                title = entry.suggestedTitle ?: fallbackTitle,
-                                                markdown = entry.markdown,
-                                            )
-                                            importedCount++
-                                        }
-                                    }.onFailure {
+                                if (backupIo.isBackupZip(uri)) {
+                                    val count = backupIo.importFrom(uri, preserveIdsForNotes = false)
+                                    if (count > 0) {
+                                        sawZipMarkdownEntry = true
+                                        importedCount += count
+                                    } else {
                                         sawFailure = true
                                     }
+                                } else {
+                                    val entriesResult =
+                                        runCatching {
+                                            appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                                readMarkdownEntriesFromZip(inputStream)
+                                            } ?: throw IllegalArgumentException("Could not open archive")
+                                        }
+                                    entriesResult
+                                        .onSuccess { entries ->
+                                            if (entries.isNotEmpty()) {
+                                                sawZipMarkdownEntry = true
+                                            }
+                                            entries.forEach { entry ->
+                                                createImportedMarkdownNote(
+                                                    noteRepository = noteRepository,
+                                                    title = entry.suggestedTitle ?: fallbackTitle,
+                                                    markdown = entry.markdown,
+                                                )
+                                                importedCount++
+                                            }
+                                        }.onFailure {
+                                            sawFailure = true
+                                        }
+                                }
                             }
                             isMarkdownOrPlainTextUri(appContext, uri) -> {
                                 when (val result = importMarkdownFromUri(appContext, uri)) {
@@ -297,6 +319,55 @@ class GoogleTasksImportViewModel
                         }
                     _state.update { it.copy(isImportingMarkdown = false, error = error) }
                 }
+            }
+        }
+
+        fun dismissPendingBackupZip() {
+            _state.update { it.copy(pendingBackupZip = null) }
+        }
+
+        fun confirmPendingBackupImportMerge() {
+            val pending = _state.value.pendingBackupZip ?: return
+            viewModelScope.launch {
+                _state.update { it.copy(pendingBackupZip = null, isImportingMarkdown = true, error = null) }
+                val count = backupIo.importFrom(pending.uri, preserveIdsForNotes = false)
+                if (count > 0) {
+                    _state.update { it.copy(isImportingMarkdown = false, error = null) }
+                    _effects.value = GoogleTasksImportEffect.MarkdownImportFinished(count)
+                } else {
+                    _state.update {
+                        it.copy(
+                            isImportingMarkdown = false,
+                            error = ImportError.MarkdownImportFailed,
+                        )
+                    }
+                }
+            }
+        }
+
+        fun requestPendingBackupRestore() {
+            val pending = _state.value.pendingBackupZip ?: return
+            viewModelScope.launch {
+                val summary = backupIo.inspectRestoreMedia(pending.uri)
+                _state.update { current ->
+                    current.copy(
+                        pendingBackupZip =
+                            current.pendingBackupZip?.copy(
+                                confirmingRestore = true,
+                                mediaSummary = summary,
+                            ),
+                    )
+                }
+            }
+        }
+
+        fun confirmPendingBackupRestore() {
+            val pending = _state.value.pendingBackupZip ?: return
+            viewModelScope.launch {
+                _state.update { it.copy(pendingBackupZip = null, isImportingMarkdown = true, error = null) }
+                val result = backupIo.restoreFullReplace(pending.uri)
+                _state.update { it.copy(isImportingMarkdown = false, error = null) }
+                _effects.value = GoogleTasksImportEffect.MarkdownImportFinished(result.noteCount)
             }
         }
 
@@ -668,6 +739,7 @@ data class GoogleTasksImportUiState(
     val selectedTaskIds: Set<String> = emptySet(),
     val alreadyImportedIds: Set<String> = emptySet(),
     val listFilterId: String? = null,
+    val pendingBackupZip: PendingBackupZip? = null,
     val searchQuery: String = "",
     /** Source-list IDs whose group is currently collapsed in the grouped LoadedPanel view. */
     val collapsedListIds: Set<String> = emptySet(),
@@ -721,6 +793,12 @@ private fun String?.sourceKey(): String =
             ?.takeIf { it.isNotBlank() }
             ?: "unknown"
     )
+
+data class PendingBackupZip(
+    val uri: Uri,
+    val confirmingRestore: Boolean = false,
+    val mediaSummary: BackupIo.RestoreMediaSummary? = null,
+)
 
 sealed class ImportError {
     data object Network : ImportError()

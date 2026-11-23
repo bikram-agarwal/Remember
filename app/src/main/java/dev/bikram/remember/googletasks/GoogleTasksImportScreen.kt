@@ -108,6 +108,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.common.isLandscape
 import dev.bikram.remember.ui.common.rememberHoistedStringTextFieldState
+import dev.bikram.remember.ui.components.RememberBackupZipActionDialog
 import dev.bikram.remember.ui.components.RememberButton
 import dev.bikram.remember.ui.components.RememberCheckbox
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
@@ -503,7 +504,7 @@ fun GoogleTasksImportRoute(
                     detailPanel(Modifier.weight(1f - LIST_PANE_PROPORTION))
                 }
             } else {
-                // The Google Tasks / Tasks.org & MD segmented pill is a SETUP-time choice. Once
+                // The Google Tasks / Tasks.org & more segmented pill is a SETUP-time choice. Once
                 // a source is loaded, the same affordance lives inside the bottom sheet's source
                 // chip - showing the pill at the top would invite users to silently nuke their
                 // selection by tapping the other tab.
@@ -564,6 +565,17 @@ fun GoogleTasksImportRoute(
                 }
             },
             onDismiss = { pendingExitConfirmation = null },
+        )
+    }
+
+    state.pendingBackupZip?.let { pendingBackup ->
+        RememberBackupZipActionDialog(
+            confirmingRestore = pendingBackup.confirmingRestore,
+            mediaSummary = pendingBackup.mediaSummary,
+            onImportMerge = vm::confirmPendingBackupImportMerge,
+            onRequestRestore = vm::requestPendingBackupRestore,
+            onConfirmRestore = vm::confirmPendingBackupRestore,
+            onDismiss = vm::dismissPendingBackupZip,
         )
     }
 }

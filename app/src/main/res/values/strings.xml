@@ -87,7 +87,10 @@
     <string name="toast_import_md_too_large">File is too large (max %1$d KB)</string>
     <string name="toast_import_md_unsupported">Only Markdown (.md) or text (.txt) files are supported</string>
     <string name="drag_drop_import_title">Drop files to import</string>
-    <string name="drag_drop_import_subtitle">Supports .md, .txt, .zip, or Google Tasks / Tasks.org .json</string>
+    <string name="drag_drop_import_subtitle">Supports .md, .txt, .zip, and .json</string>
+    <string name="drag_drop_error_unsupported_type">Unsupported file type. Use .md, .txt, .zip, or .json</string>
+    <string name="drag_drop_error_zip_empty">No valid Markdown notes or Remember backup found in ZIP</string>
+    <string name="drag_drop_error_invalid_json">Invalid JSON: expected a Google Takeout or Tasks.org backup</string>
     <plurals name="toast_exported_to_destinations">
         <item quantity="one">Backup exported to %1$d folder</item>
         <item quantity="other">Backup exported to %1$d folders</item>
@@ -933,7 +936,7 @@
     <!-- Import screen (shared) -->
     <string name="import_title">Import</string>
     <string name="import_tab_google_tasks">Google Tasks</string>
-    <string name="import_tab_tasks_org_md">Tasks.org &amp; MD</string>
+    <string name="import_tab_tasks_org_md">Tasks.org &amp; more</string>
     <string name="import_file_title">Import from a file</string>
     <string name="import_file_body">Import a Tasks.org backup or local Markdown notes. No account sign-in required.</string>
     <string name="import_choose_json_step">Come back here and choose the saved json file</string>
@@ -1022,9 +1025,9 @@
     <string name="tasks_org_import_source_title">Tasks.org backup</string>
 
     <!-- Markdown import -->
-    <string name="markdown_import_heading">Markdown &amp; text (.md, .txt &amp; .zip)</string>
-    <string name="markdown_import_step_1">Choose one or more .md or .txt files, or a .zip archive containing multiple .md files.</string>
-    <string name="markdown_import_step_2">Each file is imported as a separate note using its file name as the title.</string>
+    <string name="markdown_import_heading">Markdown, text &amp; backups (.md, .txt, .zip)</string>
+    <string name="markdown_import_step_1">Choose .md or .txt files, a .zip of Markdown files, or a Remember backup .zip.</string>
+    <string name="markdown_import_step_2">Each Markdown or text file becomes a note using its file name as the title.</string>
     <string name="markdown_import_loading">Importing Markdown notes…</string>
     <string name="markdown_import_zip_empty">No valid Markdown (.md) files found in the selected archive</string>
     <string name="markdown_import_none_valid">No valid Markdown (.md) or text (.txt) files were imported</string>
@@ -1067,6 +1070,9 @@
     </plurals>
     <string name="settings_restore_automation_disabled_no_folder">Automatic backups were turned off because no accessible backup folder was restored.</string>
     <string name="settings_restore_go_ahead">Replace and import</string>
+    <string name="backup_zip_choice_title">Remember backup detected</string>
+    <string name="backup_zip_import_action">Import</string>
+    <string name="backup_zip_restore_action">Restore</string>
     <string name="cloud_provider_google_drive">Google Drive</string>
     <string name="cloud_provider_onedrive">OneDrive</string>
     <string name="cloud_provider_dropbox">Dropbox</string>

@@ -64,6 +64,7 @@ import androidx.fragment.app.FragmentActivity
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dagger.hilt.android.AndroidEntryPoint
+import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.InteractionPrefs
 import dev.bikram.remember.data.InteractionState
 import dev.bikram.remember.data.LockPrefs
@@ -81,12 +82,14 @@ import dev.bikram.remember.data.UpdatePrefs
 import dev.bikram.remember.data.effectiveDarkTheme
 import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.di.LaunchAction
+import dev.bikram.remember.googletasks.ManualTaskImportParser
 import dev.bikram.remember.ui.InAppRatingAutoPromptHost
 import dev.bikram.remember.ui.common.LocalSystemPaneScaffoldDirective
 import dev.bikram.remember.ui.common.LocalSystemWindowAdaptiveInfo
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.UpdateChromeState
+import dev.bikram.remember.ui.components.RememberBackupZipActionDialog
 import dev.bikram.remember.ui.edit.MAX_NOTE_MARKDOWN_KB
 import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
 import dev.bikram.remember.ui.edit.createImportedMarkdownNote
@@ -112,11 +115,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
     @Inject lateinit var noteRepository: NoteRepository
+
+    @Inject lateinit var backupIo: BackupIo
 
     @Inject lateinit var tagRepository: TagRepository
 
@@ -208,6 +214,7 @@ class MainActivity : FragmentActivity() {
                 ) {
                     AppRoot(
                         noteRepository = noteRepository,
+                        backupIo = backupIo,
                         onboardingPrefs = onboardingPrefs,
                         interactionPrefs = interactionPrefs,
                         lockPrefs = lockPrefs,
@@ -290,6 +297,7 @@ class MainActivity : FragmentActivity() {
 @Composable
 private fun AppRoot(
     noteRepository: NoteRepository,
+    backupIo: BackupIo,
     onboardingPrefs: OnboardingPrefs,
     interactionPrefs: InteractionPrefs,
     lockPrefs: LockPrefs,
@@ -384,6 +392,9 @@ private fun AppRoot(
         ) {
             var isDragSessionActive by remember { mutableStateOf(false) }
             var isDragHovered by remember { mutableStateOf(false) }
+            var pendingDroppedBackupFile by remember { mutableStateOf<File?>(null) }
+            var confirmingDroppedRestore by remember { mutableStateOf(false) }
+            var droppedRestoreMediaSummary by remember { mutableStateOf<BackupIo.RestoreMediaSummary?>(null) }
             val dragAndDropTarget =
                 remember(context, activity, noteRepository, appScope, launchFlow) {
                     object : DragAndDropTarget {
@@ -421,27 +432,70 @@ private fun AppRoot(
                             appScope.launch {
                                 try {
                                     if (droppedUris.size == 1 && isJsonFileUri(context, droppedUris.first())) {
-                                        val jsonText =
+                                        val isValidJson =
                                             withContext(Dispatchers.IO) {
                                                 runCatching {
-                                                    context.contentResolver
-                                                        .openInputStream(droppedUris.first())
-                                                        ?.use { inputStream ->
-                                                            inputStream.reader(Charsets.UTF_8).readText()
-                                                        }
+                                                    val text =
+                                                        context.contentResolver
+                                                            .openInputStream(droppedUris.first())
+                                                            ?.use { inputStream ->
+                                                                inputStream.reader(Charsets.UTF_8).readText()
+                                                            } ?: return@runCatching null
+                                                    ManualTaskImportParser().parse(text)
+                                                    text
                                                 }.getOrNull()
                                             }
-                                        if (jsonText != null) {
-                                            launchFlow.value = LaunchAction.OpenTaskImport(jsonText)
+                                        if (isValidJson != null) {
+                                            launchFlow.value = LaunchAction.OpenTaskImport(isValidJson)
                                         } else {
                                             Toast
                                                 .makeText(
                                                     context,
-                                                    context.getString(R.string.import_error_json_parse),
+                                                    context.getString(R.string.drag_drop_error_invalid_json),
                                                     Toast.LENGTH_SHORT,
                                                 ).show()
                                         }
                                         return@launch
+                                    }
+
+                                    if (droppedUris.size == 1 && isZipFileUri(context, droppedUris.first())) {
+                                        val uri = droppedUris.first()
+                                        if (backupIo.isBackupZip(uri)) {
+                                            val stagedFile =
+                                                withContext(Dispatchers.IO) {
+                                                    runCatching {
+                                                        val tempFile =
+                                                            File.createTempFile(
+                                                                "remember_drop_backup_",
+                                                                ".zip",
+                                                                context.cacheDir,
+                                                            )
+                                                        context.contentResolver.openInputStream(uri)?.use { input ->
+                                                            tempFile.outputStream().use { output ->
+                                                                input.copyTo(output)
+                                                            }
+                                                        } ?: run {
+                                                            tempFile.delete()
+                                                            return@runCatching null
+                                                        }
+                                                        tempFile
+                                                    }.getOrNull()
+                                                }
+                                            if (stagedFile != null) {
+                                                pendingDroppedBackupFile?.delete()
+                                                pendingDroppedBackupFile = stagedFile
+                                                confirmingDroppedRestore = false
+                                                droppedRestoreMediaSummary = null
+                                            } else {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(R.string.markdown_import_failed),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                            }
+                                            return@launch
+                                        }
                                     }
 
                                     if (droppedUris.size == 1 && !isZipFileUri(context, droppedUris.first())) {
@@ -450,7 +504,7 @@ private fun AppRoot(
                                             Toast
                                                 .makeText(
                                                     context,
-                                                    context.getString(R.string.toast_import_md_unsupported),
+                                                    context.getString(R.string.drag_drop_error_unsupported_type),
                                                     Toast.LENGTH_SHORT,
                                                 ).show()
                                             return@launch
@@ -507,7 +561,8 @@ private fun AppRoot(
 
                                     var importedCount = 0
                                     var sawZip = false
-                                    var sawZipMarkdownEntry = false
+                                    var sawZipValidContent = false
+                                    var sawUnsupported = false
                                     var sawFailure = false
                                     val fallbackTitle = context.getString(R.string.edit_note_title_new)
                                     withContext(Dispatchers.IO) {
@@ -515,24 +570,34 @@ private fun AppRoot(
                                             when {
                                                 isZipFileUri(context, uri) -> {
                                                     sawZip = true
-                                                    runCatching {
-                                                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                                                            readMarkdownEntriesFromZip(inputStream)
-                                                        } ?: throw IllegalArgumentException("Could not open archive")
-                                                    }.onSuccess { entries ->
-                                                        if (entries.isNotEmpty()) {
-                                                            sawZipMarkdownEntry = true
+                                                    if (backupIo.isBackupZip(uri)) {
+                                                        val count = backupIo.importFrom(uri, preserveIdsForNotes = false)
+                                                        if (count > 0) {
+                                                            sawZipValidContent = true
+                                                            importedCount += count
+                                                        } else {
+                                                            sawFailure = true
                                                         }
-                                                        entries.forEach { entry ->
-                                                            createImportedMarkdownNote(
-                                                                noteRepository = noteRepository,
-                                                                title = entry.suggestedTitle ?: fallbackTitle,
-                                                                markdown = entry.markdown,
-                                                            )
-                                                            importedCount++
+                                                    } else {
+                                                        runCatching {
+                                                            context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                                                readMarkdownEntriesFromZip(inputStream)
+                                                            } ?: throw IllegalArgumentException("Could not open archive")
+                                                        }.onSuccess { entries ->
+                                                            if (entries.isNotEmpty()) {
+                                                                sawZipValidContent = true
+                                                            }
+                                                            entries.forEach { entry ->
+                                                                createImportedMarkdownNote(
+                                                                    noteRepository = noteRepository,
+                                                                    title = entry.suggestedTitle ?: fallbackTitle,
+                                                                    markdown = entry.markdown,
+                                                                )
+                                                                importedCount++
+                                                            }
+                                                        }.onFailure {
+                                                            sawFailure = true
                                                         }
-                                                    }.onFailure {
-                                                        sawFailure = true
                                                     }
                                                 }
                                                 isMarkdownOrPlainTextUri(context, uri) -> {
@@ -551,7 +616,7 @@ private fun AppRoot(
                                                         -> Unit
                                                     }
                                                 }
-                                                else -> sawFailure = true
+                                                else -> sawUnsupported = true
                                             }
                                         }
                                     }
@@ -564,8 +629,10 @@ private fun AppRoot(
                                             )
                                         } else {
                                             when {
-                                                sawZip && !sawZipMarkdownEntry && !sawFailure ->
-                                                    context.getString(R.string.markdown_import_zip_empty)
+                                                sawZip && !sawZipValidContent && !sawFailure ->
+                                                    context.getString(R.string.drag_drop_error_zip_empty)
+                                                sawUnsupported && !sawFailure ->
+                                                    context.getString(R.string.drag_drop_error_unsupported_type)
                                                 sawFailure -> context.getString(R.string.markdown_import_failed)
                                                 else -> context.getString(R.string.markdown_import_none_valid)
                                             }
@@ -749,6 +816,69 @@ private fun AppRoot(
                             }
                         }
                     }
+                }
+                pendingDroppedBackupFile?.let { backupFile ->
+                    RememberBackupZipActionDialog(
+                        confirmingRestore = confirmingDroppedRestore,
+                        mediaSummary = droppedRestoreMediaSummary,
+                        onImportMerge = {
+                            pendingDroppedBackupFile = null
+                            confirmingDroppedRestore = false
+                            droppedRestoreMediaSummary = null
+                            appScope.launch {
+                                val count =
+                                    try {
+                                        backupIo.importFrom(Uri.fromFile(backupFile), preserveIdsForNotes = false)
+                                    } finally {
+                                        backupFile.delete()
+                                    }
+                                val message =
+                                    if (count > 0) {
+                                        context.resources.getQuantityString(
+                                            R.plurals.toast_imported_notes,
+                                            count,
+                                            count,
+                                        )
+                                    } else {
+                                        context.getString(R.string.markdown_import_failed)
+                                    }
+                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onRequestRestore = {
+                            appScope.launch {
+                                droppedRestoreMediaSummary =
+                                    backupIo.inspectRestoreMedia(Uri.fromFile(backupFile))
+                                confirmingDroppedRestore = true
+                            }
+                        },
+                        onConfirmRestore = {
+                            pendingDroppedBackupFile = null
+                            confirmingDroppedRestore = false
+                            droppedRestoreMediaSummary = null
+                            appScope.launch {
+                                val result =
+                                    try {
+                                        backupIo.restoreFullReplace(Uri.fromFile(backupFile))
+                                    } finally {
+                                        backupFile.delete()
+                                    }
+                                val message =
+                                    context.resources.getQuantityString(
+                                        R.plurals.toast_imported_notes,
+                                        result.noteCount,
+                                        result.noteCount,
+                                    )
+                                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        onDismiss = {
+                            backupFile.delete()
+                            pendingDroppedBackupFile = null
+                            confirmingDroppedRestore = false
+                            droppedRestoreMediaSummary = null
+                        },
+                    )
                 }
             }
         }
