@@ -322,6 +322,7 @@ fun RememberNavGraph(
     val helpVm: HelpViewModel = hiltViewModel()
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
     var openSettingsUpdatesRequest by remember { mutableIntStateOf(0) }
+    var pendingImportJsonText by remember { mutableStateOf<String?>(null) }
     val onboardingState by onboardingPrefs.state.collectAsStateWithLifecycle(initialValue = null)
     val currentOnboardingState = onboardingState
     val onboardingScope = rememberCoroutineScope()
@@ -525,6 +526,12 @@ fun RememberNavGraph(
                             openSettingsRoot()
                             openSettingsUpdatesRequest += 1
                             updateVm.requestOpenSheet()
+                        }
+                        is LaunchAction.OpenTaskImport -> {
+                            pendingImportJsonText = action.jsonText
+                            navController.navigate(Routes.GOOGLE_TASKS_IMPORT) {
+                                launchSingleTop = true
+                            }
                         }
                     }
                     handled = true
@@ -919,7 +926,11 @@ fun RememberNavGraph(
                         LocalSharedTransitionScope provides this@SharedTransitionLayout,
                         LocalNavAnimatedVisibilityScope provides this@composable,
                     ) {
-                        GoogleTasksImportRoute(onBack = { navController.popBackStack() })
+                        GoogleTasksImportRoute(
+                            onBack = { navController.popBackStack() },
+                            initialJsonText = pendingImportJsonText,
+                            onInitialJsonTextConsumed = { pendingImportJsonText = null },
+                        )
                     }
                 }
 

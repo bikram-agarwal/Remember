@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import dev.bikram.remember.data.NoteKind
+import dev.bikram.remember.data.NoteOptions
+import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.PersistableChecklistItem
 import dev.bikram.remember.domain.checklist.EditableItem
@@ -21,6 +23,7 @@ internal const val MAX_NOTE_MARKDOWN_KB = 512
 private const val MAX_EXPORT_FILE_NAME_BASE_LENGTH = 80
 private const val MARKDOWN_EXTENSION = ".md"
 private const val MARKDOWN_LONG_EXTENSION = ".markdown"
+private const val PLAIN_TEXT_EXTENSION = ".txt"
 
 internal sealed interface NoteMarkdownImportResult {
     data class Success(
@@ -96,6 +99,8 @@ internal fun markdownTitleFromFileName(fileName: String): String? {
                 baseName.dropLast(MARKDOWN_LONG_EXTENSION.length)
             baseName.endsWith(MARKDOWN_EXTENSION, ignoreCase = true) ->
                 baseName.dropLast(MARKDOWN_EXTENSION.length)
+            baseName.endsWith(PLAIN_TEXT_EXTENSION, ignoreCase = true) ->
+                baseName.dropLast(PLAIN_TEXT_EXTENSION.length)
             else -> baseName
         }
     return withoutExtension
@@ -136,6 +141,58 @@ internal fun isMarkdownFileUri(
     return mimeType.equals("text/markdown", ignoreCase = true) ||
         mimeType.equals("text/x-markdown", ignoreCase = true)
 }
+
+internal fun isMarkdownOrPlainTextUri(
+    context: Context,
+    uri: Uri,
+): Boolean {
+    if (isMarkdownFileUri(context, uri)) return true
+    val mimeType = context.contentResolver.getType(uri)
+    return mimeType.equals("text/plain", ignoreCase = true)
+}
+
+internal fun isJsonFileUri(
+    context: Context,
+    uri: Uri,
+): Boolean {
+    val fileName = (resolveMarkdownDisplayName(context, uri) ?: uri.lastPathSegment.orEmpty()).substringAfterLast('/')
+    if (fileName.endsWith(".json", ignoreCase = true)) return true
+    val mimeType = context.contentResolver.getType(uri)
+    return mimeType.equals("application/json", ignoreCase = true) ||
+        mimeType.equals("text/json", ignoreCase = true)
+}
+
+internal fun isZipFileUri(
+    context: Context,
+    uri: Uri,
+): Boolean {
+    val fileName = (resolveMarkdownDisplayName(context, uri) ?: uri.lastPathSegment.orEmpty()).substringAfterLast('/')
+    if (fileName.endsWith(".zip", ignoreCase = true)) return true
+    val mimeType = context.contentResolver.getType(uri)
+    return mimeType.equals("application/zip", ignoreCase = true) ||
+        mimeType.equals("application/x-zip-compressed", ignoreCase = true)
+}
+
+internal suspend fun createImportedMarkdownNote(
+    noteRepository: NoteRepository,
+    title: String,
+    markdown: String,
+): Long =
+    if (isStrictChecklistMarkdown(markdown)) {
+        noteRepository.createListWithItems(
+            title = title,
+            colorIndex = 0,
+            items = markdownToPersistableChecklistItems(markdown),
+            options = NoteOptions(),
+        )
+    } else {
+        noteRepository.createNote(
+            title = title,
+            body = markdown,
+            colorIndex = 0,
+            options = NoteOptions(),
+        )
+    }
 
 private fun resolveMarkdownImportTitle(
     context: Context,

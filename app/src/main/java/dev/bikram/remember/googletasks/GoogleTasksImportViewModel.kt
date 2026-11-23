@@ -10,16 +10,15 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
-import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.di.IoDispatcher
 import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
+import dev.bikram.remember.ui.edit.createImportedMarkdownNote
 import dev.bikram.remember.ui.edit.importMarkdownFromUri
-import dev.bikram.remember.ui.edit.isMarkdownFileUri
-import dev.bikram.remember.ui.edit.isStrictChecklistMarkdown
-import dev.bikram.remember.ui.edit.markdownToPersistableChecklistItems
+import dev.bikram.remember.ui.edit.isJsonFileUri
+import dev.bikram.remember.ui.edit.isMarkdownOrPlainTextUri
+import dev.bikram.remember.ui.edit.isZipFileUri
 import dev.bikram.remember.ui.edit.readMarkdownEntriesFromZip
-import dev.bikram.remember.ui.edit.resolveMarkdownDisplayName
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -136,6 +135,30 @@ class GoogleTasksImportViewModel
 
         fun loadManualImportJson(uri: Uri) {
             viewModelScope.launch {
+                val textResult =
+                    runCatching {
+                        withContext(ioDispatcher) {
+                            appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                inputStream.reader(Charsets.UTF_8).readText()
+                            } ?: throw IllegalArgumentException("Could not open selected file")
+                        }
+                    }
+                textResult
+                    .onSuccess { text -> loadManualImportJsonText(text) }
+                    .onFailure { error ->
+                        _state.update {
+                            it.copy(
+                                isFetching = false,
+                                connected = false,
+                                error = ImportError.TakeoutParseFailed(error.localizedMessage),
+                            )
+                        }
+                    }
+            }
+        }
+
+        fun loadManualImportJsonText(text: String) {
+            viewModelScope.launch {
                 _state.update {
                     it.copy(
                         isFetching = true,
@@ -150,19 +173,21 @@ class GoogleTasksImportViewModel
                 }
                 val parsed =
                     runCatching {
-                        val text =
-                            withContext(ioDispatcher) {
-                                appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
-                                    inputStream.reader(Charsets.UTF_8).readText()
-                                } ?: throw IllegalArgumentException("Could not open selected file")
-                            }
-                        manualImportParser.parse(text)
+                        withContext(ioDispatcher) {
+                            manualImportParser.parse(text)
+                        }
                     }
                 parsed
                     .onSuccess { importData ->
                         val alreadyImported = refreshedImportedMap(importData.source.sourceKey)
+                        val resolvedTab =
+                            when (importData.source) {
+                                ManualTaskImportSource.GOOGLE_TAKEOUT -> ImportMethod.GoogleTasks
+                                ManualTaskImportSource.TASKS_ORG -> ImportMethod.TasksOrgAndMd
+                            }
                         _state.update {
                             it.copy(
+                                selectedMethod = resolvedTab,
                                 connected = true,
                                 accountEmail = null,
                                 isFetching = false,
@@ -190,7 +215,7 @@ class GoogleTasksImportViewModel
 
         fun importTasksOrgOrMarkdownFiles(uris: List<Uri>) {
             if (uris.isEmpty()) return
-            if (uris.size == 1 && isJsonFileUri(uris.first())) {
+            if (uris.size == 1 && isJsonFileUri(appContext, uris.first())) {
                 loadManualImportJson(uris.first())
                 return
             }
@@ -211,10 +236,10 @@ class GoogleTasksImportViewModel
                 withContext(ioDispatcher) {
                     uris.forEach { uri ->
                         when {
-                            isJsonFileUri(uri) -> {
+                            isJsonFileUri(appContext, uri) -> {
                                 // Ignore extra JSON files when mixed with Markdown/ZIP selection.
                             }
-                            isZipFileUri(uri) -> {
+                            isZipFileUri(appContext, uri) -> {
                                 sawZip = true
                                 val entriesResult =
                                     runCatching {
@@ -229,6 +254,7 @@ class GoogleTasksImportViewModel
                                         }
                                         entries.forEach { entry ->
                                             createImportedMarkdownNote(
+                                                noteRepository = noteRepository,
                                                 title = entry.suggestedTitle ?: fallbackTitle,
                                                 markdown = entry.markdown,
                                             )
@@ -238,10 +264,11 @@ class GoogleTasksImportViewModel
                                         sawFailure = true
                                     }
                             }
-                            isMarkdownOrPlainTextUri(uri) -> {
+                            isMarkdownOrPlainTextUri(appContext, uri) -> {
                                 when (val result = importMarkdownFromUri(appContext, uri)) {
                                     is NoteMarkdownImportResult.Success -> {
                                         createImportedMarkdownNote(
+                                            noteRepository = noteRepository,
                                             title = result.suggestedTitle ?: fallbackTitle,
                                             markdown = result.markdown,
                                         )
@@ -272,53 +299,6 @@ class GoogleTasksImportViewModel
                 }
             }
         }
-
-        private suspend fun createImportedMarkdownNote(
-            title: String,
-            markdown: String,
-        ) {
-            if (isStrictChecklistMarkdown(markdown)) {
-                noteRepository.createListWithItems(
-                    title = title,
-                    colorIndex = 0,
-                    items = markdownToPersistableChecklistItems(markdown),
-                    options = NoteOptions(),
-                )
-            } else {
-                noteRepository.createNote(
-                    title = title,
-                    body = markdown,
-                    colorIndex = 0,
-                    options = NoteOptions(),
-                )
-            }
-        }
-
-        private fun isJsonFileUri(uri: Uri): Boolean {
-            val fileName = resolveUriFileName(uri)
-            if (fileName.endsWith(".json", ignoreCase = true)) return true
-            val mimeType = appContext.contentResolver.getType(uri)
-            return mimeType.equals("application/json", ignoreCase = true) ||
-                mimeType.equals("text/json", ignoreCase = true)
-        }
-
-        private fun isZipFileUri(uri: Uri): Boolean {
-            val fileName = resolveUriFileName(uri)
-            if (fileName.endsWith(".zip", ignoreCase = true)) return true
-            val mimeType = appContext.contentResolver.getType(uri)
-            return mimeType.equals("application/zip", ignoreCase = true) ||
-                mimeType.equals("application/x-zip-compressed", ignoreCase = true)
-        }
-
-        private fun isMarkdownOrPlainTextUri(uri: Uri): Boolean {
-            if (isMarkdownFileUri(appContext, uri)) return true
-            val mimeType = appContext.contentResolver.getType(uri)
-            return mimeType.equals("text/plain", ignoreCase = true)
-        }
-
-        private fun resolveUriFileName(uri: Uri): String =
-            (resolveMarkdownDisplayName(appContext, uri) ?: uri.lastPathSegment.orEmpty())
-                .substringAfterLast('/')
 
         fun cancelTakeoutImport() {
             _state.update { current ->

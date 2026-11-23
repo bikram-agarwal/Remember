@@ -151,10 +151,19 @@ private const val LIST_PANE_PROPORTION = 0.4f
 @Composable
 fun GoogleTasksImportRoute(
     onBack: () -> Unit,
+    initialJsonText: String? = null,
+    onInitialJsonTextConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
     val vm: GoogleTasksImportViewModel = hiltViewModel()
+
+    LaunchedEffect(initialJsonText) {
+        if (initialJsonText != null) {
+            vm.loadManualImportJsonText(initialJsonText)
+            onInitialJsonTextConsumed()
+        }
+    }
 
     val state by vm.state.collectAsStateWithLifecycle()
     val visible = remember(state.tasks, state.listFilterId, state.searchQuery) { state.visibleTasks() }

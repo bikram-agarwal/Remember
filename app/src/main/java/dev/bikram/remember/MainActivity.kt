@@ -21,10 +21,13 @@ import androidx.compose.foundation.draganddrop.dragAndDropTarget
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -47,9 +50,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draganddrop.DragAndDropEvent
 import androidx.compose.ui.draganddrop.DragAndDropTarget
 import androidx.compose.ui.draganddrop.toAndroidDragEvent
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.fragment.app.FragmentActivity
@@ -81,8 +89,12 @@ import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.edit.MAX_NOTE_MARKDOWN_KB
 import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
+import dev.bikram.remember.ui.edit.createImportedMarkdownNote
 import dev.bikram.remember.ui.edit.importMarkdownFromUri
-import dev.bikram.remember.ui.edit.isMarkdownFileUri
+import dev.bikram.remember.ui.edit.isJsonFileUri
+import dev.bikram.remember.ui.edit.isMarkdownOrPlainTextUri
+import dev.bikram.remember.ui.edit.isZipFileUri
+import dev.bikram.remember.ui.edit.readMarkdownEntriesFromZip
 import dev.bikram.remember.ui.lock.AppLockSession
 import dev.bikram.remember.ui.lock.LockScreen
 import dev.bikram.remember.ui.nav.RememberNavGraph
@@ -96,8 +108,10 @@ import dev.bikram.remember.update.PlayInAppUpdateProgressController
 import dev.bikram.remember.update.RememberUpdateState
 import dev.bikram.remember.update.notificationDedupeKey
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -368,95 +382,195 @@ private fun AppRoot(
         androidx.compose.runtime.CompositionLocalProvider(
             dev.bikram.remember.ui.theme.LocalSnackbarHostState provides snackbarHostState,
         ) {
-            var isMarkdownDragOver by remember { mutableStateOf(false) }
+            var isDragSessionActive by remember { mutableStateOf(false) }
+            var isDragHovered by remember { mutableStateOf(false) }
             val dragAndDropTarget =
                 remember(context, activity, noteRepository, appScope, launchFlow) {
                     object : DragAndDropTarget {
+                        override fun onStarted(event: DragAndDropEvent) {
+                            isDragSessionActive = true
+                        }
+
                         override fun onEntered(event: DragAndDropEvent) {
-                            isMarkdownDragOver = true
+                            isDragSessionActive = true
+                            isDragHovered = true
                         }
 
                         override fun onExited(event: DragAndDropEvent) {
-                            isMarkdownDragOver = false
+                            isDragHovered = false
                         }
 
                         override fun onEnded(event: DragAndDropEvent) {
-                            isMarkdownDragOver = false
+                            isDragSessionActive = false
+                            isDragHovered = false
                         }
 
                         override fun onDrop(event: DragAndDropEvent): Boolean {
-                            isMarkdownDragOver = false
+                            isDragSessionActive = false
+                            isDragHovered = false
                             val androidEvent = event.toAndroidDragEvent()
                             val clipData = androidEvent.clipData ?: return false
-                            var droppedUri: Uri? = null
-                            for (index in 0 until clipData.itemCount) {
-                                val uri = clipData.getItemAt(index).uri
-                                if (uri != null) {
-                                    droppedUri = uri
-                                    break
+                            val droppedUris =
+                                buildList {
+                                    for (index in 0 until clipData.itemCount) {
+                                        clipData.getItemAt(index).uri?.let(::add)
+                                    }
                                 }
-                            }
-                            val uri = droppedUri ?: return false
+                            if (droppedUris.isEmpty()) return false
                             val dragPermissions = activity?.requestDragAndDropPermissions(androidEvent)
                             appScope.launch {
                                 try {
-                                    if (!isMarkdownFileUri(context, uri)) {
-                                        Toast
-                                            .makeText(
-                                                context,
-                                                context.getString(R.string.toast_import_md_unsupported),
-                                                Toast.LENGTH_SHORT,
-                                            ).show()
+                                    if (droppedUris.size == 1 && isJsonFileUri(context, droppedUris.first())) {
+                                        val jsonText =
+                                            withContext(Dispatchers.IO) {
+                                                runCatching {
+                                                    context.contentResolver
+                                                        .openInputStream(droppedUris.first())
+                                                        ?.use { inputStream ->
+                                                            inputStream.reader(Charsets.UTF_8).readText()
+                                                        }
+                                                }.getOrNull()
+                                            }
+                                        if (jsonText != null) {
+                                            launchFlow.value = LaunchAction.OpenTaskImport(jsonText)
+                                        } else {
+                                            Toast
+                                                .makeText(
+                                                    context,
+                                                    context.getString(R.string.import_error_json_parse),
+                                                    Toast.LENGTH_SHORT,
+                                                ).show()
+                                        }
                                         return@launch
                                     }
-                                    when (val result = importMarkdownFromUri(context, uri)) {
-                                        is NoteMarkdownImportResult.Success -> {
-                                            val noteTitle =
-                                                result.suggestedTitle
-                                                    ?: context.getString(R.string.edit_note_title_new)
-                                            val newId =
-                                                noteRepository.createNote(
-                                                    title = noteTitle,
-                                                    body = result.markdown,
-                                                    colorIndex = 0,
-                                                    options = NoteOptions(),
-                                                )
+
+                                    if (droppedUris.size == 1 && !isZipFileUri(context, droppedUris.first())) {
+                                        val uri = droppedUris.first()
+                                        if (!isMarkdownOrPlainTextUri(context, uri)) {
                                             Toast
                                                 .makeText(
                                                     context,
-                                                    context.getString(R.string.toast_import_md_success),
+                                                    context.getString(R.string.toast_import_md_unsupported),
                                                     Toast.LENGTH_SHORT,
                                                 ).show()
-                                            launchFlow.value = LaunchAction.OpenNote(newId)
+                                            return@launch
                                         }
-                                        NoteMarkdownImportResult.TooLarge -> {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(
-                                                        R.string.toast_import_md_too_large,
-                                                        MAX_NOTE_MARKDOWN_KB,
-                                                    ),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
+                                        when (val result = importMarkdownFromUri(context, uri)) {
+                                            is NoteMarkdownImportResult.Success -> {
+                                                val noteTitle =
+                                                    result.suggestedTitle
+                                                        ?: context.getString(R.string.edit_note_title_new)
+                                                val newId =
+                                                    createImportedMarkdownNote(
+                                                        noteRepository = noteRepository,
+                                                        title = noteTitle,
+                                                        markdown = result.markdown,
+                                                    )
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(R.string.toast_import_md_success),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                                launchFlow.value = LaunchAction.OpenNote(newId)
+                                            }
+                                            NoteMarkdownImportResult.TooLarge -> {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(
+                                                            R.string.toast_import_md_too_large,
+                                                            MAX_NOTE_MARKDOWN_KB,
+                                                        ),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                            }
+                                            NoteMarkdownImportResult.Empty -> {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(R.string.toast_import_md_empty),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                            }
+                                            NoteMarkdownImportResult.Failed -> {
+                                                Toast
+                                                    .makeText(
+                                                        context,
+                                                        context.getString(R.string.toast_import_md_failed),
+                                                        Toast.LENGTH_SHORT,
+                                                    ).show()
+                                            }
                                         }
-                                        NoteMarkdownImportResult.Empty -> {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(R.string.toast_import_md_empty),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
-                                        }
-                                        NoteMarkdownImportResult.Failed -> {
-                                            Toast
-                                                .makeText(
-                                                    context,
-                                                    context.getString(R.string.toast_import_md_failed),
-                                                    Toast.LENGTH_SHORT,
-                                                ).show()
+                                        return@launch
+                                    }
+
+                                    var importedCount = 0
+                                    var sawZip = false
+                                    var sawZipMarkdownEntry = false
+                                    var sawFailure = false
+                                    val fallbackTitle = context.getString(R.string.edit_note_title_new)
+                                    withContext(Dispatchers.IO) {
+                                        droppedUris.forEach { uri ->
+                                            when {
+                                                isZipFileUri(context, uri) -> {
+                                                    sawZip = true
+                                                    runCatching {
+                                                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                                            readMarkdownEntriesFromZip(inputStream)
+                                                        } ?: throw IllegalArgumentException("Could not open archive")
+                                                    }.onSuccess { entries ->
+                                                        if (entries.isNotEmpty()) {
+                                                            sawZipMarkdownEntry = true
+                                                        }
+                                                        entries.forEach { entry ->
+                                                            createImportedMarkdownNote(
+                                                                noteRepository = noteRepository,
+                                                                title = entry.suggestedTitle ?: fallbackTitle,
+                                                                markdown = entry.markdown,
+                                                            )
+                                                            importedCount++
+                                                        }
+                                                    }.onFailure {
+                                                        sawFailure = true
+                                                    }
+                                                }
+                                                isMarkdownOrPlainTextUri(context, uri) -> {
+                                                    when (val result = importMarkdownFromUri(context, uri)) {
+                                                        is NoteMarkdownImportResult.Success -> {
+                                                            createImportedMarkdownNote(
+                                                                noteRepository = noteRepository,
+                                                                title = result.suggestedTitle ?: fallbackTitle,
+                                                                markdown = result.markdown,
+                                                            )
+                                                            importedCount++
+                                                        }
+                                                        NoteMarkdownImportResult.Failed -> sawFailure = true
+                                                        NoteMarkdownImportResult.Empty,
+                                                        NoteMarkdownImportResult.TooLarge,
+                                                        -> Unit
+                                                    }
+                                                }
+                                                else -> sawFailure = true
+                                            }
                                         }
                                     }
+                                    val feedbackMessage =
+                                        if (importedCount > 0) {
+                                            context.resources.getQuantityString(
+                                                R.plurals.toast_imported_notes,
+                                                importedCount,
+                                                importedCount,
+                                            )
+                                        } else {
+                                            when {
+                                                sawZip && !sawZipMarkdownEntry && !sawFailure ->
+                                                    context.getString(R.string.markdown_import_zip_empty)
+                                                sawFailure -> context.getString(R.string.markdown_import_failed)
+                                                else -> context.getString(R.string.markdown_import_none_valid)
+                                            }
+                                        }
+                                    Toast.makeText(context, feedbackMessage, Toast.LENGTH_SHORT).show()
                                 } finally {
                                     dragPermissions?.release()
                                 }
@@ -495,6 +609,10 @@ private fun AppRoot(
                                     description.hasMimeType("text/markdown") ||
                                     description.hasMimeType("text/x-markdown") ||
                                     description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
+                                    description.hasMimeType("application/json") ||
+                                    description.hasMimeType("text/json") ||
+                                    description.hasMimeType("application/zip") ||
+                                    description.hasMimeType("application/x-zip-compressed") ||
                                     description.hasMimeType("application/octet-stream") ||
                                     description.hasMimeType("*/*")
                             },
@@ -533,38 +651,100 @@ private fun AppRoot(
                 )
                 val dropOverlaySpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
                 AnimatedVisibility(
-                    visible = isMarkdownDragOver,
+                    visible = isDragSessionActive || isDragHovered,
                     enter = fadeIn(dropOverlaySpec),
                     exit = fadeOut(dropOverlaySpec),
                     modifier = Modifier.fillMaxSize(),
                 ) {
+                    val containerColor =
+                        if (isDragHovered) {
+                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHigh
+                        }
+                    val contentColor =
+                        if (isDragHovered) {
+                            MaterialTheme.colorScheme.onPrimaryContainer
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    val borderColor =
+                        if (isDragHovered) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outline
+                        }
+                    val iconTint =
+                        if (isDragHovered) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    val subtitleColor =
+                        if (isDragHovered) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    val dropZoneShape = RoundedCornerShape(24.dp)
                     Box(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f)),
+                                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.45f))
+                                .padding(24.dp),
                         contentAlignment = Alignment.Center,
                     ) {
                         Surface(
-                            shape = MaterialTheme.shapes.extraLarge,
-                            color = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .widthIn(max = 420.dp)
+                                    .drawBehind {
+                                        val strokeWidthPx = 2.dp.toPx()
+                                        val cornerRadiusPx = 24.dp.toPx()
+                                        drawRoundRect(
+                                            color = borderColor,
+                                            cornerRadius = CornerRadius(cornerRadiusPx, cornerRadiusPx),
+                                            style =
+                                                Stroke(
+                                                    width = strokeWidthPx,
+                                                    pathEffect =
+                                                        PathEffect.dashPathEffect(
+                                                            floatArrayOf(10.dp.toPx(), 8.dp.toPx()),
+                                                            0f,
+                                                        ),
+                                                ),
+                                        )
+                                    },
+                            shape = dropZoneShape,
+                            color = containerColor,
+                            contentColor = contentColor,
                             tonalElevation = 6.dp,
                             shadowElevation = 6.dp,
                         ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            Column(
+                                modifier = Modifier.padding(horizontal = 32.dp, vertical = 40.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
                             ) {
                                 RememberMaterialRoundedSymbol(
                                     name = "upload_file",
-                                    size = 24.dp,
+                                    size = 48.dp,
+                                    tint = iconTint,
                                     weight = FontWeight.Medium,
                                 )
                                 Text(
-                                    text = stringResource(R.string.drag_drop_markdown_hint),
-                                    style = MaterialTheme.typography.titleMedium,
+                                    text = stringResource(R.string.drag_drop_import_title),
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center,
+                                )
+                                Text(
+                                    text = stringResource(R.string.drag_drop_import_subtitle),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = subtitleColor,
+                                    textAlign = TextAlign.Center,
                                 )
                             }
                         }

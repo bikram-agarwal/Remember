@@ -85,8 +85,9 @@
     <string name="toast_import_md_empty">Selected Markdown file is empty</string>
     <string name="toast_import_md_failed">Could not import Markdown file</string>
     <string name="toast_import_md_too_large">File is too large (max %1$d KB)</string>
-    <string name="toast_import_md_unsupported">Only Markdown (.md) files are supported</string>
-    <string name="drag_drop_markdown_hint">Drop Markdown file to create note</string>
+    <string name="toast_import_md_unsupported">Only Markdown (.md) or text (.txt) files are supported</string>
+    <string name="drag_drop_import_title">Drop files to import</string>
+    <string name="drag_drop_import_subtitle">Supports .md, .txt, .zip, or Google Tasks / Tasks.org .json</string>
     <plurals name="toast_exported_to_destinations">
         <item quantity="one">Backup exported to %1$d folder</item>
         <item quantity="other">Backup exported to %1$d folders</item>
@@ -1021,12 +1022,12 @@
     <string name="tasks_org_import_source_title">Tasks.org backup</string>
 
     <!-- Markdown import -->
-    <string name="markdown_import_heading">Markdown (.md &amp; .zip)</string>
-    <string name="markdown_import_step_1">Choose one or more .md files, or a .zip archive containing multiple .md files.</string>
-    <string name="markdown_import_step_2">Each .md file is imported as a separate note using its file name as the title.</string>
+    <string name="markdown_import_heading">Markdown &amp; text (.md, .txt &amp; .zip)</string>
+    <string name="markdown_import_step_1">Choose one or more .md or .txt files, or a .zip archive containing multiple .md files.</string>
+    <string name="markdown_import_step_2">Each file is imported as a separate note using its file name as the title.</string>
     <string name="markdown_import_loading">Importing Markdown notes…</string>
     <string name="markdown_import_zip_empty">No valid Markdown (.md) files found in the selected archive</string>
-    <string name="markdown_import_none_valid">No valid Markdown (.md) files were imported</string>
+    <string name="markdown_import_none_valid">No valid Markdown (.md) or text (.txt) files were imported</string>
     <string name="markdown_import_failed">Could not import the selected Markdown file(s)</string>
 
     <!-- Settings: backup and restore -->
