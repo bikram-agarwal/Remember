@@ -73,6 +73,7 @@ fun EditNoteRoute(
     allowInitialTitleFocus: Boolean = true,
     interceptBack: Boolean = true,
     onPersistedNoteIdChanged: (Long) -> Unit = {},
+    onConvertedToList: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -112,6 +113,7 @@ fun EditNoteRoute(
                 showNavigateBack = showNavigateBack,
                 allowInitialTitleFocus = allowInitialTitleFocus,
                 interceptBack = interceptBack,
+                onConvertedToList = onConvertedToList,
                 onBack = handleBack,
                 onNavigateUp = handleNavigateUp,
             )
@@ -139,6 +141,7 @@ fun EditNoteScreen(
     showNavigateBack: Boolean = true,
     allowInitialTitleFocus: Boolean = true,
     interceptBack: Boolean = true,
+    onConvertedToList: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -511,6 +514,12 @@ fun EditNoteScreen(
                                 }
                         },
                         overflowActions = {
+                            val canConvertToChecklist =
+                                !readOnly &&
+                                    canConvertMarkdownNoteToChecklist(
+                                        if (isEditMode) markdownEditorState.markdown else body,
+                                    )
+                            val untitledFallback = stringResource(R.string.edit_note_title_new)
                             EditorMarkdownOverflowMenu(
                                 canImportMarkdown = canImportMarkdown,
                                 canExportMarkdown = canExportMarkdown,
@@ -525,6 +534,27 @@ fun EditNoteScreen(
                                         buildMarkdownExportFileName(title, untitledName),
                                     )
                                 },
+                                convertActionLabel =
+                                    if (canConvertToChecklist) {
+                                        stringResource(R.string.note_menu_convert_to_checklist)
+                                    } else {
+                                        null
+                                    },
+                                convertActionIconName = "checklist",
+                                onConvert =
+                                    if (canConvertToChecklist) {
+                                        {
+                                            bridge.flush()
+                                            uiScope.launch {
+                                                val convertedId = vm.convertToChecklist(untitledFallback)
+                                                if (convertedId != null) {
+                                                    onConvertedToList(convertedId)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        null
+                                    },
                             )
                         },
                     )

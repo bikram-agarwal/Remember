@@ -256,7 +256,7 @@ private fun MarkdownLine(
         var showMenu by remember { mutableStateOf(false) }
         Row(
             modifier = Modifier.padding(start = styler.listStartPadding(block.indent, baseIndent = 0.dp)),
-            verticalAlignment = Alignment.CenterVertically,
+            verticalAlignment = Alignment.Top,
         ) {
             Box {
                 RememberMaterialRoundedSymbol(

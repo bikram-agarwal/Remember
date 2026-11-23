@@ -523,8 +523,12 @@ internal fun EditorMarkdownOverflowMenu(
     canExportMarkdown: Boolean,
     onImportMarkdown: () -> Unit,
     onExportMarkdown: () -> Unit,
+    convertActionLabel: String? = null,
+    convertActionIconName: String = "checklist",
+    onConvert: (() -> Unit)? = null,
 ) {
-    if (!canImportMarkdown && !canExportMarkdown) return
+    val canConvert = convertActionLabel != null && onConvert != null
+    if (!canImportMarkdown && !canExportMarkdown && !canConvert) return
     var expanded by remember { mutableStateOf(false) }
     val moreOptionsCd = stringResource(R.string.cd_note_more_options)
     Box {
@@ -578,6 +582,22 @@ internal fun EditorMarkdownOverflowMenu(
                     onClick = {
                         expanded = false
                         onExportMarkdown()
+                    },
+                )
+            }
+            if (convertActionLabel != null && onConvert != null) {
+                RememberDropdownMenuItem(
+                    text = { Text(convertActionLabel) },
+                    leadingIcon = {
+                        RememberMaterialRoundedSymbol(
+                            name = convertActionIconName,
+                            size = 20.dp,
+                            weight = FontWeight.Medium,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onConvert()
                     },
                 )
             }

@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
+import dev.bikram.remember.data.PersistableChecklistItem
 import dev.bikram.remember.domain.checklist.EditableItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -12,6 +13,7 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 
 internal const val MAX_NOTE_MARKDOWN_BYTES = 512L * 1024L
@@ -103,7 +105,7 @@ internal fun markdownTitleFromFileName(fileName: String): String? {
         .takeIf { it.isNotBlank() }
 }
 
-private fun resolveMarkdownDisplayName(
+internal fun resolveMarkdownDisplayName(
     context: Context,
     uri: Uri,
 ): String? =
@@ -181,6 +183,80 @@ internal suspend fun exportMarkdownToUri(
 
 private val CHECKLIST_LINE_REGEX = Regex("""^(\s*)(?:[-*+]|\d+[.)])\s+\[([ xX])]\s*(.*)$""")
 private val BULLET_OR_NUMBERED_LINE_REGEX = Regex("""^(\s*)(?:[-*+]|\d+[.)])\s+(.*)$""")
+private val RICH_BLOCK_DISQUALIFIER_REGEX =
+    Regex("""^\s*(?:#{1,6}\s+|```|~~~|>\s?|(?:-{3,}|\*{3,}|_{3,})\s*$|\|.*\|)""")
+
+internal fun isStrictChecklistMarkdown(markdown: String): Boolean =
+    analyzeChecklistConvertibility(markdown = markdown, allowPlainLists = false)
+
+internal fun canConvertMarkdownNoteToChecklist(markdown: String): Boolean =
+    analyzeChecklistConvertibility(markdown = markdown, allowPlainLists = true)
+
+private fun analyzeChecklistConvertibility(
+    markdown: String,
+    allowPlainLists: Boolean,
+): Boolean {
+    if (markdown.isBlank()) return false
+    var itemCount = 0
+    var hasTopLevelItem = false
+    var currentDepth = 0
+
+    val normalized = markdown.replace("\r\n", "\n").replace('\r', '\n')
+    for (rawLine in normalized.lines()) {
+        if (rawLine.isBlank()) continue
+        if (RICH_BLOCK_DISQUALIFIER_REGEX.containsMatchIn(rawLine)) return false
+
+        val checklistMatch = CHECKLIST_LINE_REGEX.matchEntire(rawLine)
+        val plainListMatch =
+            if (allowPlainLists && checklistMatch == null) {
+                BULLET_OR_NUMBERED_LINE_REGEX.matchEntire(rawLine)
+            } else {
+                null
+            }
+
+        if (checklistMatch != null || plainListMatch != null) {
+            val leadingWhitespace =
+                checklistMatch?.groupValues?.get(1) ?: plainListMatch!!.groupValues[1]
+            val itemText =
+                (checklistMatch?.groupValues?.get(3) ?: plainListMatch!!.groupValues[2]).trim()
+            if (itemText.isEmpty()) return false
+
+            val indentSpaces =
+                leadingWhitespace.sumOf { ch -> if (ch == '\t') 2 else 1 }
+            if (indentSpaces >= 4 && currentDepth == 1) {
+                return false
+            }
+            val depth = if (indentSpaces >= 2 && hasTopLevelItem) 1 else 0
+            if (depth == 0) {
+                hasTopLevelItem = true
+            }
+            currentDepth = depth
+            itemCount++
+        } else if (
+            (rawLine.startsWith("  ") || rawLine.startsWith("\t")) &&
+            itemCount > 0 &&
+            BULLET_OR_NUMBERED_LINE_REGEX.matchEntire(rawLine) == null
+        ) {
+            // Indented detail continuation line under the preceding item.
+        } else {
+            return false
+        }
+    }
+    return itemCount > 0
+}
+
+internal fun markdownToPersistableChecklistItems(markdown: String): List<PersistableChecklistItem> =
+    markdownToChecklistItems(markdown).map { item ->
+        PersistableChecklistItem(
+            localKey = item.localId,
+            text = item.text,
+            details = item.details,
+            checked = item.checked,
+            sortOrder = item.sortOrder,
+            parentLocalKey = item.parentLocalId,
+            depth = item.depth.coerceIn(0, 1),
+        )
+    }
 
 internal fun checklistToMarkdown(items: List<EditableItem>): String {
     val lines = mutableListOf<String>()
@@ -348,3 +424,48 @@ internal suspend fun exportNotesAsMarkdownZip(
             true
         }.getOrDefault(false)
     }
+
+internal data class MarkdownZipEntry(
+    val suggestedTitle: String?,
+    val markdown: String,
+)
+
+internal fun isValidMarkdownZipEntryName(entryName: String): Boolean {
+    val normalized = entryName.replace('\\', '/').trim('/')
+    if (normalized.isEmpty()) return false
+    val segments = normalized.split('/')
+    if (segments.any { segment -> segment.isEmpty() || segment.equals("__MACOSX", ignoreCase = true) || segment.startsWith('.') }) {
+        return false
+    }
+    val fileName = segments.last()
+    return fileName.endsWith(MARKDOWN_EXTENSION, ignoreCase = true) ||
+        fileName.endsWith(MARKDOWN_LONG_EXTENSION, ignoreCase = true)
+}
+
+internal fun readMarkdownEntriesFromZip(
+    inputStream: InputStream,
+    maximumEntryBytes: Long = MAX_NOTE_MARKDOWN_BYTES,
+): List<MarkdownZipEntry> {
+    val entries = mutableListOf<MarkdownZipEntry>()
+    ZipInputStream(inputStream).use { zip ->
+        while (true) {
+            val entry = zip.nextEntry ?: break
+            try {
+                if (!entry.isDirectory && isValidMarkdownZipEntryName(entry.name)) {
+                    val result = readMarkdownFromInputStream(zip, maximumEntryBytes)
+                    if (result is NoteMarkdownImportResult.Success) {
+                        val normalizedName = entry.name.replace('\\', '/')
+                        entries +=
+                            MarkdownZipEntry(
+                                suggestedTitle = markdownTitleFromFileName(normalizedName),
+                                markdown = result.markdown,
+                            )
+                    }
+                }
+            } finally {
+                zip.closeEntry()
+            }
+        }
+    }
+    return entries
+}

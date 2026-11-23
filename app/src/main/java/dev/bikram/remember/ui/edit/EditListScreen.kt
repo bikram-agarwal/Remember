@@ -162,6 +162,7 @@ fun EditListRoute(
     allowInitialTitleFocus: Boolean = true,
     interceptBack: Boolean = true,
     onPersistedNoteIdChanged: (Long) -> Unit = {},
+    onConvertedToNote: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -237,6 +238,7 @@ fun EditListRoute(
                 showNavigateBack = showNavigateBack,
                 allowInitialTitleFocus = allowInitialTitleFocus,
                 interceptBack = interceptBack,
+                onConvertedToNote = onConvertedToNote,
                 onBack = handleBack,
                 onNavigateUp = handleNavigateUp,
             )
@@ -263,6 +265,7 @@ fun EditListScreen(
     showNavigateBack: Boolean = true,
     allowInitialTitleFocus: Boolean = true,
     interceptBack: Boolean = true,
+    onConvertedToNote: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -647,6 +650,8 @@ fun EditListScreen(
                         onSave = saveAndExitEditMode,
                         onOpenIcon = { iconPickerOpen = true },
                         overflowActions = {
+                            val canConvertToNote = !readOnly
+                            val untitledFallback = stringResource(R.string.edit_list_title_new)
                             EditorMarkdownOverflowMenu(
                                 canImportMarkdown = canImportMarkdown,
                                 canExportMarkdown = canExportMarkdown,
@@ -660,6 +665,26 @@ fun EditListScreen(
                                         buildMarkdownExportFileName(title, untitledName),
                                     )
                                 },
+                                convertActionLabel =
+                                    if (canConvertToNote) {
+                                        stringResource(R.string.note_menu_convert_to_note)
+                                    } else {
+                                        null
+                                    },
+                                convertActionIconName = "description",
+                                onConvert =
+                                    if (canConvertToNote) {
+                                        {
+                                            uiScope.launch {
+                                                val convertedId = vm.convertToNote(untitledFallback)
+                                                if (convertedId != null) {
+                                                    onConvertedToNote(convertedId)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        null
+                                    },
                             )
                         },
                     )

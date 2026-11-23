@@ -5,12 +5,15 @@ import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteWithItems
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
+import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 class NoteMarkdownIoTest {
     @Test
@@ -150,5 +153,66 @@ class NoteMarkdownIoTest {
         assertEquals(listOf("Project.md", "Project (2).md"), entries.keys.toList())
         assertEquals("# Hello", entries["Project.md"])
         assertEquals("- [x] Task 1", entries["Project (2).md"])
+    }
+
+    @Test
+    fun `readMarkdownEntriesFromZip extracts valid md files and skips hidden or system entries`() {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            fun addEntry(
+                name: String,
+                content: String,
+            ) {
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(content.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+            addEntry("folder/Meeting Notes.md", "# Agenda\r\n- Item 1")
+            addEntry("Todo.MARKDOWN", "- [ ] Buy milk")
+            addEntry("__MACOSX/folder/._Meeting Notes.md", "appledouble")
+            addEntry(".DS_Store", "ds_store")
+            addEntry(".hidden/Secret.md", "hidden")
+            addEntry("._AppleDouble.md", "appledouble")
+            addEntry("Empty.md", "   \n  ")
+            addEntry("readme.txt", "not markdown")
+        }
+
+        val extracted = readMarkdownEntriesFromZip(ByteArrayInputStream(out.toByteArray()))
+        assertEquals(
+            listOf(
+                MarkdownZipEntry(suggestedTitle = "Meeting Notes", markdown = "# Agenda\n- Item 1"),
+                MarkdownZipEntry(suggestedTitle = "Todo", markdown = "- [ ] Buy milk"),
+            ),
+            extracted,
+        )
+    }
+
+    @Test
+    fun `isStrictChecklistMarkdown accepts checklists with details and rejects plain lists or prose`() {
+        assertTrue(
+            isStrictChecklistMarkdown(
+                """
+                - [ ] Drinkables
+                  - [ ] Milk
+                    Don't forget 2%
+                    Not from QFC
+                  - [x] Cola
+                """.trimIndent(),
+            ),
+        )
+        assertFalse(isStrictChecklistMarkdown("- Plain bullet\n- Another bullet"))
+        assertFalse(isStrictChecklistMarkdown("# Heading\n- [ ] Task"))
+        assertFalse(isStrictChecklistMarkdown("Intro paragraph\n- [ ] Task"))
+    }
+
+    @Test
+    fun `canConvertMarkdownNoteToChecklist accepts checklists and plain lists but rejects rich blocks`() {
+        assertTrue(canConvertMarkdownNoteToChecklist("- [ ] Task 1\n- [x] Task 2"))
+        assertTrue(canConvertMarkdownNoteToChecklist("- Milk\n  2 percent\n  - Oat\n1. Bread"))
+        assertFalse(canConvertMarkdownNoteToChecklist(""))
+        assertFalse(canConvertMarkdownNoteToChecklist("Just a plain paragraph"))
+        assertFalse(canConvertMarkdownNoteToChecklist("# Shopping\n- Milk"))
+        assertFalse(canConvertMarkdownNoteToChecklist("```kotlin\nval x = 1\n```"))
+        assertFalse(canConvertMarkdownNoteToChecklist("- Parent\n  - Child\n    - Grandchild"))
     }
 }

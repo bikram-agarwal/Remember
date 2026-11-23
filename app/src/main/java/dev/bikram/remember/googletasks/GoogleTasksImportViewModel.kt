@@ -9,8 +9,17 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.remember.BuildConfig
+import dev.bikram.remember.R
+import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.di.IoDispatcher
+import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
+import dev.bikram.remember.ui.edit.importMarkdownFromUri
+import dev.bikram.remember.ui.edit.isMarkdownFileUri
+import dev.bikram.remember.ui.edit.isStrictChecklistMarkdown
+import dev.bikram.remember.ui.edit.markdownToPersistableChecklistItems
+import dev.bikram.remember.ui.edit.readMarkdownEntriesFromZip
+import dev.bikram.remember.ui.edit.resolveMarkdownDisplayName
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -76,7 +85,6 @@ class GoogleTasksImportViewModel
         }
 
         fun setImportMethod(method: ImportMethod) {
-            if (method == ImportMethod.GrantPermission && !BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED) return
             if (_state.value.selectedMethod == method) return
             cachedToken = null
             _state.update { current ->
@@ -96,7 +104,7 @@ class GoogleTasksImportViewModel
         fun refreshFromGoogle() {
             val token = cachedToken
             val current = _state.value
-            if (token == null || current.selectedMethod != ImportMethod.GrantPermission) return
+            if (token == null || !current.isGoogleApiSession) return
             viewModelScope.launch {
                 _state.update { it.copy(isFetching = true, error = null) }
                 fetchEverything()
@@ -130,7 +138,6 @@ class GoogleTasksImportViewModel
             viewModelScope.launch {
                 _state.update {
                     it.copy(
-                        selectedMethod = ImportMethod.ManualImport,
                         isFetching = true,
                         error = null,
                         connected = false,
@@ -156,7 +163,6 @@ class GoogleTasksImportViewModel
                         val alreadyImported = refreshedImportedMap(importData.source.sourceKey)
                         _state.update {
                             it.copy(
-                                selectedMethod = ImportMethod.ManualImport,
                                 connected = true,
                                 accountEmail = null,
                                 isFetching = false,
@@ -182,11 +188,143 @@ class GoogleTasksImportViewModel
             }
         }
 
+        fun importTasksOrgOrMarkdownFiles(uris: List<Uri>) {
+            if (uris.isEmpty()) return
+            if (uris.size == 1 && isJsonFileUri(uris.first())) {
+                loadManualImportJson(uris.first())
+                return
+            }
+            viewModelScope.launch {
+                _state.update {
+                    it.copy(
+                        selectedMethod = ImportMethod.TasksOrgAndMd,
+                        isImportingMarkdown = true,
+                        error = null,
+                    )
+                }
+                var importedCount = 0
+                var sawZip = false
+                var sawZipMarkdownEntry = false
+                var sawFailure = false
+                val fallbackTitle = appContext.getString(R.string.edit_note_title_new)
+
+                withContext(ioDispatcher) {
+                    uris.forEach { uri ->
+                        when {
+                            isJsonFileUri(uri) -> {
+                                // Ignore extra JSON files when mixed with Markdown/ZIP selection.
+                            }
+                            isZipFileUri(uri) -> {
+                                sawZip = true
+                                val entriesResult =
+                                    runCatching {
+                                        appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                            readMarkdownEntriesFromZip(inputStream)
+                                        } ?: throw IllegalArgumentException("Could not open archive")
+                                    }
+                                entriesResult
+                                    .onSuccess { entries ->
+                                        if (entries.isNotEmpty()) {
+                                            sawZipMarkdownEntry = true
+                                        }
+                                        entries.forEach { entry ->
+                                            createImportedMarkdownNote(
+                                                title = entry.suggestedTitle ?: fallbackTitle,
+                                                markdown = entry.markdown,
+                                            )
+                                            importedCount++
+                                        }
+                                    }.onFailure {
+                                        sawFailure = true
+                                    }
+                            }
+                            isMarkdownOrPlainTextUri(uri) -> {
+                                when (val result = importMarkdownFromUri(appContext, uri)) {
+                                    is NoteMarkdownImportResult.Success -> {
+                                        createImportedMarkdownNote(
+                                            title = result.suggestedTitle ?: fallbackTitle,
+                                            markdown = result.markdown,
+                                        )
+                                        importedCount++
+                                    }
+                                    NoteMarkdownImportResult.Failed -> sawFailure = true
+                                    NoteMarkdownImportResult.Empty,
+                                    NoteMarkdownImportResult.TooLarge,
+                                    -> Unit
+                                }
+                            }
+                            else -> sawFailure = true
+                        }
+                    }
+                }
+
+                if (importedCount > 0) {
+                    _state.update { it.copy(isImportingMarkdown = false, error = null) }
+                    _effects.value = GoogleTasksImportEffect.MarkdownImportFinished(importedCount)
+                } else {
+                    val error =
+                        when {
+                            sawZip && !sawZipMarkdownEntry && !sawFailure -> ImportError.MarkdownZipEmpty
+                            sawFailure -> ImportError.MarkdownImportFailed
+                            else -> ImportError.MarkdownNoneValid
+                        }
+                    _state.update { it.copy(isImportingMarkdown = false, error = error) }
+                }
+            }
+        }
+
+        private suspend fun createImportedMarkdownNote(
+            title: String,
+            markdown: String,
+        ) {
+            if (isStrictChecklistMarkdown(markdown)) {
+                noteRepository.createListWithItems(
+                    title = title,
+                    colorIndex = 0,
+                    items = markdownToPersistableChecklistItems(markdown),
+                    options = NoteOptions(),
+                )
+            } else {
+                noteRepository.createNote(
+                    title = title,
+                    body = markdown,
+                    colorIndex = 0,
+                    options = NoteOptions(),
+                )
+            }
+        }
+
+        private fun isJsonFileUri(uri: Uri): Boolean {
+            val fileName = resolveUriFileName(uri)
+            if (fileName.endsWith(".json", ignoreCase = true)) return true
+            val mimeType = appContext.contentResolver.getType(uri)
+            return mimeType.equals("application/json", ignoreCase = true) ||
+                mimeType.equals("text/json", ignoreCase = true)
+        }
+
+        private fun isZipFileUri(uri: Uri): Boolean {
+            val fileName = resolveUriFileName(uri)
+            if (fileName.endsWith(".zip", ignoreCase = true)) return true
+            val mimeType = appContext.contentResolver.getType(uri)
+            return mimeType.equals("application/zip", ignoreCase = true) ||
+                mimeType.equals("application/x-zip-compressed", ignoreCase = true)
+        }
+
+        private fun isMarkdownOrPlainTextUri(uri: Uri): Boolean {
+            if (isMarkdownFileUri(appContext, uri)) return true
+            val mimeType = appContext.contentResolver.getType(uri)
+            return mimeType.equals("text/plain", ignoreCase = true)
+        }
+
+        private fun resolveUriFileName(uri: Uri): String =
+            (resolveMarkdownDisplayName(appContext, uri) ?: uri.lastPathSegment.orEmpty())
+                .substringAfterLast('/')
+
         fun cancelTakeoutImport() {
             _state.update { current ->
                 GoogleTasksImportUiState(
                     rememberedEmail = current.rememberedEmail,
-                    selectedMethod = ImportMethod.ManualImport,
+                    selectedMethod = current.selectedMethod,
                 )
             }
         }
@@ -256,7 +394,7 @@ class GoogleTasksImportViewModel
             _state.update { current ->
                 GoogleTasksImportUiState(
                     rememberedEmail = current.rememberedEmail,
-                    selectedMethod = ImportMethod.GrantPermission,
+                    selectedMethod = ImportMethod.GoogleTasks,
                 )
             }
             connect(forceAccountSelection = true)
@@ -529,12 +667,7 @@ class GoogleTasksImportViewModel
 
 data class GoogleTasksImportUiState(
     val rememberedEmail: String? = null,
-    val selectedMethod: ImportMethod =
-        if (BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED) {
-            ImportMethod.GrantPermission
-        } else {
-            ImportMethod.ManualImport
-        },
+    val selectedMethod: ImportMethod = ImportMethod.GoogleTasks,
     val accountEmail: String? = null,
     /**
      * True once authorize() has returned a Success. Decoupled from [accountEmail] because the
@@ -543,6 +676,7 @@ data class GoogleTasksImportUiState(
      */
     val connected: Boolean = false,
     val isFetching: Boolean = false,
+    val isImportingMarkdown: Boolean = false,
     val isDisconnecting: Boolean = false,
     val isImporting: Boolean = false,
     val importCompletedCount: Int = 0,
@@ -578,12 +712,13 @@ data class GoogleTasksImportUiState(
         }
     }
 
-    val isLoaded: Boolean get() = !isFetching && !isDisconnecting && connected && taskLists.isNotEmpty()
-    val isEmpty: Boolean get() = !isFetching && !isDisconnecting && connected && taskLists.isEmpty()
+    val isLoaded: Boolean get() = !isFetching && !isImportingMarkdown && !isDisconnecting && connected && taskLists.isNotEmpty()
+    val isEmpty: Boolean get() = !isFetching && !isImportingMarkdown && !isDisconnecting && connected && taskLists.isEmpty()
+    val isGoogleApiSession: Boolean get() = connected && manualImportSource == null
 
     fun importedSourceKey(): String =
-        if (selectedMethod == ImportMethod.ManualImport) {
-            manualImportSource?.sourceKey ?: GOOGLE_TASKS_TAKEOUT_SOURCE_KEY
+        if (manualImportSource != null) {
+            manualImportSource.sourceKey
         } else {
             accountEmail.sourceKey()
         }
@@ -623,11 +758,17 @@ sealed class ImportError {
     data class Unknown(
         val message: String?,
     ) : ImportError()
+
+    data object MarkdownZipEmpty : ImportError()
+
+    data object MarkdownNoneValid : ImportError()
+
+    data object MarkdownImportFailed : ImportError()
 }
 
 enum class ImportMethod {
-    GrantPermission,
-    ManualImport,
+    GoogleTasks,
+    TasksOrgAndMd,
 }
 
 sealed class GoogleTasksImportEffect {
@@ -638,5 +779,9 @@ sealed class GoogleTasksImportEffect {
 
     data class ImportFinished(
         val outcome: ImportOutcome,
+    ) : GoogleTasksImportEffect()
+
+    data class MarkdownImportFinished(
+        val importedCount: Int,
     ) : GoogleTasksImportEffect()
 }

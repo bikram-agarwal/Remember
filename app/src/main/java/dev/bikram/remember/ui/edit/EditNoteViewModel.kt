@@ -185,4 +185,35 @@ class EditNoteViewModel
                 }
             }
         }
+
+        suspend fun convertToChecklist(untitledName: String): Long? =
+            persistence.withLock {
+                if (missingNote.value) return@withLock null
+                val items = markdownToPersistableChecklistItems(_body.value)
+                val finalTitle = title.value.ifBlank { untitledName }
+                val existingId = loadedId
+                if (existingId == null) {
+                    val newId = repository.createListWithItems(finalTitle, 0, items, currentOptions())
+                    loadedId = newId
+                    syncHasPersistedRow()
+                    if (starred.value) repository.setStarred(newId, true)
+                    persistence.clearDirty()
+                    newId
+                } else {
+                    val converted =
+                        repository.convertNoteToList(
+                            id = existingId,
+                            title = finalTitle,
+                            items = items,
+                            options = currentOptions(),
+                        )
+                    if (converted) {
+                        if (starred.value) repository.setStarred(existingId, true)
+                        persistence.clearDirty()
+                        existingId
+                    } else {
+                        null
+                    }
+                }
+            }
     }

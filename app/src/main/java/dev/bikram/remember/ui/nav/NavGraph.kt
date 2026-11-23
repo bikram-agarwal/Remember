@@ -850,6 +850,7 @@ fun RememberNavGraph(
                                     appScope = appScope,
                                     noteId = id.takeIf { it > 0 },
                                     forceEdit = forceEdit,
+                                    onConvertedToNote = { resolvedKind = NoteKind.NOTE },
                                     onBack = leaveEditor,
                                     onNavigateUp = leaveEditor,
                                 )
@@ -858,6 +859,7 @@ fun RememberNavGraph(
                                     appScope = appScope,
                                     noteId = id.takeIf { it > 0 },
                                     forceEdit = forceEdit,
+                                    onConvertedToList = { resolvedKind = NoteKind.LIST },
                                     onBack = leaveEditor,
                                     onNavigateUp = leaveEditor,
                                 )
@@ -901,6 +903,11 @@ fun RememberNavGraph(
                             appScope = appScope,
                             noteId = id.takeIf { it > 0 },
                             forceEdit = forceEdit,
+                            onConvertedToList = { convertedId ->
+                                navController.navigate("${Routes.EDIT_LIST}?${Routes.ARG_ID}=$convertedId") {
+                                    popUpTo(entry.destination.id) { inclusive = true }
+                                }
+                            },
                             onBack = leaveEditor,
                             onNavigateUp = leaveEditor,
                         )
@@ -1057,6 +1064,11 @@ fun RememberNavGraph(
                             appScope = appScope,
                             noteId = id.takeIf { it > 0 },
                             forceEdit = forceEdit,
+                            onConvertedToNote = { convertedId ->
+                                navController.navigate("${Routes.EDIT_NOTE}?${Routes.ARG_ID}=$convertedId") {
+                                    popUpTo(entry.destination.id) { inclusive = true }
+                                }
+                            },
                             onBack = leaveEditor,
                             onNavigateUp = leaveEditor,
                         )

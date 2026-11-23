@@ -289,4 +289,115 @@ internal class NoteContentWriter(
             }
         }
     }
+
+    suspend fun convertNoteToList(
+        id: Long,
+        title: String,
+        items: List<PersistableChecklistItem>,
+        options: NoteOptions,
+    ): Boolean {
+        val applyConversion: suspend () -> Boolean = {
+            val existing = noteDao.get(id)?.note
+            if (existing == null) {
+                false
+            } else {
+                val resolvedReminders = reminderCoordinator.resolveUpdatedReminders(existing, options)
+                val unsyncedNote =
+                    existing.copy(
+                        kind = NoteKind.LIST,
+                        title = title,
+                        body = "",
+                        checklistText =
+                            checklistSearchText(
+                                items
+                                    .sortedBy { item -> item.sortOrder }
+                                    .flatMap { item -> listOf(item.text, item.details) },
+                            ),
+                        updatedAt = clock(),
+                        reminderAt = options.reminderAt,
+                        importance = options.importance,
+                        visibility = options.visibility,
+                        pictureUri = options.pictureUri,
+                        pictureHeroFraming = options.pictureHeroFraming,
+                        locked = options.locked,
+                        iconKey = options.iconKey,
+                        actions = options.actions,
+                        actionsText = actionsSearchText(options.actions),
+                        tags = options.tags,
+                        recurrence = options.recurrence?.sanitized(),
+                        reminders = resolvedReminders,
+                    )
+                val noteEntity = unsyncedNote.withSyncedPrimaryReminder()
+                noteDao.update(noteEntity)
+                checklistWriter.syncHierarchy(noteId = id, items = items)
+                true
+            }
+        }
+        val didConvert =
+            if (database != null) {
+                database.withTransaction { applyConversion() }
+            } else {
+                applyConversion()
+            }
+        if (didConvert) {
+            tagRepository?.replaceTagsForNote(id, options.tags)
+            val noteEntity = noteDao.get(id)?.note
+            reminderCoordinator.rescheduleReminder(id, noteEntity?.reminderAt)
+            reminderCoordinator.refreshNotificationIfActive(id)
+        }
+        return didConvert
+    }
+
+    suspend fun convertListToNote(
+        id: Long,
+        title: String,
+        body: String,
+        options: NoteOptions,
+    ): Boolean {
+        val applyConversion: suspend () -> Boolean = {
+            val existing = noteDao.get(id)?.note
+            if (existing == null) {
+                false
+            } else {
+                val resolvedReminders = reminderCoordinator.resolveUpdatedReminders(existing, options)
+                val unsyncedNote =
+                    existing.copy(
+                        kind = NoteKind.NOTE,
+                        title = title,
+                        body = body,
+                        checklistText = "",
+                        updatedAt = clock(),
+                        reminderAt = options.reminderAt,
+                        importance = options.importance,
+                        visibility = options.visibility,
+                        pictureUri = options.pictureUri,
+                        pictureHeroFraming = options.pictureHeroFraming,
+                        locked = options.locked,
+                        iconKey = options.iconKey,
+                        actions = options.actions,
+                        actionsText = actionsSearchText(options.actions),
+                        tags = options.tags,
+                        recurrence = options.recurrence?.sanitized(),
+                        reminders = resolvedReminders,
+                    )
+                val noteEntity = unsyncedNote.withSyncedPrimaryReminder()
+                noteDao.update(noteEntity)
+                checklistWriter.syncHierarchy(noteId = id, items = emptyList())
+                true
+            }
+        }
+        val didConvert =
+            if (database != null) {
+                database.withTransaction { applyConversion() }
+            } else {
+                applyConversion()
+            }
+        if (didConvert) {
+            tagRepository?.replaceTagsForNote(id, options.tags)
+            val noteEntity = noteDao.get(id)?.note
+            reminderCoordinator.rescheduleReminder(id, noteEntity?.reminderAt)
+            reminderCoordinator.refreshNotificationIfActive(id)
+        }
+        return didConvert
+    }
 }
