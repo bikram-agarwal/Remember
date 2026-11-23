@@ -13,6 +13,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.di.IoDispatcher
+import dev.bikram.remember.ui.edit.MarkdownZipTooLargeException
 import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
 import dev.bikram.remember.ui.edit.createImportedMarkdownNote
 import dev.bikram.remember.ui.edit.importMarkdownFromUri
@@ -243,6 +244,7 @@ class GoogleTasksImportViewModel
                 var sawZip = false
                 var sawZipMarkdownEntry = false
                 var sawFailure = false
+                var sawZipTooLarge = false
                 val fallbackTitle = appContext.getString(R.string.edit_note_title_new)
 
                 withContext(ioDispatcher) {
@@ -281,8 +283,12 @@ class GoogleTasksImportViewModel
                                                 )
                                                 importedCount++
                                             }
-                                        }.onFailure {
-                                            sawFailure = true
+                                        }.onFailure { error ->
+                                            if (error is MarkdownZipTooLargeException) {
+                                                sawZipTooLarge = true
+                                            } else {
+                                                sawFailure = true
+                                            }
                                         }
                                 }
                             }
@@ -313,6 +319,7 @@ class GoogleTasksImportViewModel
                 } else {
                     val error =
                         when {
+                            sawZipTooLarge -> ImportError.MarkdownZipTooLarge
                             sawZip && !sawZipMarkdownEntry && !sawFailure -> ImportError.MarkdownZipEmpty
                             sawFailure -> ImportError.MarkdownImportFailed
                             else -> ImportError.MarkdownNoneValid
@@ -338,7 +345,7 @@ class GoogleTasksImportViewModel
                     _state.update {
                         it.copy(
                             isImportingMarkdown = false,
-                            error = ImportError.MarkdownImportFailed,
+                            error = ImportError.BackupImportFailed,
                         )
                     }
                 }
@@ -819,9 +826,13 @@ sealed class ImportError {
 
     data object MarkdownZipEmpty : ImportError()
 
+    data object MarkdownZipTooLarge : ImportError()
+
     data object MarkdownNoneValid : ImportError()
 
     data object MarkdownImportFailed : ImportError()
+
+    data object BackupImportFailed : ImportError()
 }
 
 enum class ImportMethod {

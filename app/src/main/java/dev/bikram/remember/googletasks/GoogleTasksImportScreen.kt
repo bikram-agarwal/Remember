@@ -276,6 +276,10 @@ fun GoogleTasksImportRoute(
                     resources.getString(R.string.markdown_import_none_valid)
                 ImportError.MarkdownImportFailed ->
                     resources.getString(R.string.markdown_import_failed)
+                ImportError.MarkdownZipTooLarge ->
+                    resources.getString(R.string.markdown_import_zip_too_large)
+                ImportError.BackupImportFailed ->
+                    resources.getString(R.string.backup_zip_import_failed)
                 null -> return@LaunchedEffect
             }
         snackbarHostState.showSnackbar(message)
@@ -415,6 +419,7 @@ fun GoogleTasksImportRoute(
                 isFetching = state.isFetching,
                 isImportingMarkdown = state.isImportingMarkdown,
                 isEmpty = state.isEmpty,
+                isFileSource = state.manualImportSource != null,
                 rememberedEmail = state.rememberedEmail,
                 accountEmail = state.accountEmail,
                 onOpenTakeout = { uriHandler.openUri(GOOGLE_TAKEOUT_URL) },
@@ -784,6 +789,7 @@ private fun ImportMethodDetail(
     isFetching: Boolean,
     isImportingMarkdown: Boolean,
     isEmpty: Boolean,
+    isFileSource: Boolean,
     rememberedEmail: String?,
     accountEmail: String?,
     onOpenTakeout: () -> Unit,
@@ -818,11 +824,23 @@ private fun ImportMethodDetail(
             ImportMethod.GoogleTasks ->
                 when {
                     isFetching -> LoadingPanel()
-                    isEmpty ->
+                    // A loaded Takeout file with no tasks is not an empty Google account: offer
+                    // another file rather than an account switch.
+                    isEmpty && isFileSource -> EmptyFilePanel(onChooseAnotherFile = onPickJson)
+                    isEmpty -> {
+                        val email = accountEmail.orEmpty()
                         EmptyPanel(
-                            accountEmail = accountEmail.orEmpty(),
-                            onSwitchAccount = onSwitchAccount,
+                            title =
+                                if (email.isBlank()) {
+                                    stringResource(R.string.google_tasks_import_empty_title_no_email)
+                                } else {
+                                    stringResource(R.string.google_tasks_import_empty_title, email)
+                                },
+                            body = stringResource(R.string.google_tasks_import_empty_body),
+                            actionLabel = stringResource(R.string.google_tasks_import_switch_account),
+                            onAction = onSwitchAccount,
                         )
+                    }
                     else ->
                         GoogleTasksTabPanel(
                             connectEnabled = connectEnabled,
@@ -837,6 +855,7 @@ private fun ImportMethodDetail(
                 when {
                     isImportingMarkdown -> LoadingPanel(messageRes = R.string.markdown_import_loading)
                     isFetching -> LoadingPanel()
+                    isEmpty -> EmptyFilePanel(onChooseAnotherFile = onPickTasksOrgOrMd)
                     else ->
                         TasksOrgAndMarkdownTabPanel(
                             onChooseFile = onPickTasksOrgOrMd,
@@ -1061,9 +1080,21 @@ private fun LoadingPanel(
 }
 
 @Composable
+private fun EmptyFilePanel(onChooseAnotherFile: () -> Unit) {
+    EmptyPanel(
+        title = stringResource(R.string.import_empty_file_title),
+        body = stringResource(R.string.import_empty_file_body),
+        actionLabel = stringResource(R.string.import_choose_another_file),
+        onAction = onChooseAnotherFile,
+    )
+}
+
+@Composable
 private fun EmptyPanel(
-    accountEmail: String,
-    onSwitchAccount: () -> Unit,
+    title: String,
+    body: String,
+    actionLabel: String,
+    onAction: () -> Unit,
 ) {
     Column(
         modifier =
@@ -1081,25 +1112,19 @@ private fun EmptyPanel(
             weight = FontWeight.Medium,
         )
         Spacer(Modifier.height(12.dp))
-        val titleText =
-            if (accountEmail.isBlank()) {
-                stringResource(R.string.google_tasks_import_empty_title_no_email)
-            } else {
-                stringResource(R.string.google_tasks_import_empty_title, accountEmail)
-            }
         Text(
-            titleText,
+            title,
             style = MaterialTheme.typography.titleMedium,
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            stringResource(R.string.google_tasks_import_empty_body),
+            body,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(20.dp))
-        RememberOutlinedButton(onClick = onSwitchAccount) {
-            Text(stringResource(R.string.google_tasks_import_switch_account))
+        RememberOutlinedButton(onClick = onAction) {
+            Text(actionLabel)
         }
     }
 }

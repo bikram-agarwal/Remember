@@ -8,10 +8,12 @@ import dev.bikram.remember.data.NoteOptions
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.NoteWithItems
 import dev.bikram.remember.data.PersistableChecklistItem
+import dev.bikram.remember.data.ZipExtractionLimits
 import dev.bikram.remember.domain.checklist.EditableItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.zip.ZipEntry
@@ -20,6 +22,16 @@ import java.util.zip.ZipOutputStream
 
 internal const val MAX_NOTE_MARKDOWN_BYTES = 512L * 1024L
 internal const val MAX_NOTE_MARKDOWN_KB = 512
+
+/** A Markdown ZIP may list at most this many entries (same cap as a backup ZIP). */
+internal val MAX_MARKDOWN_ZIP_ENTRY_COUNT = ZipExtractionLimits().maximumEntryCount
+
+/**
+ * All notes from one Markdown ZIP are held in memory before they are created, so their combined
+ * text is capped (about 32 MB as UTF-16) instead of only each file's size.
+ */
+internal const val MAX_MARKDOWN_ZIP_TOTAL_CHARS = 16L * 1024L * 1024L
+private const val UTF8_BYTE_ORDER_MARK = "\uFEFF"
 private const val MAX_EXPORT_FILE_NAME_BASE_LENGTH = 80
 private const val MARKDOWN_EXTENSION = ".md"
 private const val MARKDOWN_LONG_EXTENSION = ".markdown"
@@ -55,9 +67,12 @@ internal fun readMarkdownFromInputStream(
             }
             output.write(buffer, 0, bytesRead)
         }
+        // Editors such as Windows Notepad can save UTF-8 with a byte-order mark; left in, it hides
+        // the first line from heading/checklist detection and lands invisibly in the note body.
         val normalized =
             output
                 .toString(Charsets.UTF_8.name())
+                .removePrefix(UTF8_BYTE_ORDER_MARK)
                 .replace("\r\n", "\n")
                 .replace('\r', '\n')
         if (normalized.isBlank()) {
@@ -497,30 +512,53 @@ internal fun isValidMarkdownZipEntryName(entryName: String): Boolean {
         fileName.endsWith(MARKDOWN_LONG_EXTENSION, ignoreCase = true)
 }
 
+/** Thrown when a Markdown ZIP exceeds [MAX_MARKDOWN_ZIP_ENTRY_COUNT] or [MAX_MARKDOWN_ZIP_TOTAL_CHARS]. */
+internal class MarkdownZipTooLargeException : IOException("Markdown archive exceeds import limits")
+
+/**
+ * Reads every `.md`/`.markdown` entry of a ZIP. Entries over [maximumEntryBytes] are skipped; an
+ * archive over [maximumEntryCount] entries or [maximumTotalChars] of accepted text throws
+ * [MarkdownZipTooLargeException] so nothing is imported from it.
+ */
 internal fun readMarkdownEntriesFromZip(
     inputStream: InputStream,
     maximumEntryBytes: Long = MAX_NOTE_MARKDOWN_BYTES,
+    maximumEntryCount: Int = MAX_MARKDOWN_ZIP_ENTRY_COUNT,
+    maximumTotalChars: Long = MAX_MARKDOWN_ZIP_TOTAL_CHARS,
 ): List<MarkdownZipEntry> {
     val entries = mutableListOf<MarkdownZipEntry>()
+    var entryCount = 0
+    var totalChars = 0L
     ZipInputStream(inputStream).use { zip ->
         while (true) {
             val entry = zip.nextEntry ?: break
-            try {
-                if (!entry.isDirectory && isValidMarkdownZipEntryName(entry.name)) {
-                    val result = readMarkdownFromInputStream(zip, maximumEntryBytes)
-                    if (result is NoteMarkdownImportResult.Success) {
-                        val normalizedName = entry.name.replace('\\', '/')
-                        entries +=
-                            MarkdownZipEntry(
-                                suggestedTitle = markdownTitleFromFileName(normalizedName),
-                                markdown = result.markdown,
-                            )
-                    }
+            entryCount++
+            if (entryCount > maximumEntryCount) throw MarkdownZipTooLargeException()
+            val markdownEntry =
+                try {
+                    readMarkdownZipEntry(zip, entry, maximumEntryBytes)
+                } finally {
+                    zip.closeEntry()
                 }
-            } finally {
-                zip.closeEntry()
+            if (markdownEntry != null) {
+                totalChars += markdownEntry.markdown.length
+                if (totalChars > maximumTotalChars) throw MarkdownZipTooLargeException()
+                entries += markdownEntry
             }
         }
     }
     return entries
+}
+
+private fun readMarkdownZipEntry(
+    zip: ZipInputStream,
+    entry: ZipEntry,
+    maximumEntryBytes: Long,
+): MarkdownZipEntry? {
+    if (entry.isDirectory || !isValidMarkdownZipEntryName(entry.name)) return null
+    val result = readMarkdownFromInputStream(zip, maximumEntryBytes) as? NoteMarkdownImportResult.Success ?: return null
+    return MarkdownZipEntry(
+        suggestedTitle = markdownTitleFromFileName(entry.name.replace('\\', '/')),
+        markdown = result.markdown,
+    )
 }

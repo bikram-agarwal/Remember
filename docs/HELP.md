@@ -192,7 +192,7 @@ When you mark a recurring reminder done, Remember advances it to the next schedu
 
 ### Pinning notifications
 
-You can also manually pin a note or list's notification from its bottom bar. A manually pinned notification stays active and is automatically restored if dismissed, until you unpin it or mark the item done.
+You can also manually pin a note or list's notification from its bottom bar. A manually pinned notification stays active, is automatically restored if dismissed, and comes back after your device restarts, until you unpin it or mark the item done.
 
 ### Reminder summary
 

@@ -4,7 +4,9 @@ import dev.bikram.remember.data.NoteEntity
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteReminder
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ReminderDismissReceiverTest {
@@ -106,10 +108,34 @@ class ReminderDismissReceiverTest {
         )
     }
 
+    @Test
+    fun refreshKeepsManualUnpinnedNotificationDismissibleEvenWithPrefOn() {
+        assertFalse(refreshedNotificationKeepsUntilDone(currentlyRestoresOnDismiss = false, keepUntilDonePref = true))
+    }
+
+    @Test
+    fun refreshKeepsRestorableReminderNotificationRestorableWhilePrefOn() {
+        assertTrue(refreshedNotificationKeepsUntilDone(currentlyRestoresOnDismiss = true, keepUntilDonePref = true))
+    }
+
+    @Test
+    fun refreshDropsRestoreWhenPrefTurnedOffSincePosting() {
+        assertFalse(refreshedNotificationKeepsUntilDone(currentlyRestoresOnDismiss = true, keepUntilDonePref = false))
+    }
+
+    @Test
+    fun pinSurvivesRebootOnlyForActiveNotes() {
+        assertTrue(pinSurvivesReboot(note(reminderAt = null, reminders = emptyList())))
+        assertFalse(pinSurvivesReboot(note(reminderAt = null, reminders = emptyList(), trashed = true)))
+        assertFalse(pinSurvivesReboot(note(reminderAt = null, reminders = emptyList(), archived = true)))
+        assertFalse(pinSurvivesReboot(note(reminderAt = null, reminders = emptyList(), completedAt = 1_000L)))
+    }
+
     private fun note(
         reminderAt: Long?,
         reminders: List<NoteReminder>,
         trashed: Boolean = false,
+        archived: Boolean = false,
         completedAt: Long? = null,
     ): NoteEntity =
         NoteEntity(
@@ -120,6 +146,7 @@ class ReminderDismissReceiverTest {
             colorIndex = 0,
             starred = false,
             trashed = trashed,
+            archived = archived,
             createdAt = 0L,
             updatedAt = 0L,
             reminderAt = reminderAt,

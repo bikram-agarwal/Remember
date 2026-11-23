@@ -35,9 +35,8 @@
 
     <!-- Common labels -->
     <string name="action_reset">Reset</string>
-    <string name="notification_created">Notification created</string>
-    <string name="notification_posted_hint">Notification posted · Long-press Notify to pin that</string>
-    <string name="notification_pinned_hint">Notification pinned · Tap Notify to dismiss that</string>
+    <string name="notification_posted_hint">Notification posted · Long-press Notify to pin it</string>
+    <string name="notification_pinned_hint">Notification pinned · Tap Notify to dismiss it</string>
     <string name="notification_removed">Notification removed</string>
     <string name="notification_channel_reminders_low">Reminders (Low)</string>
     <string name="notification_channel_reminders_low_desc">Silent note reminders</string>
@@ -991,7 +990,6 @@
     <string name="google_tasks_import_intro_body">Connect a Google account, choose the tasks you want, and add them to Remember. Read-only access, no changes are made to Google Tasks.</string>
     <string name="google_tasks_import_takeout_title">Import from Google Takeout</string>
     <string name="google_tasks_import_takeout_body">Import a Google Tasks Takeout file. No account sign-in required.</string>
-    <string name="google_tasks_import_steps_google_heading">Google Takeout</string>
     <string name="google_tasks_import_takeout_step_1">Open Google Takeout for Tasks, tap \"Next step\", then \"Create export\".</string>
     <string name="google_tasks_import_takeout_step_2">Check your email for the download link. Download and extract the archive.</string>
     <string name="google_tasks_import_takeout_pick_json">Choose JSON file</string>
@@ -1030,7 +1028,11 @@
     <string name="markdown_import_loading">Importing Markdown notes…</string>
     <string name="markdown_import_zip_empty">No valid Markdown (.md) files found in the selected archive</string>
     <string name="markdown_import_none_valid">No valid Markdown (.md) or text (.txt) files were imported</string>
-    <string name="markdown_import_failed">Could not import the selected Markdown file(s)</string>
+    <string name="markdown_import_failed">Could not import the selected file(s)</string>
+    <string name="markdown_import_zip_too_large">This ZIP holds too much to import at once. Split it into smaller archives.</string>
+    <string name="import_empty_file_title">No tasks found in this file</string>
+    <string name="import_empty_file_body">Make sure you chose a Google Takeout Tasks.json file or a Tasks.org backup.</string>
+    <string name="import_choose_another_file">Choose another file</string>
 
     <!-- Settings: backup and restore -->
     <string name="settings_backup_section">Backup &amp; restore</string>
@@ -1072,6 +1074,7 @@
     <string name="backup_zip_choice_title">Remember backup detected</string>
     <string name="backup_zip_import_action">Import</string>
     <string name="backup_zip_restore_action">Restore</string>
+    <string name="backup_zip_import_failed">Could not import this Remember backup</string>
     <string name="cloud_provider_google_drive">Google Drive</string>
     <string name="cloud_provider_onedrive">OneDrive</string>
     <string name="cloud_provider_dropbox">Dropbox</string>

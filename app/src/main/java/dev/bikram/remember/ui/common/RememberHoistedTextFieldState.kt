@@ -20,8 +20,8 @@ internal fun rememberHoistedStringTextFieldState(
     val currentText by rememberUpdatedState(text)
     val currentOnTextChange by rememberUpdatedState(onTextChange)
     LaunchedEffect(text) {
-        val currentText = textFieldState.text.toString()
-        if (currentText != text) {
+        val fieldText = textFieldState.text.toString()
+        if (fieldText != text) {
             textFieldState.edit {
                 replace(0, length, text)
                 selection = TextRange(text.length)
@@ -40,41 +40,6 @@ internal fun rememberHoistedStringTextFieldState(
             .collect { updatedText ->
                 if (updatedText != currentText) {
                     currentOnTextChange(updatedText)
-                }
-            }
-    }
-    return textFieldState
-}
-
-@Composable
-internal fun rememberLocalStringTextFieldState(
-    externalText: String,
-    onExternalTextChange: (String) -> Unit,
-    initialSelection: TextRange = TextRange(externalText.length),
-): TextFieldState {
-    val textFieldState = rememberTextFieldState(initialText = externalText, initialSelection = initialSelection)
-    LaunchedEffect(externalText) {
-        val currentText = textFieldState.text.toString()
-        if (currentText != externalText) {
-            textFieldState.edit {
-                replace(0, length, externalText)
-                selection =
-                    TextRange(
-                        start = initialSelection.start.coerceIn(0, externalText.length),
-                        end = initialSelection.end.coerceIn(0, externalText.length),
-                    )
-            }
-            // See rememberHoistedStringTextFieldState for why this sync must not leave an
-            // undo-able entry behind for the system back gesture to revert.
-            textFieldState.undoState.clearHistory()
-        }
-    }
-    LaunchedEffect(textFieldState) {
-        snapshotFlow { textFieldState.text.toString() }
-            .distinctUntilChanged()
-            .collect { updatedText ->
-                if (updatedText != externalText) {
-                    onExternalTextChange(updatedText)
                 }
             }
     }

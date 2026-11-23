@@ -38,6 +38,7 @@ import androidx.compose.material3.adaptive.layout.calculatePaneScaffoldDirective
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -92,6 +93,7 @@ import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.RememberBackupZipActionDialog
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.edit.MAX_NOTE_MARKDOWN_KB
+import dev.bikram.remember.ui.edit.MarkdownZipTooLargeException
 import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
 import dev.bikram.remember.ui.edit.createImportedMarkdownNote
 import dev.bikram.remember.ui.edit.importMarkdownFromUri
@@ -117,6 +119,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -345,6 +348,8 @@ private fun AppRoot(
             dismissedUpdateBarKey = null
         }
     }
+    // Held above the lock-screen branch so the app locking doesn't drop a pending backup dialog.
+    var pendingDroppedBackupPath by rememberPendingDroppedBackupPath(context)
     val currentLockState = lockState
 
     if (currentLockState == null) {
@@ -393,7 +398,6 @@ private fun AppRoot(
         ) {
             var isDragSessionActive by remember { mutableStateOf(false) }
             var isDragHovered by remember { mutableStateOf(false) }
-            var pendingDroppedBackupFile by remember { mutableStateOf<File?>(null) }
             val dragAndDropTarget =
                 rememberAppRootDragAndDropTarget(
                     context = context,
@@ -405,8 +409,8 @@ private fun AppRoot(
                     onDragSessionChanged = { isDragSessionActive = it },
                     onDragHoverChanged = { isDragHovered = it },
                     onBackupZipStaged = { staged ->
-                        pendingDroppedBackupFile?.delete()
-                        pendingDroppedBackupFile = staged
+                        pendingDroppedBackupPath?.let { previousPath -> File(previousPath).delete() }
+                        pendingDroppedBackupPath = staged.absolutePath
                     },
                 )
             val updateKey = updateInfo?.notificationDedupeKey()
@@ -454,12 +458,12 @@ private fun AppRoot(
                     visible = isDragSessionActive || isDragHovered,
                     isDragHovered = isDragHovered,
                 )
-                pendingDroppedBackupFile?.let { backupFile ->
+                pendingDroppedBackupPath?.let { backupPath ->
                     AppRootDroppedBackupDialog(
-                        backupFile = backupFile,
+                        backupFile = remember(backupPath) { File(backupPath) },
                         backupIo = backupIo,
                         appScope = appScope,
-                        onClear = { pendingDroppedBackupFile = null },
+                        onClear = { pendingDroppedBackupPath = null },
                     )
                 }
             }
@@ -603,7 +607,7 @@ private fun AppRootDroppedBackupDialog(
                     if (count > 0) {
                         resources.getQuantityString(R.plurals.toast_imported_notes, count, count)
                     } else {
-                        resources.getString(R.string.markdown_import_failed)
+                        resources.getString(R.string.backup_zip_import_failed)
                     }
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             }
@@ -717,7 +721,7 @@ private suspend fun handleDroppedUris(
         if (stagedFile != null) {
             onBackupZipStaged(stagedFile)
         } else {
-            Toast.makeText(context, context.getString(R.string.markdown_import_failed), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.backup_zip_import_failed), Toast.LENGTH_SHORT).show()
         }
         return
     }
@@ -757,17 +761,66 @@ private suspend fun stageDroppedBackupFile(
     uri: Uri,
 ): File? =
     withContext(Dispatchers.IO) {
+        var tempFile: File? = null
         runCatching {
-            val tempFile = File.createTempFile("remember_drop_backup_", ".zip", context.cacheDir)
+            val stagedFile = DroppedBackupStaging.createFile(context.cacheDir)
+            tempFile = stagedFile
             context.contentResolver.openInputStream(uri)?.use { input ->
-                tempFile.outputStream().use { output -> input.copyTo(output) }
-            } ?: run {
-                tempFile.delete()
-                return@runCatching null
-            }
-            tempFile
+                stagedFile.outputStream().use { output -> input.copyTo(output) }
+            } ?: error("Could not open dropped backup")
+            stagedFile
+        }.onFailure {
+            tempFile?.delete()
         }.getOrNull()
     }
+
+/**
+ * Path of a dropped Remember backup waiting for the Import/Restore choice. Saveable, so a window
+ * resize or rotation keeps the pending dialog instead of stranding its staged copy in the cache;
+ * a restored path whose copy has since been deleted is cleared.
+ */
+@Composable
+private fun rememberPendingDroppedBackupPath(context: android.content.Context): MutableState<String?> {
+    val pendingPath = rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) {
+        val keptPath = pendingPath.value
+        val keptFileExists =
+            withContext(Dispatchers.IO) {
+                DroppedBackupStaging.deleteOrphansOnce(context.cacheDir, keepPath = keptPath)
+                keptPath != null && File(keptPath).isFile
+            }
+        if (keptPath != null && !keptFileExists && pendingPath.value == keptPath) {
+            pendingPath.value = null
+        }
+    }
+    return pendingPath
+}
+
+/**
+ * Cache copies of dropped Remember backup ZIPs awaiting the Import/Restore choice. Copies left
+ * behind by an earlier process (killed while the dialog was open) are deleted once per process;
+ * a copy still referenced by restored UI state is kept.
+ */
+private object DroppedBackupStaging {
+    private const val FILE_PREFIX = "remember_drop_backup_"
+    private const val FILE_SUFFIX = ".zip"
+    private val orphansDeleted = AtomicBoolean(false)
+
+    fun createFile(cacheDir: File): File = File.createTempFile(FILE_PREFIX, FILE_SUFFIX, cacheDir)
+
+    fun deleteOrphansOnce(
+        cacheDir: File,
+        keepPath: String?,
+    ) {
+        if (!orphansDeleted.compareAndSet(false, true)) return
+        cacheDir
+            .listFiles { file ->
+                file.name.startsWith(FILE_PREFIX) &&
+                    file.name.endsWith(FILE_SUFFIX) &&
+                    file.absolutePath != keepPath
+            }?.forEach(File::delete)
+    }
+}
 
 private suspend fun handleSingleDroppedMarkdown(
     context: android.content.Context,
@@ -811,6 +864,7 @@ private suspend fun handleMultiDroppedUris(
     var sawZipValidContent = false
     var sawUnsupported = false
     var sawFailure = false
+    var sawZipTooLarge = false
     val fallbackTitle = context.getString(R.string.edit_note_title_new)
     withContext(Dispatchers.IO) {
         droppedUris.forEach { uri ->
@@ -840,7 +894,9 @@ private suspend fun handleMultiDroppedUris(
                                 )
                                 importedCount++
                             }
-                        }.onFailure { sawFailure = true }
+                        }.onFailure { error ->
+                            if (error is MarkdownZipTooLargeException) sawZipTooLarge = true else sawFailure = true
+                        }
                     }
                 }
                 isMarkdownOrPlainTextUri(context, uri) -> {
@@ -868,6 +924,7 @@ private suspend fun handleMultiDroppedUris(
             context.resources.getQuantityString(R.plurals.toast_imported_notes, importedCount, importedCount)
         } else {
             when {
+                sawZipTooLarge -> context.getString(R.string.markdown_import_zip_too_large)
                 sawZip && !sawZipValidContent && !sawFailure -> context.getString(R.string.drag_drop_error_zip_empty)
                 sawUnsupported && !sawFailure -> context.getString(R.string.drag_drop_error_unsupported_type)
                 sawFailure -> context.getString(R.string.markdown_import_failed)
@@ -901,15 +958,29 @@ private fun resolveUpdateBarState(
     }
 }
 
+/**
+ * Types that light up the drop overlay. Android exposes only the drag's declared types until the
+ * drop, and the drop handler re-checks each file's name and type.
+ * - text/plain covers .txt files, but a dragged text selection declares the same type, so the
+ *   overlay also shows for text dragged in from another app; the two can't be told apart here.
+ * - application/octet-stream is kept because some file managers and cloud apps label .md (and
+ *   occasionally .zip) files that way; anything else with that label gets the unsupported-type
+ *   toast on drop.
+ * Everything else (images, video, PDFs, launcher shortcuts, ...) is ignored.
+ */
+private val AppRootDropMimeTypes =
+    listOf(
+        "text/markdown",
+        "text/x-markdown",
+        ClipDescription.MIMETYPE_TEXT_PLAIN,
+        "application/json",
+        "text/json",
+        "application/zip",
+        "application/x-zip-compressed",
+        "application/octet-stream",
+    )
+
 private fun canAcceptAppRootDragAndDrop(event: DragAndDropEvent): Boolean {
-    val description = event.toAndroidDragEvent().clipDescription ?: return true
-    return description.hasMimeType("text/markdown") ||
-        description.hasMimeType("text/x-markdown") ||
-        description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
-        description.hasMimeType("application/json") ||
-        description.hasMimeType("text/json") ||
-        description.hasMimeType("application/zip") ||
-        description.hasMimeType("application/x-zip-compressed") ||
-        description.hasMimeType("application/octet-stream") ||
-        description.hasMimeType("*/*")
+    val description = event.toAndroidDragEvent().clipDescription ?: return false
+    return AppRootDropMimeTypes.any(description::hasMimeType)
 }

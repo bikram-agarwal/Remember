@@ -5,7 +5,7 @@
 - **Import & export Markdown**: Tap the top-right `⋮` menu on a note or checklist to **Import MD** (on empty notes or checklists) or **Export MD** (when content is present). You can also bulk-import `.md`, `.markdown`, `.txt`, `.zip` archives of Markdown files from **Import -> Tasks.org & more**.
 - **Drag and drop import**: Drag `.md`, `.markdown`, `.txt`, `.zip` (Markdown archives or Remember backups), or `.json` (Google Takeout / Tasks.org backup) files onto the unlocked Remember window to import them. 
 - **Bulk Markdown ZIP export**: In multi-select mode on the Notes tab, tap **Export** in the selection bar to save a `.zip` archive of `.md` files for all selected notes and checklists.
-- **Manual notification pinning**: Long-press the `Notify` button in the bottom bar of a note or checklist to pin its notification. Pinned notifications are restored if dismissed.
+- **Manual notification pinning**: Long-press the `Notify` button in the bottom bar of a note or checklist to pin its notification. Pinned notifications are restored if dismissed and come back after your device restarts.
 - **Importance sorting & grouping**: Sort or group notes and checklists by **Importance** on the Notes tab, with a dedicated direction toggle in the Sort menu.
 
 ### 🛠 Improved Features

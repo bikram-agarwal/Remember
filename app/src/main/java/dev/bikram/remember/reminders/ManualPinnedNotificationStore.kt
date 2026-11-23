@@ -1,6 +1,7 @@
 package dev.bikram.remember.reminders
 
 import android.content.Context
+import dev.bikram.remember.data.NoteEntity
 
 /**
  * Tracks note IDs whose notification was manually created as "Pinned", so swipe-dismiss
@@ -21,6 +22,15 @@ internal object ManualPinnedNotificationStore {
         return noteId.toString() in ids
     }
 
+    fun pinnedNoteIds(context: Context): Set<Long> =
+        context
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .getStringSet(KEY_NOTE_IDS, emptySet())
+            .orEmpty()
+            .mapNotNull { it.toLongOrNull() }
+            .filter { it > 0L }
+            .toSet()
+
     fun setPinned(
         context: Context,
         noteId: Long,
@@ -36,3 +46,9 @@ internal object ManualPinnedNotificationStore {
         }
     }
 }
+
+/**
+ * Whether a pin still applies to [note] when its notification is re-posted after a reboot. A
+ * trashed, archived, or completed note has no notification to bring back, so its pin is dropped.
+ */
+internal fun pinSurvivesReboot(note: NoteEntity): Boolean = !note.trashed && !note.archived && note.completedAt == null

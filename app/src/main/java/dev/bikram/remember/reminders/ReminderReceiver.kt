@@ -128,6 +128,11 @@ class ReminderReceiver : BroadcastReceiver() {
          * notification shade ends it. Every other alerting Critical post (edit, restore after
          * dismissal, posting from the editor, or any alert when set not to ring) sounds once
          * like High; see [channelImportance].
+         *
+         * [keepUntilDone] is the caller's choice of whether a swipe-dismiss brings the notification
+         * back. A note the user pinned from the editor (long-press Notify) always comes back,
+         * whichever path re-posts it (a reminder firing, a reschedule, an edit refresh), until
+         * the pin is cleared by tapping Notify or the notification being cancelled.
          */
         fun showNotification(
             context: Context,
@@ -154,6 +159,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     Importance.DEFAULT -> ReminderScheduler.CHANNEL_ID_DEFAULT
                 }
 
+            val restoreOnDismiss = keepUntilDone || ManualPinnedNotificationStore.isPinned(context, note.id)
             val collapsedSummary = summary(context, note, items)
             val expandedSummary = summary(context, note, items, expanded = true)
             val builder =
@@ -166,7 +172,7 @@ class ReminderReceiver : BroadcastReceiver() {
                     .setVisibility(notificationVisibility(note))
                     .setSilent(silent)
                     .setContentIntent(openNotePendingIntent(context, note.id))
-                    .setDeleteIntent(dismissPendingIntent(context, note.id, reminderIndex).takeIf { keepUntilDone })
+                    .setDeleteIntent(dismissPendingIntent(context, note.id, reminderIndex).takeIf { restoreOnDismiss })
                     .setOngoing(false)
                     .setAutoCancel(false)
                     .setOnlyAlertOnce(onlyAlertOnce)

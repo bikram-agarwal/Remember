@@ -7,6 +7,7 @@ import dev.bikram.remember.data.NoteWithItems
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayInputStream
@@ -214,5 +215,44 @@ class NoteMarkdownIoTest {
         assertFalse(canConvertMarkdownNoteToChecklist("# Shopping\n- Milk"))
         assertFalse(canConvertMarkdownNoteToChecklist("```kotlin\nval x = 1\n```"))
         assertFalse(canConvertMarkdownNoteToChecklist("- Parent\n  - Child\n    - Grandchild"))
+    }
+
+    @Test
+    fun `readMarkdownFromInputStream strips a UTF-8 byte-order mark so the first line still parses`() {
+        val checklist = "- [ ] Milk\n- [x] Eggs"
+        val withBom = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + checklist.toByteArray(Charsets.UTF_8)
+        val result = readMarkdownFromInputStream(ByteArrayInputStream(withBom))
+        assertEquals(NoteMarkdownImportResult.Success(checklist), result)
+        assertTrue(isStrictChecklistMarkdown((result as NoteMarkdownImportResult.Success).markdown))
+    }
+
+    @Test
+    fun `readMarkdownEntriesFromZip rejects archives with too many entries`() {
+        val zipBytes = markdownZip("a.md" to "A", "b.md" to "B", "c.md" to "C")
+        assertThrows(MarkdownZipTooLargeException::class.java) {
+            readMarkdownEntriesFromZip(ByteArrayInputStream(zipBytes), maximumEntryCount = 2)
+        }
+        assertEquals(3, readMarkdownEntriesFromZip(ByteArrayInputStream(zipBytes), maximumEntryCount = 3).size)
+    }
+
+    @Test
+    fun `readMarkdownEntriesFromZip rejects archives whose combined text exceeds the cap`() {
+        val zipBytes = markdownZip("a.md" to "12345", "b.md" to "67890")
+        assertThrows(MarkdownZipTooLargeException::class.java) {
+            readMarkdownEntriesFromZip(ByteArrayInputStream(zipBytes), maximumTotalChars = 9L)
+        }
+        assertEquals(2, readMarkdownEntriesFromZip(ByteArrayInputStream(zipBytes), maximumTotalChars = 10L).size)
+    }
+
+    private fun markdownZip(vararg entries: Pair<String, String>): ByteArray {
+        val out = ByteArrayOutputStream()
+        ZipOutputStream(out).use { zip ->
+            entries.forEach { (name, content) ->
+                zip.putNextEntry(ZipEntry(name))
+                zip.write(content.toByteArray(Charsets.UTF_8))
+                zip.closeEntry()
+            }
+        }
+        return out.toByteArray()
     }
 }

@@ -11,7 +11,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,6 +47,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
@@ -324,19 +324,12 @@ private fun ActionItem(
     iconScale: Float = 1f,
     compact: Boolean = false,
 ) {
-    val hapticEnabled = LocalHapticEnabled.current
-    val view = LocalView.current
     val clickableModifier =
         if (onLongClick != null) {
+            // appCombinedClickable fires the long-press haptic itself (gated on the app setting).
             modifier
                 .clip(MaterialTheme.shapes.large)
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = {
-                        if (hapticEnabled) view.performLongPressHaptic()
-                        onLongClick()
-                    },
-                )
+                .appCombinedClickable(onClick = onClick, onLongClick = onLongClick)
         } else {
             modifier
                 .clip(MaterialTheme.shapes.large)
