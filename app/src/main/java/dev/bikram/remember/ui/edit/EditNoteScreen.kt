@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -285,6 +286,7 @@ fun EditNoteScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = androidx.compose.ui.platform.LocalContext.current
+    val resources = LocalResources.current
     val notificationActive by vm.notificationActive.collectAsStateWithLifecycle()
     LaunchedEffect(persistedForToolbar) {
         vm.refreshNotificationActive(context)
@@ -402,7 +404,7 @@ fun EditNoteScreen(
                         Toast
                             .makeText(
                                 context,
-                                context.getString(R.string.toast_import_md_success),
+                                resources.getString(R.string.toast_import_md_success),
                                 Toast.LENGTH_SHORT,
                             ).show()
                     }
@@ -410,7 +412,7 @@ fun EditNoteScreen(
                         Toast
                             .makeText(
                                 context,
-                                context.getString(R.string.toast_import_md_too_large, MAX_NOTE_MARKDOWN_KB),
+                                resources.getString(R.string.toast_import_md_too_large, MAX_NOTE_MARKDOWN_KB),
                                 Toast.LENGTH_SHORT,
                             ).show()
                     }
@@ -418,7 +420,7 @@ fun EditNoteScreen(
                         Toast
                             .makeText(
                                 context,
-                                context.getString(R.string.toast_import_md_empty),
+                                resources.getString(R.string.toast_import_md_empty),
                                 Toast.LENGTH_SHORT,
                             ).show()
                     }
@@ -426,7 +428,7 @@ fun EditNoteScreen(
                         Toast
                             .makeText(
                                 context,
-                                context.getString(R.string.toast_import_md_failed),
+                                resources.getString(R.string.toast_import_md_failed),
                                 Toast.LENGTH_SHORT,
                             ).show()
                     }
@@ -447,7 +449,7 @@ fun EditNoteScreen(
                     } else {
                         R.string.toast_export_failed
                     }
-                Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, resources.getString(messageRes), Toast.LENGTH_SHORT).show()
             }
         }
     val saveAndExitEditMode: () -> Unit = {

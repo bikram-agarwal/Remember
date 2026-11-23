@@ -669,7 +669,9 @@ abstract class BaseEditorViewModel(
 
     fun hasActiveNotification(context: android.content.Context): Boolean {
         val id = loadedId ?: return false
-        return dev.bikram.remember.reminders.ReminderScheduler(context).isNotificationActive(id)
+        return dev.bikram.remember.reminders
+            .ReminderScheduler(context)
+            .isNotificationActive(id)
     }
 
     fun refreshNotificationActive(context: android.content.Context) {
@@ -678,7 +680,9 @@ abstract class BaseEditorViewModel(
 
     fun dismissActiveNotification(context: android.content.Context) {
         val id = loadedId ?: return
-        dev.bikram.remember.reminders.ReminderScheduler(context).cancelNotification(id)
+        dev.bikram.remember.reminders
+            .ReminderScheduler(context)
+            .cancelNotification(id)
         _notificationActive.value = false
         android.widget.Toast
             .makeText(
@@ -696,7 +700,8 @@ abstract class BaseEditorViewModel(
         saveIfNeeded(untitledName)
         val id = loadedId ?: return
         val noteWithItems = repository.get(id) ?: return
-        dev.bikram.remember.reminders.ManualPinnedNotificationStore.setPinned(context, id, pinned)
+        dev.bikram.remember.reminders.ManualPinnedNotificationStore
+            .setPinned(context, id, pinned)
         dev.bikram.remember.reminders.ReminderReceiver.showNotification(
             context = context,
             note = noteWithItems.note,

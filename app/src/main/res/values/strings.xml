@@ -85,7 +85,6 @@
     <string name="toast_import_md_empty">Selected Markdown file is empty</string>
     <string name="toast_import_md_failed">Could not import Markdown file</string>
     <string name="toast_import_md_too_large">File is too large (max %1$d KB)</string>
-    <string name="toast_import_md_unsupported">Only Markdown (.md) or text (.txt) files are supported</string>
     <string name="drag_drop_import_title">Drop files to import</string>
     <string name="drag_drop_import_subtitle">Supports .md, .txt, .zip, and .json</string>
     <string name="drag_drop_error_unsupported_type">Unsupported file type. Use .md, .txt, .zip, or .json</string>

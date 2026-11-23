@@ -243,11 +243,9 @@ private val BULLET_OR_NUMBERED_LINE_REGEX = Regex("""^(\s*)(?:[-*+]|\d+[.)])\s+(
 private val RICH_BLOCK_DISQUALIFIER_REGEX =
     Regex("""^\s*(?:#{1,6}\s+|```|~~~|>\s?|(?:-{3,}|\*{3,}|_{3,})\s*$|\|.*\|)""")
 
-internal fun isStrictChecklistMarkdown(markdown: String): Boolean =
-    analyzeChecklistConvertibility(markdown = markdown, allowPlainLists = false)
+internal fun isStrictChecklistMarkdown(markdown: String): Boolean = analyzeChecklistConvertibility(markdown = markdown, allowPlainLists = false)
 
-internal fun canConvertMarkdownNoteToChecklist(markdown: String): Boolean =
-    analyzeChecklistConvertibility(markdown = markdown, allowPlainLists = true)
+internal fun canConvertMarkdownNoteToChecklist(markdown: String): Boolean = analyzeChecklistConvertibility(markdown = markdown, allowPlainLists = true)
 
 private fun analyzeChecklistConvertibility(
     markdown: String,
@@ -398,7 +396,7 @@ internal fun markdownToChecklistItems(markdown: String): List<EditableItem> {
     return result
 }
 
-internal fun buildBulkExportZipFileName(): String = "remember_notes_export.zip"
+internal const val BULK_EXPORT_ZIP_FILE_NAME = "remember_notes_export.zip"
 
 internal fun noteWithItemsToMarkdown(noteWithItems: NoteWithItems): String {
     val note = noteWithItems.note

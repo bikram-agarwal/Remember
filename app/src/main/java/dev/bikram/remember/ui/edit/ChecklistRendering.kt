@@ -523,8 +523,7 @@ internal fun ChecklistRow(
                                 } else {
                                     false
                                 }
-                            }
-                            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
+                            }.then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier),
                     decorator = { innerTextField ->
                         if (item.text.isEmpty()) {
                             Text(

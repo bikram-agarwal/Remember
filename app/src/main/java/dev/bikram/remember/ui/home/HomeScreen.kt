@@ -67,14 +67,11 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.platform.LocalContext
-import dev.bikram.remember.ui.edit.buildBulkExportZipFileName
-import dev.bikram.remember.ui.edit.exportNotesAsMarkdownZip
-import kotlinx.coroutines.launch
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -108,7 +105,9 @@ import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.rememberSelectionActionBarListClearance
 import dev.bikram.remember.ui.components.toNoteCardUiModel
+import dev.bikram.remember.ui.edit.BULK_EXPORT_ZIP_FILE_NAME
 import dev.bikram.remember.ui.edit.NoteIcon
+import dev.bikram.remember.ui.edit.exportNotesAsMarkdownZip
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
@@ -315,6 +314,7 @@ fun HomeScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val context = LocalContext.current
+    val resources = LocalResources.current
     val uiScope = rememberCoroutineScope()
     val notificationsAllowed = rememberNotificationsAllowed()
     val initialListLiftPx =
@@ -413,7 +413,7 @@ fun HomeScreen(
                     } else {
                         R.string.toast_export_failed
                     }
-                Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, resources.getString(messageRes), Toast.LENGTH_SHORT).show()
             }
         }
     val collapsibleSectionKeys by
@@ -536,7 +536,7 @@ fun HomeScreen(
                     onExportSelected = {
                         if (selectedNotesForExport.isNotEmpty()) {
                             pendingExportNotes = selectedNotesForExport
-                            exportZipLauncher.launch(buildBulkExportZipFileName())
+                            exportZipLauncher.launch(BULK_EXPORT_ZIP_FILE_NAME)
                         }
                     },
                     onTagSelected = { tagSheetOpen = true },
