@@ -50,6 +50,7 @@ import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.ui.common.NoteAdaptiveTheme
 import dev.bikram.remember.ui.common.NotePageBackground
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.SuppressAppDropImportWhileEditing
 import dev.bikram.remember.ui.common.rememberImageDerivedColorScheme
 import dev.bikram.remember.ui.common.rememberImageDerivedColors
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
@@ -230,6 +231,7 @@ fun EditNoteScreen(
     LaunchedEffect(readOnly) {
         if (readOnly && isEditMode) isEditMode = false
     }
+    SuppressAppDropImportWhileEditing(isEditMode = isEditMode, readOnly = readOnly)
     LaunchedEffect(isEditMode) {
         if (!isEditMode) {
             suppressBodyAutoFocusOnEdit = false

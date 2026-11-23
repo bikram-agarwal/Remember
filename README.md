@@ -23,7 +23,7 @@ See [the differences between the Play Store, F-Droid, and GitHub versions](docs/
 ### ⏰ Reminders that actually work
 
 - **Keep reminders until done.** The feature the app is built around. Enable it, and accidental dismissals stop mattering — Remember re-posts the notification until the note is marked done.
-- **Reminers/snooze that speaks human.** Relative presets like *soon*, *later today*, *this evening*, *tomorrow morning*, OR pick a duration in minutes, hours, or days. A custom date and time is always available.
+- **Reminders/snooze that speaks human.** Relative presets like *soon*, *later today*, *this evening*, *tomorrow morning*, OR pick a duration in minutes, hours, or days. A custom date and time is always available.
 - **Multiple reminders per note.** Add up to three reminders to the same note, each with its own time and repeat pattern.
 - **Action buttons in the notification.** A reminder to call someone shows a call button right there. A reminder to pick something up shows directions. You can act on the reminder right from the notification.
 - **High-importance mode.** Heads-up alerts, sound, and vibration for the things that cannot wait.
@@ -37,7 +37,7 @@ See [the differences between the Play Store, F-Droid, and GitHub versions](docs/
 
 Reminders are more useful when they carry information. Remember's notes and lists are the container for that.
 
-- **Markdown notes** with headings, formatting, links, and code blocks — so a reminder about a meeting can include the agenda.
+- **Markdown notes** with headings, formatting, lists, links, and code blocks — so a reminder about a meeting can include the agenda. Text pasted from a web page, email, or document keeps its formatting.
 - **Checklists** with nested items and drag-to-reorder — so a grocery run or a packing list can live inside the reminder itself.
 - **Note & checklist conversion**: Convert list-formatted notes into interactive checklists or convert checklists into Markdown notes while keeping titles, reminders, tags, and attachments intact.
 - **Attachments and pictures** show up on the note card and inside reminder notifications. Cover images can be repositioned to frame exactly how you want.
@@ -50,7 +50,7 @@ Reminders are more useful when they carry information. Remember's notes and list
 - **Tags with colors** for grouping notes any way you like.
 - **Star** notes for quick access. **Archive** ones you want to keep but not see. Or send to **Trash** that clears after 30 days automatically.
 - **Filter** by type, tag, starred status, pinned status, has-reminder, has-picture, or has-attachment.
-- **Sort and group** by last modified, created date, or reminder time — grouped by date, type, or tag.
+- **Sort and group** by last modified, created date, reminder time, importance, type, tag etc.
 - **Pin** the notes you need at hand: they stay at the top of the list, regardless of your sorting or grouping.
 - **List or grid view** for note cards, so you can choose a compact list or a visual mosaic.
 

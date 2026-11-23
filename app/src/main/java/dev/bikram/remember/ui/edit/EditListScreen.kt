@@ -77,6 +77,7 @@ import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.NoteAdaptiveTheme
 import dev.bikram.remember.ui.common.NotePageBackground
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.SuppressAppDropImportWhileEditing
 import dev.bikram.remember.ui.common.rememberImageDerivedColorScheme
 import dev.bikram.remember.ui.common.rememberImageDerivedColors
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
@@ -327,6 +328,7 @@ fun EditListScreen(
     LaunchedEffect(readOnly) {
         if (readOnly && isEditMode) isEditMode = false
     }
+    SuppressAppDropImportWhileEditing(isEditMode = isEditMode, readOnly = readOnly)
     LaunchedEffect(isEditMode) {
         if (!isEditMode) {
             pendingTitleFocusOffset = null

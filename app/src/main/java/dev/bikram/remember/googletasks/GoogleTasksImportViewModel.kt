@@ -374,7 +374,7 @@ class GoogleTasksImportViewModel
                 _state.update { it.copy(pendingBackupZip = null, isImportingMarkdown = true, error = null) }
                 val result = backupIo.restoreFullReplace(pending.uri)
                 _state.update { it.copy(isImportingMarkdown = false, error = null) }
-                _effects.value = GoogleTasksImportEffect.MarkdownImportFinished(result.noteCount)
+                _effects.value = GoogleTasksImportEffect.BackupRestoreFinished(result)
             }
         }
 
@@ -852,5 +852,10 @@ sealed class GoogleTasksImportEffect {
 
     data class MarkdownImportFinished(
         val importedCount: Int,
+    ) : GoogleTasksImportEffect()
+
+    /** A full restore finished; its outcome is reported after the screen closes. */
+    data class BackupRestoreFinished(
+        val result: BackupIo.RestoreResult,
     ) : GoogleTasksImportEffect()
 }

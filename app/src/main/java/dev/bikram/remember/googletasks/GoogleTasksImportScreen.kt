@@ -104,6 +104,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.R
+import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.RememberPredictiveBackHandler
 import dev.bikram.remember.ui.common.isLandscape
@@ -154,6 +155,7 @@ fun GoogleTasksImportRoute(
     onBack: () -> Unit,
     initialJsonText: String? = null,
     onInitialJsonTextConsumed: () -> Unit = {},
+    onBackupRestored: (BackupIo.RestoreResult) -> Unit = {},
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -250,6 +252,12 @@ fun GoogleTasksImportRoute(
                     )
                 Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                 vm.consumeEffect()
+                onBack()
+            }
+            is GoogleTasksImportEffect.BackupRestoreFinished -> {
+                vm.consumeEffect()
+                // Reported by the caller: this screen closes right away, taking its snackbars.
+                onBackupRestored(current.result)
                 onBack()
             }
             null -> Unit

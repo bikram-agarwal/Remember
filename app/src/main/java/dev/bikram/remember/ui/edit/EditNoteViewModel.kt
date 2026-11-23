@@ -208,7 +208,9 @@ class EditNoteViewModel
                             options = currentOptions(),
                         )
                     if (converted) {
-                        if (starred.value) repository.setStarred(existingId, true)
+                        // Like a normal save: the draft's star wins both ways, so an un-star sticks.
+                        val saved = repository.get(existingId)?.note
+                        if (saved != null && saved.starred != starred.value) repository.setStarred(existingId, starred.value)
                         persistence.clearDirty()
                         existingId
                     } else {

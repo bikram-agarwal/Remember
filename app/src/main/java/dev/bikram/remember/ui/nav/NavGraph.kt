@@ -60,6 +60,7 @@ import dev.bikram.remember.ui.common.rememberShareAppAction
 import dev.bikram.remember.ui.common.supportsMultiPaneLayout
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.components.alertChromeSummary
+import dev.bikram.remember.ui.components.showBackupRestoreOutcome
 import dev.bikram.remember.ui.edit.EditListRoute
 import dev.bikram.remember.ui.edit.EditNoteRoute
 import dev.bikram.remember.ui.help.HelpScreen
@@ -926,10 +927,16 @@ fun RememberNavGraph(
                         LocalSharedTransitionScope provides this@SharedTransitionLayout,
                         LocalNavAnimatedVisibilityScope provides this@composable,
                     ) {
+                        val importContext = androidx.compose.ui.platform.LocalContext.current
+                        val appSnackbarHostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current
                         GoogleTasksImportRoute(
                             onBack = { navController.popBackStack() },
                             initialJsonText = pendingImportJsonText,
                             onInitialJsonTextConsumed = { pendingImportJsonText = null },
+                            // App-scoped, so the restore's follow-up warnings survive the screen closing.
+                            onBackupRestored = { result ->
+                                appScope.launch { showBackupRestoreOutcome(importContext, appSnackbarHostState, result) }
+                            },
                         )
                     }
                 }

@@ -86,12 +86,15 @@ import dev.bikram.remember.di.ApplicationScope
 import dev.bikram.remember.di.LaunchAction
 import dev.bikram.remember.googletasks.ManualTaskImportParser
 import dev.bikram.remember.ui.InAppRatingAutoPromptHost
+import dev.bikram.remember.ui.common.AppDropImportGuard
+import dev.bikram.remember.ui.common.LocalAppDropImportGuard
 import dev.bikram.remember.ui.common.LocalSystemPaneScaffoldDirective
 import dev.bikram.remember.ui.common.LocalSystemWindowAdaptiveInfo
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.RememberBackupZipActionDialog
 import dev.bikram.remember.ui.components.UpdateChromeState
+import dev.bikram.remember.ui.components.showBackupRestoreOutcome
 import dev.bikram.remember.ui.edit.MAX_NOTE_MARKDOWN_KB
 import dev.bikram.remember.ui.edit.MarkdownZipTooLargeException
 import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
@@ -393,8 +396,10 @@ private fun AppRoot(
                 appReviewLauncher = appReviewLauncher,
             )
         }
+        val dropImportGuard = remember { AppDropImportGuard() }
         androidx.compose.runtime.CompositionLocalProvider(
             dev.bikram.remember.ui.theme.LocalSnackbarHostState provides snackbarHostState,
+            LocalAppDropImportGuard provides dropImportGuard,
         ) {
             var isDragSessionActive by remember { mutableStateOf(false) }
             var isDragHovered by remember { mutableStateOf(false) }
@@ -415,15 +420,7 @@ private fun AppRoot(
                 )
             val updateKey = updateInfo?.notificationDedupeKey()
             val updateBarState = resolveUpdateBarState(playBannerState, updateInfo, updateKey, dismissedUpdateBarKey)
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .dragAndDropTarget(
-                            shouldStartDragAndDrop = ::canAcceptAppRootDragAndDrop,
-                            target = dragAndDropTarget,
-                        ),
-            ) {
+            Box(modifier = Modifier.fillMaxSize().appRootDropTarget(dropImportGuard, dragAndDropTarget)) {
                 RememberNavGraph(
                     repository = noteRepository,
                     onboardingPrefs = onboardingPrefs,
@@ -589,6 +586,8 @@ private fun AppRootDroppedBackupDialog(
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
+    // The app-wide host, so the restore's follow-up warnings outlive this dialog.
+    val snackbarHostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current
     var confirmingRestore by remember(backupFile) { mutableStateOf(false) }
     var mediaSummary by remember(backupFile) { mutableStateOf<BackupIo.RestoreMediaSummary?>(null) }
     RememberBackupZipActionDialog(
@@ -627,13 +626,7 @@ private fun AppRootDroppedBackupDialog(
                     } finally {
                         backupFile.delete()
                     }
-                val message =
-                    resources.getQuantityString(
-                        R.plurals.toast_imported_notes,
-                        result.noteCount,
-                        result.noteCount,
-                    )
-                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                showBackupRestoreOutcome(context, snackbarHostState, result)
             }
         },
         onDismiss = {
@@ -978,6 +971,16 @@ private val AppRootDropMimeTypes =
         "application/zip",
         "application/x-zip-compressed",
         "application/octet-stream",
+    )
+
+/** The window-wide import drop target; off while a note or checklist is being edited ([AppDropImportGuard]). */
+private fun Modifier.appRootDropTarget(
+    guard: AppDropImportGuard,
+    target: DragAndDropTarget,
+): Modifier =
+    dragAndDropTarget(
+        shouldStartDragAndDrop = { event -> !guard.suppressed && canAcceptAppRootDragAndDrop(event) },
+        target = target,
     )
 
 private fun canAcceptAppRootDragAndDrop(event: DragAndDropEvent): Boolean {

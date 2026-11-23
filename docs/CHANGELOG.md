@@ -9,6 +9,8 @@
 - **Importance sorting & grouping**: Sort or group notes and checklists by **Importance** on the Notes tab, with a dedicated direction toggle in the Sort menu.
 
 ### 🛠 Improved Features
+- **Paste keeps formatting**: Text copied from a web page, email, or document keeps its headings, lists, checkboxes, quotes, code, links, and bold or italic text when pasted into a note.
+- **Reorganized Import screen**: **Import** now has **Google Tasks** and **Tasks.org & more** tabs, and can import `.md`, .zip containing multiple `.md`s or restore a Remember backup `.zip`.
 - Checklist widget previews now display the first unchecked item.
 - Improved text input handling across note titles, tags, links, and search fields, including clear feedback when title or tag limits are reached.
 

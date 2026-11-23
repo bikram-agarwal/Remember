@@ -140,6 +140,9 @@ markdown -> Importing and exporting Markdown
 drag and drop -> Drag and drop
 convert to checklist -> Converting between notes and checklists
 convert to note -> Converting between notes and checklists
+paste -> Note formatting
+copy formatting -> Note formatting
+keep formatting -> Note formatting
 import failed -> If an import fails
 
 # --- Privacy / security ---

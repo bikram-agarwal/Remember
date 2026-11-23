@@ -69,6 +69,8 @@ On tablets, foldables, ChromeOS, or Android split-screen/multi-window, you can d
 - **Multiple files or `.zip` archives**: Imports all valid `.md`, `.markdown`, plain-text, zipped Markdown files, and Remember backup `.zip` files (merged additively) in bulk, then shows how many notes were imported.
 - **Single `.json` file**: Opens the Import screen with your Google Tasks Takeout (`Tasks.json`) or Tasks.org (`user….json`) backup already loaded so you can review and choose what to import.
 
+While a note or checklist is in edit mode, file import is turned off so that text you drag in from another app goes into the note instead. Switch to view mode, or go back to the notes list, to drop files.
+
 ### If an import fails
 
 - **Connect Google**: Check your internet connection, or try **Switch account** if sign-in or consent fails.
@@ -108,6 +110,8 @@ Each note and list supports: an icon, tags, reminder, notification action, impor
 ### Note formatting
 
 Notes support Markdown-style writing: headings, bold, italic, underline, strikethrough, lists, quotes, code blocks, links, and dividers. Reminder notifications use a plain-text version of the note so they stay readable.
+
+Text you copy from a web page, email, or document keeps its formatting when you paste it into a note: headings, lists, checkboxes, quotes, code, links, and bold or italic text become the matching Markdown. Tables keep their text, one row per line. Text dragged in from another app, or pasted from your keyboard's clipboard suggestions, arrives as plain text.
 
 ### Checklists
 

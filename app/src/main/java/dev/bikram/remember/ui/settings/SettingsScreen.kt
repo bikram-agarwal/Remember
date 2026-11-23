@@ -115,6 +115,7 @@ import dev.bikram.remember.ui.components.rememberResponsiveActionIconSize
 import dev.bikram.remember.ui.components.settings.GroupPosition
 import dev.bikram.remember.ui.components.settings.GroupedListColumn
 import dev.bikram.remember.ui.components.settings.GroupedListItem
+import dev.bikram.remember.ui.components.showBackupRestoreOutcome
 import dev.bikram.remember.ui.edit.DEFAULT_NOTE_HEADER_SYMBOL
 import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
@@ -1144,31 +1145,7 @@ fun SettingsRoute(
                     onClick = {
                         pendingRestore = null
                         scope.launch {
-                            val restoreResult = backupIo.restoreFullReplace(restore.uri)
-                            Toast
-                                .makeText(
-                                    context,
-                                    resources.getQuantityString(
-                                        R.plurals.toast_imported_notes,
-                                        restoreResult.noteCount,
-                                        restoreResult.noteCount,
-                                    ),
-                                    Toast.LENGTH_SHORT,
-                                ).show()
-                            if (restoreResult.settingsOutcome.foldersNeedingReselection > 0) {
-                                snackbarHostState.showSnackbar(
-                                    resources.getQuantityString(
-                                        R.plurals.settings_restore_folders_need_reselection,
-                                        restoreResult.settingsOutcome.foldersNeedingReselection,
-                                        restoreResult.settingsOutcome.foldersNeedingReselection,
-                                    ),
-                                )
-                            }
-                            if (restoreResult.settingsOutcome.automationsDisabled) {
-                                snackbarHostState.showSnackbar(
-                                    resources.getString(R.string.settings_restore_automation_disabled_no_folder),
-                                )
-                            }
+                            showBackupRestoreOutcome(context, snackbarHostState, backupIo.restoreFullReplace(restore.uri))
                         }
                     },
                 ) {

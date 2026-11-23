@@ -52,6 +52,11 @@ internal fun rememberLocalTextFieldValueState(
     onValueChange: (TextFieldValue) -> Unit,
 ): TextFieldState {
     val textFieldState = rememberTextFieldState(initialText = value.text, initialSelection = value.selection)
+    // The collector below outlives recompositions, so it must read the latest value and callback.
+    // Comparing with the first composition's value dropped any edit that returned the field to it
+    // (type a letter, then delete it: the caller kept the letter).
+    val currentValue by rememberUpdatedState(value)
+    val currentOnValueChange by rememberUpdatedState(onValueChange)
     LaunchedEffect(value.text, value.selection) {
         val fieldText = textFieldState.text.toString()
         if (fieldText != value.text) {
@@ -77,8 +82,8 @@ internal fun rememberLocalTextFieldValueState(
         }.distinctUntilChanged()
             .collect { (updatedText, updatedSelection) ->
                 val updatedValue = TextFieldValue(updatedText, updatedSelection)
-                if (updatedValue != value) {
-                    onValueChange(updatedValue)
+                if (updatedValue != currentValue) {
+                    currentOnValueChange(updatedValue)
                 }
             }
     }
@@ -92,9 +97,12 @@ internal fun rememberHoistedDigitTextFieldState(
     maxDigits: Int,
 ): TextFieldState {
     val textFieldState = rememberTextFieldState(initialText = value)
+    // See rememberLocalTextFieldValueState: the collector must compare with the latest value.
+    val currentValue by rememberUpdatedState(value)
+    val currentOnFilteredChange by rememberUpdatedState(onFilteredChange)
     LaunchedEffect(value) {
-        val currentText = textFieldState.text.toString()
-        if (currentText != value) {
+        val fieldText = textFieldState.text.toString()
+        if (fieldText != value) {
             textFieldState.edit {
                 replace(0, length, value)
                 selection = TextRange(value.length)
@@ -115,8 +123,8 @@ internal fun rememberHoistedDigitTextFieldState(
                     }
                     textFieldState.undoState.clearHistory()
                 }
-                if (filtered != value) {
-                    onFilteredChange(filtered)
+                if (filtered != currentValue) {
+                    currentOnFilteredChange(filtered)
                 }
             }
     }
