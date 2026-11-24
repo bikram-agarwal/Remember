@@ -5,6 +5,7 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.toColorInt
 import com.materialkolor.rememberDynamicColorScheme
@@ -26,11 +27,17 @@ internal fun rememberResolvedColorScheme(
 ): RememberColorResolution {
     val spec = colorSourceSpecFor(themeState.colorSource)
     val materialYouAvailable = spec.source == ColorSource.MATERIAL_YOU
-    val customTriplet =
-        if (spec.source == ColorSource.CUSTOM) {
-            parseCustomTriplet(themeState.activeCustomSeed)
-        } else {
-            null
+    // Curated or custom triplet, chroma-scaled exactly as the swatches show it (see forAppliedScheme).
+    val appliedTriplet =
+        remember(spec.source, spec.triplet, themeState.activeCustomSeed) {
+            val sourceTriplet =
+                when {
+                    materialYouAvailable -> null
+                    spec.triplet != null -> spec.triplet
+                    spec.source == ColorSource.CUSTOM -> parseCustomTriplet(themeState.activeCustomSeed)
+                    else -> null
+                }
+            sourceTriplet?.forAppliedScheme()
         }
     val base =
         when {
@@ -41,8 +48,7 @@ internal fun rememberResolvedColorScheme(
                     dynamicLightColorScheme(context)
                 }
             }
-            spec.triplet != null -> rememberCuratedColorScheme(spec.triplet, themeState, darkTheme, black)
-            customTriplet != null -> rememberCuratedColorScheme(customTriplet, themeState, darkTheme, black)
+            appliedTriplet != null -> rememberCuratedColorScheme(appliedTriplet, themeState, darkTheme, black)
             else -> rememberSeededColorScheme(spec, themeState, darkTheme, black)
         }
     val oledAdjusted = if (black) base.toOled() else base

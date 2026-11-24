@@ -74,6 +74,13 @@ val hasReleaseSigning =
 val previewVersionSuffix =
     providers.gradleProperty("previewVersionSuffix").orNull?.takeIf { it.isNotBlank() }
 
+// ../capture_screenshots.ps1 shoots the store screenshots on the release-type devRelease build:
+// with -PscreenshotsOnDevRelease=true the androidTest suite targets devRelease, and that build alone
+// gets the keep rules the screenshot tests need (proguard-screenshots.pro). Off by default, so normal
+// builds and their R8 output are unchanged. Kept in parity with FilePipe.
+val screenshotsOnDevRelease =
+    providers.gradleProperty("screenshotsOnDevRelease").map { it.toBoolean() }.getOrElse(false)
+
 extensions.configure<ApplicationExtension>("android") {
     namespace = rememberApplicationId
     compileSdk {
@@ -131,6 +138,10 @@ extensions.configure<ApplicationExtension>("android") {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (screenshotsOnDevRelease) {
+                proguardFiles("proguard-screenshots.pro")
+                testProguardFiles("proguard-screenshots-test.pro")
+            }
             matchingFallbacks += listOf("release")
         }
         release {
@@ -146,6 +157,10 @@ extensions.configure<ApplicationExtension>("android") {
                 debugSymbolLevel = "SYMBOL_TABLE"
             }
         }
+    }
+
+    if (screenshotsOnDevRelease) {
+        testBuildType = "devRelease"
     }
 
     lint {
@@ -322,9 +337,12 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     testImplementation(libs.junit4)
     testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestImplementation(libs.kotlinx.coroutines.test)
     add("playstoreImplementation", "com.google.android.play:app-update:2.1.0")
     add("playstoreImplementation", "com.google.android.play:app-update-ktx:2.1.0")
     add("playstoreImplementation", "com.google.android.play:review:2.0.2")

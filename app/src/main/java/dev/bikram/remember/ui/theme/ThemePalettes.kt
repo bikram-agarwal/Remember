@@ -4,6 +4,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.core.graphics.toColorInt
 import com.materialkolor.PaletteStyle
 import com.materialkolor.dynamiccolor.ColorSpec
+import com.materialkolor.ktx.toColor
+import com.materialkolor.ktx.toHct
 import dev.bikram.remember.data.ColorSource
 import dev.bikram.remember.data.PaletteStyleOpt
 
@@ -11,6 +13,23 @@ import dev.bikram.remember.data.PaletteStyleOpt
 internal val DefaultSeed = Color(0xFF16A34A)
 
 internal val RememberColorSpecVersion = ColorSpec.SpecVersion.SPEC_2025
+
+// Since material-kolor 5.0.1 the 2025 spec is fully applied to the curated/custom triplet
+// overrides, and those triplets are full-strength seeds (e.g. Ember #F97316): containers - chips,
+// tonal buttons, reminder pills, the FAB - came out near the seed itself, far more saturated than the
+// app looked through 5.0.0. Scaling the triplet's chroma (hue and tone unchanged) before it seeds the
+// scheme calms every role together while keeping the 2025 spec. Wallpaper (Material You) and
+// cover-image schemes are untouched. The Settings swatches use the same [forAppliedScheme] so they
+// match what gets applied.
+// Tuning: the effect is not linear (2025 containers sit at the palette's most chromatic tone), so
+// 0.7 lands back on the pre-5.0.1 look (pale light-theme chips); 0.8 is visibly milder; 1.0 = off.
+// Kept in parity with FilePipe (Theme.kt, SEED_TRIPLET_CHROMA_SCALE).
+private const val SEED_TRIPLET_CHROMA_SCALE = 0.7
+
+private fun Color.withScaledChroma(scale: Double): Color {
+    val hct = toHct()
+    return hct.withChroma(hct.chroma * scale).toColor()
+}
 
 /**
  * Hand-tuned primary/secondary/tertiary triplets. The primary seed drives surfaces,
@@ -22,6 +41,14 @@ data class CuratedPalette(
     val secondary: Color,
     val tertiary: Color,
 )
+
+/** The triplet as it actually seeds the theme; the Settings swatches draw this too. */
+internal fun CuratedPalette.forAppliedScheme(): CuratedPalette =
+    CuratedPalette(
+        primary = primary.withScaledChroma(SEED_TRIPLET_CHROMA_SCALE),
+        secondary = secondary.withScaledChroma(SEED_TRIPLET_CHROMA_SCALE),
+        tertiary = tertiary.withScaledChroma(SEED_TRIPLET_CHROMA_SCALE),
+    )
 
 enum class ColorSourceSwatchType {
     MATERIAL_YOU,

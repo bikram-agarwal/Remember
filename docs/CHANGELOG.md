@@ -16,6 +16,7 @@
 
 ### 🐛 Bug Fixes
 - Fixed checklist item titles accepting multiline input on some non-GBoard keyboards; pressing Enter now moves to the next item.
+- Colors from the hand-tuned presets and custom colors were more saturated than intended. Chips, buttons, and reminder pills look softer again.
 
 ---
 
