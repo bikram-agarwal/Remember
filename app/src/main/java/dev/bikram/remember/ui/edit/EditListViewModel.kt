@@ -145,6 +145,13 @@ class EditListViewModel
             )
         }
 
+        fun replaceItemsFromImport(importedItems: List<EditableItem>) {
+            _items.value = importedItems
+            val minLocalId = importedItems.minOfOrNull { it.localId } ?: 0L
+            nextLocalId = minOf(nextLocalId, minLocalId - 1L)
+            markDirty()
+        }
+
         private var draggingItemId: Long? = null
         private var originalSortOrder: Double? = null
 
@@ -522,4 +529,37 @@ class EditListViewModel
                 }
             }
         }
+
+        suspend fun convertToNote(untitledName: String): Long? =
+            persistence.withLock {
+                if (missingNote.value) return@withLock null
+                val body = checklistToMarkdown(_items.value)
+                val finalTitle = title.value.ifBlank { untitledName }
+                val existingId = loadedId
+                if (existingId == null) {
+                    val newId = repository.createNote(finalTitle, body, 0, currentOptions())
+                    loadedId = newId
+                    syncHasPersistedRow()
+                    if (starred.value) repository.setStarred(newId, true)
+                    persistence.clearDirty()
+                    newId
+                } else {
+                    val converted =
+                        repository.convertListToNote(
+                            id = existingId,
+                            title = finalTitle,
+                            body = body,
+                            options = currentOptions(),
+                        )
+                    if (converted) {
+                        // Like a normal save: the draft's star wins both ways, so an un-star sticks.
+                        val saved = repository.get(existingId)?.note
+                        if (saved != null && saved.starred != starred.value) repository.setStarred(existingId, starred.value)
+                        persistence.clearDirty()
+                        existingId
+                    } else {
+                        null
+                    }
+                }
+            }
     }

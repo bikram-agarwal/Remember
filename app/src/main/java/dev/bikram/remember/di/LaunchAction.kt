@@ -17,4 +17,8 @@ sealed interface LaunchAction {
     ) : LaunchAction
 
     data object OpenSettingsUpdates : LaunchAction
+
+    data class OpenTaskImport(
+        val jsonText: String,
+    ) : LaunchAction
 }

@@ -5,22 +5,37 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.ButtonGroup
+import androidx.compose.material3.ButtonGroupDefaults
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.FilterType
@@ -33,6 +48,7 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberCheckbox
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberInputChip
+import dev.bikram.remember.ui.components.RememberToggleButton
 import dev.bikram.remember.ui.components.tagColor
 import kotlinx.collections.immutable.toPersistentSet
 
@@ -102,21 +118,38 @@ internal fun ActiveFilterChips(
             }
         }
         FilterDropdownChip(
-            label = stringResource(R.string.filter_dropdown_sort, sortLabel(viewOptions.sortKey, viewOptions.sortDir)),
+            label =
+                stringResource(
+                    R.string.filter_dropdown_sort,
+                    "${sortKeyLabel(viewOptions.sortKey)} ${sortChipArrow(viewOptions.sortKey, viewOptions.sortDir)}",
+                ),
             selected = viewOptions.sortKey != defaultViewOptions.sortKey || viewOptions.sortDir != defaultViewOptions.sortDir,
             expanded = expandedDropdown == ActiveFilterDropdown.SORT,
             onExpandedChange = { expanded ->
                 onExpandedDropdownChange(if (expanded) ActiveFilterDropdown.SORT else null)
             },
         ) {
-            sortOptions().forEach { sortOption ->
+            SortDirectionToggleRow(
+                sortKey = viewOptions.sortKey,
+                sortDir = viewOptions.sortDir,
+                onDirectionChange = { sortDir ->
+                    onViewOptionsChange?.invoke(viewOptions.copy(sortDir = sortDir))
+                },
+            )
+            HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+            sortKeyOptions().forEach { (sortKey, label) ->
                 RadioMenuItem(
-                    label = sortOption.label,
-                    selected = viewOptions.sortKey == sortOption.sortKey && viewOptions.sortDir == sortOption.sortDir,
+                    label = label,
+                    selected = viewOptions.sortKey == sortKey,
                     onClick = {
-                        onViewOptionsChange?.invoke(
-                            viewOptions.copy(sortKey = sortOption.sortKey, sortDir = sortOption.sortDir),
-                        )
+                        if (viewOptions.sortKey != sortKey) {
+                            onViewOptionsChange?.invoke(
+                                viewOptions.copy(
+                                    sortKey = sortKey,
+                                    sortDir = defaultSortDirFor(sortKey),
+                                ),
+                            )
+                        }
                     },
                 )
             }
@@ -330,56 +363,166 @@ private fun RadioMenuItem(
     )
 }
 
-private data class SortOption(
-    val sortKey: SortKey,
-    val sortDir: SortDir,
-    val label: String,
-)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun SortDirectionToggleRow(
+    sortKey: SortKey,
+    sortDir: SortDir,
+    onDirectionChange: (SortDir) -> Unit,
+) {
+    val directions =
+        when (sortKey) {
+            SortKey.REMINDER,
+            SortKey.ALPHABETICAL,
+            ->
+                listOf(
+                    SortDir.ASC to sortDirectionLabel(sortKey, SortDir.ASC),
+                    SortDir.DESC to sortDirectionLabel(sortKey, SortDir.DESC),
+                )
+            SortKey.LAST_MODIFIED,
+            SortKey.CREATED,
+            SortKey.IMPORTANCE,
+            ->
+                listOf(
+                    SortDir.DESC to sortDirectionLabel(sortKey, SortDir.DESC),
+                    SortDir.ASC to sortDirectionLabel(sortKey, SortDir.ASC),
+                )
+        }
+    val shapes =
+        listOf(
+            ButtonGroupDefaults.connectedLeadingButtonShapes(),
+            ButtonGroupDefaults.connectedTrailingButtonShapes(),
+        )
+    val colors =
+        ToggleButtonDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            checkedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        )
+    ButtonGroup(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .widthIn(min = 216.dp)
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+        overflowIndicator = { menuState ->
+            ButtonGroupDefaults.OverflowIndicator(menuState = menuState)
+        },
+    ) {
+        directions.forEachIndexed { index, (dir, label) ->
+            customItem(
+                buttonGroupContent = {
+                    RememberToggleButton(
+                        checked = sortDir == dir,
+                        onCheckedChange = { checked -> if (checked) onDirectionChange(dir) },
+                        modifier = Modifier.weight(1f).height(36.dp).semantics { role = Role.RadioButton },
+                        shapes = shapes[index],
+                        colors = colors,
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    ) {
+                        if (sortDir == dir) {
+                            RememberMaterialRoundedSymbol(
+                                name = "check",
+                                size = 16.dp,
+                                weight = FontWeight.Medium,
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        }
+                        Text(
+                            text = label,
+                            style = MaterialTheme.typography.labelMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            softWrap = false,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                },
+                menuContent = {},
+            )
+        }
+    }
+}
 
 @Composable
-private fun sortLabel(
+private fun sortKeyLabel(sortKey: SortKey): String =
+    when (sortKey) {
+        SortKey.REMINDER -> stringResource(R.string.view_options_sort_reminder)
+        SortKey.LAST_MODIFIED -> stringResource(R.string.view_options_sort_modified)
+        SortKey.CREATED -> stringResource(R.string.view_options_sort_created)
+        SortKey.ALPHABETICAL -> stringResource(R.string.view_options_sort_alphabetical)
+        SortKey.IMPORTANCE -> stringResource(R.string.view_options_sort_importance)
+    }
+
+@Composable
+private fun sortDirectionLabel(
     sortKey: SortKey,
     sortDir: SortDir,
 ): String =
     when (sortKey) {
         SortKey.REMINDER ->
-            if (sortDir == SortDir.ASC) {
-                stringResource(R.string.view_options_sort_reminder_soonest)
-            } else {
-                stringResource(R.string.view_options_sort_reminder_latest)
-            }
-        SortKey.LAST_MODIFIED ->
-            if (sortDir == SortDir.ASC) {
-                stringResource(R.string.view_options_sort_modified_oldest)
-            } else {
-                stringResource(R.string.view_options_sort_modified_newest)
-            }
-        SortKey.CREATED ->
-            if (sortDir == SortDir.ASC) {
-                stringResource(R.string.view_options_sort_created_oldest)
-            } else {
-                stringResource(R.string.view_options_sort_created_newest)
-            }
+            stringResource(
+                if (sortDir == SortDir.ASC) {
+                    R.string.view_options_sort_dir_soonest
+                } else {
+                    R.string.view_options_sort_dir_farthest
+                },
+            )
+        SortKey.LAST_MODIFIED,
+        SortKey.CREATED,
+        ->
+            stringResource(
+                if (sortDir == SortDir.ASC) {
+                    R.string.view_options_sort_dir_oldest
+                } else {
+                    R.string.view_options_sort_dir_newest
+                },
+            )
         SortKey.ALPHABETICAL ->
-            if (sortDir == SortDir.ASC) {
-                stringResource(R.string.view_options_sort_alphabetical_az)
-            } else {
-                stringResource(R.string.view_options_sort_alphabetical_za)
-            }
+            stringResource(
+                if (sortDir == SortDir.ASC) {
+                    R.string.view_options_sort_dir_az
+                } else {
+                    R.string.view_options_sort_dir_za
+                },
+            )
+        SortKey.IMPORTANCE ->
+            stringResource(
+                if (sortDir == SortDir.ASC) {
+                    R.string.view_options_sort_dir_lowest
+                } else {
+                    R.string.view_options_sort_dir_highest
+                },
+            )
     }
 
 @Composable
-private fun sortOptions(): List<SortOption> =
+private fun sortKeyOptions(): List<Pair<SortKey, String>> =
     listOf(
-        SortOption(SortKey.REMINDER, SortDir.ASC, stringResource(R.string.view_options_sort_reminder_soonest)),
-        SortOption(SortKey.REMINDER, SortDir.DESC, stringResource(R.string.view_options_sort_reminder_latest)),
-        SortOption(SortKey.LAST_MODIFIED, SortDir.DESC, stringResource(R.string.view_options_sort_modified_newest)),
-        SortOption(SortKey.LAST_MODIFIED, SortDir.ASC, stringResource(R.string.view_options_sort_modified_oldest)),
-        SortOption(SortKey.CREATED, SortDir.DESC, stringResource(R.string.view_options_sort_created_newest)),
-        SortOption(SortKey.CREATED, SortDir.ASC, stringResource(R.string.view_options_sort_created_oldest)),
-        SortOption(SortKey.ALPHABETICAL, SortDir.ASC, stringResource(R.string.view_options_sort_alphabetical_az)),
-        SortOption(SortKey.ALPHABETICAL, SortDir.DESC, stringResource(R.string.view_options_sort_alphabetical_za)),
+        SortKey.REMINDER to stringResource(R.string.view_options_sort_reminder),
+        SortKey.LAST_MODIFIED to stringResource(R.string.view_options_sort_modified),
+        SortKey.CREATED to stringResource(R.string.view_options_sort_created),
+        SortKey.ALPHABETICAL to stringResource(R.string.view_options_sort_alphabetical),
+        SortKey.IMPORTANCE to stringResource(R.string.view_options_sort_importance),
     )
+
+private fun sortChipArrow(
+    sortKey: SortKey,
+    sortDir: SortDir,
+): String = if (sortDir == defaultSortDirFor(sortKey)) "↓" else "↑"
+
+private fun defaultSortDirFor(sortKey: SortKey): SortDir =
+    when (sortKey) {
+        SortKey.REMINDER,
+        SortKey.ALPHABETICAL,
+        -> SortDir.ASC
+        SortKey.LAST_MODIFIED,
+        SortKey.CREATED,
+        SortKey.IMPORTANCE,
+        -> SortDir.DESC
+    }
 
 @Composable
 private fun groupOptions(): List<Pair<GroupBy, String>> =
@@ -388,6 +531,7 @@ private fun groupOptions(): List<Pair<GroupBy, String>> =
         GroupBy.DATE to stringResource(R.string.view_options_group_date),
         GroupBy.TAG to stringResource(R.string.view_options_group_tags),
         GroupBy.TYPE to stringResource(R.string.view_options_group_type),
+        GroupBy.IMPORTANCE to stringResource(R.string.view_options_group_importance),
     )
 
 @Composable
@@ -405,4 +549,5 @@ private fun groupLabel(groupBy: GroupBy): String =
         GroupBy.NONE -> stringResource(R.string.view_options_group_none)
         GroupBy.TAG -> stringResource(R.string.view_options_group_tags)
         GroupBy.TYPE -> stringResource(R.string.view_options_group_type)
+        GroupBy.IMPORTANCE -> stringResource(R.string.view_options_group_importance)
     }

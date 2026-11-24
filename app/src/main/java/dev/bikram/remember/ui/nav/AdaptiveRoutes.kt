@@ -894,6 +894,9 @@ private fun NoteDetailPaneHost(
                                 onPersistedNoteIdChanged = { persistedNoteId ->
                                     onPersistedNoteId(persistedNoteId, NoteKind.NOTE)
                                 },
+                                onConvertedToList = { convertedId ->
+                                    onPersistedNoteId(convertedId, NoteKind.LIST)
+                                },
                                 onBack = onBack,
                                 onNavigateUp = onBack,
                             )
@@ -907,6 +910,9 @@ private fun NoteDetailPaneHost(
                                 interceptBack = noteId == null,
                                 onPersistedNoteIdChanged = { persistedNoteId ->
                                     onPersistedNoteId(persistedNoteId, NoteKind.LIST)
+                                },
+                                onConvertedToNote = { convertedId ->
+                                    onPersistedNoteId(convertedId, NoteKind.NOTE)
                                 },
                                 onBack = onBack,
                                 onNavigateUp = onBack,

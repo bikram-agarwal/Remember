@@ -574,6 +574,31 @@ class BackupIo(
             }.getOrDefault(0)
         }
 
+    suspend fun isBackupZip(uri: Uri): Boolean =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (!isZipUri(uri)) return@runCatching false
+                context.contentResolver.openInputStream(uri)?.use { raw ->
+                    ZipInputStream(BufferedInputStream(raw)).use { zip ->
+                        var entryCount = 0
+                        val maxEntries = ZipExtractionLimits().maximumEntryCount
+                        while (true) {
+                            val entry = zip.nextEntry ?: break
+                            entryCount++
+                            if (entryCount > maxEntries) return@runCatching false
+                            if (!entry.isDirectory &&
+                                (entry.name == ENTRY_MANIFEST || entry.name == ENTRY_NOTES)
+                            ) {
+                                return@runCatching true
+                            }
+                            zip.closeEntry()
+                        }
+                    }
+                }
+                false
+            }.getOrDefault(false)
+        }
+
     suspend fun inspectRestoreMedia(uri: Uri): RestoreMediaSummary =
         withContext(Dispatchers.IO) {
             val payload =

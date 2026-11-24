@@ -19,6 +19,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +46,7 @@ import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -234,94 +236,104 @@ internal fun MarkdownTextEditor(
     // text-only history; the field's shortcuts and toolbar both use MarkdownEditorState.
     SideEffect { state.textFieldState.undoState.clearHistory() }
 
+    // Pasting rich text (a copy from a web page, mail, or docs app) keeps its formatting as
+    // Markdown, except inside code, where the source is pasted verbatim.
+    val platformClipboard = LocalClipboard.current
+    val markdownPasteClipboard =
+        remember(platformClipboard, state) {
+            MarkdownPasteClipboard(platformClipboard) { !state.isCodeBlock && !state.isInlineCode }
+        }
+
     Column(modifier = modifier.fillMaxWidth()) {
-        BasicTextField(
-            state = state.textFieldState,
-            inputTransformation =
-                remember(state, displayMode) {
-                    state.inputTransformation(livePreview = displayMode == MarkdownEditorDisplayMode.LivePreview)
-                },
-            textStyle = editorTextStyle,
-            outputTransformation = outputTransformation,
-            // capitalization is intentionally constant: switching it at runtime (it used to
-            // flip to Words while state.shouldCapitalizeNextInputInEmptyInlineWrapper was true)
-            // forces Compose to renegotiate the IME session, which visibly hid and reshowed the
-            // keyboard every time typing began inside an empty formatting marker at a sentence
-            // start. The Markdown input rules capitalize that first character in the input buffer.
-            keyboardOptions =
-                KeyboardOptions(
-                    capitalization = KeyboardCapitalization.Sentences,
-                    imeAction = ImeAction.Default,
-                ),
-            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-            onTextLayout = { getResult -> textLayoutResult = getResult() },
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 140.dp)
-                    .onPreviewKeyEvent { event ->
-                        if (event.type != KeyEventType.KeyDown || (!event.isCtrlPressed && !event.isMetaPressed)) {
-                            false
-                        } else {
-                            when (event.key) {
-                                Key.Z -> {
-                                    if (event.isShiftPressed) state.redo() else state.undo()
-                                    true
+        CompositionLocalProvider(LocalClipboard provides markdownPasteClipboard) {
+            BasicTextField(
+                state = state.textFieldState,
+                inputTransformation =
+                    remember(state, displayMode) {
+                        state.inputTransformation(livePreview = displayMode == MarkdownEditorDisplayMode.LivePreview)
+                    },
+                textStyle = editorTextStyle,
+                outputTransformation = outputTransformation,
+                // capitalization is intentionally constant: switching it at runtime (it used to
+                // flip to Words while state.shouldCapitalizeNextInputInEmptyInlineWrapper was true)
+                // forces Compose to renegotiate the IME session, which visibly hid and reshowed the
+                // keyboard every time typing began inside an empty formatting marker at a sentence
+                // start. The Markdown input rules capitalize that first character in the input buffer.
+                keyboardOptions =
+                    KeyboardOptions(
+                        capitalization = KeyboardCapitalization.Sentences,
+                        imeAction = ImeAction.Default,
+                    ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                onTextLayout = { getResult -> textLayoutResult = getResult() },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 140.dp)
+                        .onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown || (!event.isCtrlPressed && !event.isMetaPressed)) {
+                                false
+                            } else {
+                                when (event.key) {
+                                    Key.Z -> {
+                                        if (event.isShiftPressed) state.redo() else state.undo()
+                                        true
+                                    }
+                                    Key.Y -> {
+                                        state.redo()
+                                        true
+                                    }
+                                    else -> false
                                 }
-                                Key.Y -> {
-                                    state.redo()
-                                    true
+                            }
+                        }.drawBehind {
+                            val layoutResult = textLayoutResult ?: return@drawBehind
+                            val layoutTextLength = layoutResult.layoutInput.text.length
+                            horizontalRuleTransformedOffsets.forEach { transformedOffset ->
+                                // The layout can lag a keystroke behind the offsets computed above; an
+                                // out-of-range offset just skips this frame rather than crashing.
+                                if (transformedOffset > layoutTextLength) {
+                                    return@forEach
                                 }
-                                else -> false
+                                val lineIndex = layoutResult.getLineForOffset(transformedOffset)
+                                val lineCenterY =
+                                    (layoutResult.getLineTop(lineIndex) + layoutResult.getLineBottom(lineIndex)) / 2f
+                                drawLine(
+                                    color = horizontalRuleColor,
+                                    start = Offset(x = 0f, y = lineCenterY),
+                                    end = Offset(x = size.width, y = lineCenterY),
+                                    strokeWidth = horizontalRuleStrokeWidthPx,
+                                )
                             }
-                        }
-                    }.drawBehind {
-                        val layoutResult = textLayoutResult ?: return@drawBehind
-                        val layoutTextLength = layoutResult.layoutInput.text.length
-                        horizontalRuleTransformedOffsets.forEach { transformedOffset ->
-                            // The layout can lag a keystroke behind the offsets computed above; an
-                            // out-of-range offset just skips this frame rather than crashing.
-                            if (transformedOffset > layoutTextLength) {
-                                return@forEach
+                        }.semantics { contentDescription = bodyPlaceholder }
+                        .onGloballyPositioned { editorCoordinates = it }
+                        .focusRequester(focusRequester)
+                        .pointerInput(onStylusInput) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent()
+                                    if (event.changes.any { change -> change.type == PointerType.Stylus }) {
+                                        onStylusInput()
+                                    }
+                                }
                             }
-                            val lineIndex = layoutResult.getLineForOffset(transformedOffset)
-                            val lineCenterY =
-                                (layoutResult.getLineTop(lineIndex) + layoutResult.getLineBottom(lineIndex)) / 2f
-                            drawLine(
-                                color = horizontalRuleColor,
-                                start = Offset(x = 0f, y = lineCenterY),
-                                end = Offset(x = size.width, y = lineCenterY),
-                                strokeWidth = horizontalRuleStrokeWidthPx,
+                        }.onFocusChanged {
+                            focused = it.isFocused
+                            onFocusChanged(it.isFocused)
+                        },
+                decorator = { innerTextField ->
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        if (state.markdown.isEmpty()) {
+                            Text(
+                                text = bodyPlaceholder,
+                                style = editorTextStyle.copy(color = editorTextStyle.color.copy(alpha = 0.35f)),
                             )
                         }
-                    }.semantics { contentDescription = bodyPlaceholder }
-                    .onGloballyPositioned { editorCoordinates = it }
-                    .focusRequester(focusRequester)
-                    .pointerInput(onStylusInput) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent()
-                                if (event.changes.any { change -> change.type == PointerType.Stylus }) {
-                                    onStylusInput()
-                                }
-                            }
-                        }
-                    }.onFocusChanged {
-                        focused = it.isFocused
-                        onFocusChanged(it.isFocused)
-                    },
-            decorator = { innerTextField ->
-                Box(modifier = Modifier.fillMaxWidth()) {
-                    if (state.markdown.isEmpty()) {
-                        Text(
-                            text = bodyPlaceholder,
-                            style = editorTextStyle.copy(color = editorTextStyle.color.copy(alpha = 0.35f)),
-                        )
+                        innerTextField()
                     }
-                    innerTextField()
-                }
-            },
-        )
+                },
+            )
+        }
         AnimatedVisibility(
             visible = resolvedActiveTag != null && !activeTagAlreadyAssigned,
             enter = fadeIn(tagPreviewEffectsSpec) + scaleIn(tagPreviewSpatialSpec, initialScale = 0.92f),

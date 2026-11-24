@@ -1,6 +1,9 @@
 package dev.bikram.remember.ui.edit
 
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -73,6 +77,7 @@ import dev.bikram.remember.domain.checklist.EditableItem
 import dev.bikram.remember.ui.common.NoteAdaptiveTheme
 import dev.bikram.remember.ui.common.NotePageBackground
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.SuppressAppDropImportWhileEditing
 import dev.bikram.remember.ui.common.rememberImageDerivedColorScheme
 import dev.bikram.remember.ui.common.rememberImageDerivedColors
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
@@ -158,6 +163,7 @@ fun EditListRoute(
     allowInitialTitleFocus: Boolean = true,
     interceptBack: Boolean = true,
     onPersistedNoteIdChanged: (Long) -> Unit = {},
+    onConvertedToNote: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -233,6 +239,7 @@ fun EditListRoute(
                 showNavigateBack = showNavigateBack,
                 allowInitialTitleFocus = allowInitialTitleFocus,
                 interceptBack = interceptBack,
+                onConvertedToNote = onConvertedToNote,
                 onBack = handleBack,
                 onNavigateUp = handleNavigateUp,
             )
@@ -259,6 +266,7 @@ fun EditListScreen(
     showNavigateBack: Boolean = true,
     allowInitialTitleFocus: Boolean = true,
     interceptBack: Boolean = true,
+    onConvertedToNote: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -320,6 +328,7 @@ fun EditListScreen(
     LaunchedEffect(readOnly) {
         if (readOnly && isEditMode) isEditMode = false
     }
+    SuppressAppDropImportWhileEditing(isEditMode = isEditMode, readOnly = readOnly)
     LaunchedEffect(isEditMode) {
         if (!isEditMode) {
             pendingTitleFocusOffset = null
@@ -337,12 +346,19 @@ fun EditListScreen(
     // of opening the note. Mirrors HomeScreen's observer.
     val focusManager = LocalFocusManager.current
     val editorLifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(editorLifecycleOwner, focusManager, keyboardController) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val notificationActive by vm.notificationActive.collectAsStateWithLifecycle()
+    LaunchedEffect(persistedForToolbar) {
+        vm.refreshNotificationActive(context)
+    }
+    DisposableEffect(editorLifecycleOwner, focusManager, keyboardController, context) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_PAUSE) {
                     focusManager.clearFocus(force = true)
                     keyboardController?.hide()
+                } else if (event == Lifecycle.Event.ON_RESUME) {
+                    vm.refreshNotificationActive(context)
                 }
             }
         editorLifecycleOwner.lifecycle.addObserver(observer)
@@ -396,6 +412,8 @@ fun EditListScreen(
             unarchiveCurrent = vm::unarchiveCurrent,
             restoreFromTrashCurrent = vm::restoreFromTrashCurrent,
             deleteForeverCurrent = vm::deleteForeverCurrent,
+            hasActiveNotification = vm::hasActiveNotification,
+            dismissActiveNotification = vm::dismissActiveNotification,
             fireNotification = vm::fireNotification,
         )
 
@@ -522,6 +540,22 @@ fun EditListScreen(
         )
     val imageResolution = rememberImageDerivedColorScheme(imageDerivedColors)
     var showChecked by rememberSaveable { mutableStateOf(true) }
+    val uiScope = rememberCoroutineScope()
+    val hasPersistedEditorRow = existing || persistedForToolbar
+    val hasListBodyContent = items.any { it.text.isNotBlank() || it.details.isNotBlank() }
+    val canImportMarkdown = !hasPersistedEditorRow && !hasListBodyContent && !readOnly
+    val canExportMarkdown = hasListBodyContent
+    val (importMarkdownLauncher, exportMarkdownLauncher) =
+        rememberListMarkdownLaunchers(
+            context = context,
+            uiScope = uiScope,
+            appScope = appScope,
+            itemsProvider = { items },
+            onImported = { importedItems, suggestedTitle ->
+                vm.replaceItemsFromImport(importedItems)
+                suggestedTitle?.let(vm::setTitle)
+            },
+        )
 
     NoteAdaptiveTheme(imageResolution) {
         Box(Modifier.fillMaxSize()) {
@@ -557,6 +591,29 @@ fun EditListScreen(
                         titleCollapseProgress = titleCollapseProgress,
                         onSave = saveAndExitEditMode,
                         onOpenIcon = { iconPickerOpen = true },
+                        overflowActions = {
+                            EditListTopBarOverflowActions(
+                                readOnly = readOnly,
+                                canImportMarkdown = canImportMarkdown,
+                                canExportMarkdown = canExportMarkdown,
+                                title = title,
+                                untitledName = untitledName,
+                                onLaunchImportMarkdown = {
+                                    importMarkdownLauncher.launch(
+                                        arrayOf("text/markdown", "text/x-markdown", "text/plain", "*/*"),
+                                    )
+                                },
+                                onLaunchExportMarkdown = { fileName -> exportMarkdownLauncher.launch(fileName) },
+                                onConvertToNote = { untitledFallback ->
+                                    uiScope.launch {
+                                        val convertedId = vm.convertToNote(untitledFallback)
+                                        if (convertedId != null) {
+                                            onConvertedToNote(convertedId)
+                                        }
+                                    }
+                                },
+                            )
+                        },
                     )
                 },
                 bottomBar = {
@@ -584,26 +641,24 @@ fun EditListScreen(
                                 },
                                 onArchive = editorActions.archiveAndBack,
                                 onNotification = editorActions.notifyOrRequestPermission,
+                                onPinNotification = editorActions.pinNotificationOrRequestPermission,
                                 onUnarchive = editorActions.unarchive,
                                 onTrash = editorActions.trashAndBack,
                                 onRestore = editorActions.restore,
                                 onDeleteForever = { deleteForeverConfirmOpen = true },
                                 showEditAction = false,
+                                notificationActive = notificationActive,
                             )
                         },
                     )
                 },
             ) { padding ->
-                val activeIds = visibleActiveEntries.filterIsInstance<ActiveEntry.Row>().map { it.item.localId }
                 val reorderState =
-                    rememberReorderableLazyListState(lazyListState) { from, to ->
-                        // Reorder only the rows currently rendered in the active section.
-                        val fromId = from.key as? Long ?: return@rememberReorderableLazyListState
-                        val toId = to.key as? Long ?: return@rememberReorderableLazyListState
-                        val fromIdx = activeIds.indexOf(fromId)
-                        val toIdx = activeIds.indexOf(toId)
-                        if (fromIdx >= 0 && toIdx >= 0) vm.reorderWithin(activeIds, fromIdx, toIdx)
-                    }
+                    rememberEditListReorderState(
+                        lazyListState = lazyListState,
+                        visibleActiveEntries = visibleActiveEntries,
+                        onReorder = vm::reorderWithin,
+                    )
 
                 androidx.compose.foundation.lazy.LazyColumn(
                     state = lazyListState,
@@ -619,21 +674,13 @@ fun EditListScreen(
                         padding = padding,
                         shelfState = shelfState,
                         heroContent =
-                            pictureUri?.let { uri ->
-                                {
-                                    EditorContentPictureHero(
-                                        uri = uri,
-                                        pictureRevision = pictureRevision,
-                                        pictureHeroFraming = pictureHeroFraming,
-                                        viewerOpen = pictureViewer != null,
-                                        onOpenFull = { pictureViewer = uri to pictureRevision },
-                                        modifier =
-                                            Modifier
-                                                .fillMaxWidth()
-                                                .height(220.dp),
-                                    )
-                                }
-                            },
+                            buildEditListHeroContent(
+                                pictureUri = pictureUri,
+                                pictureRevision = pictureRevision,
+                                pictureHeroFraming = pictureHeroFraming,
+                                viewerOpen = pictureViewer != null,
+                                onOpenFull = { uri -> pictureViewer = uri to pictureRevision },
+                            ),
                         bodyTopSpacing = 12.dp,
                     )
 
@@ -1082,3 +1129,160 @@ fun EditListScreen(
         }
     }
 }
+
+@Composable
+private fun EditListTopBarOverflowActions(
+    readOnly: Boolean,
+    canImportMarkdown: Boolean,
+    canExportMarkdown: Boolean,
+    title: String,
+    untitledName: String,
+    onLaunchImportMarkdown: () -> Unit,
+    onLaunchExportMarkdown: (String) -> Unit,
+    onConvertToNote: (String) -> Unit,
+) {
+    val canConvertToNote = !readOnly
+    val untitledFallback = stringResource(R.string.edit_list_title_new)
+    EditorMarkdownOverflowMenu(
+        canImportMarkdown = canImportMarkdown,
+        canExportMarkdown = canExportMarkdown,
+        onImportMarkdown = onLaunchImportMarkdown,
+        onExportMarkdown = {
+            onLaunchExportMarkdown(buildMarkdownExportFileName(title, untitledName))
+        },
+        convertActionLabel =
+            if (canConvertToNote) {
+                stringResource(R.string.note_menu_convert_to_note)
+            } else {
+                null
+            },
+        convertActionIconName = "description",
+        onConvert =
+            if (canConvertToNote) {
+                { onConvertToNote(untitledFallback) }
+            } else {
+                null
+            },
+    )
+}
+
+@Composable
+private fun rememberListMarkdownLaunchers(
+    context: android.content.Context,
+    uiScope: kotlinx.coroutines.CoroutineScope,
+    appScope: kotlinx.coroutines.CoroutineScope,
+    itemsProvider: () -> List<EditableItem>,
+    onImported: (List<EditableItem>, String?) -> Unit,
+): Pair<
+    androidx.activity.result.ActivityResultLauncher<Array<String>>,
+    androidx.activity.result.ActivityResultLauncher<String>,
+> {
+    val importMarkdownLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            uiScope.launch {
+                when (val result = importMarkdownFromUri(context, uri)) {
+                    is NoteMarkdownImportResult.Success -> {
+                        val importedItems = markdownToChecklistItems(result.markdown)
+                        if (importedItems.isEmpty()) {
+                            Toast
+                                .makeText(
+                                    context,
+                                    context.getString(R.string.toast_import_md_empty),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                        } else {
+                            onImported(importedItems, result.suggestedTitle)
+                            Toast
+                                .makeText(
+                                    context,
+                                    context.getString(R.string.toast_import_md_success),
+                                    Toast.LENGTH_SHORT,
+                                ).show()
+                        }
+                    }
+                    NoteMarkdownImportResult.TooLarge -> {
+                        Toast
+                            .makeText(
+                                context,
+                                context.getString(R.string.toast_import_md_too_large, MAX_NOTE_MARKDOWN_KB),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                    NoteMarkdownImportResult.Empty -> {
+                        Toast
+                            .makeText(
+                                context,
+                                context.getString(R.string.toast_import_md_empty),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                    NoteMarkdownImportResult.Failed -> {
+                        Toast
+                            .makeText(
+                                context,
+                                context.getString(R.string.toast_import_md_failed),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                }
+            }
+        }
+    val exportMarkdownLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("text/markdown"),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            val contentToExport = checklistToMarkdown(itemsProvider())
+            appScope.launch {
+                val exported = exportMarkdownToUri(context, uri, contentToExport)
+                val messageRes =
+                    if (exported) {
+                        R.string.toast_export_md_success
+                    } else {
+                        R.string.toast_export_failed
+                    }
+                Toast.makeText(context, context.getString(messageRes), Toast.LENGTH_SHORT).show()
+            }
+        }
+    return importMarkdownLauncher to exportMarkdownLauncher
+}
+
+@Composable
+private fun rememberEditListReorderState(
+    lazyListState: androidx.compose.foundation.lazy.LazyListState,
+    visibleActiveEntries: List<ActiveEntry>,
+    onReorder: (List<Long>, Int, Int) -> Unit,
+) = rememberReorderableLazyListState(lazyListState) { from, to ->
+    val activeIds = visibleActiveEntries.filterIsInstance<ActiveEntry.Row>().map { it.item.localId }
+    val fromId = from.key as? Long ?: return@rememberReorderableLazyListState
+    val toId = to.key as? Long ?: return@rememberReorderableLazyListState
+    val fromIdx = activeIds.indexOf(fromId)
+    val toIdx = activeIds.indexOf(toId)
+    if (fromIdx >= 0 && toIdx >= 0) onReorder(activeIds, fromIdx, toIdx)
+}
+
+private fun buildEditListHeroContent(
+    pictureUri: String?,
+    pictureRevision: Long,
+    pictureHeroFraming: String?,
+    viewerOpen: Boolean,
+    onOpenFull: (String) -> Unit,
+): (@Composable () -> Unit)? =
+    pictureUri?.let { uri ->
+        {
+            EditorContentPictureHero(
+                uri = uri,
+                pictureRevision = pictureRevision,
+                pictureHeroFraming = pictureHeroFraming,
+                viewerOpen = viewerOpen,
+                onOpenFull = { onOpenFull(uri) },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(220.dp),
+            )
+        }
+    }

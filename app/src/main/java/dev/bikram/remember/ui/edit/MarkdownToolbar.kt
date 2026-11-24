@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonGroup
 import androidx.compose.material3.ButtonGroupDefaults
@@ -354,8 +356,8 @@ private fun MarkdownLinkDialog(
     val selection = state.textFieldState.selection
     val initialText = state.selectedText()
     val initialUrl = state.selectedLinkUrl.orEmpty()
-    var linkText by remember(state, selection) { mutableStateOf(initialText) }
-    var linkUrl by remember(state, selection) { mutableStateOf(initialUrl) }
+    val linkTextFieldState = remember(state, selection) { TextFieldState(initialText) }
+    val linkUrlFieldState = remember(state, selection) { TextFieldState(initialUrl) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -371,18 +373,16 @@ private fun MarkdownLinkDialog(
         text = {
             Column {
                 OutlinedTextField(
-                    value = linkText,
-                    onValueChange = { linkText = it },
+                    state = linkTextFieldState,
                     label = { Text(stringResource(R.string.rt_text_to_display)) },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedTextField(
-                    value = linkUrl,
-                    onValueChange = { linkUrl = it },
+                    state = linkUrlFieldState,
                     label = { Text(stringResource(R.string.rt_url_hint)) },
-                    singleLine = true,
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -391,10 +391,10 @@ private fun MarkdownLinkDialog(
         confirmButton = {
             RememberTextButton(
                 onClick = {
-                    if (linkUrl.isNotBlank()) {
+                    if (linkUrlFieldState.text.isNotBlank()) {
                         state.addOrUpdateLink(
-                            displayText = linkText,
-                            rawUrl = linkUrl,
+                            displayText = linkTextFieldState.text.toString(),
+                            rawUrl = linkUrlFieldState.text.toString(),
                         )
                     }
                     onDismiss()

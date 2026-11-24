@@ -47,6 +47,7 @@ class BootReceiver : BroadcastReceiver() {
                         silentDueNotification = true,
                     )
                 }
+                restorePinnedNotifications(context)
                 noteRepository.refreshReminderSummaryNotification()
                 // Alarms do not survive a reboot, and a backwards clock change can leave the
                 // pending repeat far out; reconciling re-books it within one interval.
@@ -61,6 +62,33 @@ class BootReceiver : BroadcastReceiver() {
             } finally {
                 pendingResult.finish()
             }
+        }
+    }
+
+    /**
+     * A reboot clears every notification, but a manual pin lasts until the user clears it, so
+     * pinned notes come back (silently) even without a due reminder. Notes the reminder pass
+     * above already re-posted are left alone, which also keeps time-change broadcasts from
+     * re-posting a pinned notification that is still showing.
+     */
+    private suspend fun restorePinnedNotifications(context: Context) {
+        val now = System.currentTimeMillis()
+        ManualPinnedNotificationStore.pinnedNoteIds(context).forEach { noteId ->
+            if (reminderScheduler.isNotificationActive(noteId)) return@forEach
+            val noteWithItems = noteRepository.get(noteId)
+            if (noteWithItems == null || !pinSurvivesReboot(noteWithItems.note)) {
+                ManualPinnedNotificationStore.setPinned(context, noteId, pinned = false)
+                return@forEach
+            }
+            ReminderReceiver.showNotification(
+                context = context,
+                note = noteWithItems.note,
+                items = noteWithItems.items,
+                reminderIndex = latestDueReminderIndex(noteWithItems.note, now) ?: 0,
+                keepUntilDone = true,
+                onlyAlertOnce = true,
+                silent = true,
+            )
         }
     }
 }

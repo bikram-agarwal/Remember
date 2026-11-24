@@ -70,6 +70,7 @@ import dev.bikram.remember.ui.edit.CompactOutlinedField
 import dev.bikram.remember.ui.edit.EditableTagHexChip
 import dev.bikram.remember.ui.edit.TAG_NAME_MAX_LENGTH
 import dev.bikram.remember.ui.edit.TagColorSlider
+import dev.bikram.remember.ui.edit.TagNameInputTransformation
 import dev.bikram.remember.ui.edit.defaultTagColorHex
 import dev.bikram.remember.ui.edit.sanitizeTagNameInput
 import dev.bikram.remember.ui.edit.toTagHexFieldValue
@@ -399,6 +400,7 @@ internal fun BulkTagSheet(
                                     TAG_NAME_MAX_LENGTH,
                                 ),
                             counterHighlighted = draftName.length >= TAG_NAME_MAX_LENGTH,
+                            inputTransformation = TagNameInputTransformation,
                             modifier = Modifier.weight(1f),
                         )
                         EditableTagHexChip(

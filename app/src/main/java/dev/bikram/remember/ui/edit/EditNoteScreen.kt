@@ -1,5 +1,8 @@
 package dev.bikram.remember.ui.edit
 
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -7,9 +10,12 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -17,6 +23,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -25,8 +32,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -38,11 +49,16 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.ui.common.NoteAdaptiveTheme
 import dev.bikram.remember.ui.common.NotePageBackground
+import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.SuppressAppDropImportWhileEditing
 import dev.bikram.remember.ui.common.rememberImageDerivedColorScheme
 import dev.bikram.remember.ui.common.rememberImageDerivedColors
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.NoteActionBottomBarContent
 import dev.bikram.remember.ui.components.NoteShelfState
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
+import dev.bikram.remember.ui.components.RememberIconButton
+import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.modifiers.applyToFullBleedLayer
 import dev.bikram.remember.ui.modifiers.rememberProgressiveBlurStyle
 import dev.bikram.remember.ui.theme.LocalAdaptiveNoteThemes
@@ -59,6 +75,7 @@ fun EditNoteRoute(
     allowInitialTitleFocus: Boolean = true,
     interceptBack: Boolean = true,
     onPersistedNoteIdChanged: (Long) -> Unit = {},
+    onConvertedToList: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -98,6 +115,7 @@ fun EditNoteRoute(
                 showNavigateBack = showNavigateBack,
                 allowInitialTitleFocus = allowInitialTitleFocus,
                 interceptBack = interceptBack,
+                onConvertedToList = onConvertedToList,
                 onBack = handleBack,
                 onNavigateUp = handleNavigateUp,
             )
@@ -125,6 +143,7 @@ fun EditNoteScreen(
     showNavigateBack: Boolean = true,
     allowInitialTitleFocus: Boolean = true,
     interceptBack: Boolean = true,
+    onConvertedToList: (Long) -> Unit = {},
     onBack: () -> Unit,
     onNavigateUp: () -> Unit = onBack,
 ) {
@@ -212,6 +231,7 @@ fun EditNoteScreen(
     LaunchedEffect(readOnly) {
         if (readOnly && isEditMode) isEditMode = false
     }
+    SuppressAppDropImportWhileEditing(isEditMode = isEditMode, readOnly = readOnly)
     LaunchedEffect(isEditMode) {
         if (!isEditMode) {
             suppressBodyAutoFocusOnEdit = false
@@ -253,6 +273,8 @@ fun EditNoteScreen(
             unarchiveCurrent = vm::unarchiveCurrent,
             restoreFromTrashCurrent = vm::restoreFromTrashCurrent,
             deleteForeverCurrent = vm::deleteForeverCurrent,
+            hasActiveNotification = vm::hasActiveNotification,
+            dismissActiveNotification = vm::dismissActiveNotification,
             fireNotification = vm::fireNotification,
             flushPendingEdits = bridge::flush,
         )
@@ -265,12 +287,20 @@ fun EditNoteScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
-    DisposableEffect(lifecycleOwner, focusManager, keyboardController) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val resources = LocalResources.current
+    val notificationActive by vm.notificationActive.collectAsStateWithLifecycle()
+    LaunchedEffect(persistedForToolbar) {
+        vm.refreshNotificationActive(context)
+    }
+    DisposableEffect(lifecycleOwner, focusManager, keyboardController, context) {
         val observer =
             LifecycleEventObserver { _, event ->
                 if (event == Lifecycle.Event.ON_PAUSE) {
                     focusManager.clearFocus(force = true)
                     keyboardController?.hide()
+                } else if (event == Lifecycle.Event.ON_RESUME) {
+                    vm.refreshNotificationActive(context)
                 }
             }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -346,6 +376,7 @@ fun EditNoteScreen(
 
     val launchAttachmentPicker = rememberAttachmentPicker(onAdd = vm::addAttachment)
     val hasPersistedEditorRow = existing || persistedForToolbar
+    val body by vm.body.collectAsStateWithLifecycle()
     val pictureUri by vm.pictureUri.collectAsStateWithLifecycle()
     val pictureRevision by vm.pictureRevision.collectAsStateWithLifecycle()
     val pictureHeroFraming by vm.pictureHeroFraming.collectAsStateWithLifecycle()
@@ -353,6 +384,76 @@ fun EditNoteScreen(
     val iconKey by vm.iconKey.collectAsStateWithLifecycle()
     val actions by vm.actions.collectAsStateWithLifecycle()
     val tags by vm.tags.collectAsStateWithLifecycle()
+    val uiScope = rememberCoroutineScope()
+    val canImportMarkdown =
+        !hasPersistedEditorRow &&
+            body.isBlank() &&
+            markdownEditorState.markdown.isBlank() &&
+            !readOnly
+    val canExportMarkdown = markdownEditorState.markdown.isNotBlank()
+    val importMarkdownLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            uiScope.launch {
+                when (val result = importMarkdownFromUri(context, uri)) {
+                    is NoteMarkdownImportResult.Success -> {
+                        markdownEditorState.setMarkdown(result.markdown, moveCursorToEnd = false)
+                        vm.setBody(result.markdown)
+                        bridge.reset(result.markdown)
+                        result.suggestedTitle?.let(vm::setTitle)
+                        Toast
+                            .makeText(
+                                context,
+                                resources.getString(R.string.toast_import_md_success),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                    NoteMarkdownImportResult.TooLarge -> {
+                        Toast
+                            .makeText(
+                                context,
+                                resources.getString(R.string.toast_import_md_too_large, MAX_NOTE_MARKDOWN_KB),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                    NoteMarkdownImportResult.Empty -> {
+                        Toast
+                            .makeText(
+                                context,
+                                resources.getString(R.string.toast_import_md_empty),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                    NoteMarkdownImportResult.Failed -> {
+                        Toast
+                            .makeText(
+                                context,
+                                resources.getString(R.string.toast_import_md_failed),
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                    }
+                }
+            }
+        }
+    val exportMarkdownLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("text/markdown"),
+        ) { uri ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            val contentToExport = markdownEditorState.markdown
+            appScope.launch {
+                val exported = exportMarkdownToUri(context, uri, contentToExport)
+                val messageRes =
+                    if (exported) {
+                        R.string.toast_export_md_success
+                    } else {
+                        R.string.toast_export_failed
+                    }
+                Toast.makeText(context, resources.getString(messageRes), Toast.LENGTH_SHORT).show()
+            }
+        }
     val saveAndExitEditMode: () -> Unit = {
         isEditMode = false
         editorActions.saveAndShowToast()
@@ -415,6 +516,50 @@ fun EditNoteScreen(
                                 } else {
                                     MarkdownEditorDisplayMode.MarkdownCode
                                 }
+                        },
+                        overflowActions = {
+                            val canConvertToChecklist =
+                                !readOnly &&
+                                    canConvertMarkdownNoteToChecklist(
+                                        if (isEditMode) markdownEditorState.markdown else body,
+                                    )
+                            val untitledFallback = stringResource(R.string.edit_note_title_new)
+                            EditorMarkdownOverflowMenu(
+                                canImportMarkdown = canImportMarkdown,
+                                canExportMarkdown = canExportMarkdown,
+                                onImportMarkdown = {
+                                    importMarkdownLauncher.launch(
+                                        arrayOf("text/markdown", "text/x-markdown", "text/plain", "*/*"),
+                                    )
+                                },
+                                onExportMarkdown = {
+                                    bridge.flush()
+                                    exportMarkdownLauncher.launch(
+                                        buildMarkdownExportFileName(title, untitledName),
+                                    )
+                                },
+                                convertActionLabel =
+                                    if (canConvertToChecklist) {
+                                        stringResource(R.string.note_menu_convert_to_checklist)
+                                    } else {
+                                        null
+                                    },
+                                convertActionIconName = "checklist",
+                                onConvert =
+                                    if (canConvertToChecklist) {
+                                        {
+                                            bridge.flush()
+                                            uiScope.launch {
+                                                val convertedId = vm.convertToChecklist(untitledFallback)
+                                                if (convertedId != null) {
+                                                    onConvertedToList(convertedId)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        null
+                                    },
+                            )
                         },
                     )
                 },
@@ -488,11 +633,13 @@ fun EditNoteScreen(
                                 },
                                 onArchive = editorActions.archiveAndBack,
                                 onNotification = editorActions.notifyOrRequestPermission,
+                                onPinNotification = editorActions.pinNotificationOrRequestPermission,
                                 onUnarchive = editorActions.unarchive,
                                 onTrash = editorActions.trashAndBack,
                                 onRestore = editorActions.restore,
                                 onDeleteForever = { deleteForeverConfirmOpen = true },
                                 showEditAction = false,
+                                notificationActive = notificationActive,
                             )
                         },
                     )

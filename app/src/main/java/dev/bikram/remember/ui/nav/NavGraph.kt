@@ -60,6 +60,7 @@ import dev.bikram.remember.ui.common.rememberShareAppAction
 import dev.bikram.remember.ui.common.supportsMultiPaneLayout
 import dev.bikram.remember.ui.components.UpdateChromeState
 import dev.bikram.remember.ui.components.alertChromeSummary
+import dev.bikram.remember.ui.components.showBackupRestoreOutcome
 import dev.bikram.remember.ui.edit.EditListRoute
 import dev.bikram.remember.ui.edit.EditNoteRoute
 import dev.bikram.remember.ui.help.HelpScreen
@@ -322,6 +323,7 @@ fun RememberNavGraph(
     val helpVm: HelpViewModel = hiltViewModel()
     var settingsHighlightSection by remember { mutableStateOf<String?>(null) }
     var openSettingsUpdatesRequest by remember { mutableIntStateOf(0) }
+    var pendingImportJsonText by remember { mutableStateOf<String?>(null) }
     val onboardingState by onboardingPrefs.state.collectAsStateWithLifecycle(initialValue = null)
     val currentOnboardingState = onboardingState
     val onboardingScope = rememberCoroutineScope()
@@ -525,6 +527,12 @@ fun RememberNavGraph(
                             openSettingsRoot()
                             openSettingsUpdatesRequest += 1
                             updateVm.requestOpenSheet()
+                        }
+                        is LaunchAction.OpenTaskImport -> {
+                            pendingImportJsonText = action.jsonText
+                            navController.navigate(Routes.GOOGLE_TASKS_IMPORT) {
+                                launchSingleTop = true
+                            }
                         }
                     }
                     handled = true
@@ -850,6 +858,7 @@ fun RememberNavGraph(
                                     appScope = appScope,
                                     noteId = id.takeIf { it > 0 },
                                     forceEdit = forceEdit,
+                                    onConvertedToNote = { resolvedKind = NoteKind.NOTE },
                                     onBack = leaveEditor,
                                     onNavigateUp = leaveEditor,
                                 )
@@ -858,6 +867,7 @@ fun RememberNavGraph(
                                     appScope = appScope,
                                     noteId = id.takeIf { it > 0 },
                                     forceEdit = forceEdit,
+                                    onConvertedToList = { resolvedKind = NoteKind.LIST },
                                     onBack = leaveEditor,
                                     onNavigateUp = leaveEditor,
                                 )
@@ -901,6 +911,11 @@ fun RememberNavGraph(
                             appScope = appScope,
                             noteId = id.takeIf { it > 0 },
                             forceEdit = forceEdit,
+                            onConvertedToList = { convertedId ->
+                                navController.navigate("${Routes.EDIT_LIST}?${Routes.ARG_ID}=$convertedId") {
+                                    popUpTo(entry.destination.id) { inclusive = true }
+                                }
+                            },
                             onBack = leaveEditor,
                             onNavigateUp = leaveEditor,
                         )
@@ -912,7 +927,17 @@ fun RememberNavGraph(
                         LocalSharedTransitionScope provides this@SharedTransitionLayout,
                         LocalNavAnimatedVisibilityScope provides this@composable,
                     ) {
-                        GoogleTasksImportRoute(onBack = { navController.popBackStack() })
+                        val importContext = androidx.compose.ui.platform.LocalContext.current
+                        val appSnackbarHostState = dev.bikram.remember.ui.theme.LocalSnackbarHostState.current
+                        GoogleTasksImportRoute(
+                            onBack = { navController.popBackStack() },
+                            initialJsonText = pendingImportJsonText,
+                            onInitialJsonTextConsumed = { pendingImportJsonText = null },
+                            // App-scoped, so the restore's follow-up warnings survive the screen closing.
+                            onBackupRestored = { result ->
+                                appScope.launch { showBackupRestoreOutcome(importContext, appSnackbarHostState, result) }
+                            },
+                        )
                     }
                 }
 
@@ -1057,6 +1082,11 @@ fun RememberNavGraph(
                             appScope = appScope,
                             noteId = id.takeIf { it > 0 },
                             forceEdit = forceEdit,
+                            onConvertedToNote = { convertedId ->
+                                navController.navigate("${Routes.EDIT_NOTE}?${Routes.ARG_ID}=$convertedId") {
+                                    popUpTo(entry.destination.id) { inclusive = true }
+                                }
+                            },
                             onBack = leaveEditor,
                             onNavigateUp = leaveEditor,
                         )

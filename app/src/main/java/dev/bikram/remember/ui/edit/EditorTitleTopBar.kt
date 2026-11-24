@@ -14,8 +14,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -58,6 +60,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.rememberLocalTextFieldValueState
+import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.theme.transparentLargeTopAppBarColors
@@ -93,6 +96,7 @@ internal fun EditorTitleTopBar(
     titleCollapseProgress: Float = 0f,
     markdownDisplayMode: MarkdownEditorDisplayMode? = null,
     onToggleMarkdownDisplayMode: (() -> Unit)? = null,
+    overflowActions: (@Composable () -> Unit)? = null,
 ) {
     val titleFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -235,6 +239,7 @@ internal fun EditorTitleTopBar(
                             )
                         }
                     }
+                    overflowActions?.invoke()
                 },
             )
             Row(
@@ -266,56 +271,67 @@ internal fun EditorTitleTopBar(
                         rememberLocalTextFieldValueState(
                             value = titleFieldValue,
                             onValueChange = { updatedValue ->
-                                val nextText = sanitizeEditorTitle(updatedValue.text)
-                                val nextValue = updatedValue.withEditorTitleText(nextText)
+                                titleFieldValue = updatedValue
+                                if (updatedValue.text != title) {
+                                    onTitleChange(updatedValue.text)
+                                }
+                            },
+                        )
+                    val titleInputTransformation =
+                        remember(textMeasurer, titleStyle, titleTextWidth) {
+                            InputTransformation {
+                                val sanitizedText = sanitizeEditorTitle(asCharSequence().toString())
+                                val isShortening = sanitizedText.length < originalText.length
                                 val fullTextFits =
                                     titleFitsEditorHeader(
-                                        text = nextText,
+                                        text = sanitizedText,
                                         textMeasurer = textMeasurer,
                                         style = titleStyle,
                                         maxWidth = titleTextWidth,
                                     )
-                                val isShortening = nextText.length < titleFieldValue.text.length
-                                val acceptedValue =
-                                    when {
-                                        fullTextFits || isShortening -> nextValue
-                                        else ->
-                                            longestFittingEditorTitleValue(
-                                                current = titleFieldValue,
-                                                attempted = nextValue,
-                                                textMeasurer = textMeasurer,
-                                                style = titleStyle,
-                                                maxWidth = titleTextWidth,
-                                            )
+                                if (fullTextFits || isShortening) {
+                                    if (sanitizedText != asCharSequence().toString()) {
+                                        val sanitizedSelection = selection
+                                        replace(0, length, sanitizedText)
+                                        selection = sanitizedSelection
                                     }
-                                if (acceptedValue != null) {
-                                    titleFieldValue = acceptedValue
-                                    if (acceptedValue.text != title) {
-                                        onTitleChange(acceptedValue.text)
-                                    }
+                                    return@InputTransformation
                                 }
-                                if (!fullTextFits && !isShortening) {
-                                    titleBoundaryCueScope.launch {
-                                        titleBoundaryOffset.snapTo(0f)
-                                        titleBoundaryOffset.animateTo(
-                                            targetValue = -3f,
-                                            animationSpec = tween(durationMillis = 25),
-                                        )
-                                        titleBoundaryOffset.animateTo(
-                                            targetValue = 3f,
-                                            animationSpec = tween(durationMillis = 50),
-                                        )
-                                        titleBoundaryOffset.animateTo(
-                                            targetValue = 0f,
-                                            animationSpec = tween(durationMillis = 25),
-                                        )
-                                    }
+                                val fittingValue =
+                                    longestFittingEditorTitleValue(
+                                        current = TextFieldValue(originalText.toString(), originalSelection),
+                                        attempted = TextFieldValue(sanitizedText, selection),
+                                        textMeasurer = textMeasurer,
+                                        style = titleStyle,
+                                        maxWidth = titleTextWidth,
+                                    )
+                                if (fittingValue == null) {
+                                    revertAllChanges()
+                                } else {
+                                    replace(0, length, fittingValue.text)
+                                    selection = fittingValue.selection
                                 }
-                            },
-                        )
+                                titleBoundaryCueScope.launch {
+                                    titleBoundaryOffset.snapTo(0f)
+                                    titleBoundaryOffset.animateTo(
+                                        targetValue = -3f,
+                                        animationSpec = tween(durationMillis = 25),
+                                    )
+                                    titleBoundaryOffset.animateTo(
+                                        targetValue = 3f,
+                                        animationSpec = tween(durationMillis = 50),
+                                    )
+                                    titleBoundaryOffset.animateTo(
+                                        targetValue = 0f,
+                                        animationSpec = tween(durationMillis = 25),
+                                    )
+                                }
+                            }
+                        }
                     if (titleEditable) {
                         BasicTextField(
                             state = titleTextFieldState,
+                            inputTransformation = titleInputTransformation,
                             textStyle = titleStyle,
                             enabled = !readOnly,
                             keyboardOptions =
@@ -403,16 +419,6 @@ private fun Modifier.verticalCollapse(progress: Float): Modifier =
     }
 
 private fun sanitizeEditorTitle(text: String): String = text.replace('\r', ' ').replace('\n', ' ')
-
-private fun TextFieldValue.withEditorTitleText(text: String): TextFieldValue =
-    copy(
-        text = text,
-        selection =
-            TextRange(
-                start = selection.start.coerceIn(0, text.length),
-                end = selection.end.coerceIn(0, text.length),
-            ),
-    )
 
 private fun longestFittingEditorTitleValue(
     current: TextFieldValue,
@@ -509,4 +515,92 @@ private fun titleFitsEditorHeader(
             constraints = Constraints(maxWidth = maxWidth),
         )
     return !layoutResult.hasVisualOverflow
+}
+
+@Composable
+internal fun EditorMarkdownOverflowMenu(
+    canImportMarkdown: Boolean,
+    canExportMarkdown: Boolean,
+    onImportMarkdown: () -> Unit,
+    onExportMarkdown: () -> Unit,
+    convertActionLabel: String? = null,
+    convertActionIconName: String = "checklist",
+    onConvert: (() -> Unit)? = null,
+) {
+    val canConvert = convertActionLabel != null && onConvert != null
+    if (!canImportMarkdown && !canExportMarkdown && !canConvert) return
+    var expanded by remember { mutableStateOf(false) }
+    val moreOptionsCd = stringResource(R.string.cd_note_more_options)
+    Box {
+        RememberIconButton(
+            onClick = { expanded = true },
+            modifier =
+                Modifier
+                    .size(rememberResponsiveActionButtonSize())
+                    .semantics { contentDescription = moreOptionsCd },
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = "more_vert",
+                size = 20.dp,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                filled = false,
+                weight = FontWeight.Normal,
+            )
+        }
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            shape = MaterialTheme.shapes.large,
+        ) {
+            if (canImportMarkdown) {
+                RememberDropdownMenuItem(
+                    text = { Text(stringResource(R.string.note_menu_import_markdown)) },
+                    leadingIcon = {
+                        RememberMaterialRoundedSymbol(
+                            name = "upload_file",
+                            size = 20.dp,
+                            weight = FontWeight.Medium,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onImportMarkdown()
+                    },
+                )
+            }
+            if (canExportMarkdown) {
+                RememberDropdownMenuItem(
+                    text = { Text(stringResource(R.string.note_menu_export_markdown)) },
+                    leadingIcon = {
+                        RememberMaterialRoundedSymbol(
+                            name = "download",
+                            size = 20.dp,
+                            weight = FontWeight.Medium,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onExportMarkdown()
+                    },
+                )
+            }
+            if (convertActionLabel != null && onConvert != null) {
+                RememberDropdownMenuItem(
+                    text = { Text(convertActionLabel) },
+                    leadingIcon = {
+                        RememberMaterialRoundedSymbol(
+                            name = convertActionIconName,
+                            size = 20.dp,
+                            weight = FontWeight.Medium,
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onConvert()
+                    },
+                )
+            }
+        }
+    }
 }

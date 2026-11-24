@@ -51,6 +51,7 @@ import dev.bikram.remember.ui.theme.ColorSourceSwatchType
 import dev.bikram.remember.ui.theme.CuratedPalette
 import dev.bikram.remember.ui.theme.colorSourceSpecFor
 import dev.bikram.remember.ui.theme.colorSourceSpecsInPickerOrder
+import dev.bikram.remember.ui.theme.forAppliedScheme
 import dev.bikram.remember.ui.theme.generateTripletForSeed
 import dev.bikram.remember.ui.theme.parseCustomTriplet
 
@@ -147,7 +148,7 @@ fun ThemeAccentRow(
                 val triplet =
                     runCatching {
                         parseCustomTriplet(storedHex)
-                    }.getOrNull()
+                    }.getOrNull()?.forAppliedScheme()
                 val fillColor =
                     runCatching {
                         val primaryHex = storedHex.split("|").first()
@@ -252,7 +253,7 @@ private fun ThemeAccentCircleContent(
                 )
             }
         ColorSourceSwatchType.TRIPLET -> {
-            val triplet = requireNotNull(spec.triplet)
+            val triplet = requireNotNull(spec.triplet).forAppliedScheme()
             CuratedTripletSwatch(
                 primary = triplet.primary,
                 secondary = triplet.secondary,

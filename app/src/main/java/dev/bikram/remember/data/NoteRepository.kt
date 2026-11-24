@@ -224,6 +224,20 @@ class NoteRepository(
         options: NoteOptions,
     ) = contentWriter.updateList(id, title, colorIndex, items, options)
 
+    suspend fun convertNoteToList(
+        id: Long,
+        title: String,
+        items: List<PersistableChecklistItem>,
+        options: NoteOptions = NoteOptions(),
+    ): Boolean = contentWriter.convertNoteToList(id, title, items, options)
+
+    suspend fun convertListToNote(
+        id: Long,
+        title: String,
+        body: String,
+        options: NoteOptions = NoteOptions(),
+    ): Boolean = contentWriter.convertListToNote(id, title, body, options)
+
     suspend fun setStarred(
         id: Long,
         starred: Boolean,

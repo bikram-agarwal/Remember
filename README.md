@@ -23,7 +23,7 @@ See [the differences between the Play Store, F-Droid, and GitHub versions](docs/
 ### ⏰ Reminders that actually work
 
 - **Keep reminders until done.** The feature the app is built around. Enable it, and accidental dismissals stop mattering — Remember re-posts the notification until the note is marked done.
-- **Reminers/snooze that speaks human.** Relative presets like *soon*, *later today*, *this evening*, *tomorrow morning*, OR pick a duration in minutes, hours, or days. A custom date and time is always available.
+- **Reminders/snooze that speaks human.** Relative presets like *soon*, *later today*, *this evening*, *tomorrow morning*, OR pick a duration in minutes, hours, or days. A custom date and time is always available.
 - **Multiple reminders per note.** Add up to three reminders to the same note, each with its own time and repeat pattern.
 - **Action buttons in the notification.** A reminder to call someone shows a call button right there. A reminder to pick something up shows directions. You can act on the reminder right from the notification.
 - **High-importance mode.** Heads-up alerts, sound, and vibration for the things that cannot wait.
@@ -37,8 +37,9 @@ See [the differences between the Play Store, F-Droid, and GitHub versions](docs/
 
 Reminders are more useful when they carry information. Remember's notes and lists are the container for that.
 
-- **Markdown notes** with headings, formatting, links, and code blocks — so a reminder about a meeting can include the agenda.
+- **Markdown notes** with headings, formatting, lists, links, and code blocks — so a reminder about a meeting can include the agenda. Text pasted from a web page, email, or document keeps its formatting.
 - **Checklists** with nested items and drag-to-reorder — so a grocery run or a packing list can live inside the reminder itself.
+- **Note & checklist conversion**: Convert list-formatted notes into interactive checklists or convert checklists into Markdown notes while keeping titles, reminders, tags, and attachments intact.
 - **Attachments and pictures** show up on the note card and inside reminder notifications. Cover images can be repositioned to frame exactly how you want.
 - **Note icons** from hundreds of Material Symbols or the full emoji set — so every note is visually distinct at a glance.
 
@@ -49,7 +50,7 @@ Reminders are more useful when they carry information. Remember's notes and list
 - **Tags with colors** for grouping notes any way you like.
 - **Star** notes for quick access. **Archive** ones you want to keep but not see. Or send to **Trash** that clears after 30 days automatically.
 - **Filter** by type, tag, starred status, pinned status, has-reminder, has-picture, or has-attachment.
-- **Sort and group** by last modified, created date, or reminder time — grouped by date, type, or tag.
+- **Sort and group** by last modified, created date, reminder time, importance, type, tag etc.
 - **Pin** the notes you need at hand: they stay at the top of the list, regardless of your sorting or grouping.
 - **List or grid view** for note cards, so you can choose a compact list or a visual mosaic.
 
@@ -69,6 +70,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 
 - **App lock** with device credential unlock, and biometric authentication. No need to create a new PIN. 
 - **Note visibility levels:** Normal (full notification), Private (hides notification body), or Secret (hides everything — no widget or notification content).
+- Turn off **Note content on cards** to show just titles and details.
 - **No account required.** Your notes are stored entirely locally. Zero tracking, analytics, or automated background telemetry.
 
 ### 💾 Backup and import
@@ -76,7 +78,9 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 - **Manual backup and restore**: export to any folder, including cloud drives.
 - **Auto-export** on every change, or on a schedule via background worker.
 - **Media inclusion**: optionally embed pictures and attachments in the backup file.
-- **Flexible imports**: bring over your data from Google Tasks or Tasks.org (via direct account sync, Google Takeout JSON, or local backup files). Customize your layout using three import modes: single note per task, grouped by list, or rendered as a task checklist.
+- **Flexible imports**: Bring over your data from Google Tasks (direct account sync or Google Takeout JSON), Tasks.org backups, or local `.md`, `.markdown`, `.txt`, and `.zip` files. Customize task imports with three modes: single note per task, grouped by list, or list as checklist.
+- **Markdown export**: Export any note or checklist as `.md`, or bulk-export selected items as a `.zip` archive.
+- **Drag and drop**: Drop `.md`, `.txt`, `.json`, or `.zip` files directly onto the Remember window.
 
 
 ### 🏠 Widgets and shortcuts

@@ -73,6 +73,9 @@ abstract class BaseEditorViewModel(
     private val _completed = MutableStateFlow(false)
     val completed: StateFlow<Boolean> = _completed.asStateFlow()
 
+    private val _notificationActive = MutableStateFlow(false)
+    val notificationActive: StateFlow<Boolean> = _notificationActive.asStateFlow()
+
     /**
      * Snapshot of [dev.bikram.remember.data.NoteEntity.pinnedAt] as a boolean. Unlike [starred],
      * pinning is NOT part of the editor draft: it writes through immediately via
@@ -664,30 +667,58 @@ abstract class BaseEditorViewModel(
         }
     }
 
+    fun hasActiveNotification(context: android.content.Context): Boolean {
+        val id = loadedId ?: return false
+        return dev.bikram.remember.reminders
+            .ReminderScheduler(context)
+            .isNotificationActive(id)
+    }
+
+    fun refreshNotificationActive(context: android.content.Context) {
+        _notificationActive.value = hasActiveNotification(context)
+    }
+
+    fun dismissActiveNotification(context: android.content.Context) {
+        val id = loadedId ?: return
+        dev.bikram.remember.reminders
+            .ReminderScheduler(context)
+            .cancelNotification(id)
+        _notificationActive.value = false
+        android.widget.Toast
+            .makeText(
+                context,
+                context.getString(dev.bikram.remember.R.string.notification_removed),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+    }
+
     suspend fun fireNotification(
         context: android.content.Context,
         untitledName: String,
+        pinned: Boolean = false,
     ) {
         saveIfNeeded(untitledName)
         val id = loadedId ?: return
         val noteWithItems = repository.get(id) ?: return
-        val reminderPrefs =
-            EntryPointAccessors
-                .fromApplication(
-                    context.applicationContext,
-                    SettingsDependenciesEntryPoint::class.java,
-                ).reminderPrefs()
-        val keepUntilDone = reminderPrefs.snapshot().keepReminderNotificationsUntilDone
+        dev.bikram.remember.reminders.ManualPinnedNotificationStore
+            .setPinned(context, id, pinned)
         dev.bikram.remember.reminders.ReminderReceiver.showNotification(
             context = context,
             note = noteWithItems.note,
             items = noteWithItems.items,
-            keepUntilDone = keepUntilDone,
+            keepUntilDone = pinned,
         )
+        _notificationActive.value = true
+        val toastRes =
+            if (pinned) {
+                dev.bikram.remember.R.string.notification_pinned_hint
+            } else {
+                dev.bikram.remember.R.string.notification_posted_hint
+            }
         android.widget.Toast
             .makeText(
                 context,
-                context.getString(dev.bikram.remember.R.string.notification_created),
+                context.getString(toastRes),
                 android.widget.Toast.LENGTH_SHORT,
             ).show()
     }

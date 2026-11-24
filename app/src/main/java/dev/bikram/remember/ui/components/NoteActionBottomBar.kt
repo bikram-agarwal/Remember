@@ -47,6 +47,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.common.isSmallLandscape
 import dev.bikram.remember.ui.feedback.LocalHapticEnabled
+import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
 
@@ -90,6 +91,8 @@ fun NoteActionBottomBar(
     onDeleteForever: () -> Unit,
     modifier: Modifier = Modifier,
     showEditAction: Boolean = true,
+    notificationActive: Boolean = false,
+    onPinNotification: () -> Unit = {},
 ) {
     val spatialSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultSpatialSpec<IntOffset>())
     val fadeInSpec = reducedMotionAwareSpec(MaterialTheme.motionScheme.defaultEffectsSpec<Float>())
@@ -118,6 +121,8 @@ fun NoteActionBottomBar(
             onRestore = onRestore,
             onDeleteForever = onDeleteForever,
             showEditAction = showEditAction,
+            notificationActive = notificationActive,
+            onPinNotification = onPinNotification,
         )
     }
 }
@@ -151,6 +156,8 @@ fun NoteActionBottomBarContent(
     onDeleteForever: () -> Unit,
     modifier: Modifier = Modifier,
     showEditAction: Boolean = true,
+    notificationActive: Boolean = false,
+    onPinNotification: () -> Unit = {},
 ) {
     val compact = isSmallLandscape()
     val actionRow: @Composable () -> Unit = {
@@ -209,9 +216,10 @@ fun NoteActionBottomBarContent(
                     )
                     if (existing) {
                         ActionItem(
-                            icon = "notifications",
+                            icon = if (notificationActive) "notifications_off" else "notifications",
                             label = stringResource(R.string.edit_bottom_bar_notification),
                             onClick = onNotification,
+                            onLongClick = onPinNotification,
                             modifier = activeActionModifier,
                             compact = compact,
                         )
@@ -311,14 +319,22 @@ private fun ActionItem(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
     iconTint: Color = MaterialTheme.colorScheme.onSurface,
     iconScale: Float = 1f,
     compact: Boolean = false,
 ) {
     val clickableModifier =
-        modifier
-            .clip(MaterialTheme.shapes.large)
-            .clickable(onClick = onClick)
+        if (onLongClick != null) {
+            // appCombinedClickable fires the long-press haptic itself (gated on the app setting).
+            modifier
+                .clip(MaterialTheme.shapes.large)
+                .appCombinedClickable(onClick = onClick, onLongClick = onLongClick)
+        } else {
+            modifier
+                .clip(MaterialTheme.shapes.large)
+                .clickable(onClick = onClick)
+        }
     if (compact) {
         Row(
             modifier = clickableModifier.padding(horizontal = 4.dp, vertical = 2.dp),

@@ -210,10 +210,20 @@ class ReminderScheduler(
         )
     }
 
+    fun isNotificationActive(noteId: Long): Boolean {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val activeIds = notificationManager.activeNotifications.map { notification -> notification.id }.toSet()
+        if (pendingRequestCodeForNote(noteId) in activeIds) return true
+        return (0 until MAX_REMINDERS_PER_NOTE).any { index ->
+            pendingRequestCodeForNoteReminder(noteId, index) in activeIds
+        }
+    }
+
     fun cancelNotification(noteId: Long) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(pendingRequestCodeForNote(noteId))
         cancelReminderSlotNotifications(context, noteId)
+        ManualPinnedNotificationStore.setPinned(context, noteId, pinned = false)
     }
 
     suspend fun refreshNotificationIfActive(
@@ -221,32 +231,36 @@ class ReminderScheduler(
         items: List<ChecklistItemEntity>,
     ) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val activeNotificationIds = notificationManager.activeNotifications.map { notification -> notification.id }.toSet()
-        val keepUntilDone = keepReminderNotificationsUntilDone()
-        if (pendingRequestCodeForNote(note.id) in activeNotificationIds) {
-            ReminderReceiver.showNotification(
-                context = context,
-                note = note,
-                items = items,
-                reminderIndex = 0,
-                keepUntilDone = keepUntilDone,
-                onlyAlertOnce = true,
-            )
-            return
-        }
+        val activeNotificationsById = notificationManager.activeNotifications.associateBy { notification -> notification.id }
+        val primaryNotification = activeNotificationsById[pendingRequestCodeForNote(note.id)]
         val legacyReminderIndex =
-            (0 until MAX_REMINDERS_PER_NOTE)
-                .lastOrNull { index -> pendingRequestCodeForNoteReminder(note.id, index) in activeNotificationIds }
-        if (legacyReminderIndex != null) {
-            ReminderReceiver.showNotification(
-                context = context,
-                note = note,
-                items = items,
-                reminderIndex = legacyReminderIndex,
-                keepUntilDone = keepUntilDone,
-                onlyAlertOnce = true,
+            if (primaryNotification != null) {
+                null
+            } else {
+                (0 until MAX_REMINDERS_PER_NOTE)
+                    .lastOrNull { index -> pendingRequestCodeForNoteReminder(note.id, index) in activeNotificationsById }
+            }
+        val activeNotification =
+            primaryNotification
+                ?: legacyReminderIndex?.let { index -> activeNotificationsById[pendingRequestCodeForNoteReminder(note.id, index)] }
+                ?: return
+        // An edit refresh must not change whether this notification returns after a swipe. One
+        // posted by tapping Notify (no delete intent) stays dismissible even with "keep until done"
+        // on; a reminder posted while the setting was on keeps returning unless the user has since
+        // turned the setting off. A manual pin is applied inside showNotification itself.
+        val keepUntilDone =
+            refreshedNotificationKeepsUntilDone(
+                currentlyRestoresOnDismiss = activeNotification.notification.deleteIntent != null,
+                keepUntilDonePref = keepReminderNotificationsUntilDone(),
             )
-        }
+        ReminderReceiver.showNotification(
+            context = context,
+            note = note,
+            items = items,
+            reminderIndex = legacyReminderIndex ?: 0,
+            keepUntilDone = keepUntilDone,
+            onlyAlertOnce = true,
+        )
     }
 
     suspend fun refreshSummaryNotification(
@@ -571,3 +585,13 @@ internal fun latestDueReminderIndex(
     }
     return dueReminderIndex
 }
+
+/**
+ * Whether an edit refresh of an already-showing notification should keep returning after a swipe.
+ * Refreshing never turns restore on for a notification that was posted dismissible, and honours
+ * the user switching "keep until done" off since it was posted.
+ */
+internal fun refreshedNotificationKeepsUntilDone(
+    currentlyRestoresOnDismiss: Boolean,
+    keepUntilDonePref: Boolean,
+): Boolean = currentlyRestoresOnDismiss && keepUntilDonePref

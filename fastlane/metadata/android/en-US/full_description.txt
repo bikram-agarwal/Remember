@@ -3,7 +3,9 @@ Remember is built around one simple idea: if you dismiss a reminder without fini
 Mark the note done, and the reminder is gone for good.
 
 <b>━━ 📌 REMINDERS THAT STICK ━━</b>
-Automatically restore accidentally dismissed reminder notifications until they are actually done. Choose from normal reminders, high-importance reminders with heads-up alerts, critical reminders that ring like an alarm every 15 minutes until done, or a quiet summary notification that keeps overdue and upcoming items pinned in your notification shade.
+* Automatically restore accidentally dismissed reminder notifications until they are actually done. 
+* Add up to three reminders per note.
+* Choose from normal reminders, high-importance reminders with heads-up alerts, critical reminders that ring like an alarm every 15 minutes until done, or a quiet summary notification that keeps overdue and upcoming items pinned in your notification shade.
 
 <b>━━ 🔔 NOTIFICATION ACTIONS ━━</b>
 Add useful one-tap actions directly to reminder notifications so you can act without opening the app:
@@ -16,10 +18,15 @@ Add useful one-tap actions directly to reminder notifications so you can act wit
 Set reminders and snooze with Timing (named times such as soon, later today, this evening etc.) or Duration (lengths of time such as 30 mins, 6 hours etc.). A custom date and time are always available.
 
 <b>━━ 📅 RECURRING SCHEDULES ━━</b>
-Create hourly, daily, weekly, monthly, or yearly reminders. Remember also supports richer calendar-style patterns like "the last Friday of every month", with optional end dates or occurrence counts.
+* Create hourly, daily, weekly, monthly, or yearly reminders. 
+* Supports richer calendar-style patterns like "the last Friday of every month", with optional end dates or occurrence counts.
 
 <b>━━ 📝 MARKDOWN NOTES AND CHECKLISTS ━━</b>
-Write rich markdown notes with headings, bold, italics, underline, links, and code blocks. Build nested checklists for groceries, packing lists, project steps, or anything else that benefits from structure.
+* Write rich markdown notes with headings, bold, italics, underline, links, and code blocks
+* Text pasted from web pages, emails, or documents keeps its formatting. 
+* Add pictures, attachments, and an icon from hundreds of symbols or the full emoji set. 
+* Build nested checklists for groceries, packing lists, project steps, or anything else that benefits from structure. 
+* Easily convert between notes and interactive checklists, or export notes as .md files (individually or in bulk as a ZIP).
 
 <b>━━ 🔍 ORGANIZE AND FIND THINGS ━━</b>
 Use tags, stars, archive, trash, full-text search, filters, sorting, and bulk actions to keep your notes manageable.
@@ -27,8 +34,8 @@ Use tags, stars, archive, trash, full-text search, filters, sorting, and bulk ac
 <b>━━ 📱 WIDGETS AND QUICK CAPTURE ━━</b>
 Home screen widgets for upcoming reminders, starred/pinned/tagged notes, and quick capture. A persistent notification or the quick setting tiles can keep note creation one tap away at all times.
 
-<b>━━ ☁️ IMPORT FROM GOOGLE TASKS OR TASKS.ORG ━━</b>
-Move into Remember from Google Tasks using a connected account or a Google Takeout file. Or bring your data from tasks.org. Import is read-only; Remember does not modify or delete your Google Tasks / Tasks.org data.
+<b>━━ ☁️ IMPORT FROM GOOGLE TASKS, TASKS.ORG & MARKDOWN ━━</b>
+Move into Remember from Google Tasks (connected account or Takeout JSON), Tasks.org backups, or .md, .txt, and .zip files. Drag and drop files directly onto the Remember window - including Remember backup .zip files to merge or restore. Task imports are read-only; Remember never modifies or deletes your external data.
 
 <b>━━ 💾 BACKUP AND RESTORE ━━</b>
 Export your notes and settings to a backup, optionally including attached media. Restore when moving to a new device, or import a backup to merge notes into your current collection.
@@ -37,4 +44,7 @@ Export your notes and settings to a backup, optionally including attached media.
 Choose Material You wallpaper colors, hand-tuned color presets, your own custom colors & fonts, palette styles, gradient backgrounds, black OLED mode, cover images, and more. Theming is deep - the app can look and feel very different from any other notes app on your phone.
 
 <b>━━ 🔒 PRIVATE BY DEFAULT ━━</b>
-Your notes are stored entirely locally. Zero tracking, analytics, or automated background telemetry. No data leaves your phone without your explicit action (such as optional update checks or manually exporting a backup).
+* Your notes are stored entirely locally. Zero tracking, analytics, or automated background telemetry. 
+* No data leaves your phone without your explicit action (such as optional update checks or manually exporting a backup). 
+* Lock the app with your screen lock or biometrics
+* Mark notes Private (notification text hidden) or Secret (nothing shown in notifications or widgets), or hide note content on home tab.

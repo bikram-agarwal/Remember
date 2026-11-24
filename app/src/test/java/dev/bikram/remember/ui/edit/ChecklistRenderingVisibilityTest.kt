@@ -184,4 +184,40 @@ class ChecklistRenderingVisibilityTest {
         val visibleRow = filtered.single() as ActiveEntry.Row
         assertEquals(parentId, visibleRow.item.localId)
     }
+
+    @Test
+    fun typed_newline_in_title_is_stripped_and_advances_to_next_item() {
+        val result =
+            resolveChecklistTitleNewlineInput(
+                previousText = "Buy milk",
+                proposedText = "Buy milk\n",
+            )
+
+        assertEquals("Buy milk", result.sanitizedText)
+        assertTrue(result.advanceToNextItem)
+    }
+
+    @Test
+    fun typed_newline_in_empty_title_advances_to_next_item() {
+        val result =
+            resolveChecklistTitleNewlineInput(
+                previousText = "",
+                proposedText = "\n",
+            )
+
+        assertEquals("", result.sanitizedText)
+        assertTrue(result.advanceToNextItem)
+    }
+
+    @Test
+    fun pasted_multiline_text_collapses_newlines_without_advancing() {
+        val result =
+            resolveChecklistTitleNewlineInput(
+                previousText = "",
+                proposedText = "Eggs\nBread",
+            )
+
+        assertEquals("Eggs Bread", result.sanitizedText)
+        assertFalse(result.advanceToNextItem)
+    }
 }

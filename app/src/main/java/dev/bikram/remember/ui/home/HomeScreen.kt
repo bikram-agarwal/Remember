@@ -1,6 +1,9 @@
 package dev.bikram.remember.ui.home
 
 import android.annotation.SuppressLint
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.EnterExitState
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.core.FiniteAnimationSpec
@@ -52,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,6 +71,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
@@ -100,7 +105,9 @@ import dev.bikram.remember.ui.components.SwipeableRememberNoteCard
 import dev.bikram.remember.ui.components.rememberResponsiveActionButtonSize
 import dev.bikram.remember.ui.components.rememberSelectionActionBarListClearance
 import dev.bikram.remember.ui.components.toNoteCardUiModel
+import dev.bikram.remember.ui.edit.BULK_EXPORT_ZIP_FILE_NAME
 import dev.bikram.remember.ui.edit.NoteIcon
+import dev.bikram.remember.ui.edit.exportNotesAsMarkdownZip
 import dev.bikram.remember.ui.modifiers.PillBottomBarHeight
 import dev.bikram.remember.ui.modifiers.PillBottomScrimExtra
 import dev.bikram.remember.ui.modifiers.applyToScrollableList
@@ -306,6 +313,9 @@ fun HomeScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val context = LocalContext.current
+    val resources = LocalResources.current
+    val uiScope = rememberCoroutineScope()
     val notificationsAllowed = rememberNotificationsAllowed()
     val initialListLiftPx =
         with(LocalDensity.current) {
@@ -365,6 +375,47 @@ fun HomeScreen(
         }
     }
     val displayedItems = state.items
+    val selectedNotesForExport by
+        remember(displayedItems, state.selectedIds) {
+            derivedStateOf {
+                val seenIds = HashSet<Long>()
+                displayedItems.mapNotNull { item ->
+                    if (item is HomeListItem.NoteRow && item.card.id in state.selectedIds && seenIds.add(item.card.id)) {
+                        item.note
+                    } else {
+                        null
+                    }
+                }
+            }
+        }
+    val untitledNoteName = stringResource(R.string.edit_note_title_new)
+    val untitledListName = stringResource(R.string.edit_list_title_new)
+    var pendingExportNotes by remember { mutableStateOf<List<NoteWithItems>>(emptyList()) }
+    val exportZipLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.CreateDocument("application/zip"),
+        ) { uri ->
+            val notesToExport = pendingExportNotes
+            pendingExportNotes = emptyList()
+            if (uri == null || notesToExport.isEmpty()) return@rememberLauncherForActivityResult
+            uiScope.launch {
+                val exported =
+                    exportNotesAsMarkdownZip(
+                        context = context,
+                        uri = uri,
+                        notes = notesToExport,
+                        fallbackUntitledNote = untitledNoteName,
+                        fallbackUntitledList = untitledListName,
+                    )
+                val messageRes =
+                    if (exported) {
+                        R.string.toast_export_zip_success
+                    } else {
+                        R.string.toast_export_failed
+                    }
+                Toast.makeText(context, resources.getString(messageRes), Toast.LENGTH_SHORT).show()
+            }
+        }
     val collapsibleSectionKeys by
         remember(displayedItems) {
             derivedStateOf {
@@ -482,7 +533,12 @@ fun HomeScreen(
             if (showSelectionActionBar) {
                 HomeSelectionActionBar(
                     visible = state.inSelectionMode,
-                    onClearSelection = onClearSelection,
+                    onExportSelected = {
+                        if (selectedNotesForExport.isNotEmpty()) {
+                            pendingExportNotes = selectedNotesForExport
+                            exportZipLauncher.launch(BULK_EXPORT_ZIP_FILE_NAME)
+                        }
+                    },
                     onTagSelected = { tagSheetOpen = true },
                     onPinSelected = onPinSelected,
                     pinEnabled = state.canPinSelected,

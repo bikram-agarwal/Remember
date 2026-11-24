@@ -9,8 +9,18 @@ import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dev.bikram.remember.BuildConfig
+import dev.bikram.remember.R
+import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.di.IoDispatcher
+import dev.bikram.remember.ui.edit.MarkdownZipTooLargeException
+import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
+import dev.bikram.remember.ui.edit.createImportedMarkdownNote
+import dev.bikram.remember.ui.edit.importMarkdownFromUri
+import dev.bikram.remember.ui.edit.isJsonFileUri
+import dev.bikram.remember.ui.edit.isMarkdownOrPlainTextUri
+import dev.bikram.remember.ui.edit.isZipFileUri
+import dev.bikram.remember.ui.edit.readMarkdownEntriesFromZip
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -46,6 +56,7 @@ class GoogleTasksImportViewModel
         private val appContext: Context,
         private val repository: GoogleTasksRepository,
         private val noteRepository: NoteRepository,
+        private val backupIo: BackupIo,
         private val importer: GoogleTasksImporter,
         private val prefs: GoogleTasksImportPrefs,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
@@ -76,7 +87,6 @@ class GoogleTasksImportViewModel
         }
 
         fun setImportMethod(method: ImportMethod) {
-            if (method == ImportMethod.GrantPermission && !BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED) return
             if (_state.value.selectedMethod == method) return
             cachedToken = null
             _state.update { current ->
@@ -96,7 +106,7 @@ class GoogleTasksImportViewModel
         fun refreshFromGoogle() {
             val token = cachedToken
             val current = _state.value
-            if (token == null || current.selectedMethod != ImportMethod.GrantPermission) return
+            if (token == null || !current.isGoogleApiSession) return
             viewModelScope.launch {
                 _state.update { it.copy(isFetching = true, error = null) }
                 fetchEverything()
@@ -128,9 +138,32 @@ class GoogleTasksImportViewModel
 
         fun loadManualImportJson(uri: Uri) {
             viewModelScope.launch {
+                val textResult =
+                    runCatching {
+                        withContext(ioDispatcher) {
+                            appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                inputStream.reader(Charsets.UTF_8).readText()
+                            } ?: throw IllegalArgumentException("Could not open selected file")
+                        }
+                    }
+                textResult
+                    .onSuccess { text -> loadManualImportJsonText(text) }
+                    .onFailure { error ->
+                        _state.update {
+                            it.copy(
+                                isFetching = false,
+                                connected = false,
+                                error = ImportError.TakeoutParseFailed(error.localizedMessage),
+                            )
+                        }
+                    }
+            }
+        }
+
+        fun loadManualImportJsonText(text: String) {
+            viewModelScope.launch {
                 _state.update {
                     it.copy(
-                        selectedMethod = ImportMethod.ManualImport,
                         isFetching = true,
                         error = null,
                         connected = false,
@@ -143,20 +176,21 @@ class GoogleTasksImportViewModel
                 }
                 val parsed =
                     runCatching {
-                        val text =
-                            withContext(ioDispatcher) {
-                                appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
-                                    inputStream.reader(Charsets.UTF_8).readText()
-                                } ?: throw IllegalArgumentException("Could not open selected file")
-                            }
-                        manualImportParser.parse(text)
+                        withContext(ioDispatcher) {
+                            manualImportParser.parse(text)
+                        }
                     }
                 parsed
                     .onSuccess { importData ->
                         val alreadyImported = refreshedImportedMap(importData.source.sourceKey)
+                        val resolvedTab =
+                            when (importData.source) {
+                                ManualTaskImportSource.GOOGLE_TAKEOUT -> ImportMethod.GoogleTasks
+                                ManualTaskImportSource.TASKS_ORG -> ImportMethod.TasksOrgAndMd
+                            }
                         _state.update {
                             it.copy(
-                                selectedMethod = ImportMethod.ManualImport,
+                                selectedMethod = resolvedTab,
                                 connected = true,
                                 accountEmail = null,
                                 isFetching = false,
@@ -182,11 +216,173 @@ class GoogleTasksImportViewModel
             }
         }
 
+        fun importTasksOrgOrMarkdownFiles(uris: List<Uri>) {
+            if (uris.isEmpty()) return
+            if (uris.size == 1 && isJsonFileUri(appContext, uris.first())) {
+                loadManualImportJson(uris.first())
+                return
+            }
+            viewModelScope.launch {
+                if (uris.size == 1 && isZipFileUri(appContext, uris.first()) && backupIo.isBackupZip(uris.first())) {
+                    _state.update {
+                        it.copy(
+                            selectedMethod = ImportMethod.TasksOrgAndMd,
+                            pendingBackupZip = PendingBackupZip(uri = uris.first()),
+                            error = null,
+                        )
+                    }
+                    return@launch
+                }
+                _state.update {
+                    it.copy(
+                        selectedMethod = ImportMethod.TasksOrgAndMd,
+                        isImportingMarkdown = true,
+                        error = null,
+                    )
+                }
+                var importedCount = 0
+                var sawZip = false
+                var sawZipMarkdownEntry = false
+                var sawFailure = false
+                var sawZipTooLarge = false
+                val fallbackTitle = appContext.getString(R.string.edit_note_title_new)
+
+                withContext(ioDispatcher) {
+                    uris.forEach { uri ->
+                        when {
+                            isJsonFileUri(appContext, uri) -> {
+                                // Ignore extra JSON files when mixed with Markdown/ZIP selection.
+                            }
+                            isZipFileUri(appContext, uri) -> {
+                                sawZip = true
+                                if (backupIo.isBackupZip(uri)) {
+                                    val count = backupIo.importFrom(uri, preserveIdsForNotes = false)
+                                    if (count > 0) {
+                                        sawZipMarkdownEntry = true
+                                        importedCount += count
+                                    } else {
+                                        sawFailure = true
+                                    }
+                                } else {
+                                    val entriesResult =
+                                        runCatching {
+                                            appContext.contentResolver.openInputStream(uri)?.use { inputStream ->
+                                                readMarkdownEntriesFromZip(inputStream)
+                                            } ?: throw IllegalArgumentException("Could not open archive")
+                                        }
+                                    entriesResult
+                                        .onSuccess { entries ->
+                                            if (entries.isNotEmpty()) {
+                                                sawZipMarkdownEntry = true
+                                            }
+                                            entries.forEach { entry ->
+                                                createImportedMarkdownNote(
+                                                    noteRepository = noteRepository,
+                                                    title = entry.suggestedTitle ?: fallbackTitle,
+                                                    markdown = entry.markdown,
+                                                )
+                                                importedCount++
+                                            }
+                                        }.onFailure { error ->
+                                            if (error is MarkdownZipTooLargeException) {
+                                                sawZipTooLarge = true
+                                            } else {
+                                                sawFailure = true
+                                            }
+                                        }
+                                }
+                            }
+                            isMarkdownOrPlainTextUri(appContext, uri) -> {
+                                when (val result = importMarkdownFromUri(appContext, uri)) {
+                                    is NoteMarkdownImportResult.Success -> {
+                                        createImportedMarkdownNote(
+                                            noteRepository = noteRepository,
+                                            title = result.suggestedTitle ?: fallbackTitle,
+                                            markdown = result.markdown,
+                                        )
+                                        importedCount++
+                                    }
+                                    NoteMarkdownImportResult.Failed -> sawFailure = true
+                                    NoteMarkdownImportResult.Empty,
+                                    NoteMarkdownImportResult.TooLarge,
+                                    -> Unit
+                                }
+                            }
+                            else -> sawFailure = true
+                        }
+                    }
+                }
+
+                if (importedCount > 0) {
+                    _state.update { it.copy(isImportingMarkdown = false, error = null) }
+                    _effects.value = GoogleTasksImportEffect.MarkdownImportFinished(importedCount)
+                } else {
+                    val error =
+                        when {
+                            sawZipTooLarge -> ImportError.MarkdownZipTooLarge
+                            sawZip && !sawZipMarkdownEntry && !sawFailure -> ImportError.MarkdownZipEmpty
+                            sawFailure -> ImportError.MarkdownImportFailed
+                            else -> ImportError.MarkdownNoneValid
+                        }
+                    _state.update { it.copy(isImportingMarkdown = false, error = error) }
+                }
+            }
+        }
+
+        fun dismissPendingBackupZip() {
+            _state.update { it.copy(pendingBackupZip = null) }
+        }
+
+        fun confirmPendingBackupImportMerge() {
+            val pending = _state.value.pendingBackupZip ?: return
+            viewModelScope.launch {
+                _state.update { it.copy(pendingBackupZip = null, isImportingMarkdown = true, error = null) }
+                val count = backupIo.importFrom(pending.uri, preserveIdsForNotes = false)
+                if (count > 0) {
+                    _state.update { it.copy(isImportingMarkdown = false, error = null) }
+                    _effects.value = GoogleTasksImportEffect.MarkdownImportFinished(count)
+                } else {
+                    _state.update {
+                        it.copy(
+                            isImportingMarkdown = false,
+                            error = ImportError.BackupImportFailed,
+                        )
+                    }
+                }
+            }
+        }
+
+        fun requestPendingBackupRestore() {
+            val pending = _state.value.pendingBackupZip ?: return
+            viewModelScope.launch {
+                val summary = backupIo.inspectRestoreMedia(pending.uri)
+                _state.update { current ->
+                    current.copy(
+                        pendingBackupZip =
+                            current.pendingBackupZip?.copy(
+                                confirmingRestore = true,
+                                mediaSummary = summary,
+                            ),
+                    )
+                }
+            }
+        }
+
+        fun confirmPendingBackupRestore() {
+            val pending = _state.value.pendingBackupZip ?: return
+            viewModelScope.launch {
+                _state.update { it.copy(pendingBackupZip = null, isImportingMarkdown = true, error = null) }
+                val result = backupIo.restoreFullReplace(pending.uri)
+                _state.update { it.copy(isImportingMarkdown = false, error = null) }
+                _effects.value = GoogleTasksImportEffect.BackupRestoreFinished(result)
+            }
+        }
+
         fun cancelTakeoutImport() {
             _state.update { current ->
                 GoogleTasksImportUiState(
                     rememberedEmail = current.rememberedEmail,
-                    selectedMethod = ImportMethod.ManualImport,
+                    selectedMethod = current.selectedMethod,
                 )
             }
         }
@@ -256,7 +452,7 @@ class GoogleTasksImportViewModel
             _state.update { current ->
                 GoogleTasksImportUiState(
                     rememberedEmail = current.rememberedEmail,
-                    selectedMethod = ImportMethod.GrantPermission,
+                    selectedMethod = ImportMethod.GoogleTasks,
                 )
             }
             connect(forceAccountSelection = true)
@@ -529,12 +725,7 @@ class GoogleTasksImportViewModel
 
 data class GoogleTasksImportUiState(
     val rememberedEmail: String? = null,
-    val selectedMethod: ImportMethod =
-        if (BuildConfig.GOOGLE_TASKS_CONNECT_ENABLED) {
-            ImportMethod.GrantPermission
-        } else {
-            ImportMethod.ManualImport
-        },
+    val selectedMethod: ImportMethod = ImportMethod.GoogleTasks,
     val accountEmail: String? = null,
     /**
      * True once authorize() has returned a Success. Decoupled from [accountEmail] because the
@@ -543,6 +734,7 @@ data class GoogleTasksImportUiState(
      */
     val connected: Boolean = false,
     val isFetching: Boolean = false,
+    val isImportingMarkdown: Boolean = false,
     val isDisconnecting: Boolean = false,
     val isImporting: Boolean = false,
     val importCompletedCount: Int = 0,
@@ -554,6 +746,7 @@ data class GoogleTasksImportUiState(
     val selectedTaskIds: Set<String> = emptySet(),
     val alreadyImportedIds: Set<String> = emptySet(),
     val listFilterId: String? = null,
+    val pendingBackupZip: PendingBackupZip? = null,
     val searchQuery: String = "",
     /** Source-list IDs whose group is currently collapsed in the grouped LoadedPanel view. */
     val collapsedListIds: Set<String> = emptySet(),
@@ -578,12 +771,13 @@ data class GoogleTasksImportUiState(
         }
     }
 
-    val isLoaded: Boolean get() = !isFetching && !isDisconnecting && connected && taskLists.isNotEmpty()
-    val isEmpty: Boolean get() = !isFetching && !isDisconnecting && connected && taskLists.isEmpty()
+    val isLoaded: Boolean get() = !isFetching && !isImportingMarkdown && !isDisconnecting && connected && taskLists.isNotEmpty()
+    val isEmpty: Boolean get() = !isFetching && !isImportingMarkdown && !isDisconnecting && connected && taskLists.isEmpty()
+    val isGoogleApiSession: Boolean get() = connected && manualImportSource == null
 
     fun importedSourceKey(): String =
-        if (selectedMethod == ImportMethod.ManualImport) {
-            manualImportSource?.sourceKey ?: GOOGLE_TASKS_TAKEOUT_SOURCE_KEY
+        if (manualImportSource != null) {
+            manualImportSource.sourceKey
         } else {
             accountEmail.sourceKey()
         }
@@ -607,6 +801,12 @@ private fun String?.sourceKey(): String =
             ?: "unknown"
     )
 
+data class PendingBackupZip(
+    val uri: Uri,
+    val confirmingRestore: Boolean = false,
+    val mediaSummary: BackupIo.RestoreMediaSummary? = null,
+)
+
 sealed class ImportError {
     data object Network : ImportError()
 
@@ -623,11 +823,21 @@ sealed class ImportError {
     data class Unknown(
         val message: String?,
     ) : ImportError()
+
+    data object MarkdownZipEmpty : ImportError()
+
+    data object MarkdownZipTooLarge : ImportError()
+
+    data object MarkdownNoneValid : ImportError()
+
+    data object MarkdownImportFailed : ImportError()
+
+    data object BackupImportFailed : ImportError()
 }
 
 enum class ImportMethod {
-    GrantPermission,
-    ManualImport,
+    GoogleTasks,
+    TasksOrgAndMd,
 }
 
 sealed class GoogleTasksImportEffect {
@@ -638,5 +848,14 @@ sealed class GoogleTasksImportEffect {
 
     data class ImportFinished(
         val outcome: ImportOutcome,
+    ) : GoogleTasksImportEffect()
+
+    data class MarkdownImportFinished(
+        val importedCount: Int,
+    ) : GoogleTasksImportEffect()
+
+    /** A full restore finished; its outcome is reported after the screen closes. */
+    data class BackupRestoreFinished(
+        val result: BackupIo.RestoreResult,
     ) : GoogleTasksImportEffect()
 }

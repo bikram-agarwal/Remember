@@ -2,11 +2,11 @@ package dev.bikram.remember.data
 
 import androidx.compose.runtime.Immutable
 
-enum class SortKey { LAST_MODIFIED, CREATED, REMINDER, ALPHABETICAL }
+enum class SortKey { LAST_MODIFIED, CREATED, REMINDER, ALPHABETICAL, IMPORTANCE }
 
 enum class SortDir { ASC, DESC }
 
-enum class GroupBy { DATE, NONE, TAG, TYPE }
+enum class GroupBy { DATE, NONE, TAG, TYPE, IMPORTANCE }
 
 enum class NoteLayoutMode { LIST, MOSAIC }
 
