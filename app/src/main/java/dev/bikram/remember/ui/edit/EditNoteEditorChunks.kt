@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.provider.CalendarContract
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -80,9 +81,11 @@ import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.data.NoteReminder
 import dev.bikram.remember.ui.common.AppBottomSheet
 import dev.bikram.remember.ui.common.HERO_MASK_ASPECT_RATIO
+import dev.bikram.remember.ui.common.MarkdownDateInteraction
 import dev.bikram.remember.ui.common.MarkdownLinkInteraction
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.withMarkdownDateReplaced
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
@@ -97,6 +100,9 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 /**
  * Bridges the editor's [MarkdownEditorState] with [EditNoteViewModel.body]. Owns the "last
@@ -349,6 +355,7 @@ internal fun EditNoteMarkdownEditorSection(
     markdownEditorState: MarkdownEditorState,
     bodyPlaceholder: String,
     isEditMode: Boolean,
+    readOnly: Boolean = false,
     existing: Boolean,
     autoFocusBodyOnEdit: Boolean,
     scrollState: ScrollState,
@@ -363,6 +370,8 @@ internal fun EditNoteMarkdownEditorSection(
 ) {
     val bodyEmpty = markdownEditorState.markdown.isEmpty()
     var linkActions by remember { mutableStateOf<MarkdownLinkInteraction?>(null) }
+    var dateActions by remember { mutableStateOf<MarkdownDateInteraction?>(null) }
+    var editingDateChip by remember { mutableStateOf<MarkdownDateInteraction?>(null) }
     val context = LocalContext.current
     val resources = LocalResources.current
     val uriHandler = LocalUriHandler.current
@@ -456,6 +465,88 @@ internal fun EditNoteMarkdownEditorSection(
             onLinkLongPress = { link ->
                 linkActions = link
             },
+            onDateClick = { dateInteraction ->
+                if (!readOnly) {
+                    editingDateChip = dateInteraction
+                } else {
+                    dateActions = dateInteraction
+                }
+            },
+            onDateLongPress = { dateInteraction ->
+                dateActions = dateInteraction
+            },
+        )
+    }
+
+    editingDateChip?.let { dateChip ->
+        CalendarPickerDialog(
+            initial =
+                dateChip.date
+                    .atStartOfDay(ZoneOffset.UTC)
+                    .toInstant()
+                    .toEpochMilli(),
+            onConfirm = { dateMillis ->
+                val pickedDate = Instant.ofEpochMilli(dateMillis).atZone(ZoneOffset.UTC).toLocalDate()
+                val updatedMarkdown =
+                    markdownEditorState.markdown.withMarkdownDateReplaced(
+                        spanStartOffset = dateChip.spanStartOffset,
+                        spanEndOffset = dateChip.spanEndOffset,
+                        newDate = pickedDate,
+                    )
+                markdownEditorState.replaceMarkdown(updatedMarkdown)
+                onMarkdownChanged(updatedMarkdown)
+                editingDateChip = null
+            },
+            onDismiss = { editingDateChip = null },
+        )
+    }
+
+    dateActions?.let { dateChip ->
+        DateActionsSheet(
+            date = dateChip,
+            canEdit = !readOnly,
+            onDismiss = { dateActions = null },
+            onChangeDate = {
+                dateActions = null
+                editingDateChip = dateChip
+            },
+            onOpenCalendar = {
+                val startOfDayMillis =
+                    dateChip.date
+                        .atStartOfDay(ZoneId.systemDefault())
+                        .toInstant()
+                        .toEpochMilli()
+                val calendarUri =
+                    CalendarContract.CONTENT_URI
+                        .buildUpon()
+                        .appendPath("time")
+                        .appendPath(startOfDayMillis.toString())
+                        .build()
+                val opened =
+                    runCatching {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, calendarUri))
+                        true
+                    }.getOrDefault(false)
+                if (!opened) {
+                    Toast
+                        .makeText(
+                            context,
+                            resources.getString(R.string.toast_no_calendar_app),
+                            Toast.LENGTH_SHORT,
+                        ).show()
+                }
+                dateActions = null
+            },
+            onCopy = {
+                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(
+                    ClipData.newPlainText(resources.getString(R.string.clipboard_date_label), dateChip.text),
+                )
+                Toast
+                    .makeText(context, resources.getString(R.string.toast_date_copied), Toast.LENGTH_SHORT)
+                    .show()
+                dateActions = null
+            },
         )
     }
 
@@ -545,6 +636,47 @@ private fun LinkActionsSheet(
     }
 }
 
+@Composable
+private fun DateActionsSheet(
+    date: MarkdownDateInteraction,
+    canEdit: Boolean,
+    onDismiss: () -> Unit,
+    onChangeDate: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onCopy: () -> Unit,
+) {
+    AppBottomSheet(
+        title = stringResource(R.string.edit_date_actions_title),
+        subtitle = date.text,
+        onDismiss = onDismiss,
+        scrollable = false,
+    ) {
+        if (canEdit) {
+            RememberDropdownMenuItem(
+                text = { Text(stringResource(R.string.edit_date_action_change)) },
+                onClick = onChangeDate,
+                leadingIcon = {
+                    RememberMaterialRoundedSymbol(name = "calendar_month", weight = FontWeight.Medium)
+                },
+            )
+        }
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_date_action_open_calendar)) },
+            onClick = onOpenCalendar,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "event", weight = FontWeight.Medium)
+            },
+        )
+        RememberDropdownMenuItem(
+            text = { Text(stringResource(R.string.edit_date_action_copy)) },
+            onClick = onCopy,
+            leadingIcon = {
+                RememberMaterialRoundedSymbol(name = "content_copy", weight = FontWeight.Medium)
+            },
+        )
+    }
+}
+
 /**
  * Scrollable column for the body of the edit screen. Only reads [padding] / [blurModifier]
  * directly; mutable note state is collected by leaf sections so that, e.g., title typing
@@ -606,6 +738,7 @@ internal fun EditNoteScrollableContent(
                 markdownEditorState = markdownEditorState,
                 bodyPlaceholder = bodyPlaceholder,
                 isEditMode = isEditMode && !readOnly,
+                readOnly = readOnly,
                 existing = existing,
                 autoFocusBodyOnEdit = autoFocusBodyOnEdit,
                 scrollState = scrollState,

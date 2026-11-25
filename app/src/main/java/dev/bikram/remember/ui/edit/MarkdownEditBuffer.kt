@@ -2,14 +2,20 @@ package dev.bikram.remember.ui.edit
 
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
+import dev.bikram.remember.ui.common.MARKDOWN_DATE_SCHEME
 import dev.bikram.remember.ui.common.MarkdownBlockKind
 import dev.bikram.remember.ui.common.MarkdownHorizontalRuleLineRegex
 import dev.bikram.remember.ui.common.MarkdownInlineKind
 import dev.bikram.remember.ui.common.MarkdownLineSyntax
+import dev.bikram.remember.ui.common.formatInlineNoteDate
 import dev.bikram.remember.ui.common.markdownLinkUrl
+import dev.bikram.remember.ui.common.parseInlineNoteDate
+import dev.bikram.remember.ui.common.parseMarkdownDateTarget
 import dev.bikram.remember.ui.common.parseMarkdownDocument
 import dev.bikram.remember.ui.common.parseMarkdownLine
 import dev.bikram.remember.ui.common.parseMarkdownLines
+import java.time.LocalDate
+import java.util.Locale
 
 private const val BODY_AUTO_FOCUS_MAX_CHARS = 280
 private const val BODY_AUTO_FOCUS_MAX_PARAGRAPHS = 6
@@ -75,6 +81,76 @@ internal class MarkdownEditBuffer(
     val selectedLinkUrl: String?
         get() = markdownLinkAtSelection()?.url
 
+    val selectedDate: LocalDate?
+        get() = markdownDateAtSelection()?.date
+
+    /** Set by [update] when an edit inside a date chip label turned the chip back into plain text. */
+    var unwrappedDateRange: TextRange? = null
+        private set
+
+    /**
+     * Plain text that reads as a date at the selection: the (trimmed) selected text, or the
+     * date-looking word the caret is in or touching. Null inside chips, links and code.
+     */
+    val plainDateAtSelection: MarkdownPlainDate?
+        get() = plainDateAtSelection(Locale.getDefault())
+
+    fun plainDateAtSelection(locale: Locale): MarkdownPlainDate? {
+        val selection = textFieldValue.selection
+        val text = markdown
+        val start: Int
+        val end: Int
+        if (selection.collapsed) {
+            val caret = selection.start.coerceIn(0, text.length)
+            var left = caret
+            while (left > 0 && text[left - 1].isPlainDateChar()) left--
+            var right = caret
+            while (right < text.length && text[right].isPlainDateChar()) right++
+            if (left > 0 && text[left - 1].isLetter()) return null
+            if (right < text.length && text[right].isLetter()) return null
+            while (right > left && text[right - 1] == '.') right--
+            start = left
+            end = right
+        } else {
+            var left = selection.min.coerceIn(0, text.length)
+            var right = selection.max.coerceIn(left, text.length)
+            while (left < right && text[left].isWhitespace()) left++
+            while (right > left && text[right - 1].isWhitespace()) right--
+            start = left
+            end = right
+        }
+        if (end - start !in 6..12 || !text[start].isDigit() || !text[end - 1].isDigit()) return null
+        val date = parseInlineNoteDate(text.substring(start, end), locale) ?: return null
+        if (isCodeBlock) return null
+        val blocked =
+            parseMarkdownDocument(text).spans.any { span ->
+                (span.kind == MarkdownInlineKind.Link || span.kind == MarkdownInlineKind.Date || span.kind == MarkdownInlineKind.Code) &&
+                    start < span.closeEnd &&
+                    end > span.openStart
+            }
+        return if (blocked) null else MarkdownPlainDate(start, end, date)
+    }
+
+    private fun Char.isPlainDateChar(): Boolean = this in '0'..'9' || this == '/' || this == '.' || this == '-'
+
+    /** Replaces the plain date text at [start]..[endExclusive] with a chip, keeping the caret's place. */
+    fun replacePlainDateWithChip(
+        start: Int,
+        endExclusive: Int,
+        date: LocalDate,
+        locale: Locale = Locale.getDefault(),
+    ) {
+        val replacement = "[${formatInlineNoteDate(date, locale)}]($MARKDOWN_DATE_SCHEME$date)"
+        val caret = textFieldValue.selection.start
+        val cursorAfter =
+            when {
+                caret > endExclusive -> caret + replacement.length - (endExclusive - start)
+                caret >= start -> start + replacement.length
+                else -> caret
+            }
+        textFieldValue = TextFieldValue(markdown.replaceRange(start, endExclusive, replacement), selection = TextRange(cursorAfter))
+    }
+
     val shouldCapitalizeNextInputInEmptyInlineWrapper: Boolean
         get() {
             val selection = textFieldValue.selection
@@ -98,6 +174,13 @@ internal class MarkdownEditBuffer(
         breakLineAfterHorizontalRule: Boolean = true,
     ) {
         val previousValue = textFieldValue
+        if (cleanUpEmptyMarkdownWrappers) {
+            value.withDateChipLabelEditUnwrapped(previousValue, ::formatSpans)?.let {
+                textFieldValue = it.value
+                unwrappedDateRange = it.textRange
+                return
+            }
+        }
         // Read before textFieldValue is reassigned below: reflects whether the cursor sat inside
         // an empty wrapper/heading prefix at a sentence start *before* this keystroke landed.
         val shouldCapitalizeNext = shouldCapitalizeNextInputInEmptyInlineWrapper
@@ -139,13 +222,24 @@ internal class MarkdownEditBuffer(
             }
         if (!onlyMarkers) return this
         val previousCursor = previousValue.selection.start
+        val nonAtomicSpans = spans.filterNot { it.isAtomicDate }
+        val atomicCloseEnd =
+            spans
+                .filter { it.isAtomicDate && selection.min <= it.closeStart && selection.max >= it.closeEnd }
+                .maxOfOrNull { it.closeEnd }
+        val atomicOpenStart =
+            spans
+                .filter { it.isAtomicDate && selection.min <= it.openStart && selection.max >= it.openEnd }
+                .minOfOrNull { it.openStart }
         val cursor =
             if (previousValue.selection.collapsed && previousCursor in selection.min..selection.max) {
                 // Keep the side chosen by the previous input or explicit toolbar toggle.
                 previousCursor
             } else {
-                spans.map { it.openEnd }.filter { it in selection.min..selection.max }.maxOrNull()
-                    ?: spans.map { it.closeStart }.filter { it in selection.min..selection.max }.minOrNull()
+                atomicCloseEnd
+                    ?: atomicOpenStart
+                    ?: nonAtomicSpans.map { it.openEnd }.filter { it in selection.min..selection.max }.maxOrNull()
+                    ?: nonAtomicSpans.map { it.closeStart }.filter { it in selection.min..selection.max }.minOrNull()
                     ?: selection.min
             }
         return copy(selection = TextRange(cursor))
@@ -300,6 +394,59 @@ internal class MarkdownEditBuffer(
         textFieldValue = TextFieldValue(updatedText, selection = TextRange(labelStart, labelEnd))
     }
 
+    fun addOrUpdateDate(
+        date: LocalDate,
+        locale: Locale = Locale.getDefault(),
+    ) {
+        val replacement = "[${formatInlineNoteDate(date, locale)}]($MARKDOWN_DATE_SCHEME$date)"
+        val existingDate = markdownDateAtSelection()
+        if (existingDate != null) {
+            val updatedText = markdown.replaceRange(existingDate.start, existingDate.endExclusive, replacement)
+            val cursorAfter = existingDate.start + replacement.length
+            textFieldValue = TextFieldValue(updatedText, selection = TextRange(cursorAfter))
+            return
+        }
+
+        plainDateAtSelection(locale)?.let {
+            replacePlainDateWithChip(it.start, it.endExclusive, date, locale)
+            textFieldValue = textFieldValue.copy(selection = TextRange(it.start + replacement.length))
+            return
+        }
+        val selection = textFieldValue.selection
+        var start = selection.min.coerceIn(0, markdown.length)
+        var end = selection.max.coerceIn(start, markdown.length)
+        // Never cut a link or date chip in half, and never nest a chip inside a link label:
+        // a cursor strictly inside one moves after it; a selection that only partly overlaps
+        // one grows to cover it whole.
+        val atomicSpans =
+            parseMarkdownDocument(markdown)
+                .spans
+                .filter { it.kind == MarkdownInlineKind.Link || it.kind == MarkdownInlineKind.Date }
+        if (start == end) {
+            atomicSpans.firstOrNull { start > it.openStart && start < it.closeEnd }?.let {
+                start = it.closeEnd
+                end = start
+            }
+        } else {
+            var changed = true
+            while (changed) {
+                changed = false
+                for (span in atomicSpans) {
+                    val overlaps = start < span.closeEnd && end > span.openStart
+                    val covers = start <= span.openStart && end >= span.closeEnd
+                    if (overlaps && !covers) {
+                        start = minOf(start, span.openStart)
+                        end = maxOf(end, span.closeEnd)
+                        changed = true
+                    }
+                }
+            }
+        }
+        val updatedText = markdown.replaceRange(start, end, replacement)
+        val cursorAfter = start + replacement.length
+        textFieldValue = TextFieldValue(updatedText, selection = TextRange(cursorAfter))
+    }
+
     fun selectedText(): String {
         val selection = textFieldValue.selection
         val start = selection.min.coerceIn(0, markdown.length)
@@ -430,6 +577,25 @@ internal class MarkdownEditBuffer(
             }
     }
 
+    private fun markdownDateAtSelection(): MarkdownDateRange? {
+        val selection = textFieldValue.selection
+        val selectionStart = selection.min.coerceIn(0, markdown.length)
+        val selectionEnd = selection.max.coerceIn(selectionStart, markdown.length)
+        return parseMarkdownDocument(markdown)
+            .spans
+            .firstOrNull { span ->
+                span.kind == MarkdownInlineKind.Date &&
+                    if (selectionStart == selectionEnd) {
+                        selectionStart > span.openStart && selectionStart < span.closeEnd
+                    } else {
+                        selectionStart >= span.openStart && selectionEnd <= span.closeEnd
+                    }
+            }?.let { span ->
+                val parsedDate = span.url?.let(::parseMarkdownDateTarget) ?: return null
+                MarkdownDateRange(span.openStart, span.closeEnd, parsedDate)
+            }
+    }
+
     private fun replaceExistingLink(
         existingLink: MarkdownLinkRange,
         displayText: String,
@@ -553,6 +719,18 @@ private data class MarkdownLinkRange(
     val endExclusive: Int,
     val text: String,
     val url: String,
+)
+
+internal data class MarkdownPlainDate(
+    val start: Int,
+    val endExclusive: Int,
+    val date: LocalDate,
+)
+
+private data class MarkdownDateRange(
+    val start: Int,
+    val endExclusive: Int,
+    val date: LocalDate,
 )
 
 internal enum class MarkdownInlineFormat {

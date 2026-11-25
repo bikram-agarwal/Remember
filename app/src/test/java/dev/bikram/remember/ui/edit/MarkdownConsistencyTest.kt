@@ -16,13 +16,19 @@ import dev.bikram.remember.ui.common.MarkdownInlineInteraction
 import dev.bikram.remember.ui.common.MarkdownInlineInteractionBuilder
 import dev.bikram.remember.ui.common.MarkdownInlineProjection
 import dev.bikram.remember.ui.common.MarkdownStyler
+import dev.bikram.remember.ui.common.formatInlineNoteDate
 import dev.bikram.remember.ui.common.markdownCardPreview
+import dev.bikram.remember.ui.common.parseInlineNoteDate
+import dev.bikram.remember.ui.common.parseMarkdownDateTarget
 import dev.bikram.remember.ui.common.parseMarkdownDocument
+import dev.bikram.remember.ui.common.withMarkdownDateReplaced
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.util.Locale
 
 class MarkdownConsistencyTest {
     private val styler =
@@ -420,6 +426,80 @@ class MarkdownConsistencyTest {
     }
 
     @Test
+    fun dateChipsKeepConsistentChipStyleHitTargetsAndNoUrlAnnotationLeak() {
+        val date = LocalDate.of(2026, 11, 24)
+        assertEquals("11/24/2026", formatInlineNoteDate(date, Locale.US))
+        assertEquals("24/11/2026", formatInlineNoteDate(date, Locale.UK))
+        assertEquals("24.11.2026", formatInlineNoteDate(date, Locale.GERMANY))
+        assertEquals(date, parseMarkdownDateTarget("date:2026-11-24"))
+        assertNull(parseMarkdownDateTarget("date:2026-02-30"))
+        assertNull(parseMarkdownDateTarget("date:not-a-date"))
+        assertNull(parseMarkdownDateTarget("https://example.com"))
+
+        val source = "Meet on [11/24/2026](date:2026-11-24) sharp"
+        val expected = "Meet on 11/24/2026 sharp"
+        val saved = styler.markdownInlineAnnotatedString(source)
+        val card = markdownCardPreview(source, styler)
+        val preview = MarkdownOutputTransformation(styler).preview(source)
+        assertEquals(expected, saved.text)
+        assertEquals(expected, card.text.text)
+        assertEquals("Meet on \u00A011/24/2026\u00A0 sharp", preview.text.text)
+        assertEquals(listOf(MarkdownPreviewDateRange(8, 20)), preview.datePillRanges)
+
+        assertTrue(saved.getLinkAnnotations(0, saved.length).isEmpty())
+        for (index in 8 until 18) {
+            val chipStyle = resolvedStyle(saved, index)
+            assertEquals(styler.dateContentColor, chipStyle.color)
+            assertEquals(Color.Unspecified, chipStyle.background)
+            assertEquals(FontWeight.Medium, chipStyle.fontWeight)
+            assertNull(chipStyle.textDecoration)
+        }
+        for (index in 8 until 20) {
+            val previewChipStyle = resolvedStyle(preview.text, index)
+            assertEquals(styler.dateContentColor, previewChipStyle.color)
+            assertEquals(FontWeight.Medium, previewChipStyle.fontWeight)
+        }
+
+        val map = MarkdownInlineInteractionBuilder(source, 10).build()
+        val dateInteraction = map.interactionAt(12) as MarkdownInlineInteraction.Date
+        assertEquals(date, dateInteraction.date.date)
+        assertEquals("11/24/2026", dateInteraction.date.text)
+        assertEquals(10 + source.indexOf('['), dateInteraction.date.spanStartOffset)
+        assertEquals(10 + source.indexOf(')') + 1, dateInteraction.date.spanEndOffset)
+        assertTrue(map.interactionAt(0) is MarkdownInlineInteraction.Text)
+        assertTrue(map.interactionAt(18) is MarkdownInlineInteraction.Text)
+
+        val updated =
+            source.withMarkdownDateReplaced(
+                spanStartOffset = source.indexOf('['),
+                spanEndOffset = source.indexOf(')') + 1,
+                newDate = LocalDate.of(2026, 12, 5),
+                locale = Locale.US,
+            )
+        assertEquals("Meet on [12/05/2026](date:2026-12-05) sharp", updated)
+
+        // Malformed date: target falls back to a standard link instead of crashing or losing text.
+        val invalidDateSource = "[bad](date:not-a-date)"
+        val invalidMap = MarkdownInlineInteractionBuilder(invalidDateSource, 0).build()
+        assertTrue(invalidMap.interactionAt(1) is MarkdownInlineInteraction.Link)
+
+        // Toggling bold across a selection containing a date chip preserves the date target.
+        val state = MarkdownEditorState(source)
+        val projection = MarkdownInlineProjection(source, parseMarkdownDocument(source).spans)
+        state.textFieldState.edit {
+            selection = TextRange(projection.sourceOffsets[0], projection.sourceOffsets[expected.length])
+        }
+        state.toggleBold()
+        assertEquals(expected, styler.markdownInlineAnnotatedString(state.markdown).text)
+        assertEquals(expected, markdownCardPreview(state.markdown, styler).text.text)
+        assertEquals("Meet on \u00A011/24/2026\u00A0 sharp", MarkdownOutputTransformation(styler).preview(state.markdown).text.text)
+        val afterBoldMap = MarkdownInlineInteractionBuilder(state.markdown, 0).build()
+        val boldDateInteraction = afterBoldMap.interactionAt(12) as MarkdownInlineInteraction.Date
+        assertEquals(date, boldDateInteraction.date.date)
+        assertEquals("11/24/2026", boldDateInteraction.date.text)
+    }
+
+    @Test
     fun settlingSourceOnSameTransformationRefreshesDebouncedPreview() {
         val source = "**" + "w".repeat(LIVE_PREVIEW_DEBOUNCE_THRESHOLD_CHARS) + "**"
         val transformation = MarkdownOutputTransformation(styler)
@@ -501,5 +581,37 @@ class MarkdownConsistencyTest {
             replace(start, selection.max, text)
             selection = TextRange(start + text.length)
         }
+    }
+
+    @Test
+    fun dateChipSourceOffsetsStayCorrectInsideChecklistAndQuoteLines() {
+        val first = "[11/24/2026](date:2026-11-24)"
+        val second = "[11/25/2026](date:2026-11-25)"
+        val source = "- [ ] Pay $first\n> Due $second"
+        val dates = markdownCardPreview(source, styler).interactions.dates
+        assertEquals(2, dates.size)
+        assertEquals(listOf(first, second), dates.map { source.substring(it.date.spanStartOffset, it.date.spanEndOffset) })
+
+        val updated =
+            source.withMarkdownDateReplaced(
+                spanStartOffset = dates[1].date.spanStartOffset,
+                spanEndOffset = dates[1].date.spanEndOffset,
+                newDate = LocalDate.of(2026, 12, 5),
+                locale = Locale.US,
+            )
+        assertEquals("- [ ] Pay $first\n> Due [12/05/2026](date:2026-12-05)", updated)
+    }
+
+    @Test
+    fun plainTextDatesParseByLocaleOrderForThePicker() {
+        assertEquals(LocalDate.of(2026, 11, 24), parseInlineNoteDate("11/24/2026", Locale.US))
+        assertEquals(LocalDate.of(2026, 11, 24), parseInlineNoteDate(" 11-24-2026 ", Locale.US))
+        assertEquals(LocalDate.of(2026, 11, 24), parseInlineNoteDate("24/11/2026", Locale.UK))
+        assertEquals(LocalDate.of(2026, 11, 24), parseInlineNoteDate("24.11.2026", Locale.GERMANY))
+        assertEquals(LocalDate.of(2026, 11, 24), parseInlineNoteDate("2026-11-24", Locale.US))
+        assertEquals(LocalDate.of(2026, 1, 5), parseInlineNoteDate("1/5/26", Locale.US))
+        assertNull(parseInlineNoteDate("13/45/2026", Locale.US))
+        assertNull(parseInlineNoteDate("on 11/24/2026", Locale.US))
+        assertNull(parseInlineNoteDate("hello", Locale.US))
     }
 }

@@ -237,6 +237,9 @@
     <string name="rt_h3_cd">Heading 3</string>
     <string name="rt_add_link">Add link</string>
     <string name="rt_edit_link">Edit link</string>
+    <string name="rt_insert_date">Insert date</string>
+    <string name="rt_edit_date">Change date</string>
+    <string name="rt_convert_date">Turn into date</string>
     <string name="cd_redo">Redo</string>
     <string name="cd_bold">Bold</string>
     <string name="cd_italic">Italic</string>
@@ -264,6 +267,13 @@
     <string name="edit_link_action_copy">Copy link</string>
     <string name="edit_link_action_edit_text">Edit link text</string>
     <string name="edit_link_action_share">Share</string>
+    <string name="edit_date_actions_title">Date</string>
+    <string name="edit_date_action_change">Change date</string>
+    <string name="edit_date_action_open_calendar">Open in Calendar</string>
+    <string name="edit_date_action_copy">Copy date</string>
+    <string name="clipboard_date_label">Date</string>
+    <string name="toast_date_copied">Date copied</string>
+    <string name="toast_no_calendar_app">No calendar app found</string>
     <!-- Editor bottom bar and archived state -->
     <string name="edit_bottom_bar_edit">Edit</string>
     <string name="edit_bottom_bar_done">Done</string>

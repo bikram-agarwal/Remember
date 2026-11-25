@@ -13,6 +13,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.util.Locale
 
 /** Uses Compose's real mapping from displayed deletion ranges to the source document. */
 class MarkdownEditorBackspaceTest {
@@ -313,6 +315,52 @@ class MarkdownEditorBackspaceTest {
 
         assertEquals("**A**~~F~~", state.markdown)
         assertEquals("AF", output.preview(state.markdown).text.text)
+    }
+
+    @Test
+    fun backspaceAfterDateChipDeletesEntireChipCleanlyAndSupportsUndoRedo() {
+        val state = MarkdownEditorState("Meet on ")
+        state.textFieldState.edit { selection = TextRange(length) }
+        state.addOrUpdateDate(LocalDate.of(2026, 11, 24), Locale.US)
+        assertEquals("Meet on [11/24/2026](date:2026-11-24)", state.markdown)
+
+        val transformedState = transformed(state)
+        assertEquals("Meet on \u00A011/24/2026\u00A0", output.preview(state.markdown).text.text)
+
+        pressBackspace(transformedState)
+
+        assertEquals("Meet on ", state.markdown)
+        assertEquals("Meet on ", output.preview(state.markdown).text.text)
+        assertNull(state.selectedDate)
+
+        state.undo()
+        assertEquals("Meet on [11/24/2026](date:2026-11-24)", state.markdown)
+        state.redo()
+        assertEquals("Meet on ", state.markdown)
+    }
+
+    @Test
+    fun typingAtEdgesOfDateChipInsertsPlainTextOutsideTheChip() {
+        val state = MarkdownEditorState("[11/24/2026](date:2026-11-24)")
+        val transformedState = transformed(state)
+        val select = transformedState.javaClass.methods.single { it.name.startsWith("selectCharsIn-") }
+        val initialDisplayedLength = output.preview(state.markdown).text.length
+
+        // Caret at end of displayed chip -> typing appends after ')'.
+        select.invoke(transformedState, TextRange(initialDisplayedLength).toComposeTestRange())
+        type(state, " at noon")
+        assertEquals("[11/24/2026](date:2026-11-24) at noon", state.markdown)
+
+        // Caret at start of displayed text -> typing prepends before '['.
+        select.invoke(transformedState, TextRange.Zero.toComposeTestRange())
+        type(state, "On ")
+        assertEquals("On [11/24/2026](date:2026-11-24) at noon", state.markdown)
+
+        // Punctuation directly after chip stays outside the pill range in Live Preview.
+        val periodPreview = output.preview("Last replaced on [11/27/2026](date:2026-11-27).")
+        assertEquals("Last replaced on \u00A011/27/2026\u00A0.", periodPreview.text.text)
+        val pillRange = periodPreview.datePillRanges.single()
+        assertEquals("\u00A011/27/2026\u00A0", periodPreview.text.text.substring(pillRange.start, pillRange.endExclusive))
     }
 
     @Test

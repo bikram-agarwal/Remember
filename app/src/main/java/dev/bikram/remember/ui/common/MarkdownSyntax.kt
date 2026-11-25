@@ -2,6 +2,15 @@
 
 package dev.bikram.remember.ui.common
 
+import java.time.LocalDate
+import java.time.chrono.IsoChronology
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatterBuilder
+import java.time.format.FormatStyle
+import java.util.Locale
+
+internal const val MARKDOWN_DATE_SCHEME = "date:"
+
 /** Source ranges are half-open and always refer to the unchanged Markdown string. */
 internal data class MarkdownInlineSpan(
     val kind: MarkdownInlineKind,
@@ -12,7 +21,7 @@ internal data class MarkdownInlineSpan(
     val url: String? = null,
 )
 
-internal enum class MarkdownInlineKind { Code, Underline, Strikethrough, BoldItalic, Bold, Italic, Link }
+internal enum class MarkdownInlineKind { Code, Underline, Strikethrough, BoldItalic, Bold, Italic, Link, Date }
 
 internal enum class MarkdownBlockKind { Plain, Heading, Checklist, Bullet, Numbered, Quote, Rule, CodeFence, Code }
 
@@ -156,7 +165,14 @@ private fun collectMarkdownInlineSpans(
         val link = nextLink?.takeIf { it.range.first == index && it.range.last < frame.end }
         val span =
             if (link != null) {
-                MarkdownInlineSpan(MarkdownInlineKind.Link, index, link.groups[1]!!.range.first, link.groups[1]!!.range.last + 1, link.range.last + 1, link.groupValues[2])
+                val target = link.groupValues[2]
+                val kind =
+                    if (parseMarkdownDateTarget(target) != null) {
+                        MarkdownInlineKind.Date
+                    } else {
+                        MarkdownInlineKind.Link
+                    }
+                MarkdownInlineSpan(kind, index, link.groups[1]!!.range.first, link.groups[1]!!.range.last + 1, link.range.last + 1, target)
             } else {
                 findMarkdownInlineSpan(source, index, frame.end, matcher)
             }
@@ -235,4 +251,130 @@ internal class MarkdownInlineProjection(
 
 internal fun String.markdownLinkUrl(): String {
     return if (startsWith("http://") || startsWith("https://")) this else "https://$this"
+}
+
+private val MarkdownDateTargetRegex = Regex("""^date:(\d{4}-\d{2}-\d{2})$""")
+
+internal fun parseMarkdownDateTarget(rawTarget: String): LocalDate? {
+    val isoDate = MarkdownDateTargetRegex.matchEntire(rawTarget.trim())?.groupValues?.get(1) ?: return null
+    return runCatching { LocalDate.parse(isoDate) }.getOrNull()
+}
+
+internal fun formatInlineNoteDate(
+    date: LocalDate,
+    locale: Locale = Locale.getDefault(),
+): String {
+    return runCatching {
+        val shortPattern =
+            DateTimeFormatterBuilder.getLocalizedDateTimePattern(
+                FormatStyle.SHORT,
+                null,
+                IsoChronology.INSTANCE,
+                locale,
+            )
+        val normalizedPattern = normalizeShortNumericDatePattern(shortPattern)
+        DateTimeFormatter.ofPattern(normalizedPattern, locale).format(date)
+    }.getOrElse {
+        DateTimeFormatter.ISO_LOCAL_DATE.format(date)
+    }
+}
+
+private val PlainDateTextRegex = Regex("^[0-9]{1,4}[-/. ][0-9]{1,4}[-/. ][0-9]{1,4}[.]?$")
+
+/**
+ * Parses plain text a user typed as a date (e.g. `11/24/2026`, `24.11.2026`, `2026-11-24`) so the
+ * date picker can open on it. Numeric field order follows [locale]'s short date format; a leading
+ * four-digit year is always read as year-month-day. Returns null for anything else.
+ */
+internal fun parseInlineNoteDate(
+    text: String,
+    locale: Locale = Locale.getDefault(),
+): LocalDate? {
+    val trimmed = text.trim()
+    if (!PlainDateTextRegex.matches(trimmed)) return null
+    val parts = Regex("[0-9]+").findAll(trimmed).map { it.value }.toList()
+    if (parts.size != 3) return null
+    val order =
+        if (parts[0].length == 4) {
+            listOf('y', 'M', 'd')
+        } else {
+            localeDateFieldOrder(locale)
+        }
+    val values = HashMap<Char, String>(3)
+    order.forEachIndexed { index, field -> values[field] = parts[index] }
+    val yearText = values['y'] ?: return null
+    val year =
+        when (yearText.length) {
+            4 -> yearText.toInt()
+            2 -> 2000 + yearText.toInt()
+            else -> return null
+        }
+    val month = values['M']?.toIntOrNull() ?: return null
+    val day = values['d']?.toIntOrNull() ?: return null
+    return runCatching { LocalDate.of(year, month, day) }.getOrNull()
+}
+
+private fun localeDateFieldOrder(locale: Locale): List<Char> {
+    val pattern =
+        runCatching {
+            DateTimeFormatterBuilder.getLocalizedDateTimePattern(FormatStyle.SHORT, null, IsoChronology.INSTANCE, locale)
+        }.getOrDefault("M/d/y")
+    val order = LinkedHashSet<Char>()
+    var inQuotes = false
+    for (ch in pattern) {
+        if (ch == '\'') inQuotes = !inQuotes
+        if (inQuotes) continue
+        when (ch) {
+            'y', 'u' -> order.add('y')
+            'M', 'L' -> order.add('M')
+            'd' -> order.add('d')
+        }
+    }
+    return if (order.size == 3) order.toList() else listOf('M', 'd', 'y')
+}
+
+internal fun String.withMarkdownDateReplaced(
+    spanStartOffset: Int,
+    spanEndOffset: Int,
+    newDate: LocalDate,
+    locale: Locale = Locale.getDefault(),
+): String {
+    if (spanStartOffset < 0 || spanEndOffset > length || spanStartOffset >= spanEndOffset) return this
+    val replacement = "[${formatInlineNoteDate(newDate, locale)}]($MARKDOWN_DATE_SCHEME$newDate)"
+    return replaceRange(spanStartOffset, spanEndOffset, replacement)
+}
+
+private fun normalizeShortNumericDatePattern(rawPattern: String): String {
+    val builder = StringBuilder(rawPattern.length + 4)
+    var index = 0
+    var inQuotes = false
+    while (index < rawPattern.length) {
+        val ch = rawPattern[index]
+        if (ch == '\'') {
+            builder.append(ch)
+            if (index + 1 < rawPattern.length && rawPattern[index + 1] == '\'') {
+                builder.append('\'')
+                index += 2
+                continue
+            }
+            inQuotes = !inQuotes
+            index++
+            continue
+        }
+        if (!inQuotes && (ch == 'y' || ch == 'M' || ch == 'L' || ch == 'd')) {
+            while (index < rawPattern.length && rawPattern[index] == ch) {
+                index++
+            }
+            when (ch) {
+                'y' -> builder.append("yyyy")
+                'M' -> builder.append("MM")
+                'L' -> builder.append("LL")
+                'd' -> builder.append("dd")
+            }
+            continue
+        }
+        builder.append(ch)
+        index++
+    }
+    return builder.toString()
 }

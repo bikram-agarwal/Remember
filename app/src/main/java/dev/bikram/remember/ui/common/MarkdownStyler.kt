@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextIndent
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
@@ -23,6 +24,9 @@ import androidx.compose.ui.unit.sp
 @Composable
 internal fun rememberMarkdownStyler(bodyStyle: TextStyle): MarkdownStyler {
     val linkColor = MaterialTheme.colorScheme.primary
+    val dateContainerColor = MaterialTheme.colorScheme.secondaryContainer
+    val dateContentColor = MaterialTheme.colorScheme.onSecondaryContainer
+    val dateBorderColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.38f)
     val codeBackground = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
     val quoteColor = MaterialTheme.colorScheme.onSurfaceVariant
     val quoteBarColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
@@ -35,6 +39,9 @@ internal fun rememberMarkdownStyler(bodyStyle: TextStyle): MarkdownStyler {
     return remember(
         bodyStyle,
         linkColor,
+        dateContainerColor,
+        dateContentColor,
+        dateBorderColor,
         codeBackground,
         quoteColor,
         quoteBarColor,
@@ -54,6 +61,9 @@ internal fun rememberMarkdownStyler(bodyStyle: TextStyle): MarkdownStyler {
             headingOneBaseStyle = headingOneStyle,
             headingTwoBaseStyle = headingTwoStyle,
             headingThreeBaseStyle = headingThreeStyle,
+            dateContainerColor = dateContainerColor,
+            dateContentColor = dateContentColor,
+            dateBorderColor = dateBorderColor,
         )
     }
 }
@@ -68,9 +78,24 @@ internal class MarkdownStyler(
     private val headingOneBaseStyle: TextStyle,
     private val headingTwoBaseStyle: TextStyle,
     private val headingThreeBaseStyle: TextStyle,
+    val dateContainerColor: Color = linkColor.copy(alpha = 0.16f),
+    val dateContentColor: Color = linkColor,
+    val dateBorderColor: Color = linkColor.copy(alpha = 0.38f),
 ) {
+    private val dateChipFontSize: TextUnit =
+        if (bodyStyle.fontSize.isSpecified && bodyStyle.fontSize.value > 0f) {
+            (bodyStyle.fontSize.value * 0.85f).sp
+        } else {
+            TextUnit.Unspecified
+        }
     val syntaxMarkerSpanStyle: SpanStyle = SpanStyle(color = Color.Transparent)
     val linkSpanStyle: SpanStyle = SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
+    val dateChipSpanStyle: SpanStyle =
+        SpanStyle(
+            color = dateContentColor,
+            fontSize = dateChipFontSize,
+            fontWeight = FontWeight.Medium,
+        )
     val inlineCodeSpanStyle: SpanStyle = SpanStyle(background = codeBackground, fontFamily = FontFamily.Monospace)
     val quoteSpanStyle: SpanStyle = SpanStyle(color = quoteColor, fontStyle = FontStyle.Italic)
     val codeBlockSpanStyle: SpanStyle = SpanStyle(color = quoteColor, background = codeBackground, fontFamily = FontFamily.Monospace)
@@ -132,6 +157,7 @@ internal class MarkdownStyler(
             MarkdownInlineKind.Strikethrough -> strikethroughSpanStyle
             MarkdownInlineKind.Code -> inlineCodeSpanStyle
             MarkdownInlineKind.Link -> linkSpanStyle
+            MarkdownInlineKind.Date -> dateChipSpanStyle
         }
 
     fun markdownInlineAnnotatedString(
@@ -154,7 +180,7 @@ internal class MarkdownStyler(
                 val end = projection.visibleOffsets[span.closeStart]
                 if (end <= start) continue
                 addStyle(inlineSpanStyle(span.kind), start, end)
-                if (includeLinkAnnotations && span.url != null) {
+                if (includeLinkAnnotations && span.kind == MarkdownInlineKind.Link && span.url != null) {
                     addLink(LinkAnnotation.Url(span.url.markdownLinkUrl()), start, end)
                 }
             }

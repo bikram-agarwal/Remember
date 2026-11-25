@@ -17,6 +17,7 @@ class NotesWidgetTest {
         assertEquals("30 May IST", widgetPlainText("**30 May IST**"))
         assertEquals("May 2026 games were:...", widgetPlainText("**May 2026** games were:..."))
         assertEquals("Read docs", widgetPlainText("[Read docs](https://example.com)"))
+        assertEquals("Due 11/24/2026", widgetPlainText("Due [11/24/2026](date:2026-11-24)"))
         assertEquals("code", widgetPlainText("`code`"))
     }
 

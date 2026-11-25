@@ -58,6 +58,51 @@ internal fun TextFieldValue.withInlineWrapperEnterAdjusted(
 }
 
 /**
+ * A date chip is atomic, but a user fixing its text ("11/24/2026" -> delete the 4, type 5) edits
+ * the label from the inside. The label is only a display string for the `date:` target, so
+ * editing it would silently desync the two; instead the chip falls back to its plain label text
+ * with the edit applied, which can be re-chipped by selecting it and using the date button.
+ * Returns null when the edit isn't strictly inside a chip label. [spans] lazily supplies the
+ * previous text's spans.
+ */
+internal fun TextFieldValue.withDateChipLabelEditUnwrapped(
+    previousValue: TextFieldValue,
+    spans: () -> List<MarkdownWrapperRange>,
+): DateChipUnwrap? {
+    if (text == previousValue.text || !previousValue.text.contains("](date:")) return null
+    val change = markdownChangedRange(previousValue.text, text)
+    val inserted = text.substring(change.start, change.updatedEnd)
+    val deletionStart = change.start
+    val deletionEnd = change.originalEnd
+    val chip =
+        spans().firstOrNull { span ->
+            span.isAtomicDate &&
+                if (deletionStart == deletionEnd) {
+                    deletionStart > span.openEnd && deletionStart < span.closeStart
+                } else {
+                    deletionStart >= span.openEnd &&
+                        deletionEnd <= span.closeStart &&
+                        !(inserted.isEmpty() && deletionStart == span.openEnd && deletionEnd == span.closeStart)
+                }
+        } ?: return null
+    val label = previousValue.text.substring(chip.openEnd, chip.closeStart)
+    val editedLabel = label.replaceRange(deletionStart - chip.openEnd, deletionEnd - chip.openEnd, inserted)
+    val updatedText =
+        previousValue.text.substring(0, chip.openStart) + editedLabel + previousValue.text.substring(chip.closeEnd)
+    val cursor = chip.openStart + (deletionStart - chip.openEnd) + inserted.length
+    return DateChipUnwrap(
+        value = copy(text = updatedText, selection = TextRange(cursor), composition = null),
+        textRange = TextRange(chip.openStart, chip.openStart + editedLabel.length),
+    )
+}
+
+/** Result of [withDateChipLabelEditUnwrapped]: the edited value and where the plain label text now sits. */
+internal class DateChipUnwrap(
+    val value: TextFieldValue,
+    val textRange: TextRange,
+)
+
+/**
  * Applies deletions the way live preview displays them, dropping hidden Markdown syntax the user
  * cannot see instead of the raw characters. [spans] lazily supplies the previous text's spans.
  */
@@ -136,6 +181,13 @@ private fun TextFieldValue.withInlineFormattingPreserved(
     for (index in deletion.min until deletion.max) {
         removed[index] = !markers[index]
     }
+    if (inserted.isEmpty() && deletion.min < deletion.max) {
+        for (span in spans) {
+            if (span.isAtomicDate && deletion.min < span.closeEnd && deletion.max > span.openStart) {
+                removed.fill(true, span.openStart, span.closeEnd)
+            }
+        }
+    }
     if (inserted.isEmpty() && removed.none { it }) {
         // An IME can send a raw Backspace on a hidden marker instead of a displayed range.
         // Redirect that deletion to the previous visible grapheme, preserving its boundaries.
@@ -152,15 +204,22 @@ private fun TextFieldValue.withInlineFormattingPreserved(
     }
     val firstDeletedContent = removed.indexOfFirst { it }
     if (firstDeletedContent < 0 && inserted.isEmpty()) return previousValue
-    var insertionPoint = if (firstDeletedContent >= 0) firstDeletedContent else previousValue.selection.start.coerceIn(deletion.min, deletion.max)
+    var insertionPoint =
+        resolveLivePreviewInsertionPointAndAtomicRemovals(
+            spans = spans,
+            removed = removed,
+            deletion = deletion,
+            previousCursor = previousValue.selection.start,
+        )
     if (inserted.firstOrNull()?.isWhitespace() == true) {
         // A space inserted at the start of an emphasis span belongs before its opener;
         // otherwise a valid *word* becomes the literal Markdown * word*.
         while (true) {
-            val opening = spans.filter { it.openEnd == insertionPoint }.minByOrNull { it.openStart } ?: break
+            val opening = spans.filter { !it.isAtomicDate && it.openEnd == insertionPoint }.minByOrNull { it.openStart } ?: break
             insertionPoint = opening.openStart
         }
     }
+    val adjustedFirstDeletedContent = removed.indexOfFirst { it }
     val lastDeletedContent = removed.indexOfLast { it }
     // A selection can empty several separate wrappers. Cursor-local cleanup only removes
     // the first one, leaving invisible Markdown elsewhere in an apparently empty note.
@@ -170,7 +229,8 @@ private fun TextFieldValue.withInlineFormattingPreserved(
         survivingContent[index + 1] = survivingContent[index] + if (!markers[index] && !removed[index]) 1 else 0
     }
     for (span in spans) {
-        val touchedContent = span.openEnd <= lastDeletedContent && span.closeStart > firstDeletedContent
+        if (span.isAtomicDate) continue
+        val touchedContent = adjustedFirstDeletedContent >= 0 && span.openEnd <= lastDeletedContent && span.closeStart > adjustedFirstDeletedContent
         val selectedWrapper =
             !previousValue.selection.collapsed && deletion.min <= span.openStart && deletion.max >= span.closeEnd
         val ownsInsertion = inserted.isNotEmpty() && insertionPoint in span.openEnd..span.closeStart
@@ -180,7 +240,7 @@ private fun TextFieldValue.withInlineFormattingPreserved(
         }
     }
     for ((left, right) in spans.distinctBy { it.openStart }.sortedBy { it.openStart }.zipWithNext()) {
-        if (left.format != right.format || left.closeEnd > right.openStart) continue
+        if (left.format == null || left.format != right.format || left.closeEnd > right.openStart) continue
         if (removed[left.openStart] || removed[right.closeStart]) continue
         if (previousValue.text.substring(left.closeStart, left.closeEnd) != previousValue.text.substring(right.openStart, right.openEnd)) continue
         if ((left.closeEnd until right.openStart).any { !removed[it] }) continue
@@ -207,8 +267,48 @@ private fun TextFieldValue.withInlineFormattingPreserved(
                 updatedCursor = length
             }
         }
+    val relocated = relocateEdgeWhitespaceOutsideWrappers(spans, removed, updatedPositions, updatedText, updatedCursor)
+    return copy(text = relocated.first, selection = TextRange(relocated.second), composition = null).withCompleteEmptyWrappersRemoved()
+}
+
+private fun resolveLivePreviewInsertionPointAndAtomicRemovals(
+    spans: List<MarkdownWrapperRange>,
+    removed: BooleanArray,
+    deletion: TextRange,
+    previousCursor: Int,
+): Int {
+    for (span in spans) {
+        if (span.isAtomicDate && (span.openEnd until span.closeStart).any { removed[it] }) {
+            removed.fill(true, span.openStart, span.closeEnd)
+        }
+    }
+    val adjustedFirstDeletedContent = removed.indexOfFirst { it }
+    if (adjustedFirstDeletedContent >= 0) {
+        return adjustedFirstDeletedContent
+    }
+    var wedgePoint = previousCursor.coerceIn(deletion.min, deletion.max)
+    for (span in spans) {
+        if (!span.isAtomicDate) continue
+        if (deletion.min >= span.closeStart && deletion.max <= span.closeEnd) {
+            wedgePoint = maxOf(wedgePoint, span.closeEnd)
+        } else if (deletion.min >= span.openStart && deletion.max <= span.openEnd) {
+            wedgePoint = minOf(wedgePoint, span.openStart)
+        }
+    }
+    return wedgePoint
+}
+
+private fun relocateEdgeWhitespaceOutsideWrappers(
+    spans: List<MarkdownWrapperRange>,
+    removed: BooleanArray,
+    updatedPositions: IntArray,
+    initialText: String,
+    initialCursor: Int,
+): Pair<String, Int> {
+    var updatedText = initialText
+    var updatedCursor = initialCursor
     for (span in spans.distinctBy { it.openStart }.sortedByDescending { it.openStart }) {
-        if (span.format == MarkdownInlineFormat.UNDERLINE || removed[span.openStart] || removed[span.closeStart]) continue
+        if (span.format == null || span.format == MarkdownInlineFormat.UNDERLINE || removed[span.openStart] || removed[span.closeStart]) continue
         val openStart = updatedPositions[span.openStart]
         val openLength = span.openEnd - span.openStart
         val openEnd = openStart + openLength
@@ -242,5 +342,5 @@ private fun TextFieldValue.withInlineFormattingPreserved(
                 else -> updatedCursor
             }
     }
-    return copy(text = updatedText, selection = TextRange(updatedCursor), composition = null).withCompleteEmptyWrappersRemoved()
+    return updatedText to updatedCursor
 }

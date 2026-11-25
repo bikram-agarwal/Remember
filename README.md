@@ -41,6 +41,7 @@ Reminders are more useful when they carry information. Remember's notes and list
 - **Checklists** with nested items and drag-to-reorder — so a grocery run or a packing list can live inside the reminder itself.
 - **Note & checklist conversion**: Convert list-formatted notes into interactive checklists or convert checklists into Markdown notes while keeping titles, reminders, tags, and attachments intact.
 - **Attachments and pictures** show up on the note card and inside reminder notifications. Cover images can be repositioned to frame exactly how you want.
+- **Interactive date chips** right inside notes — insert a date from the formatting toolbar's calendar picker, tap it anytime to update it in place, or long-press to jump to your calendar app.
 - **Note icons** from hundreds of Material Symbols or the full emoji set — so every note is visually distinct at a glance.
 
 

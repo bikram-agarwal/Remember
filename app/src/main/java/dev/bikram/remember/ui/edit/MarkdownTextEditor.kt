@@ -31,9 +31,12 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -61,6 +64,7 @@ import androidx.compose.ui.unit.isSpecified
 import androidx.compose.ui.unit.sp
 import dev.bikram.remember.data.TagPalette
 import dev.bikram.remember.data.normalizeTagName
+import dev.bikram.remember.ui.common.MARKDOWN_DATE_SCHEME
 import dev.bikram.remember.ui.common.rememberMarkdownStyler
 import dev.bikram.remember.ui.components.TagChipFilled
 import dev.bikram.remember.ui.theme.reducedMotionAwareSpec
@@ -160,6 +164,21 @@ internal fun MarkdownTextEditor(
         }
     val horizontalRuleColor = MaterialTheme.colorScheme.outlineVariant
     val horizontalRuleStrokeWidthPx = with(density) { 1.dp.toPx() }
+    val dateChipLineGapPx = with(density) { 3.dp.toPx() }
+    val dateChipBorderWidthPx = with(density) { 1.dp.toPx() }
+    val dateChipTransformedRanges =
+        remember(displayMode, outputTransformation, outputTransformation?.settledSource, state.markdown) {
+            if (displayMode != MarkdownEditorDisplayMode.LivePreview || !state.markdown.contains("($MARKDOWN_DATE_SCHEME")) {
+                emptyList()
+            } else {
+                val transformedText = outputTransformation?.preview(state.markdown)
+                if (transformedText == null || transformedText.text.text == state.markdown) {
+                    emptyList()
+                } else {
+                    transformedText.datePillRanges
+                }
+            }
+        }
     val activeTagToken =
         remember(state.markdown, state.textFieldValue.selection) {
             activeHashTagToken(
@@ -187,6 +206,17 @@ internal fun MarkdownTextEditor(
                 assignedTags.any { assignedTag -> normalizeTagName(assignedTag) == normalizeTagName(activeTag) }
             } ?: false
         }
+
+    // Text that was a date chip and is being retyped becomes a chip again: right away once the
+    // caret leaves it, or after a pause while the caret is still in it. Any keystroke or caret
+    // move restarts this effect, which cancels a pending delay.
+    val pendingDateRechip = state.pendingDateRechip
+    LaunchedEffect(pendingDateRechip, state.markdown, state.textFieldValue.selection, displayMode) {
+        if (pendingDateRechip == null || displayMode != MarkdownEditorDisplayMode.LivePreview) return@LaunchedEffect
+        val delayMs = state.pendingDateRechipDelayMs() ?: return@LaunchedEffect
+        if (delayMs > 0) kotlinx.coroutines.delay(delayMs)
+        state.rechipPendingDate()
+    }
 
     LaunchedEffect(state.focusRequestRevision) {
         if (state.focusRequestRevision > 0) {
@@ -289,6 +319,18 @@ internal fun MarkdownTextEditor(
                         }.drawBehind {
                             val layoutResult = textLayoutResult ?: return@drawBehind
                             val layoutTextLength = layoutResult.layoutInput.text.length
+                            dateChipTransformedRanges.forEach { range ->
+                                drawDateChipCapsules(
+                                    layoutResult = layoutResult,
+                                    layoutTextLength = layoutTextLength,
+                                    startOffset = range.start,
+                                    endOffset = range.endExclusive,
+                                    fillColor = styler.dateContainerColor,
+                                    borderColor = styler.dateBorderColor,
+                                    lineGapPx = dateChipLineGapPx,
+                                    borderWidthPx = dateChipBorderWidthPx,
+                                )
+                            }
                             horizontalRuleTransformedOffsets.forEach { transformedOffset ->
                                 // The layout can lag a keystroke behind the offsets computed above; an
                                 // out-of-range offset just skips this frame rather than crashing.
@@ -319,6 +361,8 @@ internal fun MarkdownTextEditor(
                             }
                         }.onFocusChanged {
                             focused = it.isFocused
+                            // Leaving the field settles retyped dates right away.
+                            if (!it.isFocused) state.rechipPendingDate()
                             onFocusChanged(it.isFocused)
                         },
                 decorator = { innerTextField ->
@@ -351,6 +395,55 @@ internal fun MarkdownTextEditor(
                 modifier = Modifier.padding(top = 8.dp),
             )
         }
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawDateChipCapsules(
+    layoutResult: TextLayoutResult,
+    layoutTextLength: Int,
+    startOffset: Int,
+    endOffset: Int,
+    fillColor: Color,
+    borderColor: Color,
+    lineGapPx: Float,
+    borderWidthPx: Float,
+) {
+    if (startOffset < 0 || endOffset > layoutTextLength || startOffset >= endOffset) return
+    val startLine = layoutResult.getLineForOffset(startOffset)
+    val endInclusive = (endOffset - 1).coerceAtLeast(startOffset)
+    val endLine = layoutResult.getLineForOffset(endInclusive)
+    for (lineIndex in startLine..endLine) {
+        val segmentStart = if (lineIndex == startLine) startOffset else layoutResult.getLineStart(lineIndex)
+        val segmentEnd = if (lineIndex == endLine) endOffset else layoutResult.getLineEnd(lineIndex, visibleEnd = true)
+        if (segmentStart >= segmentEnd) continue
+        val firstBox = layoutResult.getBoundingBox(segmentStart)
+        val lastBox = layoutResult.getBoundingBox((segmentEnd - 1).coerceAtLeast(segmentStart))
+        val middleBox = layoutResult.getBoundingBox(((segmentStart + segmentEnd) / 2).coerceIn(segmentStart, segmentEnd - 1))
+        val rawLeft = minOf(firstBox.left, lastBox.left)
+        val rawRight = maxOf(firstBox.right, lastBox.right)
+        val glyphCenterY = (middleBox.top + middleBox.bottom) / 2f
+        val glyphHeight = (middleBox.bottom - middleBox.top).coerceAtLeast(1f)
+        // Keep the capsule (including its border stroke) inside its own line box so it never
+        // paints over the pills on the lines above and below.
+        val lineTop = layoutResult.getLineTop(lineIndex) + borderWidthPx / 2f
+        val lineBottom = layoutResult.getLineBottom(lineIndex) - borderWidthPx / 2f
+        val pillHeight = minOf(glyphHeight, (lineBottom - lineTop - lineGapPx).coerceAtLeast(1f))
+        val pillWidth = (rawRight - rawLeft).coerceAtLeast(1f)
+        val pillTop = (glyphCenterY - pillHeight / 2f).coerceIn(lineTop, (lineBottom - pillHeight).coerceAtLeast(lineTop))
+        val radius = CornerRadius(pillHeight / 2f, pillHeight / 2f)
+        drawRoundRect(
+            color = fillColor,
+            topLeft = Offset(rawLeft, pillTop),
+            size = Size(pillWidth, pillHeight),
+            cornerRadius = radius,
+        )
+        drawRoundRect(
+            color = borderColor,
+            topLeft = Offset(rawLeft, pillTop),
+            size = Size(pillWidth, pillHeight),
+            cornerRadius = radius,
+            style = Stroke(width = borderWidthPx),
+        )
     }
 }
 

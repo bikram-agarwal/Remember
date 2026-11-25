@@ -21,22 +21,36 @@ internal data class MarkdownWrapperRange(
     val closeStart: Int,
     val closeEnd: Int,
     val format: MarkdownInlineFormat? = null,
+    val isAtomicDate: Boolean = false,
 )
 
-/** Inline spans of [source] expanded to one range per individually toggleable format. */
+/** Inline spans of [source] expanded to one range per individually toggleable format (plus atomic date chips). */
 internal fun markdownFormatSpans(source: String): List<MarkdownWrapperRange> =
     parseMarkdownDocument(source).spans.flatMap { span ->
-        val formats =
-            when (span.kind) {
-                MarkdownInlineKind.Bold -> listOf(MarkdownInlineFormat.BOLD)
-                MarkdownInlineKind.Italic -> listOf(MarkdownInlineFormat.ITALIC)
-                MarkdownInlineKind.BoldItalic -> listOf(MarkdownInlineFormat.BOLD, MarkdownInlineFormat.ITALIC)
-                MarkdownInlineKind.Underline -> listOf(MarkdownInlineFormat.UNDERLINE)
-                MarkdownInlineKind.Strikethrough -> listOf(MarkdownInlineFormat.STRIKETHROUGH)
-                MarkdownInlineKind.Code -> listOf(MarkdownInlineFormat.INLINE_CODE)
-                MarkdownInlineKind.Link -> emptyList()
-            }
-        formats.map { format -> MarkdownWrapperRange(span.openStart, span.openEnd, span.closeStart, span.closeEnd, format) }
+        if (span.kind == MarkdownInlineKind.Date) {
+            listOf(
+                MarkdownWrapperRange(
+                    openStart = span.openStart,
+                    openEnd = span.openEnd,
+                    closeStart = span.closeStart,
+                    closeEnd = span.closeEnd,
+                    format = null,
+                    isAtomicDate = true,
+                ),
+            )
+        } else {
+            val formats =
+                when (span.kind) {
+                    MarkdownInlineKind.Bold -> listOf(MarkdownInlineFormat.BOLD)
+                    MarkdownInlineKind.Italic -> listOf(MarkdownInlineFormat.ITALIC)
+                    MarkdownInlineKind.BoldItalic -> listOf(MarkdownInlineFormat.BOLD, MarkdownInlineFormat.ITALIC)
+                    MarkdownInlineKind.Underline -> listOf(MarkdownInlineFormat.UNDERLINE)
+                    MarkdownInlineKind.Strikethrough -> listOf(MarkdownInlineFormat.STRIKETHROUGH)
+                    MarkdownInlineKind.Code -> listOf(MarkdownInlineFormat.INLINE_CODE)
+                    MarkdownInlineKind.Link -> emptyList()
+                }
+            formats.map { format -> MarkdownWrapperRange(span.openStart, span.openEnd, span.closeStart, span.closeEnd, format) }
+        }
     }
 
 internal fun String.lineStartBefore(cursor: Int): Int {

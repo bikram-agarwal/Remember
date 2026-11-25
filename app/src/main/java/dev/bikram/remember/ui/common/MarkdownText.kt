@@ -3,6 +3,7 @@
 package dev.bikram.remember.ui.common
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,12 +12,15 @@ import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.InlineTextContent
+import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -26,31 +30,41 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.Placeholder
+import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.isSpecified
+import androidx.compose.ui.unit.sp
 import dev.bikram.remember.R
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.feedback.LocalHapticEnabled
 import dev.bikram.remember.ui.feedback.appClickable
 import dev.bikram.remember.ui.feedback.appCombinedClickable
 import dev.bikram.remember.ui.feedback.performLongPressHaptic
+import dev.bikram.remember.ui.theme.pillShape
+import java.time.LocalDate
 
 private val MarkdownChecklistContinuationLineRegex = Regex("""^\s{4,}(.+)$""")
 private const val MARKDOWN_PREVIEW_HORIZONTAL_RULE = "\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500"
@@ -67,6 +81,13 @@ internal data class MarkdownLinkInteraction(
     val textEndOffset: Int,
 )
 
+internal data class MarkdownDateInteraction(
+    val date: LocalDate,
+    val text: String,
+    val spanStartOffset: Int,
+    val spanEndOffset: Int,
+)
+
 @Composable
 internal fun MarkdownText(
     markdown: String,
@@ -81,6 +102,8 @@ internal fun MarkdownText(
     onTextLongPress: ((MarkdownTextTap) -> Unit)? = null,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)? = null,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)? = null,
+    onDateClick: ((MarkdownDateInteraction) -> Unit)? = null,
+    onDateLongPress: ((MarkdownDateInteraction) -> Unit)? = null,
 ) {
     val styler = rememberMarkdownStyler(style)
     val includeLinkAnnotations = onLinkClick == null && onLinkLongPress == null
@@ -97,6 +120,8 @@ internal fun MarkdownText(
             onTextLongPress = onTextLongPress,
             onLinkClick = onLinkClick,
             onLinkLongPress = onLinkLongPress,
+            onDateClick = onDateClick,
+            onDateLongPress = onDateLongPress,
         )
         return
     }
@@ -130,6 +155,8 @@ internal fun MarkdownText(
                     onTextLongPress = onTextLongPress,
                     onLinkClick = onLinkClick,
                     onLinkLongPress = onLinkLongPress,
+                    onDateClick = onDateClick,
+                    onDateLongPress = onDateLongPress,
                 )
             } else if (lineIndex < lines.size && blocks[lineIndex].kind == MarkdownBlockKind.CodeFence) {
                 val codeBlockStartOffset = (blocks[lineIndex].end + 1).coerceAtMost(markdown.length)
@@ -189,6 +216,8 @@ internal fun MarkdownText(
                     onTextLongPress = onTextLongPress,
                     onLinkClick = onLinkClick,
                     onLinkLongPress = onLinkLongPress,
+                    onDateClick = onDateClick,
+                    onDateLongPress = onDateLongPress,
                 )
                 lineIndex += 1 + checklistContinuationLines.size
             }
@@ -219,6 +248,8 @@ private fun MarkdownLine(
     onTextLongPress: ((MarkdownTextTap) -> Unit)?,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)?,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)?,
+    onDateClick: ((MarkdownDateInteraction) -> Unit)?,
+    onDateLongPress: ((MarkdownDateInteraction) -> Unit)?,
 ) {
     if (block.kind == MarkdownBlockKind.Rule) {
         MarkdownHorizontalRule(
@@ -245,6 +276,8 @@ private fun MarkdownLine(
             onTextLongPress = onTextLongPress,
             onLinkClick = onLinkClick,
             onLinkLongPress = onLinkLongPress,
+            onDateClick = onDateClick,
+            onDateLongPress = onDateLongPress,
         )
         return
     }
@@ -337,6 +370,8 @@ private fun MarkdownLine(
                     onTextLongPress = onTextLongPress,
                     onLinkClick = onLinkClick,
                     onLinkLongPress = onLinkLongPress,
+                    onDateClick = onDateClick,
+                    onDateLongPress = onDateLongPress,
                 )
                 checklistContinuationLines.forEach { continuationLine ->
                     MarkdownInlineText(
@@ -350,6 +385,8 @@ private fun MarkdownLine(
                         onTextLongPress = onTextLongPress,
                         onLinkClick = onLinkClick,
                         onLinkLongPress = onLinkLongPress,
+                        onDateClick = onDateClick,
+                        onDateLongPress = onDateLongPress,
                     )
                 }
             }
@@ -379,6 +416,8 @@ private fun MarkdownLine(
                 onTextLongPress = onTextLongPress,
                 onLinkClick = onLinkClick,
                 onLinkLongPress = onLinkLongPress,
+                onDateClick = onDateClick,
+                onDateLongPress = onDateLongPress,
             )
         }
         return
@@ -406,6 +445,8 @@ private fun MarkdownLine(
                 onTextLongPress = onTextLongPress,
                 onLinkClick = onLinkClick,
                 onLinkLongPress = onLinkLongPress,
+                onDateClick = onDateClick,
+                onDateLongPress = onDateLongPress,
             )
         }
         return
@@ -422,6 +463,8 @@ private fun MarkdownLine(
         onTextLongPress = onTextLongPress,
         onLinkClick = onLinkClick,
         onLinkLongPress = onLinkLongPress,
+        onDateClick = onDateClick,
+        onDateLongPress = onDateLongPress,
     )
 }
 
@@ -477,6 +520,8 @@ private fun MarkdownInlineText(
     onTextLongPress: ((MarkdownTextTap) -> Unit)? = null,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)? = null,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)? = null,
+    onDateClick: ((MarkdownDateInteraction) -> Unit)? = null,
+    onDateLongPress: ((MarkdownDateInteraction) -> Unit)? = null,
 ) {
     val hapticEnabled = LocalHapticEnabled.current
     val view = LocalView.current
@@ -491,9 +536,28 @@ private fun MarkdownInlineText(
         }
     val text = content.text
     val inlineInteractionMap = content.interactions
+    val displayContent =
+        rememberMarkdownDateDisplayContent(
+            baseText = text,
+            dates = inlineInteractionMap.dates,
+            styler = styler,
+            style = style,
+            onDateClick = onDateClick,
+            onDateLongPress = onDateLongPress,
+        )
+    val hasTapHandler = onTextTap != null || onLinkClick != null || onDateClick != null
+    val hasLongPressHandler = onTextLongPress != null || onLinkLongPress != null || onDateLongPress != null
     val interactionModifier =
-        if (onTextTap != null || onTextLongPress != null || onLinkClick != null || onLinkLongPress != null) {
-            Modifier.pointerInput(inlineInteractionMap, onTextTap, onTextLongPress, onLinkClick, onLinkLongPress) {
+        if (hasTapHandler || hasLongPressHandler) {
+            Modifier.pointerInput(
+                inlineInteractionMap,
+                onTextTap,
+                onTextLongPress,
+                onLinkClick,
+                onLinkLongPress,
+                onDateClick,
+                onDateLongPress,
+            ) {
                 detectTapGestures(
                     onTap = { tapOffset ->
                         val visibleOffset =
@@ -502,6 +566,13 @@ private fun MarkdownInlineText(
                                 ?: return@detectTapGestures
                         when (val interaction = inlineInteractionMap.interactionAt(visibleOffset)) {
                             is MarkdownInlineInteraction.Link -> onLinkClick?.invoke(interaction.link)
+                            is MarkdownInlineInteraction.Date -> {
+                                if (onDateClick != null) {
+                                    onDateClick(interaction.date)
+                                } else {
+                                    onTextTap?.invoke(MarkdownTextTap(interaction.date.spanEndOffset))
+                                }
+                            }
                             is MarkdownInlineInteraction.Text -> {
                                 onTextTap?.invoke(MarkdownTextTap(interaction.markdownOffset))
                             }
@@ -521,6 +592,11 @@ private fun MarkdownInlineText(
                                     if (hapticEnabled) view.performLongPressHaptic()
                                     callback(interaction.link)
                                 }
+                            is MarkdownInlineInteraction.Date ->
+                                onDateLongPress?.let { callback ->
+                                    if (hapticEnabled) view.performLongPressHaptic()
+                                    callback(interaction.date)
+                                }
                             is MarkdownInlineInteraction.Text ->
                                 onTextLongPress?.let { callback ->
                                     if (hapticEnabled) view.performLongPressHaptic()
@@ -534,13 +610,206 @@ private fun MarkdownInlineText(
             Modifier
         }
     Text(
-        text = text,
+        text = displayContent.text,
         style = style,
+        inlineContent = displayContent.inlineContent,
         maxLines = maxLines,
         overflow = overflow,
         onTextLayout = { textLayoutResult = it },
         modifier = modifier.then(interactionModifier),
     )
+}
+
+private data class MarkdownDateDisplayContent(
+    val text: AnnotatedString,
+    val inlineContent: Map<String, InlineTextContent>,
+)
+
+private val DATE_CHIP_PAD_START = 5.dp
+private val DATE_CHIP_PAD_END = 6.dp
+private val DATE_CHIP_ICON_GAP = 3.5.dp
+private val DATE_CHIP_VERTICAL_PAD = 2.dp
+private val DATE_CHIP_MEASURE_BUFFER = 1.dp
+
+@Composable
+private fun rememberMarkdownDateDisplayContent(
+    baseText: AnnotatedString,
+    dates: List<MarkdownInlineDateRange>,
+    styler: MarkdownStyler,
+    style: TextStyle,
+    onDateClick: ((MarkdownDateInteraction) -> Unit)?,
+    onDateLongPress: ((MarkdownDateInteraction) -> Unit)?,
+): MarkdownDateDisplayContent {
+    if (dates.isEmpty()) {
+        return remember(baseText) { MarkdownDateDisplayContent(baseText, emptyMap()) }
+    }
+    val density = LocalDensity.current
+    val textMeasurer = rememberTextMeasurer()
+    // Callers pass fresh lambdas each recomposition; keying on them would re-measure every chip
+    // every time. Key on presence only and read the latest lambda when a chip is actually used.
+    val latestOnDateClick by rememberUpdatedState(onDateClick)
+    val latestOnDateLongPress by rememberUpdatedState(onDateLongPress)
+    val hasDateClick = onDateClick != null
+    val hasDateLongPress = onDateLongPress != null
+    return remember(baseText, dates, styler, style, density, textMeasurer, hasDateClick, hasDateLongPress) {
+        val baseFontSize = if (style.fontSize.isSpecified && style.fontSize.value > 0f) style.fontSize else 16.sp
+        val chipFontSize = (baseFontSize.value * 0.85f).sp
+        val iconSizeDp = with(density) { (chipFontSize.toDp() * 1.12f).coerceIn(12.dp, 22.dp) }
+        val inlineMap = LinkedHashMap<String, InlineTextContent>(dates.size)
+        val annotated =
+            buildAnnotatedString {
+                var cursor = 0
+                dates.forEachIndexed { index, dateRange ->
+                    val rangeStart = dateRange.visibleStart.coerceIn(cursor, baseText.length)
+                    val rangeEnd = dateRange.visibleEnd.coerceIn(rangeStart, baseText.length)
+                    if (rangeStart > cursor) {
+                        append(baseText.subSequence(cursor, rangeStart))
+                    }
+                    if (rangeEnd > rangeStart) {
+                        val chipId = "markdown_date_chip_$index"
+                        val chipTextStyle = resolveDateChipTextStyle(baseText, rangeStart, rangeEnd, style, chipFontSize)
+                        val measured =
+                            textMeasurer.measure(
+                                text = AnnotatedString(dateRange.date.text),
+                                style = chipTextStyle,
+                                maxLines = 1,
+                                softWrap = false,
+                            )
+                        val textWidthDp = with(density) { measured.size.width.toDp() }
+                        val textHeightDp = with(density) { measured.size.height.toDp() }
+                        val pillHeightDp = maxOf(textHeightDp, iconSizeDp) + DATE_CHIP_VERTICAL_PAD * 2
+                        val slotWidthDp =
+                            DATE_CHIP_PAD_START +
+                                iconSizeDp +
+                                DATE_CHIP_ICON_GAP +
+                                textWidthDp +
+                                DATE_CHIP_PAD_END +
+                                DATE_CHIP_MEASURE_BUFFER
+                        val slotHeightDp = pillHeightDp + 2.dp
+                        val placeholder =
+                            Placeholder(
+                                width = with(density) { slotWidthDp.toSp() },
+                                height = with(density) { slotHeightDp.toSp() },
+                                placeholderVerticalAlign = PlaceholderVerticalAlign.Center,
+                            )
+                        val lineStruckThrough = style.textDecoration?.contains(TextDecoration.LineThrough) == true
+                        inlineMap[chipId] =
+                            InlineTextContent(placeholder) {
+                                MarkdownDateChipPill(
+                                    dateInteraction = dateRange.date,
+                                    styler = styler,
+                                    chipTextStyle = chipTextStyle,
+                                    iconSize = iconSizeDp,
+                                    pillHeight = pillHeightDp,
+                                    faded = lineStruckThrough,
+                                    onDateClick = if (hasDateClick) { date -> latestOnDateClick?.invoke(date) } else null,
+                                    onDateLongPress = if (hasDateLongPress) { date -> latestOnDateLongPress?.invoke(date) } else null,
+                                )
+                            }
+                        appendInlineContent(
+                            id = chipId,
+                            alternateText = baseText.text.substring(rangeStart, rangeEnd),
+                        )
+                    }
+                    cursor = rangeEnd
+                }
+                if (cursor < baseText.length) {
+                    append(baseText.subSequence(cursor, baseText.length))
+                }
+            }
+        MarkdownDateDisplayContent(annotated, inlineMap)
+    }
+}
+
+private fun resolveDateChipTextStyle(
+    baseText: AnnotatedString,
+    rangeStart: Int,
+    rangeEnd: Int,
+    lineStyle: TextStyle,
+    chipFontSize: androidx.compose.ui.unit.TextUnit,
+): TextStyle {
+    val overlapping = baseText.spanStyles.filter { it.start < rangeEnd && it.end > rangeStart }
+    val hasBold = overlapping.any { it.item.fontWeight == FontWeight.Bold }
+    val hasItalic = overlapping.any { it.item.fontStyle == FontStyle.Italic }
+    val decorations = mutableListOf<TextDecoration>()
+    if (lineStyle.textDecoration?.contains(TextDecoration.LineThrough) == true ||
+        overlapping.any { it.item.textDecoration?.contains(TextDecoration.LineThrough) == true }
+    ) {
+        decorations += TextDecoration.LineThrough
+    }
+    if (overlapping.any { it.item.textDecoration?.contains(TextDecoration.Underline) == true }) {
+        decorations += TextDecoration.Underline
+    }
+    return lineStyle.copy(
+        fontSize = chipFontSize,
+        lineHeight = chipFontSize,
+        fontWeight = if (hasBold) FontWeight.Bold else FontWeight.Medium,
+        fontStyle = if (hasItalic) FontStyle.Italic else FontStyle.Normal,
+        textDecoration = if (decorations.isEmpty()) TextDecoration.None else TextDecoration.combine(decorations),
+    )
+}
+
+@Composable
+private fun MarkdownDateChipPill(
+    dateInteraction: MarkdownDateInteraction,
+    styler: MarkdownStyler,
+    chipTextStyle: TextStyle,
+    iconSize: Dp,
+    pillHeight: Dp,
+    faded: Boolean,
+    onDateClick: ((MarkdownDateInteraction) -> Unit)?,
+    onDateLongPress: ((MarkdownDateInteraction) -> Unit)?,
+) {
+    val clickModifier =
+        when {
+            onDateClick != null && onDateLongPress != null ->
+                Modifier
+                    .clip(pillShape)
+                    .appCombinedClickable(
+                        role = Role.Button,
+                        onClick = { onDateClick(dateInteraction) },
+                        onLongClick = { onDateLongPress(dateInteraction) },
+                    )
+            onDateClick != null ->
+                Modifier
+                    .clip(pillShape)
+                    .appClickable(role = Role.Button) { onDateClick(dateInteraction) }
+            else -> Modifier
+        }
+    Box(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .alpha(if (faded) 0.7f else 1f),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(DATE_CHIP_ICON_GAP, Alignment.CenterHorizontally),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(pillHeight)
+                    .background(styler.dateContainerColor, pillShape)
+                    .border(1.dp, styler.dateBorderColor, pillShape)
+                    .then(clickModifier)
+                    .padding(start = DATE_CHIP_PAD_START, end = DATE_CHIP_PAD_END),
+        ) {
+            RememberMaterialRoundedSymbol(
+                name = "calendar_month",
+                size = iconSize,
+                tint = styler.linkColor,
+                filled = false,
+            )
+            Text(
+                text = dateInteraction.text,
+                style = chipTextStyle,
+                color = styler.dateContentColor,
+                maxLines = 1,
+                softWrap = false,
+            )
+        }
+    }
 }
 
 @Composable
@@ -554,6 +823,8 @@ private fun MarkdownQuoteBlock(
     onTextLongPress: ((MarkdownTextTap) -> Unit)?,
     onLinkClick: ((MarkdownLinkInteraction) -> Unit)?,
     onLinkLongPress: ((MarkdownLinkInteraction) -> Unit)?,
+    onDateClick: ((MarkdownDateInteraction) -> Unit)?,
+    onDateLongPress: ((MarkdownDateInteraction) -> Unit)?,
 ) {
     Row(
         modifier =
@@ -594,6 +865,8 @@ private fun MarkdownQuoteBlock(
                     onTextLongPress = onTextLongPress,
                     onLinkClick = onLinkClick,
                     onLinkLongPress = onLinkLongPress,
+                    onDateClick = onDateClick,
+                    onDateLongPress = onDateLongPress,
                 )
             }
         }
@@ -665,6 +938,10 @@ internal sealed interface MarkdownInlineInteraction {
     data class Link(
         val link: MarkdownLinkInteraction,
     ) : MarkdownInlineInteraction
+
+    data class Date(
+        val date: MarkdownDateInteraction,
+    ) : MarkdownInlineInteraction
 }
 
 internal data class MarkdownInlineLinkRange(
@@ -673,12 +950,26 @@ internal data class MarkdownInlineLinkRange(
     val link: MarkdownLinkInteraction,
 )
 
+internal data class MarkdownInlineDateRange(
+    val visibleStart: Int,
+    val visibleEnd: Int,
+    val date: MarkdownDateInteraction,
+)
+
 internal data class MarkdownInlineInteractionMap(
     val sourceOffsetByVisibleOffset: IntArray,
     val links: List<MarkdownInlineLinkRange>,
+    val dates: List<MarkdownInlineDateRange> = emptyList(),
 ) {
     fun interactionAt(visibleOffset: Int): MarkdownInlineInteraction {
         val boundedVisibleOffset = visibleOffset.coerceIn(0, sourceOffsetByVisibleOffset.lastIndex)
+        val dateRange =
+            dates.firstOrNull { candidate ->
+                boundedVisibleOffset >= candidate.visibleStart && boundedVisibleOffset < candidate.visibleEnd
+            }
+        if (dateRange != null) {
+            return MarkdownInlineInteraction.Date(dateRange.date)
+        }
         val linkRange =
             links.firstOrNull { candidate ->
                 boundedVisibleOffset >= candidate.visibleStart && boundedVisibleOffset < candidate.visibleEnd
@@ -717,9 +1008,27 @@ internal class MarkdownInlineInteractionBuilder(
                     ),
                 )
             }
+        val dates =
+            projection.spans.filter { it.kind == MarkdownInlineKind.Date }.mapNotNull { span ->
+                val start = projection.visibleOffsets[span.openEnd]
+                val end = projection.visibleOffsets[span.closeStart]
+                val parsedDate = span.url?.let(::parseMarkdownDateTarget) ?: return@mapNotNull null
+                if (end <= start) return@mapNotNull null
+                MarkdownInlineDateRange(
+                    start,
+                    end,
+                    MarkdownDateInteraction(
+                        date = parsedDate,
+                        text = projection.text.substring(start, end),
+                        spanStartOffset = sourceOffsetAt(span.openStart),
+                        spanEndOffset = sourceOffsetAt(span.closeEnd),
+                    ),
+                )
+            }
         return MarkdownInlineInteractionMap(
             IntArray(projection.sourceOffsets.size) { sourceOffsetAt(projection.sourceOffsets[it]) },
             links,
+            dates,
         )
     }
 
@@ -765,6 +1074,7 @@ internal fun markdownCardPreview(
     val builder = AnnotatedString.Builder()
     val offsets = mutableListOf<Int>()
     val links = mutableListOf<MarkdownInlineLinkRange>()
+    val dates = mutableListOf<MarkdownInlineDateRange>()
     for (line in parseMarkdownLines(markdown)) {
         if (line.start > 0) {
             builder.append('\n')
@@ -790,7 +1100,11 @@ internal fun markdownCardPreview(
         val interactions = MarkdownInlineInteractionBuilder(content, line.contentStart).build(projection)
         offsets.addAll(interactions.sourceOffsetByVisibleOffset.dropLast(1))
         links.addAll(interactions.links.map { it.copy(visibleStart = it.visibleStart + visibleStart, visibleEnd = it.visibleEnd + visibleStart) })
+        dates.addAll(interactions.dates.map { it.copy(visibleStart = it.visibleStart + visibleStart, visibleEnd = it.visibleEnd + visibleStart) })
     }
     offsets.add(markdown.length)
-    return MarkdownRenderedContent(builder.toAnnotatedString().withCombinedMarkdownDecorations(), MarkdownInlineInteractionMap(offsets.toIntArray(), links))
+    return MarkdownRenderedContent(
+        builder.toAnnotatedString().withCombinedMarkdownDecorations(),
+        MarkdownInlineInteractionMap(offsets.toIntArray(), links, dates),
+    )
 }

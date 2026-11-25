@@ -26,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,6 +43,8 @@ import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
 import dev.bikram.remember.ui.components.RememberTextButton
+import java.time.Instant
+import java.time.ZoneOffset
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -54,8 +57,15 @@ internal fun MarkdownToolbar(
     onRedo: (() -> Unit)? = null,
 ) {
     var showLinkDialog by remember { mutableStateOf(false) }
+    var showDateDialog by rememberSaveable { mutableStateOf(false) }
     val activeHeading = state.headingLevel
     val cursorInLink = state.selectedLinkUrl != null
+    val selectedDate = state.selectedDate
+    val cursorInDate = selectedDate != null
+    // Plain text that reads as a date (e.g. "11/24/2026") under the selection or caret: the button
+    // lights up, the picker opens on it, and confirming turns that text into a chip.
+    val plainDate = if (selectedDate == null) state.plainDateAtSelection else null
+    val dateTargetActive = cursorInDate || plainDate != null
     val isBulletList = state.isBulletList
     val isNumberedList = state.isNumberedList
     val isChecklist = state.isChecklist
@@ -72,6 +82,27 @@ internal fun MarkdownToolbar(
             state = state,
             editing = cursorInLink,
             onDismiss = { showLinkDialog = false },
+        )
+    }
+
+    if (showDateDialog) {
+        CalendarPickerDialog(
+            initial =
+                (selectedDate ?: plainDate?.date)
+                    ?.atStartOfDay(ZoneOffset.UTC)
+                    ?.toInstant()
+                    ?.toEpochMilli()
+                    ?: pickerDayMillisForLocalWallClock(System.currentTimeMillis()),
+            onConfirm = { dateMillis ->
+                val pickedDate = Instant.ofEpochMilli(dateMillis).atZone(ZoneOffset.UTC).toLocalDate()
+                state.addOrUpdateDate(pickedDate)
+                showDateDialog = false
+                state.focusRangeAndShowKeyboard(
+                    state.textFieldState.selection.start,
+                    state.textFieldState.selection.end,
+                )
+            },
+            onDismiss = { showDateDialog = false },
         )
     }
 
@@ -107,6 +138,14 @@ internal fun MarkdownToolbar(
             stringResource(R.string.rt_edit_link)
         } else {
             stringResource(R.string.rt_add_link)
+        }
+    val dateLabel =
+        if (cursorInDate) {
+            stringResource(R.string.rt_edit_date)
+        } else if (plainDate != null) {
+            stringResource(R.string.rt_convert_date)
+        } else {
+            stringResource(R.string.rt_insert_date)
         }
 
     ButtonGroup(
@@ -232,6 +271,12 @@ internal fun MarkdownToolbar(
             contentDescription = linkLabel,
             colors = if (cursorInLink) activeColors else colors,
             onClick = { showLinkDialog = true },
+        )
+        markdownToolbarIconButton(
+            symbolName = "calendar_month",
+            contentDescription = dateLabel,
+            colors = if (dateTargetActive) activeColors else colors,
+            onClick = { showDateDialog = true },
         )
     }
 }

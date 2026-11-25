@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.buildAnnotatedString
 import dev.bikram.remember.ui.common.MarkdownBlockKind
+import dev.bikram.remember.ui.common.MarkdownInlineKind
 import dev.bikram.remember.ui.common.MarkdownStyler
 import dev.bikram.remember.ui.common.parseMarkdownDocument
 import dev.bikram.remember.ui.common.parseMarkdownLines
@@ -18,6 +19,7 @@ import dev.bikram.remember.ui.common.withCombinedMarkdownDecorations
 private const val LIVE_PREVIEW_UNCHECKED_CHECKLIST_MARKER = "\u2610 "
 private const val LIVE_PREVIEW_CHECKED_CHECKLIST_MARKER = "\u2611 "
 private const val LIVE_PREVIEW_QUOTE_MARKER = "| "
+private const val LIVE_PREVIEW_DATE_INNER_PAD = "\u00A0"
 
 // Hard safety net: never parse markdown for live-preview highlighting past this size, regardless
 // of debounce state, so a huge paste/import can never reintroduce per-keystroke cost.
@@ -87,6 +89,7 @@ private class MarkdownPreviewTransformationBuilder(
 ) {
     private val hiddenRanges = mutableListOf<HiddenRange>()
     private val styleRanges = mutableListOf<MarkdownStyleRange>()
+    private val dateSpanMarkers = mutableListOf<DateSpanPaddingSpec>()
     private val insertedTextBeforeSourceIndex = mutableMapOf<Int, String>()
 
     fun build(): MarkdownPreview {
@@ -95,10 +98,12 @@ private class MarkdownPreviewTransformationBuilder(
         val transformedText = StringBuilder(source.length)
         val originalToTransformed = IntArray(source.length + 1)
         val transformedToOriginal = mutableListOf<Int>()
+        val preInsertTransformed = IntArray(source.length + 1)
         var hiddenRangeIndex = 0
         var transformedOffset = 0
 
         for (sourceIndex in source.indices) {
+            preInsertTransformed[sourceIndex] = transformedOffset
             insertedTextBeforeSourceIndex[sourceIndex]?.let { insertedText ->
                 insertedText.forEach { character ->
                     transformedToOriginal.add(sourceIndex)
@@ -125,8 +130,16 @@ private class MarkdownPreviewTransformationBuilder(
                 transformedOffset++
             }
         }
+        preInsertTransformed[source.length] = transformedOffset
         originalToTransformed[source.length] = transformedOffset
         transformedToOriginal.add(source.length)
+
+        val datePillRanges =
+            dateSpanMarkers.mapNotNull { spec ->
+                val pillStart = preInsertTransformed[spec.openStart]
+                val pillEnd = preInsertTransformed[spec.closeStart] + spec.innerTrailLength
+                if (pillStart < pillEnd) MarkdownPreviewDateRange(pillStart, pillEnd) else null
+            }
 
         val annotatedString =
             buildAnnotatedString {
@@ -137,6 +150,9 @@ private class MarkdownPreviewTransformationBuilder(
                     if (transformedStart < transformedEnd) {
                         addStyle(styleRange.style, transformedStart, transformedEnd)
                     }
+                }
+                datePillRanges.forEach { pillRange ->
+                    addStyle(styler.dateChipSpanStyle, pillRange.start, pillRange.endExclusive)
                 }
             }
 
@@ -149,6 +165,7 @@ private class MarkdownPreviewTransformationBuilder(
                     .map { range ->
                         MarkdownPreviewEdit(range.start, range.end, insertedTextBeforeSourceIndex[range.start].orEmpty())
                     }.sortedByDescending { it.start },
+            datePillRanges = datePillRanges,
         )
     }
 
@@ -175,7 +192,22 @@ private class MarkdownPreviewTransformationBuilder(
         for (span in syntax.spans) {
             hiddenRanges.add(HiddenRange(span.openStart, span.openEnd))
             hiddenRanges.add(HiddenRange(span.closeStart, span.closeEnd))
-            styleRanges.add(MarkdownStyleRange(span.openEnd, span.closeStart, styler.inlineSpanStyle(span.kind)))
+            if (span.kind == MarkdownInlineKind.Date) {
+                // Only the pill's own inner padding is injected. An extra "gap" character outside
+                // it would be a phantom: it looks like a real space, but Backspace on it can only
+                // delete the chip it is attached to.
+                insertedTextBeforeSourceIndex[span.openStart] = LIVE_PREVIEW_DATE_INNER_PAD
+                insertedTextBeforeSourceIndex[span.closeStart] = LIVE_PREVIEW_DATE_INNER_PAD
+                dateSpanMarkers.add(
+                    DateSpanPaddingSpec(
+                        openStart = span.openStart,
+                        closeStart = span.closeStart,
+                        innerTrailLength = LIVE_PREVIEW_DATE_INNER_PAD.length,
+                    ),
+                )
+            } else {
+                styleRanges.add(MarkdownStyleRange(span.openEnd, span.closeStart, styler.inlineSpanStyle(span.kind)))
+            }
         }
     }
 }
@@ -212,6 +244,18 @@ private data class MarkdownStyleRange(
     val style: androidx.compose.ui.text.SpanStyle,
 )
 
+private data class DateSpanPaddingSpec(
+    val openStart: Int,
+    val closeStart: Int,
+    val innerTrailLength: Int,
+)
+
+/** Half-open `[start, endExclusive)` range of a date pill in the transformed (displayed) text. */
+internal data class MarkdownPreviewDateRange(
+    val start: Int,
+    val endExclusive: Int,
+)
+
 internal data class MarkdownPreviewEdit(
     val start: Int,
     val end: Int,
@@ -223,6 +267,7 @@ internal class MarkdownPreview(
     private val originalPositions: IntArray,
     private val displayedPositions: IntArray,
     val edits: List<MarkdownPreviewEdit>,
+    val datePillRanges: List<MarkdownPreviewDateRange> = emptyList(),
 ) {
     fun originalToTransformed(offset: Int): Int {
         return originalPositions[offset.coerceIn(0, originalPositions.lastIndex)]

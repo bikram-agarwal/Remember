@@ -1,4 +1,4 @@
-## v1.20.0 Markdown import/export, Drag & drop, Note/checklist conversion, Importance sorting
+## v1.21.0 Markdown import/export, Drag & drop, Note/checklist conversion, Importance sorting
 
 ### ✨ New Features
 - **Convert between notes and checklists**: Tap `⋮` -> **Convert to checklist** on list-formatted notes, or `⋮` -> **Convert to note** on checklists, keeping your title, reminders, tags, and attachments intact.
@@ -7,6 +7,7 @@
 - **Bulk Markdown ZIP export**: In multi-select mode on the Notes tab, tap **Export** in the selection bar to save a `.zip` archive of `.md` files for all selected notes and checklists.
 - **Manual notification pinning**: Long-press the `Notify` button in the bottom bar of a note or checklist to pin its notification. Pinned notifications are restored if dismissed and come back after your device restarts.
 - **Importance sorting & grouping**: Sort or group notes and checklists by **Importance** on the Notes tab, with a dedicated direction toggle in the Sort menu.
+- **Inline date chips in notes**: Tap the calendar button in the formatting toolbar to pick and insert a date pill right into your note. Tap any inserted date to update it, or long-press to open it in your calendar app.
 
 ### 🛠 Improved Features
 - **Paste keeps formatting**: Text copied from a web page, email, or document keeps its headings, lists, checkboxes, quotes, code, links, and bold or italic text when pasted into a note.

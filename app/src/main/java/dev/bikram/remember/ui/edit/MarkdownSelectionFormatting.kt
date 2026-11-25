@@ -162,7 +162,7 @@ private class MarkdownSelectionContent(
                 }
             for (index in projection.visibleOffsets[span.openEnd] until projection.visibleOffsets[span.closeStart]) {
                 formats[index] = formats[index] or bit
-                if (span.kind == MarkdownInlineKind.Link) links[index] = span.url
+                if (span.kind == MarkdownInlineKind.Link || span.kind == MarkdownInlineKind.Date) links[index] = span.url
                 if (span.kind == MarkdownInlineKind.Code) code[index] = true
             }
         }

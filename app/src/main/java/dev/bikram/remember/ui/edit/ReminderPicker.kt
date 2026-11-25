@@ -2414,7 +2414,7 @@ private fun weekdayShort(weekday: Int): String =
  * (not the user's reminder wall-clock instant). Map a real instant to that encoding using the
  * **local** calendar date so reopening a saved reminder keeps the same day as on the grid.
  */
-private fun pickerDayMillisForLocalWallClock(wallClockEpochMillis: Long): Long {
+internal fun pickerDayMillisForLocalWallClock(wallClockEpochMillis: Long): Long {
     val zone = ZoneId.systemDefault()
     val localDate = Instant.ofEpochMilli(wallClockEpochMillis).atZone(zone).toLocalDate()
     return localDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()

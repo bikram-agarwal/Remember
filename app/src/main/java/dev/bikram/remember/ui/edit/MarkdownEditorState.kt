@@ -15,7 +15,10 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.bikram.remember.ui.common.MarkdownInlineProjection
+import dev.bikram.remember.ui.common.parseInlineNoteDate
 import dev.bikram.remember.ui.common.parseMarkdownDocument
+import java.time.LocalDate
+import java.util.Locale
 
 /**
  * The field owns the document. Input, toolbar commands and history operate on it immediately;
@@ -29,6 +32,13 @@ internal class MarkdownEditorState(
     val textFieldState = TextFieldState(initialMarkdown)
     private val history = MarkdownEditorHistory()
     private var explicitFormatting by mutableStateOf<MarkdownEditorSnapshot?>(null)
+
+    /**
+     * Plain text that used to be a date chip and is being retyped (see
+     * [withDateChipLabelEditUnwrapped]); once the user pauses at its end it becomes a chip again.
+     */
+    var pendingDateRechip by mutableStateOf<TextRange?>(null)
+        private set
     private val context by derivedStateOf { MarkdownEditBuffer(textFieldValue) }
 
     var focusRequestRevision by mutableIntStateOf(0)
@@ -46,6 +56,8 @@ internal class MarkdownEditorState(
     val isQuote: Boolean get() = context.isQuote
     val isCodeBlock: Boolean get() = context.isCodeBlock
     val selectedLinkUrl: String? get() = context.selectedLinkUrl
+    val selectedDate: LocalDate? get() = context.selectedDate
+    val plainDateAtSelection: MarkdownPlainDate? get() = context.plainDateAtSelection
     val shouldCapitalizeNextInputInEmptyInlineWrapper: Boolean get() = context.shouldCapitalizeNextInputInEmptyInlineWrapper
 
     val inlineFormats: Set<MarkdownInlineFormat>
@@ -71,6 +83,7 @@ internal class MarkdownEditorState(
             val incoming = TextFieldValue(toString(), selection)
             val edited = MarkdownEditBuffer(previousValue)
             edited.update(incoming, livePreview, livePreview)
+            trackPendingDateRechip(previousValue.text, edited)
             if (livePreview) applyPendingFormats(before, edited)
             val after = inputSnapshot(before, incoming, edited)
             // Compose commits this buffer. Never call TextFieldState.edit from this callback.
@@ -88,6 +101,7 @@ internal class MarkdownEditorState(
         val before = snapshot(textFieldValue)
         val edited = MarkdownEditBuffer(textFieldValue)
         edited.update(value, cleanUpEmptyMarkdownWrappers, breakLineAfterHorizontalRule)
+        trackPendingDateRechip(before.text, edited)
         if (cleanUpEmptyMarkdownWrappers) applyPendingFormats(before, edited)
         val after = inputSnapshot(before, value, edited)
         Snapshot.withMutableSnapshot {
@@ -111,6 +125,7 @@ internal class MarkdownEditorState(
                 )
             }
         Snapshot.withMutableSnapshot {
+            pendingDateRechip = null
             textFieldState.edit { applyMarkdownValue(TextFieldValue(value, selection)) }
             explicitFormatting = null
             history.clear()
@@ -134,6 +149,7 @@ internal class MarkdownEditorState(
 
     private fun restore(value: MarkdownEditorSnapshot) {
         Snapshot.withMutableSnapshot {
+            pendingDateRechip = null
             textFieldState.edit { applyMarkdownValue(TextFieldValue(value.text, value.selection)) }
             explicitFormatting = value
             textFieldState.undoState.clearHistory()
@@ -189,6 +205,57 @@ internal class MarkdownEditorState(
         rawUrl: String,
     ) {
         command { addOrUpdateLink(displayText, rawUrl) }
+    }
+
+    fun addOrUpdateDate(
+        date: LocalDate,
+        locale: Locale = Locale.getDefault(),
+    ) {
+        command { addOrUpdateDate(date, locale) }
+    }
+
+    /**
+     * How long to wait before turning the retyped date text ([pendingDateRechip]) back into a chip,
+     * or null if it shouldn't convert (no longer a valid date, or a range is selected).
+     * 0 means convert now: the caret has left the text, so the user is done with it. While the
+     * caret is in or touching it, wait [DATE_RECHIP_PAUSE_MS] of inactivity.
+     */
+    fun pendingDateRechipDelayMs(locale: Locale = Locale.getDefault()): Long? {
+        val range = pendingDateRechip ?: return null
+        if (pendingRechipDate(range, locale) == null) return null
+        val selection = textFieldState.selection
+        if (!selection.collapsed) return null
+        return if (selection.start in range.start..range.end) DATE_RECHIP_PAUSE_MS else 0L
+    }
+
+    /** Turns the pending retyped date text into a chip now, if it still reads as a date. */
+    fun rechipPendingDate(locale: Locale = Locale.getDefault()) {
+        val range = pendingDateRechip ?: return
+        val date = pendingRechipDate(range, locale) ?: return
+        command { replacePlainDateWithChip(range.start, range.end, date, locale) }
+    }
+
+    private fun pendingRechipDate(
+        range: TextRange,
+        locale: Locale,
+    ): LocalDate? {
+        val text = markdown
+        if (range.end > text.length || range.start >= range.end) return null
+        return parseInlineNoteDate(text.substring(range.start, range.end), locale)
+    }
+
+    /** Starts tracking text that an edit just un-chipped, or keeps an existing range aligned with later edits. */
+    private fun trackPendingDateRechip(
+        previousText: String,
+        edited: MarkdownEditBuffer,
+    ) {
+        val unwrapped = edited.unwrappedDateRange
+        pendingDateRechip =
+            if (unwrapped != null) {
+                unwrapped
+            } else {
+                pendingDateRechip?.let { shiftRangeThroughEdit(it, previousText, edited.markdown) }
+            }
     }
 
     fun selectedText(): String {
@@ -261,6 +328,7 @@ internal class MarkdownEditorState(
         edited.edit()
         val after = MarkdownEditorSnapshot(edited.markdown, edited.textFieldValue.selection, formats ?: edited.inlineFormats(), pendingFormats)
         Snapshot.withMutableSnapshot {
+            pendingDateRechip = null
             textFieldState.edit { applyMarkdownValue(edited.textFieldValue) }
             explicitFormatting = after
             history.record(before, after, MarkdownEditKind.Command)
@@ -332,3 +400,33 @@ internal fun TextFieldBuffer.applyMarkdownValue(value: TextFieldValue) {
         selection = value.selection
     }
 }
+
+/**
+ * Keeps [range] pointing at the same text across the edit that turned [before] into [after]:
+ * edits inside it or typed at its end stretch it, edits before it shift it, edits after it leave it
+ * alone, and an edit straddling its boundary drops it (null).
+ */
+internal fun shiftRangeThroughEdit(
+    range: TextRange,
+    before: String,
+    after: String,
+): TextRange? {
+    if (before == after) return range
+    val change = markdownChangedRange(before, after)
+    val delta = change.updatedEnd - change.originalEnd
+    val inserted = after.substring(change.start, change.updatedEnd)
+    return when {
+        change.originalEnd <= range.start -> TextRange(range.start + delta, range.end + delta)
+        change.start >= range.start && change.originalEnd <= range.end ->
+            when {
+                inserted.all { it in '0'..'9' || it == '/' || it == '.' || it == '-' } -> TextRange(range.start, range.end + delta)
+                // A space or letter typed right after the date ends it; it isn't part of it.
+                change.start == range.end && change.originalEnd == range.end -> range
+                else -> null
+            }
+        change.start >= range.end -> range
+        else -> null
+    }
+}
+
+private const val DATE_RECHIP_PAUSE_MS = 1500L

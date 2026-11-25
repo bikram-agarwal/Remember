@@ -4,8 +4,11 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
+import java.util.Locale
 
 class MarkdownEditorStateTest {
     @Test
@@ -810,5 +813,193 @@ class MarkdownEditorStateTest {
         // Cursor in outro (outside code block)
         state.update(TextFieldValue("intro\n```\nval x = 1\n```\noutro", selection = TextRange(24)))
         assertFalse(state.isCodeBlock)
+    }
+
+    @Test
+    fun addOrUpdateDateInsertsChipMovesCursorAfterAndUpdatesExistingDateInPlace() {
+        val state = MarkdownEditorState("Deadline: ")
+        state.update(TextFieldValue("Deadline: ", selection = TextRange(10)))
+
+        val initialDate = LocalDate.of(2026, 11, 24)
+        state.addOrUpdateDate(initialDate, Locale.US)
+
+        val expectedInserted = "Deadline: [11/24/2026](date:2026-11-24)"
+        assertEquals(expectedInserted, state.markdown)
+        assertEquals(TextRange(expectedInserted.length), state.textFieldValue.selection)
+        assertNull(state.selectedDate)
+        assertNull(state.selectedLinkUrl)
+
+        // Undo & Redo round-trip
+        state.undo()
+        assertEquals("Deadline: ", state.markdown)
+        state.redo()
+        assertEquals(expectedInserted, state.markdown)
+
+        // Move cursor inside the date chip -> selectedDate becomes active, selectedLinkUrl stays null
+        state.update(TextFieldValue(expectedInserted, selection = TextRange(15)))
+        assertEquals(initialDate, state.selectedDate)
+        assertNull(state.selectedLinkUrl)
+
+        // Updating in-place replaces the existing date chip without duplicating brackets
+        val updatedDate = LocalDate.of(2026, 12, 31)
+        state.addOrUpdateDate(updatedDate, Locale.US)
+        val expectedUpdated = "Deadline: [12/31/2026](date:2026-12-31)"
+        assertEquals(expectedUpdated, state.markdown)
+        assertEquals(TextRange(expectedUpdated.length), state.textFieldValue.selection)
+        assertNull(state.selectedDate)
+    }
+
+    @Test
+    fun addDateOverPartialChipSelectionReplacesWholeChipInsteadOfCuttingIt() {
+        val chip = "[11/24/2026](date:2026-11-24)"
+        val state = MarkdownEditorState("A $chip B")
+        state.update(TextFieldValue(state.markdown, selection = TextRange(0, 8)))
+
+        state.addOrUpdateDate(LocalDate.of(2026, 12, 1), Locale.US)
+
+        assertEquals("[12/01/2026](date:2026-12-01) B", state.markdown)
+    }
+
+    @Test
+    fun addDateWithCursorInsideLinkLandsAfterTheLinkNotInsideItsLabel() {
+        val state = MarkdownEditorState("See [docs](https://x.com) now")
+        state.update(TextFieldValue(state.markdown, selection = TextRange(7)))
+
+        state.addOrUpdateDate(LocalDate.of(2026, 12, 1), Locale.US)
+
+        assertEquals("See [docs](https://x.com)[12/01/2026](date:2026-12-01) now", state.markdown)
+    }
+
+    @Test
+    fun addDateOverSelectedPlainDateTextTurnsItIntoAChip() {
+        val state = MarkdownEditorState("Due 11/24/2026 sharp")
+        state.update(TextFieldValue(state.markdown, selection = TextRange(4, 14)))
+        assertEquals("11/24/2026", state.selectedText())
+
+        state.addOrUpdateDate(LocalDate.of(2026, 11, 24), Locale.US)
+
+        assertEquals("Due [11/24/2026](date:2026-11-24) sharp", state.markdown)
+    }
+
+    @Test
+    fun editingInsideDateChipLabelFallsBackToPlainEditableText() {
+        val chip = "[11/24/2026](date:2026-11-24)"
+        val state = MarkdownEditorState(chip)
+        // Backspace after the "4": source loses the char at index 5.
+        state.update(TextFieldValue("[11/2/2026](date:2026-11-24)", selection = TextRange(5)))
+        assertEquals("11/2/2026", state.markdown)
+        assertEquals(TextRange(4), state.textFieldValue.selection)
+        assertNull(state.selectedDate)
+
+        state.update(TextFieldValue("11/25/2026", selection = TextRange(5)))
+        assertEquals("11/25/2026", state.markdown)
+
+        val typed = MarkdownEditorState(chip)
+        typed.update(TextFieldValue("[11/924/2026](date:2026-11-24)", selection = TextRange(5)))
+        assertEquals("11/924/2026", typed.markdown)
+    }
+
+    @Test
+    fun deletingTheWholeDateChipLabelStillRemovesTheChipCleanly() {
+        val state = MarkdownEditorState("A [11/24/2026](date:2026-11-24)")
+        state.update(TextFieldValue("A [](date:2026-11-24)", selection = TextRange(3)))
+        assertEquals("A ", state.markdown)
+    }
+
+    @Test
+    fun caretInsideDateLookingWordIsEnoughToTurnItIntoAChip() {
+        val state = MarkdownEditorState("Due 11/25/2026. Next")
+        state.update(TextFieldValue(state.markdown, selection = TextRange(8)))
+        val plain = state.plainDateAtSelection!!
+        assertEquals(LocalDate.of(2026, 11, 25), plain.date)
+        assertEquals(4, plain.start)
+        assertEquals(14, plain.endExclusive)
+
+        state.addOrUpdateDate(LocalDate.of(2026, 11, 25), Locale.US)
+
+        assertEquals("Due [11/25/2026](date:2026-11-25). Next", state.markdown)
+    }
+
+    @Test
+    fun plainDateDetectionSkipsLinksCodeAndOrdinaryText() {
+        assertNull(MarkdownEditorState("see [x](https://a.com/2026-11-24) now").also {
+            it.update(TextFieldValue(it.markdown, selection = TextRange(25)))
+        }.plainDateAtSelection)
+        assertNull(MarkdownEditorState("a `11/25/2026` b").also {
+            it.update(TextFieldValue(it.markdown, selection = TextRange(6)))
+        }.plainDateAtSelection)
+        assertNull(MarkdownEditorState("room 12345 here").also {
+            it.update(TextFieldValue(it.markdown, selection = TextRange(7)))
+        }.plainDateAtSelection)
+        assertNull(MarkdownEditorState("v11/25/2026x").also {
+            it.update(TextFieldValue(it.markdown, selection = TextRange(4)))
+        }.plainDateAtSelection)
+    }
+
+    @Test
+    fun retypedDateBecomesChipAgainAfterAPauseEvenWithTheCaretMidText() {
+        val state = MarkdownEditorState("[11/24/2026](date:2026-11-24) ok")
+        state.update(TextFieldValue("[11/2/2026](date:2026-11-24) ok", selection = TextRange(5)))
+        assertEquals("11/2/2026 ok", state.markdown)
+        assertEquals(TextRange(0, 9), state.pendingDateRechip)
+
+        // Replace the 24 with 25 and stop with the caret after the 5, in the middle of the date.
+        state.update(TextFieldValue("11/25/2026 ok", selection = TextRange(5)))
+        assertEquals(TextRange(0, 10), state.pendingDateRechip)
+        assertEquals(1500L, state.pendingDateRechipDelayMs(Locale.US))
+
+        state.rechipPendingDate(Locale.US)
+
+        assertEquals("[11/25/2026](date:2026-11-25) ok", state.markdown)
+        assertEquals(TextRange("[11/25/2026](date:2026-11-25)".length), state.textFieldValue.selection)
+        assertNull(state.pendingDateRechip)
+
+        state.undo()
+        assertEquals("11/25/2026 ok", state.markdown)
+    }
+
+    @Test
+    fun retypedDateConvertsImmediatelyOnceTheCaretLeavesIt() {
+        val state = MarkdownEditorState("[11/24/2026](date:2026-11-24)\nnext")
+        state.update(TextFieldValue("[11/2/2026](date:2026-11-24)\nnext", selection = TextRange(5)))
+        state.update(TextFieldValue("11/25/2026\nnext", selection = TextRange(5)))
+        assertEquals(1500L, state.pendingDateRechipDelayMs(Locale.US))
+
+        // Tap on the next line.
+        state.update(TextFieldValue(state.markdown, selection = TextRange(13)))
+        assertEquals(0L, state.pendingDateRechipDelayMs(Locale.US))
+        state.rechipPendingDate(Locale.US)
+
+        assertEquals("[11/25/2026](date:2026-11-25)\nnext", state.markdown)
+    }
+
+    @Test
+    fun spaceTypedAfterRetypedDateEndsItWithoutBecomingPartOfIt() {
+        val state = MarkdownEditorState("[11/24/2026](date:2026-11-24)")
+        state.update(TextFieldValue("[11/2/2026](date:2026-11-24)", selection = TextRange(5)))
+        state.update(TextFieldValue("11/25/2026", selection = TextRange(10)))
+        state.update(TextFieldValue("11/25/2026 ", selection = TextRange(11)))
+        assertEquals(TextRange(0, 10), state.pendingDateRechip)
+        assertEquals(0L, state.pendingDateRechipDelayMs(Locale.US))
+        state.rechipPendingDate(Locale.US)
+        assertEquals("[11/25/2026](date:2026-11-25) ", state.markdown)
+    }
+
+    @Test
+    fun pendingRechipIsDroppedWhenAnEditCutsAcrossItOrTextIsNoLongerADate() {
+        val state = MarkdownEditorState("[11/24/2026](date:2026-11-24)")
+        state.update(TextFieldValue("[11/2/2026](date:2026-11-24)", selection = TextRange(5)))
+        assertEquals(TextRange(0, 9), state.pendingDateRechip)
+
+        // Typing before it shifts the range; deleting across its start drops it.
+        state.update(TextFieldValue("> 11/2/2026", selection = TextRange(2)))
+        assertEquals(TextRange(2, 11), state.pendingDateRechip)
+        state.update(TextFieldValue("> 11/2/2026".removeRange(1, 5), selection = TextRange(1)))
+        assertNull(state.pendingDateRechip)
+
+        val other = MarkdownEditorState("[11/24/2026](date:2026-11-24)")
+        other.update(TextFieldValue("[11/2/2026](date:2026-11-24)", selection = TextRange(5)))
+        other.update(TextFieldValue("11/2x/2026", selection = TextRange(10)))
+        assertNull(other.pendingDateRechipDelayMs(Locale.US))
     }
 }
