@@ -85,6 +85,39 @@ fun rememberEmailPickLauncher(onPicked: (ContactPick) -> Unit): ActivityResultLa
     }
 }
 
+@Composable
+fun rememberPostalPickLauncher(onPicked: (ContactPick) -> Unit): ActivityResultLauncher<Intent> {
+    val context = LocalContext.current
+    return rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val uri: Uri = result.data?.data ?: return@rememberLauncherForActivityResult
+        context.contentResolver
+            .query(
+                uri,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.StructuredPostal.DISPLAY_NAME,
+                    ContactsContract.CommonDataKinds.StructuredPostal.FORMATTED_ADDRESS,
+                ),
+                null,
+                null,
+                null,
+            )?.use { cur ->
+                if (cur.moveToFirst()) {
+                    val name = cur.getString(0) ?: ""
+                    // Formatted addresses are multi-line; the row and the geo: query want one line.
+                    val address =
+                        (cur.getString(1) ?: "")
+                            .lines()
+                            .map { line -> line.trim() }
+                            .filter { line -> line.isNotEmpty() }
+                            .joinToString(", ")
+                    if (address.isNotBlank()) onPicked(ContactPick(name, address))
+                }
+            }
+    }
+}
+
 private fun android.content.ContentResolver.drawableFromUri(uri: String): Drawable? =
     runCatching {
         openInputStream(uri.toUri())?.use { input ->
@@ -97,7 +130,6 @@ fun phonePickIntent(): Intent =
     // only Contacts handles it on the user's device today, so we leave it as-is.
     Intent(Intent.ACTION_PICK).apply {
         type = ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
 
 fun emailPickIntent(): Intent =
@@ -107,6 +139,6 @@ fun emailPickIntent(): Intent =
     // vnd.android.cursor.dir/* MIME prefix and were showing up in the chooser. The
     // explicit data URI restricts resolvers to those declaring filters for
     // com.android.contacts/data/emails, which is effectively just Contacts.
-    Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Email.CONTENT_URI).apply {
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
+    // No FLAG_GRANT_READ_URI_PERMISSION: without READ_CONTACTS the app cannot grant this URI, and
+    // startActivity throws a SecurityException. The picker grants the returned row on its own.
+    Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Email.CONTENT_URI)

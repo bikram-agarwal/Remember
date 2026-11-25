@@ -712,6 +712,9 @@ class ReminderReceiver : BroadcastReceiver() {
                     ActionType.OPEN_SHORTCUT ->
                         action.iconData.toNoteActionIconBitmap()
                             ?: shortcutNotificationIconBitmap(context, action.details)
+                    ActionType.CALL_NUMBER,
+                    ActionType.SEND_MESSAGE,
+                    -> action.iconData.toNoteActionIconBitmap()
                     else -> null
                 }
             return if (bitmap != null) {

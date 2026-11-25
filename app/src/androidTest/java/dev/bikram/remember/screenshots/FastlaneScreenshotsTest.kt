@@ -22,6 +22,11 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.filter
+import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.onAncestors
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -270,6 +275,18 @@ class FastlaneScreenshotsTest {
             composeRule.onAllNodesWithText("Rhea Birthday").onFirst().performClick()
             waitForText("Call in the morning")
             waitForText("Call Rhea")
+            // Nudge the detail pane up so the hero image sits partly behind the top bar blur,
+            // as in tablet_2_actions.
+            // (Semantic scroll, not a swipe: a short touch swipe didn't move the pane.)
+            val scrollPx = 90 * targetContext.resources.displayMetrics.density
+            composeRule
+                .onAllNodesWithText("Call Rhea")
+                .onFirst()
+                .onAncestors()
+                .filter(hasScrollAction())
+                .onFirst()
+                .performSemanticsAction(SemanticsActions.ScrollBy) { it(0f, scrollPx) }
+            composeRule.waitForIdle()
             captureDeviceScreenshot("tablet_1_home.jpg")
         }
     }

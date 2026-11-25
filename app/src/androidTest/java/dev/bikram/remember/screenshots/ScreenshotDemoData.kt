@@ -1,6 +1,11 @@
 package dev.bikram.remember.screenshots
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.util.Base64
 import androidx.core.content.FileProvider
 import dev.bikram.remember.BuildConfig
 import dev.bikram.remember.data.ActionType
@@ -26,6 +31,7 @@ import dev.bikram.remember.data.ThemeMode
 import dev.bikram.remember.data.UpdateCheckSchedule
 import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.di.DevOptionsDependenciesEntryPoint
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -189,7 +195,7 @@ internal object ScreenshotDemoData {
         val airFilterId =
             noteRepository.createNote(
                 title = "Air Filter Replacement",
-                body = "Last replaced on 11/15/2025",
+                body = "Last replaced on [11/15/2025](date:2025-11-15)",
                 colorIndex = COLOR_INDEX_SKY,
                 options =
                     NoteOptions(
@@ -257,6 +263,8 @@ internal object ScreenshotDemoData {
                                     type = ActionType.CALL_NUMBER,
                                     title = "Call Rhea",
                                     details = "+11234567890",
+                                    // What picking a contact stores: the contact's photo, as PNG data.
+                                    iconData = demoContactAvatarData("💕"),
                                 ),
                             ),
                         tags = listOf("Birthday 🎂"),
@@ -368,9 +376,9 @@ internal object ScreenshotDemoData {
                 title = "Use Other Cards",
                 body =
                     """
-                    - BofA last used on 12/03/2025.
-                    - Amex last used on 01/26/2026.
-                    - CapOne last used on 04/08/2026.
+                    - BofA last used on [12/03/2025](date:2025-12-03).
+                    - Amex last used on [01/26/2026](date:2026-01-26).
+                    - CapOne last used on [04/08/2026](date:2026-04-08).
                     """.trimIndent(),
                 colorIndex = COLOR_INDEX_ORCHID,
                 options =
@@ -412,6 +420,33 @@ internal object ScreenshotDemoData {
             useOtherCardsId = useOtherCardsId,
             markdownShowcaseId = markdownShowcaseId,
         )
+    }
+
+    /**
+     * Stand-in for a contact's photo, drawn like a Google Contacts monogram (the glyph on a soft
+     * round tile; here an emoji), encoded like [toNoteActionIconData] does.
+     */
+    private fun demoContactAvatarData(initial: String): String? {
+        val size = 96
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        return try {
+            val canvas = Canvas(bitmap)
+            val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFFF8BBD0.toInt() }
+            canvas.drawCircle(size / 2f, size / 2f, size / 2f, fill)
+            val text =
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.WHITE
+                    textSize = size * 0.5f
+                    textAlign = Paint.Align.CENTER
+                }
+            canvas.drawText(initial, size / 2f, size / 2f - (text.descent() + text.ascent()) / 2f, text)
+            ByteArrayOutputStream().use { out ->
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+            }
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     private fun groceriesChecklistItems(): List<PersistableChecklistItem> =

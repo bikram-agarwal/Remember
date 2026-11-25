@@ -1,23 +1,23 @@
-## v1.21.0 Markdown import/export, Drag & drop, Note/checklist conversion, Importance sorting
+## v1.21.0 — Markdown Import/Export, Drag & Drop, Note Conversion & Importance Sorting
 
 ### ✨ New Features
-- **Convert between notes and checklists**: Tap `⋮` -> **Convert to checklist** on list-formatted notes, or `⋮` -> **Convert to note** on checklists, keeping your title, reminders, tags, and attachments intact.
-- **Import & export Markdown**: Tap the top-right `⋮` menu on a note or checklist to **Import MD** (on empty notes or checklists) or **Export MD** (when content is present). You can also bulk-import `.md`, `.markdown`, `.txt`, `.zip` archives of Markdown files from **Import -> Tasks.org & more**.
-- **Drag and drop import**: Drag `.md`, `.markdown`, `.txt`, `.zip` (Markdown archives or Remember backups), or `.json` (Google Takeout / Tasks.org backup) files onto the unlocked Remember window to import them. 
-- **Bulk Markdown ZIP export**: In multi-select mode on the Notes tab, tap **Export** in the selection bar to save a `.zip` archive of `.md` files for all selected notes and checklists.
-- **Manual notification pinning**: Long-press the `Notify` button in the bottom bar of a note or checklist to pin its notification. Pinned notifications are restored if dismissed and come back after your device restarts.
-- **Importance sorting & grouping**: Sort or group notes and checklists by **Importance** on the Notes tab, with a dedicated direction toggle in the Sort menu.
-- **Inline date chips in notes**: Tap the calendar button in the formatting toolbar to pick and insert a date pill right into your note. Tap any inserted date to update it, or long-press to open it in your calendar app.
+- **Note & checklist conversion**: Convert between list-formatted notes and checklists via the top-right `⋮` menu while preserving titles, reminders, tags, and attachments.
+- **Markdown import & export**: From a note's `⋮` menu, use **Import MD** on an empty note or **Export MD** when content is present. You can also bulk-import `.md`, `.markdown`, `.txt`, or Markdown `.zip` archives from **Import → Tasks.org & more**.
+- **Bulk Markdown ZIP export**: Multi-select notes and checklists on the Notes home screen and tap **Export** in the floating action bar to save them as a `.zip` archive of `.md` files.
+- **Drag-and-drop import**: Drop `.md`, `.txt`, `.zip` (Markdown archives or Remember backups), or `.json` (Google Takeout / Tasks.org backup) files onto the unlocked app window to import them.
+- **Manual notification pinning**: Long-press **Notify** in the bottom bar to pin a notification so it restores automatically if dismissed or after a device reboot.
+- **Importance sorting & grouping**: Sort or group items by **Importance** on the Notes tab with independent direction controls.
+- **Inline date chips**: Insert interactive date pills from the formatting toolbar — tap to edit or long-press to open in your calendar app.
 
-### 🛠 Improved Features
-- **Paste keeps formatting**: Text copied from a web page, email, or document keeps its headings, lists, checkboxes, quotes, code, links, and bold or italic text when pasted into a note.
-- **Reorganized Import screen**: **Import** now has **Google Tasks** and **Tasks.org & more** tabs, and can import `.md`, .zip containing multiple `.md`s or restore a Remember backup `.zip`.
-- Checklist widget previews now display the first unchecked item.
-- Improved text input handling across note titles, tags, links, and search fields, including clear feedback when title or tag limits are reached.
+### 🛠 Improvements
+- **Rich-text paste**: Pasting rich text from other apps preserves most of the formatting instead of stripping it to plain text.
+- **Redesigned Import screen**: Split into **Google Tasks** and **Tasks.org & more** tabs, supporting `.md`, `.txt`, Markdown `.zip` archives, and Remember backup `.zip` files.
+- **Contact notification actions**: Restored contact photos on call/text actions, fixed a crash when selecting **Send email**, and added a contact picker to **Get directions**.
+- **Widget & input polish**: Checklist widgets now preview the first unchecked item, and text fields show clearer feedback when title or tag character limits are reached.
 
 ### 🐛 Bug Fixes
-- Fixed checklist item titles accepting multiline input on some non-GBoard keyboards; pressing Enter now moves to the next item.
-- Colors from the hand-tuned presets and custom colors were more saturated than intended. Chips, buttons, and reminder pills look softer again.
+- Prevented multiline input on checklist item titles on third-party keyboards so pressing Enter advances to the next item.
+- Restored softer color saturation across apps.
 
 ---
 

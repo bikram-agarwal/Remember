@@ -1230,6 +1230,9 @@ private fun actionOptionsIcon(
         ActionType.OPEN_SHORTCUT ->
             action.iconData.toNoteActionIconDrawable(context.resources)
                 ?: shortcutFallbackIcon(context.packageManager, action.details)
+        ActionType.CALL_NUMBER,
+        ActionType.SEND_MESSAGE,
+        -> action.iconData.toNoteActionIconDrawable(context.resources)
         else -> null
     }
 

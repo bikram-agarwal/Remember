@@ -1,8 +1,10 @@
 package dev.bikram.remember.ui.edit
 
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
+import android.provider.ContactsContract
 import android.util.Patterns
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -64,6 +66,14 @@ import dev.bikram.remember.ui.components.RememberUnsavedChangesDialog
 import dev.bikram.remember.ui.feedback.appClickable
 
 private const val LEGACY_CONTACT_MANUAL_ENTRY_EXTRA = "__remember_manual_contact_entry__"
+
+// Google Contacts exports these CREATE_SHORTCUT activities. Their shortcut icon is the contact photo,
+// which the app cannot read itself without READ_CONTACTS. Used only when the component resolves.
+private val CONTACT_DIAL_SHORTCUT = ComponentName("com.google.android.contacts", "alias.DialShortcut")
+private val CONTACT_MESSAGE_SHORTCUT = ComponentName("com.google.android.contacts", "alias.MessageShortcut")
+// Google labels these shortcuts "Name (Call)" or "Name (Message)" and cuts the label to 12 characters
+// with an ellipsis, so the closing parenthesis can be missing. The action title only needs the name.
+private val contactShortcutTypeSuffixRegex = Regex("""\s*\([^()]*\)?$""")
 
 fun ActionType.materialSymbolName(): String =
     when (this) {
@@ -153,7 +163,7 @@ fun ActionPicker(
                 ActionType.CALL_NUMBER,
                 ActionType.SEND_MESSAGE,
                 ActionType.SEND_EMAIL,
-                -> targetIcon
+                -> targetIcon ?: savedShortcutIcon.takeIf { initialAction?.details == details }
                 ActionType.GET_DIRECTIONS -> null
                 ActionType.OPEN_LINK -> null
                 ActionType.OPEN_APP -> targetIcon ?: appIcon(packageManager, details)
@@ -207,10 +217,10 @@ fun ActionPicker(
                 else -> extra?.trim()?.takeIf { it.isNotBlank() }
             }
         val cleanIconData =
-            if (type == ActionType.OPEN_SHORTCUT) {
+            if (type == ActionType.OPEN_SHORTCUT || type == ActionType.CALL_NUMBER || type == ActionType.SEND_MESSAGE) {
                 targetIcon?.toNoteActionIconData()
                     ?: initialAction
-                        ?.takeIf { it.type == ActionType.OPEN_SHORTCUT && it.details == cleanDetails }
+                        ?.takeIf { it.type == type && it.details == cleanDetails }
                         ?.iconData
             } else {
                 null
@@ -218,25 +228,44 @@ fun ActionPicker(
         return NoteAction(type, cleanTitle, cleanDetails, extra = cleanExtra, iconData = cleanIconData)
     }
 
+    fun applyContactPick(
+        displayName: String,
+        data: String,
+        avatar: Drawable?,
+    ) {
+        val verb =
+            when (selectedType) {
+                ActionType.SEND_MESSAGE -> resources.getString(R.string.action_contact_verb_message)
+                ActionType.GET_DIRECTIONS -> resources.getString(R.string.action_contact_verb_directions)
+                else -> resources.getString(R.string.action_contact_verb_call)
+            }
+        if (displayName.isNotBlank()) {
+            title =
+                resources.getString(
+                    R.string.actions_contact_title_format,
+                    verb,
+                    displayName,
+                )
+        }
+        details = data
+        extra = displayName.takeIf { it.isNotBlank() }
+        targetIcon = avatar
+    }
+
     val phoneLauncher =
         rememberPhonePickLauncher { pick ->
-            val verb =
-                if (selectedType == ActionType.SEND_MESSAGE) {
-                    resources.getString(R.string.action_contact_verb_message)
-                } else {
-                    resources.getString(R.string.action_contact_verb_call)
-                }
-            if (pick.displayName.isNotBlank()) {
-                title =
-                    resources.getString(
-                        R.string.actions_contact_title_format,
-                        verb,
-                        pick.displayName,
-                    )
-            }
-            details = pick.data
-            extra = pick.displayName.takeIf { it.isNotBlank() }
-            targetIcon = pick.avatar
+            applyContactPick(pick.displayName, pick.data, pick.avatar)
+        }
+    val postalLauncher =
+        rememberPostalPickLauncher { pick ->
+            applyContactPick(pick.displayName, pick.data, null)
+        }
+    val contactShortcutLauncher =
+        rememberShortcutPickLauncher { pick ->
+            val number =
+                contactNumberFromShortcutUri(pick.intentUri) ?: return@rememberShortcutPickLauncher
+            val contactName = pick.label.replace(contactShortcutTypeSuffixRegex, "")
+            applyContactPick(contactName, number, pick.icon)
         }
     val emailLauncher =
         rememberEmailPickLauncher { pick ->
@@ -340,8 +369,25 @@ fun ActionPicker(
                         when (selectedType) {
                             ActionType.CALL_NUMBER,
                             ActionType.SEND_MESSAGE,
-                            -> phoneLauncher.launch(phonePickIntent())
+                            -> {
+                                val contactShortcut =
+                                    if (selectedType == ActionType.CALL_NUMBER) CONTACT_DIAL_SHORTCUT else CONTACT_MESSAGE_SHORTCUT
+                                val shortcutProbe = Intent(Intent.ACTION_CREATE_SHORTCUT).setComponent(contactShortcut)
+                                if (packageManager.resolveActivity(shortcutProbe, 0) != null) {
+                                    contactShortcutLauncher(contactShortcut)
+                                } else {
+                                    // Fallback never yields an avatar, by design. The system contact picker only grants
+                                    // the picked data row (name, number), not the separate .../contacts/<id>/photo URI,
+                                    // so the photo read throws SecurityException (verified on emulator, Nov 2026).
+                                    // Only the Google Contacts shortcut above hands over the photo without READ_CONTACTS.
+                                    phoneLauncher.launch(phonePickIntent())
+                                }
+                            }
                             ActionType.SEND_EMAIL -> emailLauncher.launch(emailPickIntent())
+                            ActionType.GET_DIRECTIONS ->
+                                postalLauncher.launch(
+                                    Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.StructuredPostal.CONTENT_URI),
+                                )
                             else -> Unit
                         }
                     },
@@ -473,6 +519,20 @@ private fun ActionEditor(
                         } else {
                             KeyboardOptions(keyboardType = KeyboardType.Phone)
                         },
+                    errorText = detailsError,
+                    trailingIconName = "contacts",
+                    leadingTone = ActionRowTone.SurfaceVariant,
+                    trailingTone = ActionRowTone.Primary,
+                    onTrailingClick = onPickContact,
+                )
+            }
+            ActionType.GET_DIRECTIONS -> {
+                ActionEditableRow(
+                    iconName = type.materialSymbolName(),
+                    label = stringResource(type.dataLabelRes()),
+                    value = details,
+                    onValueChange = onDetailsChange,
+                    placeholder = stringResource(type.dataLabelRes()),
                     errorText = detailsError,
                     trailingIconName = "contacts",
                     leadingTone = ActionRowTone.SurfaceVariant,
@@ -707,6 +767,9 @@ private fun ActionEditableRow(
                         },
                     )
                 }
+                if (onTrailingClick != null) {
+                    Spacer(Modifier.size(12.dp))
+                }
                 if (trailingLabel != null && onTrailingClick != null) {
                     RememberTextButton(onClick = onTrailingClick) {
                         Text(trailingLabel)
@@ -924,7 +987,13 @@ private fun String.isValidPhoneActionValue(): Boolean =
 private fun ActionType?.isContactAction(): Boolean =
     this == ActionType.CALL_NUMBER ||
         this == ActionType.SEND_MESSAGE ||
-        this == ActionType.SEND_EMAIL
+        this == ActionType.SEND_EMAIL ||
+        this == ActionType.GET_DIRECTIONS
+
+private fun contactNumberFromShortcutUri(intentUri: String): String? {
+    val shortcutIntent = runCatching { Intent.parseUri(intentUri, Intent.URI_INTENT_SCHEME) }.getOrNull() ?: return null
+    return shortcutIntent.data?.schemeSpecificPart?.takeIf { it.isNotBlank() }
+}
 
 private fun appLabel(
     packageManager: PackageManager,
