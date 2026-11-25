@@ -131,12 +131,11 @@ internal fun MarkdownText(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        val lines = markdown.lines()
         var lineIndex = 0
-        while (lineIndex < lines.size) {
+        while (lineIndex < blocks.size) {
             val quoteLines = mutableListOf<String>()
             val quoteLineContentOffsets = mutableListOf<Int>()
-            while (lineIndex < lines.size) {
+            while (lineIndex < blocks.size) {
                 val quoteBlock = blocks[lineIndex].takeIf { it.kind == MarkdownBlockKind.Quote } ?: break
                 quoteLines.add(markdown.substring(quoteBlock.contentStart, quoteBlock.end))
                 quoteLineContentOffsets.add(
@@ -158,15 +157,21 @@ internal fun MarkdownText(
                     onDateClick = onDateClick,
                     onDateLongPress = onDateLongPress,
                 )
-            } else if (lineIndex < lines.size && blocks[lineIndex].kind == MarkdownBlockKind.CodeFence) {
-                val codeBlockStartOffset = (blocks[lineIndex].end + 1).coerceAtMost(markdown.length)
+            } else if (blocks[lineIndex].kind == MarkdownBlockKind.CodeFence) {
+                val codeBlockStartOffset =
+                    if (lineIndex + 1 < blocks.size) {
+                        blocks[lineIndex + 1].start
+                    } else {
+                        blocks[lineIndex].end
+                    }
                 val codeLines = mutableListOf<String>()
                 lineIndex++
-                while (lineIndex < lines.size && blocks[lineIndex].kind != MarkdownBlockKind.CodeFence) {
-                    codeLines.add(lines[lineIndex])
+                while (lineIndex < blocks.size && blocks[lineIndex].kind != MarkdownBlockKind.CodeFence) {
+                    val codeBlock = blocks[lineIndex]
+                    codeLines.add(markdown.substring(codeBlock.start, codeBlock.end))
                     lineIndex++
                 }
-                if (lineIndex < lines.size && blocks[lineIndex].kind == MarkdownBlockKind.CodeFence) {
+                if (lineIndex < blocks.size && blocks[lineIndex].kind == MarkdownBlockKind.CodeFence) {
                     lineIndex++
                 }
                 MarkdownCodeBlock(
@@ -178,20 +183,22 @@ internal fun MarkdownText(
                     onTextLongPress = onTextLongPress,
                 )
             } else {
+                val currentBlock = blocks[lineIndex]
                 val checklistContinuationLines =
-                    if (blocks[lineIndex].kind == MarkdownBlockKind.Checklist) {
+                    if (currentBlock.kind == MarkdownBlockKind.Checklist) {
                         val continuationLines = mutableListOf<MarkdownContinuationLine>()
                         var continuationIndex = lineIndex + 1
-                        while (continuationIndex < lines.size) {
-                            val continuationLine = lines[continuationIndex]
+                        while (continuationIndex < blocks.size) {
+                            val continuationBlock = blocks[continuationIndex]
+                            if (continuationBlock.kind != MarkdownBlockKind.Plain) break
+                            val continuationLine = markdown.substring(continuationBlock.start, continuationBlock.end)
                             val continuationMatch =
                                 MarkdownChecklistContinuationLineRegex.matchEntire(continuationLine) ?: break
-                            if (blocks[continuationIndex].kind != MarkdownBlockKind.Plain) break
                             val contentRange = continuationMatch.groups[1]?.range ?: break
                             continuationLines +=
                                 MarkdownContinuationLine(
                                     text = continuationMatch.groupValues[1],
-                                    lineStartOffset = blocks[continuationIndex].start,
+                                    lineStartOffset = continuationBlock.start,
                                     contentStartOffset = contentRange.first,
                                 )
                             continuationIndex++
@@ -201,10 +208,10 @@ internal fun MarkdownText(
                         emptyList()
                     }
                 MarkdownLine(
-                    line = lines[lineIndex],
-                    block = blocks[lineIndex],
+                    line = markdown.substring(currentBlock.start, currentBlock.end),
+                    block = currentBlock,
                     lineIndex = lineIndex,
-                    lineStartOffset = blocks[lineIndex].start,
+                    lineStartOffset = currentBlock.start,
                     checklistContinuationLines = checklistContinuationLines,
                     style = style,
                     styler = styler,

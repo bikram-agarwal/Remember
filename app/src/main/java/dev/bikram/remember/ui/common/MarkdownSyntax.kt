@@ -61,7 +61,45 @@ internal val MarkdownQuoteLineRegex = Regex("""^\s*>\s?(.*)$""")
 // Only dash rules are supported: star runs remain available for in-progress emphasis.
 internal val MarkdownHorizontalRuleLineRegex = Regex("""^ {0,3}-{3,}[ \t]*$""")
 internal val MarkdownCodeFenceLineRegex = Regex("""^\s*```\s*$""")
-internal val MarkdownLinkRegex = Regex("""\[([^\]\n]+)]\(([^)\n]+)\)""")
+internal val MarkdownLinkRegex = Regex("""\[([^\]\r\n]+)]\(([^)\r\n]+)\)""")
+
+internal fun String.normalizeMarkdownLineEndings(): String {
+    val firstCarriageReturn = indexOf('\r')
+    if (firstCarriageReturn < 0) return this
+    val normalized = StringBuilder(length)
+    normalized.append(this, 0, firstCarriageReturn)
+    var index = firstCarriageReturn
+    while (index < length) {
+        val character = this[index]
+        if (character == '\r') {
+            normalized.append('\n')
+            if (index + 1 < length && this[index + 1] == '\n') {
+                index += 2
+                continue
+            }
+        } else {
+            normalized.append(character)
+        }
+        index++
+    }
+    return normalized.toString()
+}
+
+private inline fun String.forEachMarkdownLine(action: (line: String, start: Int) -> Unit) {
+    var lineStart = 0
+    var index = 0
+    while (index < length) {
+        val character = this[index]
+        if (character == '\r' || character == '\n') {
+            action(substring(lineStart, index), lineStart)
+            index += if (character == '\r' && index + 1 < length && this[index + 1] == '\n') 2 else 1
+            lineStart = index
+        } else {
+            index++
+        }
+    }
+    action(substring(lineStart, length), lineStart)
+}
 
 // Incomplete input is intentionally distinct from complete syntax: Backspace may leave half
 // a checklist marker or a heading without its space while deleting an empty block prefix.
@@ -102,13 +140,11 @@ internal fun parseMarkdownLine(
 
 internal fun parseMarkdownLines(source: String): List<MarkdownLineSyntax> {
     val lines = mutableListOf<MarkdownLineSyntax>()
-    var start = 0
     var inCodeBlock = false
-    source.splitToSequence('\n').forEach { text ->
+    source.forEachMarkdownLine { text, start ->
         val line = parseMarkdownLine(text, start, inCodeBlock)
         lines.add(line)
         if (line.kind == MarkdownBlockKind.CodeFence) inCodeBlock = !inCodeBlock
-        start += text.length + 1
     }
     return lines
 }
@@ -128,10 +164,8 @@ internal fun parseMarkdownDocument(source: String): MarkdownDocumentSyntax {
 /** Inline fragments obey the same line boundaries as the editor, even in compact card text. */
 internal fun parseMarkdownInline(source: String): List<MarkdownInlineSpan> {
     val spans = mutableListOf<MarkdownInlineSpan>()
-    var start = 0
-    source.splitToSequence('\n').forEach { line ->
+    source.forEachMarkdownLine { line, start ->
         collectMarkdownInlineSpans(line, start, spans)
-        start += line.length + 1
     }
     return spans
 }

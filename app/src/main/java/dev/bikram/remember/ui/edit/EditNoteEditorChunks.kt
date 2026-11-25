@@ -85,6 +85,7 @@ import dev.bikram.remember.ui.common.MarkdownDateInteraction
 import dev.bikram.remember.ui.common.MarkdownLinkInteraction
 import dev.bikram.remember.ui.common.MarkdownText
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.normalizeMarkdownLineEndings
 import dev.bikram.remember.ui.common.withMarkdownDateReplaced
 import dev.bikram.remember.ui.components.NoteShelfState
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
@@ -171,7 +172,7 @@ internal fun rememberEditorBodyBridge(
     // an existing note's first edit went into an empty undo stack (so undoing erased it).
     LaunchedEffect(vm, markdownEditorState, bridge) {
         vm.loaded.first { it }
-        val initialBody = vm.body.value
+        val initialBody = vm.body.value.normalizeMarkdownLineEndings()
         markdownEditorState.setMarkdown(initialBody)
         bridge.reset(initialBody)
     }
@@ -181,11 +182,12 @@ internal fun rememberEditorBodyBridge(
     // is the source of truth.
     LaunchedEffect(vm, markdownEditorState, bridge) {
         vm.body.collect { latestBody ->
-            if (!isEditModeState.value && latestBody != bridge.lastSyncedBody) {
-                if (latestBody != markdownEditorState.markdown) {
-                    markdownEditorState.setMarkdown(latestBody)
+            val normalizedLatestBody = latestBody.normalizeMarkdownLineEndings()
+            if (!isEditModeState.value && normalizedLatestBody != bridge.lastSyncedBody) {
+                if (normalizedLatestBody != markdownEditorState.markdown) {
+                    markdownEditorState.setMarkdown(normalizedLatestBody)
                 }
-                bridge.reset(latestBody)
+                bridge.reset(normalizedLatestBody)
             }
         }
     }

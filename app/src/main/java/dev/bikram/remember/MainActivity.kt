@@ -91,6 +91,7 @@ import dev.bikram.remember.ui.common.LocalAppDropImportGuard
 import dev.bikram.remember.ui.common.LocalSystemPaneScaffoldDirective
 import dev.bikram.remember.ui.common.LocalSystemWindowAdaptiveInfo
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.normalizeMarkdownLineEndings
 import dev.bikram.remember.ui.common.rememberNotificationsAllowed
 import dev.bikram.remember.ui.components.RememberBackupZipActionDialog
 import dev.bikram.remember.ui.components.UpdateChromeState
@@ -258,7 +259,11 @@ class MainActivity : FragmentActivity() {
         }
         when (intent.action) {
             Intent.ACTION_SEND -> {
-                val text = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+                val text =
+                    intent
+                        .getStringExtra(Intent.EXTRA_TEXT)
+                        .orEmpty()
+                        .normalizeMarkdownLineEndings()
                 pendingLaunch.value = LaunchAction.NewNote(prefill = text)
             }
             ACTION_SHORTCUT_NEW_NOTE -> {

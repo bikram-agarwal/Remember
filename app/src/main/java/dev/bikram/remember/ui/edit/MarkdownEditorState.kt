@@ -15,6 +15,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import dev.bikram.remember.ui.common.MarkdownInlineProjection
+import dev.bikram.remember.ui.common.normalizeMarkdownLineEndings
 import dev.bikram.remember.ui.common.parseInlineNoteDate
 import dev.bikram.remember.ui.common.parseMarkdownDocument
 import java.time.LocalDate
@@ -29,7 +30,7 @@ import java.util.Locale
 internal class MarkdownEditorState(
     initialMarkdown: String = "",
 ) {
-    val textFieldState = TextFieldState(initialMarkdown)
+    val textFieldState = TextFieldState(initialMarkdown.normalizeMarkdownLineEndings())
     private val history = MarkdownEditorHistory()
     private var explicitFormatting by mutableStateOf<MarkdownEditorSnapshot?>(null)
 
@@ -80,7 +81,7 @@ internal class MarkdownEditorState(
         return InputTransformation {
             val previousValue = TextFieldValue(originalText.toString(), originalSelection)
             val before = snapshot(previousValue)
-            val incoming = TextFieldValue(toString(), selection)
+            val incoming = TextFieldValue(toString(), selection).withNormalizedLineEndings()
             val edited = MarkdownEditBuffer(previousValue)
             edited.update(incoming, livePreview, livePreview)
             trackPendingDateRechip(previousValue.text, edited)
@@ -98,12 +99,13 @@ internal class MarkdownEditorState(
         cleanUpEmptyMarkdownWrappers: Boolean = true,
         breakLineAfterHorizontalRule: Boolean = true,
     ) {
+        val normalizedValue = value.withNormalizedLineEndings()
         val before = snapshot(textFieldValue)
         val edited = MarkdownEditBuffer(textFieldValue)
-        edited.update(value, cleanUpEmptyMarkdownWrappers, breakLineAfterHorizontalRule)
+        edited.update(normalizedValue, cleanUpEmptyMarkdownWrappers, breakLineAfterHorizontalRule)
         trackPendingDateRechip(before.text, edited)
         if (cleanUpEmptyMarkdownWrappers) applyPendingFormats(before, edited)
-        val after = inputSnapshot(before, value, edited)
+        val after = inputSnapshot(before, normalizedValue, edited)
         Snapshot.withMutableSnapshot {
             textFieldState.edit { applyMarkdownValue(edited.textFieldValue) }
             finishInput(before, after)
@@ -115,18 +117,19 @@ internal class MarkdownEditorState(
         value: String,
         moveCursorToEnd: Boolean = true,
     ) {
+        val normalized = value.normalizeMarkdownLineEndings()
         val selection =
             if (moveCursorToEnd) {
-                TextRange(value.length)
+                TextRange(normalized.length)
             } else {
                 TextRange(
-                    textFieldState.selection.start.coerceIn(0, value.length),
-                    textFieldState.selection.end.coerceIn(0, value.length),
+                    textFieldState.selection.start.coerceIn(0, normalized.length),
+                    textFieldState.selection.end.coerceIn(0, normalized.length),
                 )
             }
         Snapshot.withMutableSnapshot {
             pendingDateRechip = null
-            textFieldState.edit { applyMarkdownValue(TextFieldValue(value, selection)) }
+            textFieldState.edit { applyMarkdownValue(TextFieldValue(normalized, selection)) }
             explicitFormatting = null
             history.clear()
             textFieldState.undoState.clearHistory()
@@ -399,6 +402,37 @@ internal fun TextFieldBuffer.applyMarkdownValue(value: TextFieldValue) {
     if (selection != value.selection) {
         selection = value.selection
     }
+}
+
+internal fun TextFieldValue.withNormalizedLineEndings(): TextFieldValue {
+    if ('\r' !in text) return this
+    val normalizedText = text.normalizeMarkdownLineEndings()
+    val startCollapseCount = collapsedCarriageReturnsBefore(text, selection.start)
+    val endCollapseCount = collapsedCarriageReturnsBefore(text, selection.end)
+    val mappedSelection =
+        TextRange(
+            (selection.start - startCollapseCount).coerceIn(0, normalizedText.length),
+            (selection.end - endCollapseCount).coerceIn(0, normalizedText.length),
+        )
+    return copy(text = normalizedText, selection = mappedSelection, composition = null)
+}
+
+private fun collapsedCarriageReturnsBefore(
+    source: String,
+    offset: Int,
+): Int {
+    val limit = offset.coerceIn(0, source.length)
+    var collapsedCount = 0
+    var index = 0
+    while (index < limit) {
+        if (source[index] == '\r' && index + 1 < source.length && source[index + 1] == '\n') {
+            collapsedCount++
+            index += 2
+        } else {
+            index++
+        }
+    }
+    return collapsedCount
 }
 
 /**

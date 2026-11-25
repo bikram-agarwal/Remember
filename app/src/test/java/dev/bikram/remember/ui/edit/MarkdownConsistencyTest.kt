@@ -10,6 +10,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDecoration
 import dev.bikram.remember.ui.common.MarkdownBlockKind
 import dev.bikram.remember.ui.common.MarkdownInlineInteraction
@@ -18,9 +19,12 @@ import dev.bikram.remember.ui.common.MarkdownInlineProjection
 import dev.bikram.remember.ui.common.MarkdownStyler
 import dev.bikram.remember.ui.common.formatInlineNoteDate
 import dev.bikram.remember.ui.common.markdownCardPreview
+import dev.bikram.remember.ui.common.normalizeMarkdownLineEndings
 import dev.bikram.remember.ui.common.parseInlineNoteDate
 import dev.bikram.remember.ui.common.parseMarkdownDateTarget
 import dev.bikram.remember.ui.common.parseMarkdownDocument
+import dev.bikram.remember.ui.common.parseMarkdownInline
+import dev.bikram.remember.ui.common.parseMarkdownLines
 import dev.bikram.remember.ui.common.withMarkdownDateReplaced
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -613,5 +617,89 @@ class MarkdownConsistencyTest {
         assertNull(parseInlineNoteDate("13/45/2026", Locale.US))
         assertNull(parseInlineNoteDate("on 11/24/2026", Locale.US))
         assertNull(parseInlineNoteDate("hello", Locale.US))
+    }
+
+    @Test
+    fun carriageReturnAndCrLfNotesParseBlocksSpansAndToggleChecklistWithoutBoundsErrors() {
+        val bareCarriageReturnNote = "first line\rsecond line"
+        val bareBlocks = parseMarkdownLines(bareCarriageReturnNote)
+        assertEquals(2, bareBlocks.size)
+        assertEquals("first line", bareCarriageReturnNote.substring(bareBlocks[0].start, bareBlocks[0].end))
+        assertEquals("second line", bareCarriageReturnNote.substring(bareBlocks[1].start, bareBlocks[1].end))
+        assertEquals("first line\nsecond line", markdownCardPreview(bareCarriageReturnNote, styler).text.text)
+
+        val trailingCarriageReturnNote = "only line\r"
+        val trailingBlocks = parseMarkdownLines(trailingCarriageReturnNote)
+        assertEquals(2, trailingBlocks.size)
+        assertEquals("only line", trailingCarriageReturnNote.substring(trailingBlocks[0].start, trailingBlocks[0].end))
+        assertEquals("", trailingCarriageReturnNote.substring(trailingBlocks[1].start, trailingBlocks[1].end))
+
+        val mixedLineEndings =
+            "# Heading\r\n" +
+                "- [ ] **First** [link](example.com)\r" +
+                "> Quoted [11/24/2026](date:2026-11-24)\r\n" +
+                "```\r\n" +
+                "code line\r" +
+                "```\r" +
+                "---"
+        val document = parseMarkdownDocument(mixedLineEndings)
+        assertEquals(
+            listOf(
+                MarkdownBlockKind.Heading,
+                MarkdownBlockKind.Checklist,
+                MarkdownBlockKind.Quote,
+                MarkdownBlockKind.CodeFence,
+                MarkdownBlockKind.Code,
+                MarkdownBlockKind.CodeFence,
+                MarkdownBlockKind.Rule,
+            ),
+            document.lines.map { line -> line.kind },
+        )
+
+        val toggledMixed = mixedLineEndings.withChecklistLineToggled(lineIndex = 1, checked = true)
+        assertTrue(toggledMixed.contains("- [x] **First**"))
+        assertEquals(mixedLineEndings, toggledMixed.withChecklistLineToggled(lineIndex = 1, checked = false))
+
+        val cardPreview = markdownCardPreview(mixedLineEndings, styler)
+        val dateRange = cardPreview.interactions.dates.single()
+        assertEquals(
+            "[11/24/2026](date:2026-11-24)",
+            mixedLineEndings.substring(dateRange.date.spanStartOffset, dateRange.date.spanEndOffset),
+        )
+        val linkRange = cardPreview.interactions.links.single()
+        assertEquals("link", linkRange.link.text)
+        assertEquals(mixedLineEndings.indexOf("**First**") + 10, linkRange.link.markdownOffset)
+
+        // Inline spans must not cross bare carriage-return line breaks.
+        assertTrue(parseMarkdownInline("*split\rline*").isEmpty())
+        assertTrue(parseMarkdownInline("[split\rlabel](example.com)").isEmpty())
+    }
+
+    @Test
+    fun editorStateNormalizesCarriageReturnsOnInitSetPasteAndUpdate() {
+        assertEquals("alpha\nbeta\ngamma\n", "alpha\r\nbeta\rgamma\r\n".normalizeMarkdownLineEndings())
+
+        val initialState = MarkdownEditorState("one\r\ntwo\rthree")
+        assertEquals("one\ntwo\nthree", initialState.markdown)
+
+        initialState.setMarkdown("four\rfive\r\nsix", moveCursorToEnd = true)
+        assertEquals("four\nfive\nsix", initialState.markdown)
+        assertEquals("four\nfive\nsix".length, initialState.textFieldState.selection.end)
+
+        val pasteState = MarkdownEditorState("Start: ")
+        pasteState.textFieldState.edit { selection = TextRange(length) }
+        input(pasteState, "first\r\nsecond\rthird")
+        assertEquals("Start: first\nsecond\nthird", pasteState.markdown)
+        assertEquals(pasteState.markdown.length, pasteState.textFieldState.selection.end)
+
+        val updateState = MarkdownEditorState("")
+        updateState.update(
+            TextFieldValue(
+                text = "a\r\nb\rc",
+                selection = TextRange(3, 6),
+            ),
+        )
+        assertEquals("a\nb\nc", updateState.markdown)
+        assertEquals(TextRange(2, 5), updateState.textFieldState.selection)
     }
 }

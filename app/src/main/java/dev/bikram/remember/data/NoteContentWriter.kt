@@ -2,6 +2,7 @@ package dev.bikram.remember.data
 
 import androidx.room.withTransaction
 import dev.bikram.remember.reminders.ReminderScheduler
+import dev.bikram.remember.ui.common.normalizeMarkdownLineEndings
 
 /**
  * The create / update half of [NoteRepository]: turns a screen's title, body, colour, checklist
@@ -32,7 +33,7 @@ internal class NoteContentWriter(
             NoteEntity(
                 kind = NoteKind.NOTE,
                 title = title,
-                body = body,
+                body = body.normalizeMarkdownLineEndings(),
                 colorIndex = colorIndex,
                 starred = false,
                 trashed = false,
@@ -187,7 +188,7 @@ internal class NoteContentWriter(
         val unsyncedNote =
             existing.copy(
                 title = title,
-                body = body,
+                body = body.normalizeMarkdownLineEndings(),
                 colorIndex = colorIndex,
                 updatedAt = clock(),
                 reminderAt = options.reminderAt,
@@ -364,7 +365,7 @@ internal class NoteContentWriter(
                     existing.copy(
                         kind = NoteKind.NOTE,
                         title = title,
-                        body = body,
+                        body = body.normalizeMarkdownLineEndings(),
                         checklistText = "",
                         updatedAt = clock(),
                         reminderAt = options.reminderAt,

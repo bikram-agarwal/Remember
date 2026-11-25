@@ -7,6 +7,7 @@ import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.data.PersistableChecklistItem
 import dev.bikram.remember.data.RecurrenceRule
 import dev.bikram.remember.data.limitedToReminderSlots
+import dev.bikram.remember.ui.common.normalizeMarkdownLineEndings
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -140,9 +141,10 @@ class GoogleTasksImporter(
                                             .orEmpty()
                                             .isNotBlank()
                                     ) {
+                                        val normalizedTaskNotes = wrapper.task.notes.normalizeMarkdownLineEndings()
                                         append(indent)
                                             .append("    ")
-                                            .append(wrapper.task.notes.replace("\n", "\n$indent    "))
+                                            .append(normalizedTaskNotes.replace("\n", "\n$indent    "))
                                             .append('\n')
                                     }
                                 }
@@ -189,7 +191,10 @@ class GoogleTasksImporter(
                 .orEmpty()
                 .trim()
                 .ifBlank { firstLineOfNotes(task.task) }
-        val body = task.task.notes.orEmpty()
+        val body =
+            task.task.notes
+                .orEmpty()
+                .normalizeMarkdownLineEndings()
         if (title.isBlank() && body.isBlank()) return null
 
         val reminderAt = task.reminderAt ?: computeReminderAt(task.task)
