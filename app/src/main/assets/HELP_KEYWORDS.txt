@@ -103,32 +103,32 @@ schedule repeat -> Recurring reminders
 reminder every day -> Recurring reminders
 
 # --- Notification actions ---
-call button notification -> How they work
-button in notification -> How they work
-action button -> How they work
-notification button -> How they work
+call button notification -> How notification actions work
+button in notification -> How notification actions work
+action button -> How notification actions work
+notification button -> How notification actions work
 action not working -> Troubleshooting notification actions
 button not working -> Troubleshooting notification actions
-tap action -> How they work
-open app from notification -> How they work
-directions notification -> How they work
-phone call reminder -> How they work
+tap action -> How notification actions work
+open app from notification -> How notification actions work
+directions notification -> How notification actions work
+phone call reminder -> How notification actions work
 
 # --- Backup ---
-lost notes -> Importing/Restoring Remember backup
-notes gone -> Importing/Restoring Remember backup | Finding archived or trashed notes
-backup -> Importing/Restoring Remember backup
-restore notes -> Importing/Restoring Remember backup
-import backup -> Importing/Restoring Remember backup
-export notes -> Importing/Restoring Remember backup
-transfer notes -> Importing/Restoring Remember backup
-move notes -> Importing/Restoring Remember backup
-pictures missing -> Importing/Restoring Remember backup
-images missing -> Importing/Restoring Remember backup
-attachments missing -> Importing/Restoring Remember backup
-media missing -> Importing/Restoring Remember backup
-new phone -> Importing/Restoring Remember backup
-reinstall -> Importing/Restoring Remember backup
+lost notes -> Importing or restoring a Remember backup
+notes gone -> Importing or restoring a Remember backup | Finding archived or trashed notes
+backup -> Importing or restoring a Remember backup
+restore notes -> Importing or restoring a Remember backup
+import backup -> Importing or restoring a Remember backup
+export notes -> Importing or restoring a Remember backup
+transfer notes -> Importing or restoring a Remember backup
+move notes -> Importing or restoring a Remember backup
+pictures missing -> Importing or restoring a Remember backup
+images missing -> Importing or restoring a Remember backup
+attachments missing -> Importing or restoring a Remember backup
+media missing -> Importing or restoring a Remember backup
+new phone -> Importing or restoring a Remember backup
+reinstall -> Importing or restoring a Remember backup
 
 # --- Google Tasks & Imports ---
 import google -> Importing from Google Tasks
@@ -137,13 +137,31 @@ takeout -> Importing from Google Tasks
 tasks.json -> Importing from Google Tasks
 tasks.org -> Importing from Tasks.org
 markdown -> Importing and exporting Markdown
-drag and drop -> Drag and drop
+drag and drop -> Drag and drop files
 convert to checklist -> Converting between notes and checklists
 convert to note -> Converting between notes and checklists
 paste -> Note formatting
 copy formatting -> Note formatting
 keep formatting -> Note formatting
 import failed -> If an import fails
+
+# --- Share / Open with / attachments ---
+share to remember -> Share or open a file with Remember
+share sheet -> Share or open a file with Remember
+share -> Share or open a file with Remember
+open with -> Share or open a file with Remember
+remember not listed -> Share or open a file with Remember
+save to remember -> Share or open a file with Remember
+quick save -> Share or open a file with Remember
+share link -> Share or open a file with Remember
+share image -> Share or open a file with Remember
+share file -> Share or open a file with Remember | Troubleshooting sharing and file imports
+attach file -> Share or open a file with Remember | Drag and drop files
+attachment -> Share or open a file with Remember
+pdf -> Share or open a file with Remember
+open md -> Share or open a file with Remember | Importing and exporting Markdown
+share not working -> Troubleshooting sharing and file imports
+remember not in share -> Troubleshooting sharing and file imports
 
 # --- Privacy / security ---
 encrypt -> Where notes are stored

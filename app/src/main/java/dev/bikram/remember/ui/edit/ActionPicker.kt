@@ -71,6 +71,7 @@ private const val LEGACY_CONTACT_MANUAL_ENTRY_EXTRA = "__remember_manual_contact
 // which the app cannot read itself without READ_CONTACTS. Used only when the component resolves.
 private val CONTACT_DIAL_SHORTCUT = ComponentName("com.google.android.contacts", "alias.DialShortcut")
 private val CONTACT_MESSAGE_SHORTCUT = ComponentName("com.google.android.contacts", "alias.MessageShortcut")
+
 // Google labels these shortcuts "Name (Call)" or "Name (Message)" and cuts the label to 12 characters
 // with an ellipsis, so the closing parenthesis can be missing. The action title only needs the name.
 private val contactShortcutTypeSuffixRegex = Regex("""\s*\([^()]*\)?$""")

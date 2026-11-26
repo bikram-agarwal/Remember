@@ -124,7 +124,7 @@ val helpSubsectionActions: Map<String, List<HelpAction>> =
             listOf(
                 HelpAction.OpenAppSection(R.string.help_action_reminder_settings, "notifications.keep_until_done"),
             ),
-        "Importing/Restoring Remember backup" to
+        "Importing or restoring a Remember backup" to
             listOf(
                 HelpAction.OpenAppSection(R.string.help_action_backup_settings, "backup"),
             ),

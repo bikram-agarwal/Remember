@@ -81,7 +81,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 - **Media inclusion**: optionally embed pictures and attachments in the backup file.
 - **Flexible imports**: Bring over your data from Google Tasks (direct account sync or Google Takeout JSON), Tasks.org backups, or local `.md`, `.markdown`, `.txt`, and `.zip` files. Customize task imports with three modes: single note per task, grouped by list, or list as checklist.
 - **Markdown export**: Export any note or checklist as `.md`, or bulk-export selected items as a `.zip` archive.
-- **Drag and drop**: Drop `.md`, `.txt`, `.json`, or `.zip` files directly onto the Remember window.
+- **Drag and drop**: Drop files onto the Remember window. Notes, backups, and task exports (`.md`, `.txt`, `.zip`, `.json`) are imported; anything else is attached to a new note.
 
 
 ### 🏠 Widgets and shortcuts
@@ -90,6 +90,7 @@ Remember has a deep theme engine — keep it minimal, make it colorful, or match
 - **Starred widget**: your favorite notes on the home screen.
 - **Quick capture widget**: one tap to create a new note or list.
 - **Launcher shortcuts**: long-press the app icon to jump straight to a new note or list.
+- **Share to Remember and Open with**: share text, links, images, or any file from another app to Remember to quickly create a note without leaving what you are doing. 
 
 
 ## 🖼️ Screenshots

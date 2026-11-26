@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import dev.bikram.remember.R
 import dev.bikram.remember.data.NoteKind
 import dev.bikram.remember.ui.common.RememberMaterialRoundedSymbol
+import dev.bikram.remember.ui.common.enterMovesFocusNext
 import dev.bikram.remember.ui.common.rememberLocalTextFieldValueState
 import dev.bikram.remember.ui.components.RememberDropdownMenuItem
 import dev.bikram.remember.ui.components.RememberIconButton
@@ -345,6 +346,7 @@ internal fun EditorTitleTopBar(
                                 Modifier
                                     .fillMaxWidth()
                                     .focusRequester(titleFocusRequester)
+                                    .enterMovesFocusNext()
                                     .onFocusChanged { onTitleFocusChanged(it.isFocused) }
                                     .graphicsLayer {
                                         translationX = titleBoundaryOffset.value

@@ -84,11 +84,9 @@
     <string name="toast_import_md_empty">Selected Markdown file is empty</string>
     <string name="toast_import_md_failed">Could not import Markdown file</string>
     <string name="toast_import_md_too_large">File is too large (max %1$d KB)</string>
-    <string name="drag_drop_import_title">Drop files to import</string>
-    <string name="drag_drop_import_subtitle">Supports .md, .txt, .zip, and .json</string>
+    <string name="drag_drop_title">Drop files here</string>
+    <string name="drag_drop_subtitle">Imports .md, .txt, .zip, and .json files.\nAnything else is attached to a new note.</string>
     <string name="drag_drop_error_unsupported_type">Unsupported file type. Use .md, .txt, .zip, or .json</string>
-    <string name="drag_drop_error_zip_empty">No valid Markdown notes or Remember backup found in ZIP</string>
-    <string name="drag_drop_error_invalid_json">Invalid JSON: expected a Google Takeout or Tasks.org backup</string>
     <plurals name="toast_exported_to_destinations">
         <item quantity="one">Backup exported to %1$d folder</item>
         <item quantity="other">Backup exported to %1$d folders</item>
@@ -1396,5 +1394,34 @@
     <string name="diagnostics_value_configured_content_uri">configured: content URI</string>
     <string name="diagnostics_value_configured_filesystem_path">configured: filesystem path</string>
     <string name="diagnostics_value_configured_reference_format">configured: %1$s reference</string>
+
+    <!-- Share sheet & Open With quick-capture -->
+    <string name="share_capture_sheet_title">Save to Remember</string>
+    <string name="share_capture_saved_title">Saved to Remember</string>
+    <string name="share_capture_close">Close</string>
+    <string name="share_capture_open_note">Open note</string>
+    <string name="share_capture_content_label">Content</string>
+    <string name="share_capture_open_in_editor">Open in editor</string>
+    <string name="share_capture_image_attach">Attach to note</string>
+    <string name="share_capture_image_banner">Use as banner image</string>
+    <string name="share_capture_remove_image_cd">Remove image</string>
+    <string name="share_capture_clear_reminder_cd">Clear reminder</string>
+    <string name="share_capture_staging_images">Preparing shared images…</string>
+    <string name="share_capture_error_nothing_to_share">Nothing to save from shared content</string>
+    <string name="share_capture_error_image_read_failed">Could not read some shared files (max 100 MB each)</string>
+    <plurals name="share_capture_files_count">
+        <item quantity="one">%1$d file</item>
+        <item quantity="other">%1$d files</item>
+    </plurals>
+    <string name="drop_attachments_title">Create a note with attachments?</string>
+    <plurals name="drop_attachments_message">
+        <item quantity="one">Remember can\'t import this as a note, but it can attach %1$d file to a new one.</item>
+        <item quantity="other">Remember can\'t import these as notes, but it can attach %1$d files to a new one.</item>
+    </plurals>
+    <string name="drop_attachments_create">Create note</string>
+    <plurals name="share_capture_images_count">
+        <item quantity="one">%1$d image</item>
+        <item quantity="other">%1$d images</item>
+    </plurals>
 
 </resources>

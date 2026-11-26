@@ -13,6 +13,7 @@ import dev.bikram.remember.R
 import dev.bikram.remember.data.BackupIo
 import dev.bikram.remember.data.NoteRepository
 import dev.bikram.remember.di.IoDispatcher
+import dev.bikram.remember.di.PendingNoteSelection
 import dev.bikram.remember.ui.edit.MarkdownZipTooLargeException
 import dev.bikram.remember.ui.edit.NoteMarkdownImportResult
 import dev.bikram.remember.ui.edit.createImportedMarkdownNote
@@ -60,6 +61,7 @@ class GoogleTasksImportViewModel
         private val importer: GoogleTasksImporter,
         private val prefs: GoogleTasksImportPrefs,
         @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
+        private val pendingNoteSelection: PendingNoteSelection,
     ) : ViewModel() {
         private val auth: GoogleTasksAuthDelegate = DefaultGoogleTasksAuthDelegate
         private val manualImportParser = ManualTaskImportParser()
@@ -241,6 +243,7 @@ class GoogleTasksImportViewModel
                     )
                 }
                 var importedCount = 0
+                val createdNoteIds = mutableListOf<Long>()
                 var sawZip = false
                 var sawZipMarkdownEntry = false
                 var sawFailure = false
@@ -276,11 +279,12 @@ class GoogleTasksImportViewModel
                                                 sawZipMarkdownEntry = true
                                             }
                                             entries.forEach { entry ->
-                                                createImportedMarkdownNote(
-                                                    noteRepository = noteRepository,
-                                                    title = entry.suggestedTitle ?: fallbackTitle,
-                                                    markdown = entry.markdown,
-                                                )
+                                                createdNoteIds +=
+                                                    createImportedMarkdownNote(
+                                                        noteRepository = noteRepository,
+                                                        title = entry.suggestedTitle ?: fallbackTitle,
+                                                        markdown = entry.markdown,
+                                                    )
                                                 importedCount++
                                             }
                                         }.onFailure { error ->
@@ -295,11 +299,12 @@ class GoogleTasksImportViewModel
                             isMarkdownOrPlainTextUri(appContext, uri) -> {
                                 when (val result = importMarkdownFromUri(appContext, uri)) {
                                     is NoteMarkdownImportResult.Success -> {
-                                        createImportedMarkdownNote(
-                                            noteRepository = noteRepository,
-                                            title = result.suggestedTitle ?: fallbackTitle,
-                                            markdown = result.markdown,
-                                        )
+                                        createdNoteIds +=
+                                            createImportedMarkdownNote(
+                                                noteRepository = noteRepository,
+                                                title = result.suggestedTitle ?: fallbackTitle,
+                                                markdown = result.markdown,
+                                            )
                                         importedCount++
                                     }
                                     NoteMarkdownImportResult.Failed -> sawFailure = true
@@ -314,6 +319,7 @@ class GoogleTasksImportViewModel
                 }
 
                 if (importedCount > 0) {
+                    pendingNoteSelection.offer(createdNoteIds)
                     _state.update { it.copy(isImportingMarkdown = false, error = null) }
                     _effects.value = GoogleTasksImportEffect.MarkdownImportFinished(importedCount)
                 } else {

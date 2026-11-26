@@ -32,10 +32,12 @@ Set reminders and snooze with Timing (named times such as soon, later today, thi
 Use tags, stars, archive, trash, full-text search, filters, sorting, and bulk actions to keep your notes manageable.
 
 <b>━━ 📱 WIDGETS AND QUICK CAPTURE ━━</b>
-Home screen widgets for upcoming reminders, starred/pinned/tagged notes, and quick capture. A persistent notification or the quick setting tiles can keep note creation one tap away at all times.
+* Home screen widgets for upcoming reminders, starred/pinned/tagged notes, and quick capture. 
+* A persistent notification or the quick setting tiles can keep note creation one tap away at all times.
+* Share text, links, images, or files from any app straight into a new note.
 
 <b>━━ ☁️ IMPORT FROM GOOGLE TASKS, TASKS.ORG & MARKDOWN ━━</b>
-Move into Remember from Google Tasks (connected account or Takeout JSON), Tasks.org backups, or .md, .txt, and .zip files. Drag and drop files directly onto the Remember window - including Remember backup .zip files to merge or restore. Task imports are read-only; Remember never modifies or deletes your external data.
+Move into Remember from Google Tasks (connected account or Takeout JSON), Tasks.org backups, or .md, .txt, and .zip files. Drag and drop files onto the Remember window. Task imports are read-only; Remember never modifies or deletes your external data.
 
 <b>━━ 💾 BACKUP AND RESTORE ━━</b>
 Export your notes and settings to a backup, optionally including attached media. Restore when moving to a new device, or import a backup to merge notes into your current collection.

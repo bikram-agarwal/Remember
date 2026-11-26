@@ -64,6 +64,7 @@ fun AppBottomSheet(
     containerColor: Color = BottomSheetDefaults.ContainerColor,
     contentColor: Color = contentColorFor(containerColor),
     subtitleContent: (@Composable () -> Unit)? = null,
+    titleLeading: (@Composable RowScope.() -> Unit)? = null,
     titleAccessory: (@Composable RowScope.() -> Unit)? = null,
     titleActions: (@Composable RowScope.() -> Unit)? = null,
     actions: (@Composable () -> Unit)? = null,
@@ -108,6 +109,10 @@ fun AppBottomSheet(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
+                            if (titleLeading != null) {
+                                titleLeading()
+                                Spacer(Modifier.width(12.dp))
+                            }
                             Text(
                                 title,
                                 // Smaller title in landscape so the header doesn't eat a third of a

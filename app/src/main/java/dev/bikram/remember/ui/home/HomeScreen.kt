@@ -182,6 +182,7 @@ fun HomeRoute(
 ) {
     val vm: HomeViewModel = hiltViewModel()
     val state by vm.state.collectAsStateWithLifecycle()
+    val scrollToNoteIds by vm.scrollToNoteIds.collectAsStateWithLifecycle()
     val interaction by interactionPrefs.state.collectAsStateWithLifecycle(
         initialValue = InteractionState(),
     )
@@ -237,6 +238,8 @@ fun HomeRoute(
         pendingNewNoteKind = pendingNewNoteKind,
         showSelectionActionBar = showSelectionActionBar,
         onSelectableVisibleIdsChanged = onSelectableVisibleIdsChanged,
+        scrollToNoteIds = scrollToNoteIds,
+        onScrollToNoteHandled = vm::onScrollHandled,
     )
 }
 
@@ -272,6 +275,8 @@ fun HomeScreen(
     pendingNewNoteKind: NoteKind? = null,
     showSelectionActionBar: Boolean = true,
     onSelectableVisibleIdsChanged: (Set<Long>) -> Unit = {},
+    scrollToNoteIds: Set<Long> = emptySet(),
+    onScrollToNoteHandled: () -> Unit = {},
 ) {
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var searchFocusRequestKey by rememberSaveable { mutableIntStateOf(0) }
@@ -605,6 +610,26 @@ fun HomeScreen(
                     }
                 }
             }
+
+        // Newly imported notes: bring the first of them into view if the sort/grouping put it
+        // off-screen. Rows follow the optional chips and pending-note entries in both layouts.
+        LaunchedEffect(scrollToNoteIds, visibleItems, showFilterControls, pendingNewNoteKind) {
+            if (scrollToNoteIds.isEmpty()) return@LaunchedEffect
+            val rowIndex =
+                visibleItems.indexOfFirst { item -> item is HomeListItem.NoteRow && item.note.note.id in scrollToNoteIds }
+            if (rowIndex < 0) return@LaunchedEffect
+            // Let the one-off initial list lift settle first so it cannot undo this scroll.
+            kotlinx.coroutines.yield()
+            val target = rowIndex + (if (showFilterControls) 1 else 0) + (if (pendingNewNoteKind != null) 1 else 0)
+            if (state.viewOptions.noteLayoutMode == NoteLayoutMode.MOSAIC) {
+                if (mosaicGridState.layoutInfo.visibleItemsInfo.none { it.index == target }) {
+                    mosaicGridState.scrollToItem(target)
+                }
+            } else if (listState.layoutInfo.visibleItemsInfo.none { it.index == target }) {
+                listState.scrollToItem(target)
+            }
+            onScrollToNoteHandled()
+        }
 
         // The mosaic (staggered grid) and list (LazyColumn) layouts render the exact same
         // sequence of entries -- filter chips, pending-new-note placeholder, empty state

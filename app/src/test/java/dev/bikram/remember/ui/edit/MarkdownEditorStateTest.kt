@@ -922,18 +922,30 @@ class MarkdownEditorStateTest {
 
     @Test
     fun plainDateDetectionSkipsLinksCodeAndOrdinaryText() {
-        assertNull(MarkdownEditorState("see [x](https://a.com/2026-11-24) now").also {
-            it.update(TextFieldValue(it.markdown, selection = TextRange(25)))
-        }.plainDateAtSelection)
-        assertNull(MarkdownEditorState("a `11/25/2026` b").also {
-            it.update(TextFieldValue(it.markdown, selection = TextRange(6)))
-        }.plainDateAtSelection)
-        assertNull(MarkdownEditorState("room 12345 here").also {
-            it.update(TextFieldValue(it.markdown, selection = TextRange(7)))
-        }.plainDateAtSelection)
-        assertNull(MarkdownEditorState("v11/25/2026x").also {
-            it.update(TextFieldValue(it.markdown, selection = TextRange(4)))
-        }.plainDateAtSelection)
+        assertNull(
+            MarkdownEditorState("see [x](https://a.com/2026-11-24) now")
+                .also {
+                    it.update(TextFieldValue(it.markdown, selection = TextRange(25)))
+                }.plainDateAtSelection,
+        )
+        assertNull(
+            MarkdownEditorState("a `11/25/2026` b")
+                .also {
+                    it.update(TextFieldValue(it.markdown, selection = TextRange(6)))
+                }.plainDateAtSelection,
+        )
+        assertNull(
+            MarkdownEditorState("room 12345 here")
+                .also {
+                    it.update(TextFieldValue(it.markdown, selection = TextRange(7)))
+                }.plainDateAtSelection,
+        )
+        assertNull(
+            MarkdownEditorState("v11/25/2026x")
+                .also {
+                    it.update(TextFieldValue(it.markdown, selection = TextRange(4)))
+                }.plainDateAtSelection,
+        )
     }
 
     @Test

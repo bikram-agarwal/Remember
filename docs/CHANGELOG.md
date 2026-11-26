@@ -1,4 +1,20 @@
-## v1.21.0 — Markdown Import/Export, Drag & Drop, Note Conversion & Importance Sorting
+## v1.22.0 - Share to Remember, Date chips, Contact actions
+
+### ✨ New Features
+- **Share to Remember**: Share text, links, images, or files from any app to Remember to create a new note without leaving what you're doing. 
+- **Inline date chips**: Insert interactive date pills into your notes. Tap to change, long-press to jump to your calendar app.
+
+### 🛠 Improved Features
+- **Importing several files at once** now selects the new notes, so you can tag, archive, or export them together.
+- **Contact notification actions**: Call and text actions show the contact's photo, and Get directions can use a contact's address.
+
+### 🐛 Bug Fixes
+- Fixed a crash caused by certain line breaks in pasted, shared, and imported text.
+- Fixed a crash when choosing **Send email** as a notification action.
+
+---
+
+## v1.20.0 — Markdown import/export, Drag & drop, Note conversion, Importance sorting
 
 ### ✨ New Features
 - **Note & checklist conversion**: Convert between list-formatted notes and checklists via the top-right `⋮` menu while preserving titles, reminders, tags, and attachments.
@@ -7,12 +23,10 @@
 - **Drag-and-drop import**: Drop `.md`, `.txt`, `.zip` (Markdown archives or Remember backups), or `.json` (Google Takeout / Tasks.org backup) files onto the unlocked app window to import them.
 - **Manual notification pinning**: Long-press **Notify** in the bottom bar to pin a notification so it restores automatically if dismissed or after a device reboot.
 - **Importance sorting & grouping**: Sort or group items by **Importance** on the Notes tab with independent direction controls.
-- **Inline date chips**: Insert interactive date pills from the formatting toolbar — tap to edit or long-press to open in your calendar app.
 
-### 🛠 Improvements
+### 🛠 Improved Features
 - **Rich-text paste**: Pasting rich text from other apps preserves most of the formatting instead of stripping it to plain text.
 - **Redesigned Import screen**: Split into **Google Tasks** and **Tasks.org & more** tabs, supporting `.md`, `.txt`, Markdown `.zip` archives, and Remember backup `.zip` files.
-- **Contact notification actions**: Restored contact photos on call/text actions, fixed a crash when selecting **Send email**, and added a contact picker to **Get directions**.
 - **Widget & input polish**: Checklist widgets now preview the first unchecked item, and text fields show clearer feedback when title or tag character limits are reached.
 
 ### 🐛 Bug Fixes

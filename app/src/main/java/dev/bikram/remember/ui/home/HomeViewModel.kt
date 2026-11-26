@@ -13,6 +13,7 @@ import dev.bikram.remember.data.ViewOptions
 import dev.bikram.remember.data.ViewOptionsPrefs
 import dev.bikram.remember.data.normalizeTagName
 import dev.bikram.remember.data.pinned
+import dev.bikram.remember.di.PendingNoteSelection
 import dev.bikram.remember.ui.common.BulkUndoableAction
 import kotlinx.collections.immutable.persistentSetOf
 import kotlinx.collections.immutable.toPersistentSet
@@ -56,6 +57,7 @@ class HomeViewModel
     constructor(
         private val repository: NoteRepository,
         private val viewOptionsPrefs: ViewOptionsPrefs,
+        private val pendingNoteSelection: PendingNoteSelection,
     ) : ViewModel() {
         private val filter = MutableStateFlow(NotesFilter())
         private val selectedIds = MutableStateFlow(persistentSetOf<Long>())
@@ -119,7 +121,23 @@ class HomeViewModel
                 availableTagNames = repository.observeActiveTagSuggestions(),
             ).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), HomeState())
 
+        /** Ids the list should scroll to once (the first of them in display order); cleared by [onScrollHandled]. */
+        private val _scrollToNoteIds = MutableStateFlow<Set<Long>>(emptySet())
+        val scrollToNoteIds: StateFlow<Set<Long>> = _scrollToNoteIds
+
+        fun onScrollHandled() {
+            _scrollToNoteIds.value = emptySet()
+        }
+
         init {
+            viewModelScope.launch {
+                pendingNoteSelection.ids.collect { ids ->
+                    if (ids.isNullOrEmpty()) return@collect
+                    pendingNoteSelection.ids.value = null
+                    selectedIds.value = ids.toPersistentSet()
+                    _scrollToNoteIds.value = ids
+                }
+            }
             viewModelScope.launch {
                 repository.observeActiveTagSuggestions().collect { storedNames ->
                     val selectedTags = filter.value.tags

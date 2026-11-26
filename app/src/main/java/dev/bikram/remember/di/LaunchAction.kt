@@ -14,7 +14,12 @@ sealed interface LaunchAction {
          * from in-app navigation, so the note has to be opened on a back stack of its own making.
          */
         val externalLaunch: Boolean = false,
+        /** Open straight into edit mode instead of view mode. */
+        val forceEdit: Boolean = false,
     ) : LaunchAction
+
+    /** Bring the Notes home screen to the front (after an import that has no single note to open). */
+    data object ShowNotesHome : LaunchAction
 
     data object OpenSettingsUpdates : LaunchAction
 

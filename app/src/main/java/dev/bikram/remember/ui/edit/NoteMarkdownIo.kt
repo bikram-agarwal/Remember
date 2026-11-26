@@ -192,20 +192,21 @@ internal suspend fun createImportedMarkdownNote(
     noteRepository: NoteRepository,
     title: String,
     markdown: String,
+    options: NoteOptions = NoteOptions(),
 ): Long =
     if (isStrictChecklistMarkdown(markdown)) {
         noteRepository.createListWithItems(
             title = title,
             colorIndex = 0,
             items = markdownToPersistableChecklistItems(markdown),
-            options = NoteOptions(),
+            options = options,
         )
     } else {
         noteRepository.createNote(
             title = title,
             body = markdown,
             colorIndex = 0,
-            options = NoteOptions(),
+            options = options,
         )
     }
 

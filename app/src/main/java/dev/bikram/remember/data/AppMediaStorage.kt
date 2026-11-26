@@ -101,6 +101,91 @@ class AppMediaStorage
                 fallbackName = "cover.jpg",
             )
 
+        suspend fun promoteStagedFileToAttachment(
+            noteId: Long,
+            stagedFile: File,
+            displayName: String,
+            mimeType: String?,
+        ): MediaCopyResult =
+            withContext(Dispatchers.IO) {
+                val destinationDirectory = File(context.filesDir, "$NOTE_ATTACHMENTS_DIR/$noteId").apply { mkdirs() }
+                var destinationFile =
+                    File(
+                        destinationDirectory,
+                        "${System.currentTimeMillis()}_${safeFileName(displayName, mimeType)}",
+                    )
+                val compress = backupPrefs.state.first().compressImages
+                val isImage = mimeType?.startsWith("image/") == true
+                var finalMimeType = mimeType
+                var finalDisplayName = displayName
+                val copyResult =
+                    runCatching {
+                        val compressed =
+                            if (compress && isImage) {
+                                compressImage(context, Uri.fromFile(stagedFile), destinationFile)
+                            } else {
+                                false
+                            }
+                        if (compressed) {
+                            val jpegFile = File(destinationFile.parentFile, jpegFileName(destinationFile.name))
+                            if (destinationFile.renameTo(jpegFile)) {
+                                destinationFile = jpegFile
+                            }
+                            finalMimeType = "image/jpeg"
+                            finalDisplayName = jpegFileName(displayName)
+                        } else {
+                            stagedFile.copyTo(destinationFile, overwrite = true)
+                        }
+                    }
+                runCatching { stagedFile.delete() }
+                if (copyResult.isSuccess) {
+                    MediaCopyResult(
+                        uriString = fileProviderUri(destinationFile),
+                        copiedToAppStorage = true,
+                        mimeType = finalMimeType,
+                        displayName = finalDisplayName,
+                    )
+                } else {
+                    runCatching { destinationFile.delete() }
+                    MediaCopyResult(
+                        uriString = Uri.fromFile(stagedFile).toString(),
+                        copiedToAppStorage = false,
+                        mimeType = mimeType,
+                        displayName = displayName,
+                    )
+                }
+            }
+
+        suspend fun promoteStagedFileToHero(
+            stagedFile: File,
+            mimeType: String?,
+        ): String? =
+            withContext(Dispatchers.IO) {
+                val heroesDirectory = File(context.filesDir, NOTE_HEROES_DIR).apply { mkdirs() }
+                val destinationFile = File(heroesDirectory, "cover_${System.currentTimeMillis()}.jpg")
+                val compress = backupPrefs.state.first().compressImages
+                val isImage = mimeType?.startsWith("image/") == true
+                val copyResult =
+                    runCatching {
+                        val compressed =
+                            if (compress && isImage) {
+                                compressImage(context, Uri.fromFile(stagedFile), destinationFile)
+                            } else {
+                                false
+                            }
+                        if (!compressed) {
+                            stagedFile.copyTo(destinationFile, overwrite = true)
+                        }
+                    }
+                runCatching { stagedFile.delete() }
+                if (copyResult.isSuccess) {
+                    fileProviderUri(destinationFile)
+                } else {
+                    runCatching { destinationFile.delete() }
+                    null
+                }
+            }
+
         suspend fun copyAttachmentForDuplicate(
             noteId: Long,
             uriString: String,
@@ -281,6 +366,10 @@ class AppMediaStorage
                 sourceUri: Uri,
             ): Long? =
                 runCatching {
+                    if (sourceUri.scheme == "file") {
+                        val filePath = sourceUri.path ?: return@runCatching null
+                        return@runCatching File(filePath).takeIf(File::isFile)?.length()
+                    }
                     context.contentResolver
                         .query(sourceUri, arrayOf(OpenableColumns.SIZE), null, null, null)
                         ?.use { cursor ->

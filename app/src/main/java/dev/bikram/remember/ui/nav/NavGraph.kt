@@ -521,7 +521,17 @@ fun RememberNavGraph(
                                 handled = true
                                 return@collectLatest
                             }
-                            navController.openEditRouteFor(note, externalLaunch = action.externalLaunch)
+                            navController.openEditRouteFor(note, forceEdit = action.forceEdit, externalLaunch = action.externalLaunch)
+                        }
+                        LaunchAction.ShowNotesHome -> {
+                            if (navController.currentDestination?.route != Routes.NOTES) {
+                                navController.navigate(Routes.NOTES) {
+                                    popUpTo(navController.graph.id) {
+                                        inclusive = true
+                                    }
+                                    launchSingleTop = true
+                                }
+                            }
                         }
                         LaunchAction.OpenSettingsUpdates -> {
                             openSettingsRoot()
